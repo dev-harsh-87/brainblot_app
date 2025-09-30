@@ -25,3 +25,14 @@ class AuthRegisterSubmitted extends AuthEvent {
 class AuthLogoutRequested extends AuthEvent {
   const AuthLogoutRequested();
 }
+
+class AuthUserChanged extends AuthEvent {
+  final User? user;
+  const AuthUserChanged(this.user);
+  @override
+  List<Object?> get props => [user];
+}
+
+class AuthCheckRequested extends AuthEvent {
+  const AuthCheckRequested();
+}

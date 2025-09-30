@@ -30,3 +30,36 @@ class _ActiveUpdated extends ProgramsEvent {
   @override
   List<Object?> get props => [active];
 }
+
+class ProgramsCreateRequested extends ProgramsEvent {
+  final Program program;
+  const ProgramsCreateRequested(this.program);
+  @override
+  List<Object?> get props => [program];
+}
+
+class ProgramsUpdateRequested extends ProgramsEvent {
+  final Program program;
+  const ProgramsUpdateRequested(this.program);
+  @override
+  List<Object?> get props => [program];
+}
+
+class ProgramsDeleteRequested extends ProgramsEvent {
+  final String programId;
+  const ProgramsDeleteRequested(this.programId);
+  @override
+  List<Object?> get props => [programId];
+}
+
+class ProgramsSeedDefaultRequested extends ProgramsEvent {
+  const ProgramsSeedDefaultRequested();
+}
+
+class _ProgramsErrorOccurred extends ProgramsEvent {
+  final String error;
+  const _ProgramsErrorOccurred(this.error);
+  
+  @override
+  List<Object?> get props => [error];
+}
