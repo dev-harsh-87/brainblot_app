@@ -1,13 +1,19 @@
 import 'dart:async';
 import 'package:brainblot_app/features/drills/domain/drill.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:uuid/uuid.dart';
 
 abstract class DrillRepository {
+  Stream<List<Drill>> watchAll();
   Future<List<Drill>> fetchAll({String? query, String? category, Difficulty? difficulty});
+  Future<List<Drill>> fetchMyDrills({String? query, String? category, Difficulty? difficulty});
+  Future<List<Drill>> fetchPublicDrills({String? query, String? category, Difficulty? difficulty});
+  Future<List<Drill>> fetchFavoriteDrills({String? query, String? category, Difficulty? difficulty});
   Future<Drill> upsert(Drill drill);
   Future<void> delete(String id);
-  Stream<List<Drill>> watchAll();
+  Future<void> toggleFavorite(String drillId);
+  Future<bool> isFavorite(String drillId);
 }
 
 class InMemoryDrillRepository implements DrillRepository {
@@ -16,330 +22,10 @@ class InMemoryDrillRepository implements DrillRepository {
   final _uuid = const Uuid();
 
   InMemoryDrillRepository() {
-    _seedPresets();
     _emit();
   }
 
   void _emit() => _controller.add(List.unmodifiable(_items));
-
-  void _seedPresets() {
-    // Comprehensive sample drill data for testing and demonstration
-    _items.addAll([
-      // Beginner Drills
-      Drill(
-        id: _uuid.v4(),
-        name: 'Basic Colors (Beginner)',
-        category: 'fitness',
-        difficulty: Difficulty.beginner,
-        durationSec: 60,
-        restSec: 30,
-        reps: 3,
-        stimulusTypes: const [StimulusType.color],
-        numberOfStimuli: 30,
-        zones: const [ReactionZone.center],
-        colors: const [Colors.red, Colors.green, Colors.blue, Colors.yellow],
-        isPreset: true,
-      ),
-      Drill(
-        id: _uuid.v4(),
-        name: 'Simple Shapes',
-        category: 'fitness',
-        difficulty: Difficulty.beginner,
-        durationSec: 45,
-        restSec: 20,
-        reps: 2,
-        stimulusTypes: const [StimulusType.shape],
-        numberOfStimuli: 20,
-        zones: const [ReactionZone.center],
-        colors: const [Colors.blue, Colors.orange],
-        isPreset: true,
-      ),
-      Drill(
-        id: _uuid.v4(),
-        name: 'Number Recognition',
-        category: 'fitness',
-        difficulty: Difficulty.beginner,
-        durationSec: 50,
-        restSec: 25,
-        reps: 3,
-        stimulusTypes: const [StimulusType.number],
-        numberOfStimuli: 25,
-        zones: const [ReactionZone.center],
-        colors: const [Colors.white],
-        isPreset: true,
-      ),
-
-      // Soccer Drills
-      Drill(
-        id: _uuid.v4(),
-        name: 'Arrow Decisions (Intermediate)',
-        category: 'soccer',
-        difficulty: Difficulty.intermediate,
-        durationSec: 90,
-        restSec: 30,
-        reps: 3,
-        stimulusTypes: const [StimulusType.arrow],
-        numberOfStimuli: 45,
-        zones: const [ReactionZone.left, ReactionZone.right, ReactionZone.top, ReactionZone.bottom],
-        colors: const [Colors.white],
-        isPreset: true,
-      ),
-      Drill(
-        id: _uuid.v4(),
-        name: 'Soccer Field Awareness',
-        category: 'soccer',
-        difficulty: Difficulty.intermediate,
-        durationSec: 75,
-        restSec: 35,
-        reps: 4,
-        stimulusTypes: const [StimulusType.color, StimulusType.arrow],
-        numberOfStimuli: 40,
-        zones: const [ReactionZone.quadrants],
-        colors: const [Colors.green, Colors.white, Colors.yellow],
-        isPreset: true,
-      ),
-      Drill(
-        id: _uuid.v4(),
-        name: 'Advanced Soccer Reactions',
-        category: 'soccer',
-        difficulty: Difficulty.advanced,
-        durationSec: 120,
-        restSec: 40,
-        reps: 3,
-        stimulusTypes: const [StimulusType.color, StimulusType.arrow, StimulusType.shape],
-        numberOfStimuli: 65,
-        zones: const [ReactionZone.left, ReactionZone.right, ReactionZone.top, ReactionZone.bottom, ReactionZone.center],
-        colors: const [Colors.green, Colors.white, Colors.red, Colors.yellow],
-        isPreset: true,
-      ),
-
-      // Basketball Drills
-      Drill(
-        id: _uuid.v4(),
-        name: 'Court Vision Training',
-        category: 'basketball',
-        difficulty: Difficulty.intermediate,
-        durationSec: 80,
-        restSec: 30,
-        reps: 3,
-        stimulusTypes: const [StimulusType.color, StimulusType.number],
-        numberOfStimuli: 35,
-        zones: const [ReactionZone.left, ReactionZone.right],
-        colors: const [Colors.orange, Colors.black, Colors.white],
-        isPreset: true,
-      ),
-      Drill(
-        id: _uuid.v4(),
-        name: 'Numbers & Audio Mix (Advanced)',
-        category: 'basketball',
-        difficulty: Difficulty.advanced,
-        durationSec: 120,
-        restSec: 45,
-        reps: 2,
-        stimulusTypes: const [StimulusType.number, StimulusType.audio],
-        numberOfStimuli: 60,
-        zones: const [ReactionZone.quadrants],
-        colors: const [Colors.white],
-        isPreset: true,
-      ),
-      Drill(
-        id: _uuid.v4(),
-        name: 'Fast Break Reactions',
-        category: 'basketball',
-        difficulty: Difficulty.advanced,
-        durationSec: 100,
-        restSec: 35,
-        reps: 4,
-        stimulusTypes: const [StimulusType.arrow, StimulusType.color],
-        numberOfStimuli: 55,
-        zones: const [ReactionZone.top, ReactionZone.bottom],
-        colors: const [Colors.orange, Colors.red, Colors.blue],
-        isPreset: true,
-      ),
-
-      // Tennis Drills
-      Drill(
-        id: _uuid.v4(),
-        name: 'Tennis Court Coverage',
-        category: 'tennis',
-        difficulty: Difficulty.intermediate,
-        durationSec: 70,
-        restSec: 25,
-        reps: 3,
-        stimulusTypes: const [StimulusType.color],
-        numberOfStimuli: 30,
-        zones: const [ReactionZone.left, ReactionZone.right],
-        colors: const [Colors.green, Colors.white, Colors.yellow],
-        isPreset: true,
-      ),
-      Drill(
-        id: _uuid.v4(),
-        name: 'Serve Return Reactions',
-        category: 'tennis',
-        difficulty: Difficulty.advanced,
-        durationSec: 90,
-        restSec: 30,
-        reps: 3,
-        stimulusTypes: const [StimulusType.arrow, StimulusType.shape],
-        numberOfStimuli: 45,
-        zones: const [ReactionZone.quadrants],
-        colors: const [Colors.green, Colors.white],
-        isPreset: true,
-      ),
-
-      // Hockey Drills
-      Drill(
-        id: _uuid.v4(),
-        name: 'Ice Hockey Awareness',
-        category: 'hockey',
-        difficulty: Difficulty.intermediate,
-        durationSec: 85,
-        restSec: 40,
-        reps: 3,
-        stimulusTypes: const [StimulusType.color, StimulusType.arrow],
-        numberOfStimuli: 40,
-        zones: const [ReactionZone.left, ReactionZone.right, ReactionZone.center],
-        colors: const [Colors.blue, Colors.red, Colors.white],
-        isPreset: true,
-      ),
-      Drill(
-        id: _uuid.v4(),
-        name: 'Power Play Reactions',
-        category: 'hockey',
-        difficulty: Difficulty.advanced,
-        durationSec: 110,
-        restSec: 45,
-        reps: 2,
-        stimulusTypes: const [StimulusType.color, StimulusType.number, StimulusType.arrow],
-        numberOfStimuli: 50,
-        zones: const [ReactionZone.quadrants],
-        colors: const [Colors.blue, Colors.red, Colors.white, Colors.black],
-        isPreset: true,
-      ),
-
-      // Volleyball Drills
-      Drill(
-        id: _uuid.v4(),
-        name: 'Volleyball Net Play',
-        category: 'volleyball',
-        difficulty: Difficulty.intermediate,
-        durationSec: 75,
-        restSec: 30,
-        reps: 3,
-        stimulusTypes: const [StimulusType.color, StimulusType.shape],
-        numberOfStimuli: 35,
-        zones: const [ReactionZone.top, ReactionZone.bottom],
-        colors: const [Colors.white, Colors.blue, Colors.yellow],
-        isPreset: true,
-      ),
-
-      // Football Drills
-      Drill(
-        id: _uuid.v4(),
-        name: 'Quarterback Reads',
-        category: 'football',
-        difficulty: Difficulty.advanced,
-        durationSec: 95,
-        restSec: 35,
-        reps: 3,
-        stimulusTypes: const [StimulusType.number, StimulusType.arrow, StimulusType.color],
-        numberOfStimuli: 45,
-        zones: const [ReactionZone.left, ReactionZone.right, ReactionZone.center],
-        colors: const [Colors.brown, Colors.white, Colors.green],
-        isPreset: true,
-      ),
-      Drill(
-        id: _uuid.v4(),
-        name: 'Defensive Line Reactions',
-        category: 'football',
-        difficulty: Difficulty.intermediate,
-        durationSec: 80,
-        restSec: 30,
-        reps: 4,
-        stimulusTypes: const [StimulusType.arrow, StimulusType.audio],
-        numberOfStimuli: 40,
-        zones: const [ReactionZone.left, ReactionZone.right],
-        colors: const [Colors.white],
-        isPreset: true,
-      ),
-
-      // Physiotherapy Drills
-      Drill(
-        id: _uuid.v4(),
-        name: 'Rehabilitation Colors',
-        category: 'physiotherapy',
-        difficulty: Difficulty.beginner,
-        durationSec: 40,
-        restSec: 20,
-        reps: 2,
-        stimulusTypes: const [StimulusType.color],
-        numberOfStimuli: 15,
-        zones: const [ReactionZone.center],
-        colors: const [Colors.red, Colors.blue],
-        isPreset: true,
-      ),
-      Drill(
-        id: _uuid.v4(),
-        name: 'Cognitive Recovery',
-        category: 'physiotherapy',
-        difficulty: Difficulty.intermediate,
-        durationSec: 60,
-        restSec: 30,
-        reps: 3,
-        stimulusTypes: const [StimulusType.shape, StimulusType.number],
-        numberOfStimuli: 25,
-        zones: const [ReactionZone.left, ReactionZone.right],
-        colors: const [Colors.green, Colors.blue, Colors.orange],
-        isPreset: true,
-      ),
-
-      // Agility Drills
-      Drill(
-        id: _uuid.v4(),
-        name: 'Multi-Zone Agility',
-        category: 'agility',
-        difficulty: Difficulty.advanced,
-        durationSec: 100,
-        restSec: 40,
-        reps: 3,
-        stimulusTypes: const [StimulusType.color, StimulusType.arrow, StimulusType.shape, StimulusType.number],
-        numberOfStimuli: 55,
-        zones: const [ReactionZone.left, ReactionZone.right, ReactionZone.top, ReactionZone.bottom, ReactionZone.center],
-        colors: const [Colors.red, Colors.green, Colors.blue, Colors.yellow, Colors.orange, Colors.purple],
-        isPreset: true,
-      ),
-      Drill(
-        id: _uuid.v4(),
-        name: 'Speed & Precision',
-        category: 'agility',
-        difficulty: Difficulty.intermediate,
-        durationSec: 65,
-        restSec: 25,
-        reps: 4,
-        stimulusTypes: const [StimulusType.color, StimulusType.shape],
-        numberOfStimuli: 35,
-        zones: const [ReactionZone.quadrants],
-        colors: const [Colors.red, Colors.blue, Colors.green, Colors.yellow],
-        isPreset: true,
-      ),
-
-      // Lacrosse Drills
-      Drill(
-        id: _uuid.v4(),
-        name: 'Lacrosse Field Vision',
-        category: 'lacrosse',
-        difficulty: Difficulty.intermediate,
-        durationSec: 85,
-        restSec: 35,
-        reps: 3,
-        stimulusTypes: const [StimulusType.color, StimulusType.arrow],
-        numberOfStimuli: 40,
-        zones: const [ReactionZone.left, ReactionZone.right, ReactionZone.top, ReactionZone.bottom],
-        colors: const [Colors.white, Colors.orange, Colors.blue],
-        isPreset: true,
-      ),
-    ]);
-  }
 
   @override
   Future<List<Drill>> fetchAll({String? query, String? category, Difficulty? difficulty}) async {
@@ -358,23 +44,162 @@ class InMemoryDrillRepository implements DrillRepository {
 
   @override
   Future<Drill> upsert(Drill drill) async {
+    final currentUserId = FirebaseAuth.instance.currentUser?.uid;
+    if (currentUserId == null) {
+      throw Exception('User must be logged in to create/update drills');
+    }
+
     final idx = _items.indexWhere((e) => e.id == drill.id);
     if (idx == -1) {
-      final toAdd = drill.id.isEmpty ? drill.copyWith(id: _uuid.v4()) : drill;
+      // Creating new drill - ensure it belongs to current user and is private by default
+      final toAdd = drill.id.isEmpty 
+          ? drill.copyWith(
+              id: _uuid.v4(),
+              createdBy: currentUserId,
+              isPublic: false, // Private by default
+            )
+          : drill.copyWith(
+              createdBy: currentUserId,
+              isPublic: false, // Private by default
+            );
       _items.add(toAdd);
+      _emit();
+      return toAdd;
     } else {
+      // Updating existing drill - verify ownership
+      final existingDrill = _items[idx];
+      if (existingDrill.createdBy != currentUserId) {
+        throw Exception('You can only edit your own drills');
+      }
       _items[idx] = drill;
+      _emit();
+      return drill;
     }
-    _emit();
-    return drill;
   }
 
   @override
   Future<void> delete(String id) async {
-    _items.removeWhere((e) => e.id == id);
-    _emit();
+    final currentUserId = FirebaseAuth.instance.currentUser?.uid;
+    if (currentUserId == null) {
+      throw Exception('User must be logged in to delete drills');
+    }
+
+    final drillIndex = _items.indexWhere((e) => e.id == id);
+    if (drillIndex != -1) {
+      final drill = _items[drillIndex];
+      if (drill.createdBy != currentUserId) {
+        throw Exception('You can only delete your own drills');
+      }
+      _items.removeAt(drillIndex);
+      _emit();
+    }
   }
 
   @override
   Stream<List<Drill>> watchAll() => _controller.stream;
+
+  @override
+  Future<void> toggleFavorite(String drillId) async {
+    final currentUserId = FirebaseAuth.instance.currentUser?.uid;
+    if (currentUserId == null) {
+      throw Exception('User must be logged in to favorite drills');
+    }
+
+    final index = _items.indexWhere((drill) => drill.id == drillId);
+    if (index != -1) {
+      final drill = _items[index];
+      // Users can only favorite drills they can see (their own or public ones)
+      if (drill.createdBy == currentUserId || drill.isPublic) {
+        _items[index] = _items[index].copyWith(favorite: !_items[index].favorite);
+        _emit();
+      }
+    }
+  }
+
+  @override
+  Future<bool> isFavorite(String drillId) async {
+    final drill = _items.firstWhereOrNull((drill) => drill.id == drillId);
+    return drill?.favorite ?? false;
+  }
+
+  @override
+  Future<List<Drill>> fetchMyDrills({String? query, String? category, Difficulty? difficulty}) async {
+    // Get current user from Firebase Auth
+    final currentUserId = FirebaseAuth.instance.currentUser?.uid;
+    if (currentUserId == null) return [];
+    
+    Iterable<Drill> out = _items.where((drill) => drill.createdBy == currentUserId);
+    
+    if (query != null && query.isNotEmpty) {
+      out = out.where((d) => d.name.toLowerCase().contains(query.toLowerCase()));
+    }
+    if (category != null && category.isNotEmpty) {
+      out = out.where((d) => d.category == category);
+    }
+    if (difficulty != null) {
+      out = out.where((d) => d.difficulty == difficulty);
+    }
+    return out.toList(growable: false);
+  }
+
+  @override
+  Future<List<Drill>> fetchPublicDrills({String? query, String? category, Difficulty? difficulty}) async {
+    // Get current user from Firebase Auth
+    final currentUserId = FirebaseAuth.instance.currentUser?.uid;
+    
+    // Only return public drills that are not created by current user
+    Iterable<Drill> out = _items.where((drill) => 
+        drill.isPublic && drill.createdBy != currentUserId);
+    
+    if (query != null && query.isNotEmpty) {
+      out = out.where((d) => d.name.toLowerCase().contains(query.toLowerCase()));
+    }
+    if (category != null && category.isNotEmpty) {
+      out = out.where((d) => d.category == category);
+    }
+    if (difficulty != null) {
+      out = out.where((d) => d.difficulty == difficulty);
+    }
+    return out.toList(growable: false);
+  }
+
+  @override
+  Future<List<Drill>> fetchFavoriteDrills({String? query, String? category, Difficulty? difficulty}) async {
+    await Future.delayed(const Duration(milliseconds: 100));
+    
+    // Get current user from Firebase Auth
+    final currentUserId = FirebaseAuth.instance.currentUser?.uid;
+    if (currentUserId == null) return [];
+    
+    // Return favorite drills that user can see (their own or public ones)
+    Iterable<Drill> out = _items.where((drill) => 
+        drill.favorite && 
+        (drill.createdBy == currentUserId || drill.isPublic));
+    
+    if (query != null && query.isNotEmpty) {
+      out = out.where((d) => d.name.toLowerCase().contains(query.toLowerCase()));
+    }
+    if (category != null && category.isNotEmpty) {
+      out = out.where((d) => d.category == category);
+    }
+    if (difficulty != null) {
+      out = out.where((d) => d.difficulty == difficulty);
+    }
+    return out.toList(growable: false);
+  }
+
+  /// Dispose resources when no longer needed
+  void dispose() {
+    _controller.close();
+  }
+}
+
+// Extension to add firstWhereOrNull if not available
+extension IterableExtension<T> on Iterable<T> {
+  T? firstWhereOrNull(bool Function(T) test) {
+    for (final element in this) {
+      if (test(element)) return element;
+    }
+    return null;
+  }
 }

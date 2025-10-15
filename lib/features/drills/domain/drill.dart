@@ -20,8 +20,12 @@ class Drill {
   final List<Color> colors; // used for color stimulus
   final bool favorite;
   final bool isPreset; // preset vs user-created
+  final String? createdBy; // user ID who created the drill
+  final List<String> sharedWith; // user IDs who have access to this drill
+  final bool isPublic; // whether drill is publicly visible
+  final DateTime createdAt; // when the drill was created
 
-  const Drill({
+  Drill({
     required this.id,
     required this.name,
     required this.category,
@@ -35,7 +39,11 @@ class Drill {
     required this.colors,
     this.favorite = false,
     this.isPreset = false,
-  });
+    this.createdBy,
+    this.sharedWith = const [],
+    this.isPublic = false,
+    DateTime? createdAt,
+  }) : createdAt = createdAt ?? DateTime.now();
 
   Drill copyWith({
     String? id,
@@ -51,6 +59,10 @@ class Drill {
     List<Color>? colors,
     bool? favorite,
     bool? isPreset,
+    String? createdBy,
+    List<String>? sharedWith,
+    bool? isPublic,
+    DateTime? createdAt,
   }) => Drill(
         id: id ?? this.id,
         name: name ?? this.name,
@@ -65,6 +77,10 @@ class Drill {
         colors: colors ?? this.colors,
         favorite: favorite ?? this.favorite,
         isPreset: isPreset ?? this.isPreset,
+        createdBy: createdBy ?? this.createdBy,
+        sharedWith: sharedWith ?? this.sharedWith,
+        isPublic: isPublic ?? this.isPublic,
+        createdAt: createdAt ?? this.createdAt,
       );
 
   Map<String, dynamic> toMap() => {
@@ -81,6 +97,10 @@ class Drill {
         'colors': colors.map((c) => '#${c.value.toRadixString(16).padLeft(8, '0')}').toList(),
         'favorite': favorite,
         'isPreset': isPreset,
+        'createdBy': createdBy,
+        'sharedWith': sharedWith,
+        'isPublic': isPublic,
+        'createdAt': createdAt.toIso8601String(),
       };
 
   static Drill fromMap(Map<String, dynamic> map) => Drill(
@@ -97,5 +117,9 @@ class Drill {
         colors: (map['colors'] as List).map((hex) => Color(int.parse((hex as String).replaceFirst('#', ''), radix: 16))).toList(),
         favorite: (map['favorite'] as bool?) ?? false,
         isPreset: (map['isPreset'] as bool?) ?? false,
+        createdBy: map['createdBy'] as String?,
+        sharedWith: List<String>.from((map['sharedWith'] as List?) ?? []),
+        isPublic: (map['isPublic'] as bool?) ?? false,
+        createdAt: map['createdAt'] != null ? DateTime.parse(map['createdAt'] as String) : DateTime.now(),
       );
 }

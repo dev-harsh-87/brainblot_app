@@ -105,7 +105,7 @@ class _TrainingScreenState extends State<TrainingScreen> {
               label: const Text('Browse Drill Library'),
             ),
             const Spacer(),
-            const Text('Tip: Use Team to assign drills and track group progress.', style: TextStyle(color: Colors.white38)),
+            const Text('Tip: Use Programs to follow structured training plans.', style: TextStyle(color: Colors.white38)),
           ],
         ),
       ),

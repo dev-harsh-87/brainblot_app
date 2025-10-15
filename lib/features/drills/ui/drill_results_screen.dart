@@ -1,6 +1,5 @@
 import 'package:brainblot_app/features/drills/domain/session_result.dart';
 import 'package:brainblot_app/features/drills/domain/drill.dart';
-import 'package:brainblot_app/features/team/bloc/team_bloc.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -69,9 +68,6 @@ class _DrillResultsScreenState extends State<DrillResultsScreen>
     
     // Haptic feedback for completion
     HapticFeedback.heavyImpact();
-    
-    // Update team stats after session completion
-    _updateTeamStats();
   }
 
   @override
@@ -692,14 +688,4 @@ ${_getPerformanceEmoji(widget.result.accuracy)} ${_getPerformanceMessage(widget.
     return '🎯';
   }
   
-  void _updateTeamStats() {
-    // Try to update team stats if user is in a team
-    try {
-      final teamBloc = context.read<TeamBloc>();
-      teamBloc.add(const TeamStatsUpdateRequested());
-    } catch (e) {
-      // TeamBloc might not be available in this context, which is fine
-      // Team stats will be updated when user visits team screen
-    }
-  }
 }

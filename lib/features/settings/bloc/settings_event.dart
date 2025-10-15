@@ -11,10 +11,10 @@ class SettingsStarted extends SettingsEvent {
 }
 
 class SettingsProfileChanged extends SettingsEvent {
-  final String name;
-  final String sport;
-  final String goals;
-  const SettingsProfileChanged({required this.name, required this.sport, required this.goals});
+  final String? name;
+  final String? sport;
+  final String? goals;
+  const SettingsProfileChanged({this.name, this.sport, this.goals});
   @override
   List<Object?> get props => [name, sport, goals];
 }
@@ -25,7 +25,11 @@ class SettingsToggled extends SettingsEvent {
   final bool? highBrightness;
   final bool? darkMode;
   final bool? notifications;
-  const SettingsToggled({this.sound, this.vibration, this.highBrightness, this.darkMode, this.notifications});
+  final String? colorblindMode;
+  const SettingsToggled({this.sound, this.vibration, this.highBrightness, this.darkMode, this.notifications, this.colorblindMode});
+  
+  @override
+  List<Object?> get props => [sound, vibration, highBrightness, darkMode, notifications, colorblindMode];
 }
 
 class SettingsColorblindChanged extends SettingsEvent {

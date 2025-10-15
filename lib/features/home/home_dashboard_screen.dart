@@ -71,6 +71,7 @@ class _WelcomeHeader extends StatelessWidget {
     final colorScheme = theme.colorScheme;
     final now = DateTime.now();
     final hour = now.hour;
+    final user = FirebaseAuth.instance.currentUser;
     
     String greeting;
     if (hour < 12) {
@@ -79,6 +80,14 @@ class _WelcomeHeader extends StatelessWidget {
       greeting = 'Good Afternoon';
     } else {
       greeting = 'Good Evening';
+    }
+    
+    // Get user's display name or email
+    String userName = 'User';
+    if (user?.displayName != null && user!.displayName!.isNotEmpty) {
+      userName = user.displayName!.split(' ').first; // First name only
+    } else if (user?.email != null) {
+      userName = user!.email!.split('@').first; // Username from email
     }
     
     return Container(
@@ -102,17 +111,61 @@ class _WelcomeHeader extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  greeting,
+                  '$greeting, $userName!',
                   style: theme.textTheme.headlineSmall?.copyWith(
                     fontWeight: FontWeight.w600,
                     color: colorScheme.onPrimaryContainer,
                   ),
                 ),
                 const SizedBox(height: 4),
+                Row(
+                  children: [
+                    Icon(
+                      Icons.stars,
+                      color: Colors.amber,
+                      size: 20,
+                    ),
+                    const SizedBox(width: 4),
+                    BlocBuilder<HomeBloc, HomeState>(
+                      builder: (context, state) {
+                        // Calculate points from recent sessions
+                        final totalPoints = _calculateUserPoints(state.recent);
+                        return Text(
+                          '$totalPoints Points',
+                          style: theme.textTheme.bodyLarge?.copyWith(
+                            color: colorScheme.onPrimaryContainer.withOpacity(0.9),
+                            fontWeight: FontWeight.w600,
+                          ),
+                        );
+                      },
+                    ),
+                    const SizedBox(width: 8),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: colorScheme.onPrimaryContainer.withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: BlocBuilder<HomeBloc, HomeState>(
+                        builder: (context, state) {
+                          final status = _getAppStatus(state.recent);
+                          return Text(
+                            status,
+                            style: theme.textTheme.bodySmall?.copyWith(
+                              color: colorScheme.onPrimaryContainer.withOpacity(0.8),
+                              fontWeight: FontWeight.w500,
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 4),
                 Text(
                   'Ready to train your brain?',
-                  style: theme.textTheme.bodyLarge?.copyWith(
-                    color: colorScheme.onPrimaryContainer.withOpacity(0.8),
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    color: colorScheme.onPrimaryContainer.withOpacity(0.7),
                   ),
                 ),
               ],
@@ -304,10 +357,10 @@ class _StatsOverview extends StatelessWidget {
     // Calculate stats from recent sessions
     final totalSessions = recentSessions.length;
     final avgAccuracy = totalSessions > 0 
-        ? recentSessions.map((s) => s.accuracy).reduce((a, b) => a + b) / totalSessions
+        ? recentSessions.map((s) => (s.accuracy as num).toDouble()).reduce((a, b) => a + b) / totalSessions
         : 0.0;
     final avgReactionTime = totalSessions > 0
-        ? recentSessions.map((s) => s.avgReactionMs).reduce((a, b) => a + b) / totalSessions
+        ? recentSessions.map((s) => (s.avgReactionMs as num).toDouble()).reduce((a, b) => a + b) / totalSessions
         : 0.0;
     
     return Container(
@@ -326,13 +379,27 @@ class _StatsOverview extends StatelessWidget {
             children: [
               Expanded(
                 child: _StatCard(
-                  icon: Icons.trending_up,
-                  title: 'Sessions',
-                  value: totalSessions.toString(),
-                  subtitle: 'Total completed',
+                  icon: Icons.stars,
+                  title: 'Points',
+                  value: _calculateUserPoints(recentSessions).toString(),
+                  subtitle: 'Total earned',
+                  color: Colors.amber,
                 ),
               ),
               const SizedBox(width: 12),
+              Expanded(
+                child: _StatCard(
+                  icon: Icons.trending_up,
+                  title: 'Sessions',
+                  value: totalSessions.toString(),
+                  subtitle: 'Completed',
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Row(
+            children: [
               Expanded(
                 child: _StatCard(
                   icon: Icons.psychology,
@@ -364,12 +431,14 @@ class _StatCard extends StatelessWidget {
   final String title;
   final String value;
   final String subtitle;
+  final Color? color;
   
   const _StatCard({
     required this.icon,
     required this.title,
     required this.value,
     required this.subtitle,
+    this.color,
   });
 
   @override
@@ -390,7 +459,7 @@ class _StatCard extends StatelessWidget {
           children: [
             Icon(
               icon,
-              color: colorScheme.primary,
+              color: color ?? colorScheme.primary,
               size: 20,
             ),
             const SizedBox(height: 8),
@@ -522,7 +591,7 @@ class _ActivityItem extends StatelessWidget {
           ),
         ),
         subtitle: Text(
-          'Accuracy: ${(session.accuracy * 100).toStringAsFixed(0)}% • Avg RT: ${session.avgReactionMs.toStringAsFixed(0)}ms',
+          'Accuracy: ${((session.accuracy as num).toDouble() * 100).toStringAsFixed(0)}% • Avg RT: ${(session.avgReactionMs as num).toDouble().toStringAsFixed(0)}ms',
           style: theme.textTheme.bodyMedium?.copyWith(
             color: colorScheme.onSurface.withOpacity(0.7),
           ),
@@ -581,11 +650,6 @@ class _NavigationGrid extends StatelessWidget {
                 label: 'Profile',
                 icon: Icons.person,
                 onTap: () => context.go('/profile'),
-              ),
-              _NavTile(
-                label: 'Team',
-                icon: Icons.group,
-                onTap: () => context.go('/team'),
               ),
               _NavTile(
                 label: 'Settings',
@@ -656,5 +720,61 @@ class _NavTile extends StatelessWidget {
         ),
       ),
     );
+  }
+}
+
+// Helper functions for points calculation and app status
+int _calculateUserPoints(List<dynamic> sessions) {
+  if (sessions.isEmpty) return 0;
+  
+  int totalPoints = 0;
+  for (final session in sessions) {
+    // Points calculation based on performance
+    // Base points for completion
+    int sessionPoints = 10;
+    
+    // Bonus points for accuracy (0-50 points based on accuracy percentage)
+    final accuracy = (session.accuracy as num).toDouble();
+    sessionPoints += (accuracy * 50).round();
+    
+    // Bonus points for reaction time (faster = more points)
+    final reactionTime = (session.avgReactionMs as num).toDouble();
+    if (reactionTime < 300) {
+      sessionPoints += 20; // Very fast
+    } else if (reactionTime < 500) {
+      sessionPoints += 15; // Fast
+    } else if (reactionTime < 700) {
+      sessionPoints += 10; // Average
+    } else if (reactionTime < 1000) {
+      sessionPoints += 5; // Slow
+    }
+    // No bonus for very slow (>1000ms)
+    
+    totalPoints += sessionPoints;
+  }
+  
+  return totalPoints;
+}
+
+String _getAppStatus(List<dynamic> sessions) {
+  if (sessions.isEmpty) {
+    return 'Getting Started';
+  }
+  
+  final totalSessions = sessions.length;
+  final avgAccuracy = sessions.map((s) => (s.accuracy as num).toDouble()).reduce((a, b) => a + b) / totalSessions;
+  final avgReactionTime = sessions.map((s) => (s.avgReactionMs as num).toDouble()).reduce((a, b) => a + b) / totalSessions;
+  
+  // Determine status based on performance metrics
+  if (totalSessions >= 10 && avgAccuracy >= 0.8 && avgReactionTime <= 500.0) {
+    return 'Expert Level';
+  } else if (totalSessions >= 5 && avgAccuracy >= 0.7 && avgReactionTime <= 700.0) {
+    return 'Advanced';
+  } else if (totalSessions >= 3 && avgAccuracy >= 0.6) {
+    return 'Improving';
+  } else if (totalSessions >= 1) {
+    return 'Beginner';
+  } else {
+    return 'New User';
   }
 }

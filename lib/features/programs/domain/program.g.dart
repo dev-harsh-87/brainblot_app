@@ -24,25 +24,48 @@ Map<String, dynamic> _$ProgramDayToJson(ProgramDay instance) =>
 Program _$ProgramFromJson(Map<String, dynamic> json) => Program(
       id: json['id'] as String,
       name: json['name'] as String,
+      description: json['description'] as String?,
       category: json['category'] as String,
-      totalDays: (json['totalDays'] as num).toInt(),
+      durationDays: (json['totalDays'] as num).toInt(),
       days: (json['days'] as List<dynamic>)
           .map((e) => ProgramDay.fromJson(e as Map<String, dynamic>))
           .toList(),
       level: json['level'] as String,
       createdAt: DateTime.parse(json['createdAt'] as String),
       createdBy: json['createdBy'] as String?,
+      sharedWith: (json['sharedWith'] as List<dynamic>?)
+              ?.map((e) => e as String)
+              .toList() ??
+          const [],
+      isPublic: json['isPublic'] as bool? ?? false,
+      favorite: json['favorite'] as bool? ?? false,
+      dayWiseDrillIds: (json['dayWiseDrillIds'] as Map<String, dynamic>?)?.map(
+            (k, e) => MapEntry(int.parse(k),
+                (e as List<dynamic>).map((e) => e as String).toList()),
+          ) ??
+          const {},
+      selectedDrillIds: (json['selectedDrillIds'] as List<dynamic>?)
+              ?.map((e) => e as String)
+              .toList() ??
+          const [],
     );
 
 Map<String, dynamic> _$ProgramToJson(Program instance) => <String, dynamic>{
       'id': instance.id,
       'name': instance.name,
+      'description': instance.description,
       'category': instance.category,
-      'totalDays': instance.totalDays,
+      'totalDays': instance.durationDays,
       'days': instance.days.map((e) => e.toJson()).toList(),
       'level': instance.level,
       'createdAt': instance.createdAt.toIso8601String(),
       'createdBy': instance.createdBy,
+      'sharedWith': instance.sharedWith,
+      'isPublic': instance.isPublic,
+      'favorite': instance.favorite,
+      'dayWiseDrillIds':
+          instance.dayWiseDrillIds.map((k, e) => MapEntry(k.toString(), e)),
+      'selectedDrillIds': instance.selectedDrillIds,
     };
 
 ActiveProgram _$ActiveProgramFromJson(Map<String, dynamic> json) =>

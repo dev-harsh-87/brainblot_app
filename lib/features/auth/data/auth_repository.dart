@@ -5,6 +5,7 @@ abstract class AuthRepository {
   Future<UserCredential> registerWithEmailPassword({required String email, required String password});
   Future<void> signOut();
   Stream<User?> authState();
+  Future<void> sendPasswordResetEmail({required String email});
 }
 
 class FirebaseAuthRepository implements AuthRepository {
@@ -26,4 +27,9 @@ class FirebaseAuthRepository implements AuthRepository {
 
   @override
   Stream<User?> authState() => _auth.authStateChanges();
+
+  @override
+  Future<void> sendPasswordResetEmail({required String email}) async {
+    return _auth.sendPasswordResetEmail(email: email);
+  }
 }

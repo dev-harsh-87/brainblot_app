@@ -1,7 +1,12 @@
 import 'package:brainblot_app/core/di/injection.dart';
 import 'package:brainblot_app/features/drills/bloc/drill_library_bloc.dart';
 import 'package:brainblot_app/features/drills/data/drill_repository.dart';
+import 'package:brainblot_app/features/drills/data/firebase_drill_repository.dart';
 import 'package:brainblot_app/features/drills/domain/drill.dart';
+import 'package:brainblot_app/features/sharing/ui/privacy_control_widget.dart';
+import 'package:brainblot_app/features/sharing/services/sharing_service.dart';
+import 'package:brainblot_app/core/services/auto_refresh_service.dart';
+import 'package:brainblot_app/core/widgets/confirmation_dialog.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -14,21 +19,27 @@ class DrillLibraryScreen extends StatefulWidget {
   State<DrillLibraryScreen> createState() => _DrillLibraryScreenState();
 }
 
-class _DrillLibraryScreenState extends State<DrillLibraryScreen> with TickerProviderStateMixin {
+class _DrillLibraryScreenState extends State<DrillLibraryScreen> 
+    with TickerProviderStateMixin, AutoRefreshMixin {
   late TabController _tabController;
   late AnimationController _fabAnimationController;
   late Animation<double> _fabAnimation;
+  late SharingService _sharingService;
+  late DrillRepository _drillRepository;
   bool _isGridView = true;
   String _selectedCategory = '';
   Difficulty? _selectedDifficulty;
   final TextEditingController _searchController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
   bool _showFab = true;
+  final Map<String, bool> _ownershipCache = {};
 
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 3, vsync: this);
+    _sharingService = getIt<SharingService>();
+    _drillRepository = getIt<DrillRepository>();
+    _tabController = TabController(length: 4, vsync: this);
     _fabAnimationController = AnimationController(
       duration: const Duration(milliseconds: 300),
       vsync: this,
@@ -38,13 +49,34 @@ class _DrillLibraryScreenState extends State<DrillLibraryScreen> with TickerProv
       curve: Curves.easeInOut,
     );
     _fabAnimationController.forward();
-    
+
     _scrollController.addListener(_onScroll);
     
-    // Load drills on init
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      context.read<DrillLibraryBloc>().add(const DrillLibraryStarted());
+    // Setup auto-refresh listeners
+    listenToMultipleAutoRefresh({
+      AutoRefreshService.drills: _refreshDrills,
+      AutoRefreshService.sharing: _refreshDrills,
     });
+    _tabController.addListener(_onTabChanged);
+  }
+
+  void _refreshDrills() {
+    if (mounted) {
+      context.read<DrillLibraryBloc>().add(DrillLibraryRefreshRequested());
+    }
+  }
+
+  void _onTabChanged() {
+    if (!_tabController.indexIsChanging) return;
+
+    final view = switch (_tabController.index) {
+      0 => DrillLibraryView.all,
+      1 => DrillLibraryView.favorites,
+      2 => DrillLibraryView.custom,
+      _ => DrillLibraryView.all,
+    };
+
+    context.read<DrillLibraryBloc>().add(DrillLibraryViewChanged(view));
   }
 
   @override
@@ -82,13 +114,6 @@ class _DrillLibraryScreenState extends State<DrillLibraryScreen> with TickerProv
             backgroundColor: colorScheme.surface,
             foregroundColor: colorScheme.onSurface,
             flexibleSpace: FlexibleSpaceBar(
-              title: Text(
-                'Drill Library',
-                style: theme.textTheme.headlineSmall?.copyWith(
-                  fontWeight: FontWeight.bold,
-                  color: colorScheme.onSurface,
-                ),
-              ),
               background: Container(
                 decoration: BoxDecoration(
                   gradient: LinearGradient(
@@ -176,6 +201,7 @@ class _DrillLibraryScreenState extends State<DrillLibraryScreen> with TickerProv
                         ),
                         onChanged: (query) {
                           setState(() {});
+                          print('🔍 Search query changed: "$query"');
                           context.read<DrillLibraryBloc>().add(DrillLibraryQueryChanged(query));
                         },
                       ),
@@ -190,8 +216,9 @@ class _DrillLibraryScreenState extends State<DrillLibraryScreen> with TickerProv
                       indicatorWeight: 3,
                       tabs: const [
                         Tab(text: 'All'),
+                        Tab(text: 'My Drills'),
+                        Tab(text: 'Public'),
                         Tab(text: 'Favorites'),
-                        Tab(text: 'Custom'),
                       ],
                     ),
                   ],
@@ -217,7 +244,7 @@ class _DrillLibraryScreenState extends State<DrillLibraryScreen> with TickerProv
                           const SizedBox(width: 8),
                           _buildFilterChip('Difficulty', _selectedDifficulty?.name ?? 'All', () => _showDifficultyFilter()),
                           const SizedBox(width: 8),
-                          _buildFilterChip('Sport', 'All Sports', () {}),
+                          _buildFilterChip('Sport', _selectedCategory.isEmpty ? 'All Sports' : _selectedCategory.toUpperCase(), () => _showSportFilter()),
                         ],
                       ),
                     ),
@@ -226,33 +253,62 @@ class _DrillLibraryScreenState extends State<DrillLibraryScreen> with TickerProv
               ),
             ),
             // Stats Bar
-            BlocBuilder<DrillLibraryBloc, DrillLibraryState>(
-              builder: (context, state) {
-                if (state.status == DrillLibraryStatus.loaded) {
-                  return _buildStatsBar(state.items);
-                }
-                return const SizedBox.shrink();
-              },
-            ),
+            // BlocBuilder<DrillLibraryBloc, DrillLibraryState>(
+            //   builder: (context, state) {
+            //     if (state.status == DrillLibraryStatus.loaded) {
+            //       return _buildStatsBar(state.items);
+            //     }
+            //     return const SizedBox.shrink();
+            //   },
+            // ),
             // Drill List/Grid
             Expanded(
               child: BlocBuilder<DrillLibraryBloc, DrillLibraryState>(
                 builder: (context, state) {
+                  print('🔍 Drill Library State: ${state.status}, Items: ${state.items.length}');
+                  
                   if (state.status == DrillLibraryStatus.loading) {
                     return _buildLoadingState();
                   }
+                  
+                  if (state.status == DrillLibraryStatus.error) {
+                    return _buildErrorState(state.errorMessage ?? 'Unknown error');
+                  }
 
                   final drills = state.items;
+                  print('📊 Loaded ${drills.length} drills');
+                  
                   if (drills.isEmpty) {
                     return _buildEmptyState();
                   }
 
-                  return TabBarView(
-                    controller: _tabController,
+                  return Stack(
                     children: [
-                      _buildDrillView(drills),
-                      _buildDrillView(drills.where((d) => d.favorite).toList()),
-                      _buildDrillView(drills.where((d) => !d.isPreset).toList()),
+                      TabBarView(
+                        controller: _tabController,
+                        children: [
+                          _buildDrillViewWithRefresh(drills, state), // All drills
+                          _buildMyDrillsViewWithRefresh(state), // My drills only
+                          _buildPublicDrillsViewWithRefresh(state), // Public drills only
+                          _buildDrillViewWithRefresh(drills.where((d) => d.favorite).toList(), state), // Favorites
+                        ],
+                      ),
+                      // Show refreshing indicator
+                      if (state.isRefreshing)
+                        Positioned(
+                          top: 0,
+                          left: 0,
+                          right: 0,
+                          child: Container(
+                            height: 4,
+                            child: LinearProgressIndicator(
+                              backgroundColor: Colors.transparent,
+                              valueColor: AlwaysStoppedAnimation<Color>(
+                                Theme.of(context).colorScheme.primary,
+                              ),
+                            ),
+                          ),
+                        ),
                     ],
                   );
                 },
@@ -293,7 +349,7 @@ class _DrillLibraryScreenState extends State<DrillLibraryScreen> with TickerProv
   Widget _buildFilterChip(String label, String value, VoidCallback onTap) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
-    
+
     return GestureDetector(
       onTap: onTap,
       child: Container(
@@ -321,36 +377,10 @@ class _DrillLibraryScreenState extends State<DrillLibraryScreen> with TickerProv
     );
   }
 
-  Widget _buildStatsBar(List<Drill> drills) {
-    final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
-    
-    final totalDrills = drills.length;
-    final favoriteDrills = drills.where((d) => d.favorite).length;
-    final customDrills = drills.where((d) => !d.isPreset).length;
-    
-    return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: colorScheme.surfaceContainerHighest,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: colorScheme.outline.withOpacity(0.2)),
-      ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceAround,
-        children: [
-          _buildStatItem(Icons.fitness_center, 'Total', totalDrills.toString(), colorScheme.primary),
-          _buildStatItem(Icons.favorite, 'Favorites', favoriteDrills.toString(), Colors.red),
-          _buildStatItem(Icons.build, 'Custom', customDrills.toString(), Colors.orange),
-        ],
-      ),
-    );
-  }
 
   Widget _buildStatItem(IconData icon, String label, String value, Color color) {
     final theme = Theme.of(context);
-    
+
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
@@ -383,17 +413,39 @@ class _DrillLibraryScreenState extends State<DrillLibraryScreen> with TickerProv
   Widget _buildLoadingState() {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
-    
+
     return Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          CircularProgressIndicator(color: colorScheme.primary),
-          const SizedBox(height: 16),
-          Text(
-            'Loading drills...',
-            style: theme.textTheme.bodyLarge?.copyWith(
-              color: colorScheme.onSurface.withOpacity(0.7),
+          Container(
+            padding: const EdgeInsets.all(24),
+            decoration: BoxDecoration(
+              color: colorScheme.surfaceContainerHighest,
+              borderRadius: BorderRadius.circular(16),
+            ),
+            child: Column(
+              children: [
+                CircularProgressIndicator(
+                  color: colorScheme.primary,
+                  strokeWidth: 3,
+                ),
+                const SizedBox(height: 16),
+                Text(
+                  'Loading drills...',
+                  style: theme.textTheme.bodyLarge?.copyWith(
+                    color: colorScheme.onSurface.withOpacity(0.7),
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  'Fetching the latest data',
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: colorScheme.onSurface.withOpacity(0.5),
+                  ),
+                ),
+              ],
             ),
           ),
         ],
@@ -401,12 +453,99 @@ class _DrillLibraryScreenState extends State<DrillLibraryScreen> with TickerProv
     );
   }
 
+  Widget _buildErrorState(String error) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(
+            Icons.error_outline,
+            size: 64,
+            color: colorScheme.error,
+          ),
+          const SizedBox(height: 16),
+          Text(
+            'Failed to load drills',
+            style: theme.textTheme.titleLarge?.copyWith(
+              color: colorScheme.error,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 32),
+            child: Text(
+              error,
+              textAlign: TextAlign.center,
+              style: theme.textTheme.bodyMedium?.copyWith(
+                color: colorScheme.onSurface.withOpacity(0.7),
+              ),
+            ),
+          ),
+          const SizedBox(height: 24),
+          FilledButton.icon(
+            onPressed: () {
+              context.read<DrillLibraryBloc>().add(const DrillLibraryRefreshRequested());
+            },
+            icon: const Icon(Icons.refresh),
+            label: const Text('Retry'),
+          ),
+        ],
+      ),
+    );
+  }
+
+
+  Widget _buildDrillViewWithRefresh(List<Drill> drills, DrillLibraryState state) {
+    if (drills.isEmpty) {
+      return RefreshIndicator(
+        onRefresh: () async {
+          context.read<DrillLibraryBloc>().add(const DrillLibraryRefreshRequested());
+        },
+        child: SingleChildScrollView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          child: SizedBox(
+            height: MediaQuery.of(context).size.height * 0.6,
+            child: _buildEmptyStateForTab(),
+          ),
+        ),
+      );
+    }
+
+    return RefreshIndicator(
+      onRefresh: () async {
+        context.read<DrillLibraryBloc>().add(const DrillLibraryRefreshRequested());
+      },
+      child: _isGridView ? _buildGridView(drills) : _buildListView(drills),
+    );
+  }
+
+  Widget _buildMyDrillsViewWithRefresh(DrillLibraryState state) {
+    return RefreshIndicator(
+      onRefresh: () async {
+        context.read<DrillLibraryBloc>().add(const DrillLibraryRefreshRequested());
+      },
+      child: _buildMyDrillsView(),
+    );
+  }
+
+  Widget _buildPublicDrillsViewWithRefresh(DrillLibraryState state) {
+    return RefreshIndicator(
+      onRefresh: () async {
+        context.read<DrillLibraryBloc>().add(const DrillLibraryRefreshRequested());
+      },
+      child: _buildPublicDrillsView(),
+    );
+  }
 
   Widget _buildDrillView(List<Drill> drills) {
     if (drills.isEmpty) {
       return _buildEmptyStateForTab();
     }
-    
+
     if (_isGridView) {
       return _buildGridView(drills);
     } else {
@@ -440,110 +579,181 @@ class _DrillLibraryScreenState extends State<DrillLibraryScreen> with TickerProv
       itemBuilder: (context, index) => _buildDrillListTile(drills[index]),
     );
   }
-
   Widget _buildDrillCard(Drill drill) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
+    final size = MediaQuery.of(context).size;
 
-    return Card(
-      elevation: 2,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-      child: InkWell(
-        onTap: () {
-          HapticFeedback.lightImpact();
-          context.go('/drill-detail', extra: drill);
-        },
-        borderRadius: BorderRadius.circular(16),
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
+    // Dynamically adjust padding, font sizes, and spacing based on screen width
+    final isCompact = size.width < 400;
+    final padding = EdgeInsets.all(isCompact ? 12 : 16);
+    final iconSize = isCompact ? 14.0 : 16.0;
+    final smallFont = theme.textTheme.bodySmall?.copyWith(fontSize: isCompact ? 10 : 12);
+    final labelFont = theme.textTheme.labelSmall?.copyWith(
+      fontSize: isCompact ? 12 : 14,
+      fontWeight: FontWeight.w600,
+    );
+
+    return LayoutBuilder(
+
+
+      builder: (context, constraints) {
+        return Card(
+          elevation: 2,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          clipBehavior: Clip.antiAlias,
+          child: InkWell(
+            onTap: () {
+              HapticFeedback.lightImpact();
+              context.push('/drill-detail', extra: drill);
+            },
+            borderRadius: BorderRadius.circular(16),
+            child: Padding(
+              padding: padding,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
+                  /// Header Row (icon + name)
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(6),
+                        decoration: BoxDecoration(
+                          color: _getDifficultyColor(drill.difficulty).withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Icon(
+                          _getCategoryIcon(drill.category),
+                          color: _getDifficultyColor(drill.difficulty),
+                          size: iconSize,
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          drill.name,
+                          style: labelFont,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                    ],
+                  ),
+
+                  const SizedBox(height: 8),
+
+                  /// Category
+                  Text(
+                    drill.category.toUpperCase(),
+                    style: smallFont?.copyWith(
+                      color: colorScheme.primary,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+
+                  const SizedBox(height: 6),
+
+                  /// Chips (duration + reps)
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 4,
+                    children: [
+                      _buildInfoChip(Icons.timer, '${drill.durationSec}s'),
+                      _buildInfoChip(Icons.repeat, '${drill.reps}x',),
+                    ],
+                  ),
+
+                  const SizedBox(height: 6),
+
+                  /// Privacy indicator
+                  Flexible(child: _buildPrivacyIndicator(drill)),
+
+                  const SizedBox(height: 6),
+
+                  /// Shared / Custom tags
+                  Wrap(
+                    spacing: 4,
+                    runSpacing: 4,
+                    alignment: WrapAlignment.end,
+                    children: [
+                      if (drill.sharedWith.isNotEmpty)
+                        _buildTag(
+                          icon: Icons.people,
+                          text: 'SHARED',
+                          color: Colors.blue,
+                          theme: theme,
+                          fontSize: isCompact ? 8 : 10,
+                        ),
+                      if (!drill.isPreset)
+                        _buildTag(
+                          text: 'CUSTOM',
+                          color: Colors.orange,
+                          theme: theme,
+                          fontSize: isCompact ? 8 : 10,
+                        ),
+                    ],
+                  ),
+
+                  const SizedBox(height: 6),
+
+                  /// Difficulty badge
                   Container(
-                    padding: const EdgeInsets.all(8),
+                    width: double.infinity,
+                    padding: const EdgeInsets.symmetric(vertical: 8),
                     decoration: BoxDecoration(
                       color: _getDifficultyColor(drill.difficulty).withOpacity(0.1),
                       borderRadius: BorderRadius.circular(8),
                     ),
-                    child: Icon(
-                      _getCategoryIcon(drill.category),
-                      color: _getDifficultyColor(drill.difficulty),
-                      size: 20,
+                    child: Text(
+                      drill.difficulty.name.toUpperCase(),
+                      textAlign: TextAlign.center,
+                      style: smallFont?.copyWith(
+                        color: _getDifficultyColor(drill.difficulty),
+                        fontWeight: FontWeight.w600,
+                      ),
                     ),
                   ),
-                  const Spacer(),
-                  Row(
-                    children: [
-                      if (drill.favorite)
-                        Icon(Icons.favorite, color: colorScheme.error, size: 16),
-                      if (drill.favorite) const SizedBox(width: 4),
-                      if (!drill.isPreset)
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                          decoration: BoxDecoration(
-                            color: Colors.orange.withOpacity(0.1),
-                            borderRadius: BorderRadius.circular(4),
-                          ),
-                          child: Text(
-                            'CUSTOM',
-                            style: theme.textTheme.bodySmall?.copyWith(
-                              color: Colors.orange,
-                              fontSize: 8,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        ),
-                    ],
-                  ),
                 ],
               ),
-              const SizedBox(height: 12),
-              Text(
-                drill.name,
-                style: theme.textTheme.titleMedium?.copyWith(
-                  fontWeight: FontWeight.w600,
-                ),
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-              ),
-              const SizedBox(height: 4),
-              Text(
-                drill.category.toUpperCase(),
-                style: theme.textTheme.bodySmall?.copyWith(
-                  color: colorScheme.primary,
-                  fontWeight: FontWeight.w500,
-                ),
-              ),
-              const SizedBox(height: 8),
-              Row(
-                children: [
-                  _buildInfoChip(Icons.timer, '${drill.durationSec}s'),
-                  const SizedBox(width: 8),
-                  _buildInfoChip(Icons.repeat, '${drill.reps}x'),
-                ],
-              ),
-              const Spacer(),
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.symmetric(vertical: 8),
-                decoration: BoxDecoration(
-                  color: _getDifficultyColor(drill.difficulty).withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Text(
-                  drill.difficulty.name.toUpperCase(),
-                  textAlign: TextAlign.center,
-                  style: theme.textTheme.bodySmall?.copyWith(
-                    color: _getDifficultyColor(drill.difficulty),
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ),
-            ],
+            ),
           ),
-        ),
+        );
+      },
+    );
+  }
+
+
+
+  Widget _buildTag({
+    IconData? icon,
+    required String text,
+    required Color color,
+    required ThemeData theme,
+    double fontSize = 10,
+  }) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(4),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (icon != null) ...[
+            Icon(icon, color: color, size: fontSize + 2),
+            const SizedBox(width: 2),
+          ],
+          Text(
+            text,
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: color,
+              fontSize: fontSize,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -558,7 +768,7 @@ class _DrillLibraryScreenState extends State<DrillLibraryScreen> with TickerProv
       child: ListTile(
         onTap: () {
           HapticFeedback.lightImpact();
-          context.go('/drill-detail', extra: drill);
+          context.push('/drill-detail', extra: drill);
         },
         contentPadding: const EdgeInsets.all(16),
         leading: Container(
@@ -578,32 +788,73 @@ class _DrillLibraryScreenState extends State<DrillLibraryScreen> with TickerProv
             Expanded(
               child: Text(
                 drill.name,
-                style: theme.textTheme.titleMedium?.copyWith(
+                style: theme.textTheme.labelMedium?.copyWith(
                   fontWeight: FontWeight.w600,
                 ),
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
               ),
+
+
             ),
-            if (!drill.isPreset)
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                decoration: BoxDecoration(
-                  color: Colors.orange.withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(4),
-                ),
-                child: Text(
-                  'CUSTOM',
-                  style: theme.textTheme.bodySmall?.copyWith(
-                    color: Colors.orange,
-                    fontSize: 8,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-              ),
+            if (!drill.isPreset) const SizedBox(width: 2),
+            // Privacy indicator - always show, load ownership async
+            Flexible(child: _buildPrivacyIndicator(drill)),
           ],
         ),
         subtitle: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.end,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (drill.sharedWith.isNotEmpty)
+                  Flexible(
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: Colors.blue.withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(Icons.people, color: Colors.blue, size: 10),
+                          const SizedBox(width: 2),
+                          Text(
+                            'SHARED',
+                            style: theme.textTheme.bodySmall?.copyWith(
+                              color: Colors.blue,
+                              fontSize: 8,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                if (drill.sharedWith.isNotEmpty) const SizedBox(width: 4),
+                if (!drill.isPreset)
+                  Flexible(
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: Colors.orange.withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      child: Text(
+                        'CUSTOM',
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: Colors.orange,
+                          fontSize: 8,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                  ),
+              ],
+            ),
             const SizedBox(height: 4),
             Text(
               '${drill.category.toUpperCase()} • ${drill.difficulty.name.toUpperCase()}',
@@ -622,15 +873,6 @@ class _DrillLibraryScreenState extends State<DrillLibraryScreen> with TickerProv
                 _buildInfoChip(Icons.pause, '${drill.restSec}s rest'),
               ],
             ),
-          ],
-        ),
-        trailing: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            if (drill.favorite)
-              Icon(Icons.favorite, color: colorScheme.error, size: 20),
-            const SizedBox(width: 8),
-            Icon(Icons.chevron_right, color: colorScheme.onSurface.withOpacity(0.5)),
           ],
         ),
       ),
@@ -704,16 +946,50 @@ class _DrillLibraryScreenState extends State<DrillLibraryScreen> with TickerProv
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 32),
-            FilledButton.icon(
-              onPressed: () async {
-                HapticFeedback.mediumImpact();
-                final result = await context.push('/drill-builder');
-                if (result is Drill && mounted) {
-                  await getIt<DrillRepository>().upsert(result);
-                }
-              },
-              icon: const Icon(Icons.add),
-              label: const Text('Create Your First Drill'),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                OutlinedButton.icon(
+                  onPressed: () async {
+                    HapticFeedback.lightImpact();
+                    try {
+                      final repo = getIt<DrillRepository>();
+                      if (repo is FirebaseDrillRepository) {
+                        await repo.seedDefaultDrills();
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text('Default drills loaded successfully!'),
+                            behavior: SnackBarBehavior.floating,
+                          ),
+                        );
+                        context.read<DrillLibraryBloc>().add(const DrillLibraryRefreshRequested());
+                      }
+                    } catch (e) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text('Failed to load default drills: $e'),
+                          backgroundColor: Theme.of(context).colorScheme.error,
+                          behavior: SnackBarBehavior.floating,
+                        ),
+                      );
+                    }
+                  },
+                  icon: const Icon(Icons.download),
+                  label: const Text('Load Default Drills'),
+                ),
+                const SizedBox(width: 16),
+                FilledButton.icon(
+                  onPressed: () async {
+                    HapticFeedback.mediumImpact();
+                    final result = await context.push('/drill-builder');
+                    if (result is Drill && mounted) {
+                      await getIt<DrillRepository>().upsert(result);
+                    }
+                  },
+                  icon: const Icon(Icons.add),
+                  label: const Text('Create Drill'),
+                ),
+              ],
             ),
           ],
         ),
@@ -798,9 +1074,56 @@ class _DrillLibraryScreenState extends State<DrillLibraryScreen> with TickerProv
     }
   }
 
+  void _showSportFilter() {
+    final sports = ['Soccer', 'Basketball', 'Tennis', 'Fitness', 'Hockey', 'Volleyball', 'Football'];
+
+    showModalBottomSheet<void>(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (context) {
+        final theme = Theme.of(context);
+        final colorScheme = theme.colorScheme;
+        
+        return Container(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Icon(Icons.sports, color: colorScheme.primary),
+                  const SizedBox(width: 8),
+                  Text(
+                    'Filter by Sport',
+                    style: theme.textTheme.titleLarge?.copyWith(
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 20),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  _buildSportChip('All Sports', _selectedCategory.isEmpty),
+                  ...sports.map((sport) => _buildSportChip(sport, _selectedCategory == sport.toLowerCase())),
+                ],
+              ),
+              const SizedBox(height: 24),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
   void _showCategoryFilter() {
     final categories = ['Soccer', 'Basketball', 'Tennis', 'Fitness', 'Hockey', 'Volleyball', 'Football'];
-    
+
     showModalBottomSheet<void>(
       context: context,
       shape: const RoundedRectangleBorder(
@@ -808,6 +1131,7 @@ class _DrillLibraryScreenState extends State<DrillLibraryScreen> with TickerProv
       ),
       builder: (context) {
         return Container(
+          width: double.infinity,
           padding: const EdgeInsets.all(24),
           child: Column(
             mainAxisSize: MainAxisSize.min,
@@ -836,18 +1160,48 @@ class _DrillLibraryScreenState extends State<DrillLibraryScreen> with TickerProv
     );
   }
 
+  Widget _buildSportChip(String sport, bool isSelected) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+
+    return FilterChip(
+      label: Text(sport),
+      selected: isSelected,
+      onSelected: (selected) {
+        setState(() {
+          _selectedCategory = selected ? (sport == 'All Sports' ? '' : sport.toLowerCase()) : '';
+        });
+        print('🏃 Sport filter changed: "$sport" -> category: "$_selectedCategory"');
+        context.read<DrillLibraryBloc>().add(DrillLibraryFilterChanged(
+          category: _selectedCategory.isEmpty ? null : _selectedCategory,
+          difficulty: _selectedDifficulty,
+        ));
+        Navigator.pop(context);
+      },
+      selectedColor: colorScheme.primary.withOpacity(0.2),
+      checkmarkColor: colorScheme.primary,
+      labelStyle: TextStyle(
+        color: isSelected ? colorScheme.primary : colorScheme.onSurface,
+        fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
+      ),
+    );
+  }
+
   Widget _buildCategoryChip(String category, bool isSelected) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
-    
+
     return FilterChip(
       label: Text(category),
       selected: isSelected,
       onSelected: (selected) {
         setState(() {
-          _selectedCategory = selected ? (category == 'All' ? '' : category) : '';
+          _selectedCategory = selected ? (category == 'All' ? '' : category.toLowerCase()) : '';
         });
-        context.read<DrillLibraryBloc>().add(DrillLibraryFilterChanged(category: _selectedCategory));
+        context.read<DrillLibraryBloc>().add(DrillLibraryFilterChanged(
+          category: _selectedCategory.isEmpty ? null : _selectedCategory,
+          difficulty: _selectedDifficulty,
+        ));
         Navigator.pop(context);
       },
       selectedColor: colorScheme.primary.withOpacity(0.2),
@@ -867,6 +1221,7 @@ class _DrillLibraryScreenState extends State<DrillLibraryScreen> with TickerProv
       ),
       builder: (context) {
         return Container(
+          width: double.infinity,
           padding: const EdgeInsets.all(24),
           child: Column(
             mainAxisSize: MainAxisSize.min,
@@ -885,7 +1240,7 @@ class _DrillLibraryScreenState extends State<DrillLibraryScreen> with TickerProv
                 children: [
                   _buildDifficultyChip('All', _selectedDifficulty == null),
                   ...Difficulty.values.map((difficulty) => _buildDifficultyChip(
-                    difficulty.name.toUpperCase(), 
+                    difficulty.name.toUpperCase(),
                     _selectedDifficulty == difficulty
                   )),
                 ],
@@ -901,7 +1256,7 @@ class _DrillLibraryScreenState extends State<DrillLibraryScreen> with TickerProv
   Widget _buildDifficultyChip(String label, bool isSelected) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
-    
+
     Color chipColor = colorScheme.primary;
     if (label != 'All') {
       final difficulty = Difficulty.values.firstWhere(
@@ -910,7 +1265,7 @@ class _DrillLibraryScreenState extends State<DrillLibraryScreen> with TickerProv
       );
       chipColor = _getDifficultyColor(difficulty);
     }
-    
+
     return FilterChip(
       label: Text(label),
       selected: isSelected,
@@ -919,12 +1274,15 @@ class _DrillLibraryScreenState extends State<DrillLibraryScreen> with TickerProv
           if (label == 'All') {
             _selectedDifficulty = null;
           } else {
-            _selectedDifficulty = selected 
+            _selectedDifficulty = selected
                 ? Difficulty.values.firstWhere((d) => d.name.toUpperCase() == label)
                 : null;
           }
         });
-        context.read<DrillLibraryBloc>().add(DrillLibraryFilterChanged(difficulty: _selectedDifficulty));
+        context.read<DrillLibraryBloc>().add(DrillLibraryFilterChanged(
+          category: _selectedCategory.isEmpty ? null : _selectedCategory,
+          difficulty: _selectedDifficulty,
+        ));
         Navigator.pop(context);
       },
       selectedColor: chipColor.withOpacity(0.2),
@@ -934,5 +1292,306 @@ class _DrillLibraryScreenState extends State<DrillLibraryScreen> with TickerProv
         fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
       ),
     );
+  }
+
+  Widget _buildMyDrillsView() {
+    return BlocBuilder<DrillLibraryBloc, DrillLibraryState>(
+      builder: (context, state) {
+        return FutureBuilder<List<Drill>>(
+          key: ValueKey('${state.query}-${state.category}-${state.difficulty}'),
+          future: getIt<DrillRepository>().fetchMyDrills(
+            query: state.query?.isEmpty == true ? null : state.query,
+            category: state.category?.isEmpty == true ? null : state.category,
+            difficulty: state.difficulty,
+          ),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Center(child: CircularProgressIndicator());
+        }
+
+        if (snapshot.hasError) {
+          return Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(Icons.error_outline, size: 64, color: Colors.red),
+                const SizedBox(height: 16),
+                Text('Error loading your drills: ${snapshot.error}'),
+              ],
+            ),
+          );
+        }
+
+        final myDrills = snapshot.data ?? [];
+        if (myDrills.isEmpty) {
+          return _buildEmptyMyDrillsState();
+        }
+
+        return _buildDrillView(myDrills);
+        },
+      );
+      },
+    );
+  }
+
+  Widget _buildPublicDrillsView() {
+    return BlocBuilder<DrillLibraryBloc, DrillLibraryState>(
+      builder: (context, state) {
+        return FutureBuilder<List<Drill>>(
+          key: ValueKey('public-${state.query}-${state.category}-${state.difficulty}'),
+          future: getIt<DrillRepository>().fetchPublicDrills(
+            query: state.query?.isEmpty == true ? null : state.query,
+            category: state.category?.isEmpty == true ? null : state.category,
+            difficulty: state.difficulty,
+          ),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Center(child: CircularProgressIndicator());
+        }
+
+        if (snapshot.hasError) {
+          return Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(Icons.error_outline, size: 64, color: Colors.red),
+                const SizedBox(height: 16),
+                Text('Error loading public drills: ${snapshot.error}'),
+              ],
+            ),
+          );
+        }
+
+        final publicDrills = snapshot.data ?? [];
+        if (publicDrills.isEmpty) {
+          return _buildEmptyPublicDrillsState();
+        }
+
+        return _buildDrillView(publicDrills);
+        },
+      );
+      },
+    );
+  }
+
+  Widget _buildEmptyMyDrillsState() {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(
+            Icons.psychology_outlined,
+            size: 80,
+            color: colorScheme.primary.withOpacity(0.5),
+          ),
+          const SizedBox(height: 24),
+          Text(
+            'No Personal Drills Yet',
+            style: theme.textTheme.headlineSmall?.copyWith(
+              color: colorScheme.onSurface.withOpacity(0.7),
+            ),
+          ),
+          const SizedBox(height: 12),
+          Text(
+            'Create your first drill to get started!\nYour drills will be private by default.',
+            textAlign: TextAlign.center,
+            style: theme.textTheme.bodyMedium?.copyWith(
+              color: colorScheme.onSurface.withOpacity(0.6),
+            ),
+          ),
+          const SizedBox(height: 24),
+          ElevatedButton.icon(
+            onPressed: () {
+              // Navigate to create drill
+            },
+            icon: const Icon(Icons.add),
+            label: const Text('Create First Drill'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildEmptyPublicDrillsState() {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(
+            Icons.public_outlined,
+            size: 80,
+            color: colorScheme.primary.withOpacity(0.5),
+          ),
+          const SizedBox(height: 24),
+          Text(
+            'No Public Drills Available',
+            style: theme.textTheme.headlineSmall?.copyWith(
+              color: colorScheme.onSurface.withOpacity(0.7),
+            ),
+          ),
+          const SizedBox(height: 12),
+          Text(
+            'Be the first to share a drill with the community!\nMake your drills public to help others train.',
+            textAlign: TextAlign.center,
+            style: theme.textTheme.bodyMedium?.copyWith(
+              color: colorScheme.onSurface.withOpacity(0.6),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildPrivacyIndicator(Drill drill) {
+    return FutureBuilder<bool>(
+      future: _isOwner(drill),
+      builder: (context, snapshot) {
+        final isOwner = snapshot.data ?? false;
+        final isLoading = snapshot.connectionState == ConnectionState.waiting;
+
+        return PrivacyToggleButton(
+          isPublic: drill.isPublic,
+          isOwner: isOwner,
+          onToggle: isOwner ? () => _toggleDrillPrivacy(drill) : null,
+          isLoading: isLoading,
+        );
+      },
+    );
+  }
+
+  Future<bool> _isOwner(Drill drill) async {
+    if (_ownershipCache.containsKey(drill.id)) {
+      return _ownershipCache[drill.id]!;
+    }
+
+    try {
+      final isOwner = await _sharingService.isOwner('drill', drill.id);
+      _ownershipCache[drill.id] = isOwner;
+      return isOwner;
+    } catch (e) {
+      return false;
+    }
+  }
+
+  Future<void> _toggleFavorite(Drill drill) async {
+    try {
+      await _drillRepository.toggleFavorite(drill.id);
+      
+      HapticFeedback.lightImpact();
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Row(
+            children: [
+              Icon(
+                drill.favorite ? Icons.favorite_border : Icons.favorite,
+                color: Colors.white,
+                size: 20,
+              ),
+              const SizedBox(width: 8),
+              Text(drill.favorite 
+                  ? 'Removed from favorites' 
+                  : 'Added to favorites'),
+            ],
+          ),
+          duration: const Duration(seconds: 2),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+
+      // Refresh the drills list to show updated favorite status
+      context.read<DrillLibraryBloc>().add(const DrillLibraryRefreshRequested());
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Failed to update favorite: $e'),
+          backgroundColor: Theme.of(context).colorScheme.error,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    }
+  }
+
+  Future<void> _editDrill(Drill drill) async {
+    HapticFeedback.lightImpact();
+    
+    final editedDrill = await context.push<Drill>('/drill-builder', extra: drill);
+    
+    if (editedDrill != null && mounted) {
+      try {
+        await _drillRepository.upsert(editedDrill);
+        
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Drill updated successfully!'),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+
+        // Refresh the drills list to show updated drill
+        context.read<DrillLibraryBloc>().add(const DrillLibraryRefreshRequested());
+      } catch (e) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to update drill: $e'),
+            backgroundColor: Theme.of(context).colorScheme.error,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    }
+  }
+
+  Future<void> _toggleDrillPrivacy(Drill drill) async {
+    // Show confirmation dialog
+    final confirmed = await ConfirmationDialog.showPrivacyConfirmation(
+      context,
+      isCurrentlyPublic: drill.isPublic,
+      itemType: 'drill',
+      itemName: drill.name,
+    );
+
+    if (confirmed != true) return;
+
+    try {
+      await _sharingService.togglePrivacy('drill', drill.id, !drill.isPublic);
+
+      HapticFeedback.lightImpact();
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Row(
+            children: [
+              Icon(
+                !drill.isPublic ? Icons.public : Icons.lock,
+                color: Colors.white,
+                size: 20,
+              ),
+              const SizedBox(width: 8),
+              Text(!drill.isPublic
+                  ? 'Drill is now public! 🌍'
+                  : 'Drill is now private 🔒'),
+            ],
+          ),
+          backgroundColor: !drill.isPublic ? Colors.green : Colors.grey,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+
+      // Refresh the drills list to show updated privacy status
+      context.read<DrillLibraryBloc>().add(const DrillLibraryRefreshRequested());
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Failed to update privacy: $e'),
+          backgroundColor: Colors.red,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    }
   }
 }

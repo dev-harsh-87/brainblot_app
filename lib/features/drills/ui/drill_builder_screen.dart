@@ -1,7 +1,9 @@
-import 'package:brainblot_app/features/drills/domain/drill.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:uuid/uuid.dart';
+import 'package:brainblot_app/core/di/injection.dart';
+import 'package:brainblot_app/features/drills/domain/drill.dart';
+import 'package:brainblot_app/features/drills/services/drill_creation_service.dart';
 
 class DrillBuilderScreen extends StatefulWidget {
   final Drill? initial;
@@ -59,7 +61,7 @@ class _DrillBuilderScreenState extends State<DrillBuilderScreen>
     if (d != null) {
       _category = d.category;
       _difficulty = d.difficulty;
-      _duration = d.durationSec;
+      _duration = d.durationSec < 60 ? 60 : d.durationSec; // Ensure minimum 60 seconds
       _rest = d.restSec;
       _reps = d.reps;
       _numberOfStimuli = d.numberOfStimuli;
@@ -89,8 +91,9 @@ class _DrillBuilderScreenState extends State<DrillBuilderScreen>
   }
 
   Drill _build() {
+    final initial = widget.initial;
     return Drill(
-      id: widget.initial?.id ?? _uuid.v4(),
+      id: initial?.id ?? _uuid.v4(),
       name: _name.text.trim(),
       category: _category,
       difficulty: _difficulty,
@@ -101,7 +104,11 @@ class _DrillBuilderScreenState extends State<DrillBuilderScreen>
       numberOfStimuli: _numberOfStimuli,
       zones: _zones.toList(),
       colors: _selectedColors,
-      isPreset: false,
+      favorite: initial?.favorite ?? false,
+      isPreset: initial?.isPreset ?? false,
+      createdBy: initial?.createdBy,
+      sharedWith: initial?.sharedWith ?? [],
+      isPublic: initial?.isPublic ?? false,
     );
   }
 
@@ -515,7 +522,7 @@ class _DrillBuilderScreenState extends State<DrillBuilderScreen>
                       child: _buildSliderField(
                         'Duration (seconds)',
                         _duration.toDouble(),
-                        15.0,
+                        60.0,
                         300.0,
                         (value) => setState(() => _duration = value.round()),
                         '${_duration}s',
@@ -1165,6 +1172,11 @@ class _DrillBuilderScreenState extends State<DrillBuilderScreen>
       errors.add('Please select a difficulty level');
     }
     
+    // Validate minimum duration of 60 seconds
+    if (_duration < 60) {
+      errors.add('Drill duration must be at least 60 seconds (1 minute)');
+    }
+    
     if (_stimuli.isEmpty) {
       errors.add('Please select at least one stimulus type');
     }
@@ -1228,12 +1240,47 @@ class _DrillBuilderScreenState extends State<DrillBuilderScreen>
     return luminance > 0.5 ? Colors.black : Colors.white;
   }
 
-  void _saveDrill() {
+  void _saveDrill() async {
     final errors = _getValidationErrors();
     if (errors.isEmpty) {
       final drill = _build();
-      Navigator.of(context).pop(drill);
-      HapticFeedback.mediumImpact();
+      
+      try {
+        // Use DrillCreationService for additional validation
+        final drillCreationService = getIt<DrillCreationService>();
+        
+        if (widget.initial == null) {
+          // Creating new drill
+          await drillCreationService.createDrill(drill);
+        } else {
+          // Updating existing drill
+          await drillCreationService.updateDrill(drill);
+        }
+        
+        if (mounted) {
+          Navigator.of(context).pop(drill);
+          HapticFeedback.mediumImpact();
+          
+          // Show success message
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(widget.initial == null ? 'Drill created successfully!' : 'Drill updated successfully!'),
+              backgroundColor: Colors.green,
+            ),
+          );
+        }
+      } catch (e) {
+        if (mounted) {
+          // Show validation error from service
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Error: ${e.toString().replaceAll('Exception: ', '').replaceAll('ArgumentError: ', '')}'),
+              backgroundColor: Colors.red,
+            ),
+          );
+          HapticFeedback.heavyImpact();
+        }
+      }
     } else {
       // Show validation errors
       ScaffoldMessenger.of(context).showSnackBar(

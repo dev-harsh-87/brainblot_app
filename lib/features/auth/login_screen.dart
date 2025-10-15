@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import 'package:brainblot_app/features/auth/bloc/auth_bloc.dart';
+import 'package:brainblot_app/core/services/preferences_service.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
@@ -36,6 +37,23 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
       CurvedAnimation(parent: _animationController, curve: Curves.easeOutCubic),
     );
     _animationController.forward();
+    _loadSavedCredentials();
+  }
+
+  Future<void> _loadSavedCredentials() async {
+    final prefs = await PreferencesService.getInstance();
+    final rememberMe = prefs.getRememberMe();
+    
+    if (rememberMe) {
+      final credentials = await prefs.getSavedCredentials();
+      if (credentials['email'] != null && credentials['password'] != null) {
+        _emailCtrl.text = credentials['email']!;
+        _passwordCtrl.text = credentials['password']!;
+        setState(() {
+          _rememberMe = true;
+        });
+      }
+    }
   }
 
   @override
@@ -46,12 +64,25 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
     super.dispose();
   }
 
-  void _submit() {
+  Future<void> _submit() async {
     if (_formKey.currentState?.validate() ?? false) {
-      context.read<AuthBloc>().add(AuthLoginSubmitted(
-            email: _emailCtrl.text.trim(),
-            password: _passwordCtrl.text,
-          ));
+      final prefs = await PreferencesService.getInstance();
+      
+      // Save credentials if remember me is checked
+      if (_rememberMe) {
+        await prefs.setRememberMe(true);
+        await prefs.saveCredentials(_emailCtrl.text.trim(), _passwordCtrl.text);
+      } else {
+        await prefs.setRememberMe(false);
+        await prefs.clearSavedCredentials();
+      }
+      
+      if (mounted) {
+        context.read<AuthBloc>().add(AuthLoginSubmitted(
+              email: _emailCtrl.text.trim(),
+              password: _passwordCtrl.text,
+            ));
+      }
     }
   }
 
@@ -246,7 +277,7 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
                                     ),
                                     TextButton(
                                       onPressed: () {
-                                        // TODO: Implement forgot password
+                                        context.push('/forgot-password');
                                       },
                                       child: Text(
                                         'Forgot Password?',

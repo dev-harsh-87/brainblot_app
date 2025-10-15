@@ -1,12 +1,12 @@
 import 'dart:async';
-import 'dart:collection';
 import 'package:brainblot_app/features/programs/data/firebase_program_repository.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:equatable/equatable.dart';
-import 'package:flutter/foundation.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:collection/collection.dart';
 import 'package:brainblot_app/features/programs/data/program_repository.dart';
 import 'package:brainblot_app/features/programs/domain/program.dart';
+import 'package:brainblot_app/core/bloc/bloc_utils.dart';
 
 part 'programs_event.dart';
 part 'programs_state.dart';
@@ -30,117 +30,75 @@ class ProgramsBloc extends Bloc<ProgramsEvent, ProgramsState> {
     on<ProgramsUpdateRequested>(_onUpdateProgram);
     on<ProgramsDeleteRequested>(_onDeleteProgram);
     on<ProgramsSeedDefaultRequested>(_onSeedDefault);
+    on<ProgramsRefreshRequested>(_onRefreshRequested);
+    on<ProgramsCategoryFilterChanged>(_onCategoryFilterChanged);
+    on<ProgramsRetryRequested>(_onRetryRequested);
     
     // Initial load
     add(const ProgramsStarted());
   }
 
   Future<void> _onStarted(ProgramsStarted event, Emitter<ProgramsState> emit) async {
-    print('🚀 ProgramsBloc: Starting programs initialization');
-    try {
-      emit(state.copyWith(status: ProgramsStatus.loading));
-      print('📊 ProgramsBloc: Emitted loading state');
-      
-      // Cancel any existing subscriptions
-      await _subPrograms?.cancel();
-      await _subActive?.cancel();
-      print('🔄 ProgramsBloc: Cancelled existing subscriptions');
-      
-      // Seed default programs if using Firebase repository
-      if (_repo is FirebaseProgramRepository) {
-        print('🌱 ProgramsBloc: Using Firebase repository, seeding default programs');
-        try {
-          await (_repo as FirebaseProgramRepository).seedDefaultPrograms();
-          print('✅ ProgramsBloc: Default programs seeded successfully');
-        } catch (e) {
-          // Seeding failed, but continue with normal operation
-          print('❌ ProgramsBloc: Failed to seed default programs: $e');
-        }
-      } else {
-        print('📦 ProgramsBloc: Using non-Firebase repository');
-      }
-      
-      // Set up new subscriptions with error handling
-      print('🔗 ProgramsBloc: Setting up stream subscriptions');
-      _subPrograms = _repo.watchAll().listen(
-        (programs) {
-          print('📊 ProgramsBloc: Received ${programs.length} programs from repository');
-          if (!isClosed) {
-            add(_ProgramsUpdated(programs));
-          } else {
-            print('⚠️ ProgramsBloc: BLoC is closed, skipping programs update');
-          }
-        },
-        onError: (error) {
-          print('❌ ProgramsBloc: Error in programs stream: $error');
-          if (!isClosed) {
-            add(_ProgramsErrorOccurred('Failed to load programs: $error'));
-          }
-        },
-        cancelOnError: false,
-      );
-      
-      _subActive = _repo.watchActive().listen(
-        (active) {
-          print('🎯 ProgramsBloc: Received active program: ${active?.programId ?? "none"}');
-          if (!isClosed) {
-            add(_ActiveUpdated(active));
-          } else {
-            print('⚠️ ProgramsBloc: BLoC is closed, skipping active update');
-          }
-        },
-        onError: (error) {
-          print('❌ ProgramsBloc: Error in active program stream: $error');
-          if (!isClosed) {
-            add(_ProgramsErrorOccurred('Failed to load active program: $error'));
-          }
-        },
-        cancelOnError: false,
-      );
-      
-      // Initial load with timeout
-      try {
-        final initialPrograms = await _repo.watchAll().first.timeout(
-          const Duration(seconds: 10),
-          onTimeout: () {
-            if (!isClosed) {
-              add(const _ProgramsErrorOccurred('Connection timeout. Please check your internet connection.'));
-            }
-            return [];
-          },
-        );
-        
+    await BlocUtils.executeWithErrorHandling(
+      () async {
         emit(state.copyWith(
-          status: ProgramsStatus.loaded,
-          programs: initialPrograms,
+          status: ProgramsStatus.loading,
           errorMessage: null,
         ));
-      } on TimeoutException {
-        emit(state.copyWith(
-          status: ProgramsStatus.error,
-          errorMessage: 'Connection timeout. Please check your internet connection.',
-        ));
-      } catch (e) {
-        emit(state.copyWith(
-          status: ProgramsStatus.error,
-          errorMessage: 'Failed to load initial programs: ${e.toString()}',
-        ));
-      }
-    } catch (e) {
-      emit(state.copyWith(
+        
+        // Cancel any existing subscriptions
+        await _subPrograms?.cancel();
+        await _subActive?.cancel();
+        
+        // Seeding disabled - only show user-created programs
+        print('📝 Loading user-created programs only...');
+        
+        // Set up new subscriptions with error handling
+        _subPrograms = _repo.watchAll().listen(
+          (programs) {
+            if (!isClosed) {
+              add(_ProgramsUpdated(programs));
+            }
+          },
+          onError: (Object error) {
+            if (!isClosed) {
+              add(_ProgramsErrorOccurred(error.toString()));
+            }
+          },
+          cancelOnError: false,
+        );
+        
+        _subActive = _repo.watchActive().listen(
+          (active) {
+            if (!isClosed) {
+              add(_ActiveUpdated(active));
+            }
+          },
+          onError: (Object error) {
+            if (!isClosed) {
+              add(_ProgramsErrorOccurred('Failed to load active program: $error'));
+            }
+          },
+          cancelOnError: false,
+        );
+      },
+      emit,
+      (error) => state.copyWith(
         status: ProgramsStatus.error,
-        errorMessage: 'Failed to initialize programs: ${e.toString()}',
-      ));
-    }
+        errorMessage: error.message,
+      ),
+    );
   }
 
   void _onProgramsUpdated(_ProgramsUpdated event, Emitter<ProgramsState> emit) {
     // Only update if the programs list has actually changed
     if (state.programs.length != event.programs.length || 
-        !const ListEquality().equals(state.programs, event.programs)) {
+        !const ListEquality<Program>().equals(state.programs, event.programs)) {
       emit(state.copyWith(
         status: ProgramsStatus.loaded,
         programs: List.unmodifiable(event.programs),
+        errorMessage: null,
+        lastUpdated: DateTime.now(),
       ));
     }
   }
@@ -153,6 +111,7 @@ class ProgramsBloc extends Bloc<ProgramsEvent, ProgramsState> {
         status: ProgramsStatus.loaded,
         active: event.active,
         errorMessage: null,
+        lastUpdated: DateTime.now(),
       ));
     }
   }
@@ -161,98 +120,226 @@ class ProgramsBloc extends Bloc<ProgramsEvent, ProgramsState> {
     emit(state.copyWith(
       status: ProgramsStatus.error,
       errorMessage: event.error,
+      isRefreshing: false,
+      programBeingModified: null,
     ));
   }
 
   Future<void> _onActivate(ProgramsActivateRequested event, Emitter<ProgramsState> emit) async {
-    try {
-      await _repo.setActive(ActiveProgram(
-        programId: event.program.id, 
-        currentDay: 1,
-        startedAt: DateTime.now(),
-      ));
-    } catch (e) {
-      emit(state.copyWith(
+    await BlocUtils.executeWithErrorHandling(
+      () async {
+        emit(state.copyWith(
+          status: ProgramsStatus.activating,
+          programBeingModified: event.program,
+          errorMessage: null,
+        ));
+        
+        await _repo.setActive(ActiveProgram(
+          programId: event.program.id, 
+          currentDay: 1,
+          startedAt: DateTime.now(),
+        ));
+        
+        emit(state.copyWith(
+          status: ProgramsStatus.loaded,
+          programBeingModified: null,
+          lastUpdated: DateTime.now(),
+        ));
+      },
+      emit,
+      (error) => state.copyWith(
         status: ProgramsStatus.error,
-        errorMessage: 'Failed to activate program: ${e.toString()}',
-      ));
-    }
+        errorMessage: 'Failed to activate program: ${error.message}',
+        programBeingModified: null,
+      ),
+    );
   }
 
   Future<void> _onCreateProgram(ProgramsCreateRequested event, Emitter<ProgramsState> emit) async {
-    print('🎯 ProgramsBloc: Starting program creation');
-    print('📝 Program: ${event.program.name} (${event.program.category}, ${event.program.totalDays} days)');
-    
-    emit(state.copyWith(status: ProgramsStatus.creating));
-    print('📊 ProgramsBloc: Emitted creating state');
-    
-    try {
-      await _repo.createProgram(event.program);
-      print('✅ ProgramsBloc: Program created successfully in repository');
-      
-      // Don't refresh the entire programs list, the stream subscription will handle updates
-      emit(state.copyWith(
-        status: ProgramsStatus.loaded,
-        errorMessage: null,
-      ));
-      print('📊 ProgramsBloc: Emitted loaded state after creation');
-    } catch (e) {
-      print('❌ ProgramsBloc: Error creating program: $e');
-      emit(state.copyWith(
+    await BlocUtils.executeWithErrorHandling(
+      () async {
+        emit(state.copyWith(
+          status: ProgramsStatus.creating,
+          programBeingModified: event.program,
+          errorMessage: null,
+        ));
+        
+        await _repo.createProgram(event.program);
+        
+        emit(state.copyWith(
+          status: ProgramsStatus.loaded,
+          programBeingModified: null,
+          lastUpdated: DateTime.now(),
+        ));
+      },
+      emit,
+      (error) => state.copyWith(
         status: ProgramsStatus.error,
-        errorMessage: 'Failed to create program: ${e.toString()}',
-      ));
-      print('📊 ProgramsBloc: Emitted error state');
-    }
+        errorMessage: 'Failed to create program: ${error.message}',
+        programBeingModified: null,
+      ),
+    );
   }
 
   Future<void> _onUpdateProgram(ProgramsUpdateRequested event, Emitter<ProgramsState> emit) async {
-    try {
-      if (_repo is FirebaseProgramRepository) {
-        await (_repo as FirebaseProgramRepository).updateProgram(event.program);
-      } else {
+    await BlocUtils.executeWithErrorHandling(
+      () async {
         emit(state.copyWith(
-          status: ProgramsStatus.error,
-          errorMessage: 'Program update not supported with current repository',
+          status: ProgramsStatus.updating,
+          programBeingModified: event.program,
+          errorMessage: null,
         ));
-      }
-    } catch (e) {
-      emit(state.copyWith(
+        
+        if (_repo is FirebaseProgramRepository) {
+          await (_repo as FirebaseProgramRepository).updateProgram(event.program);
+        } else {
+          throw Exception('Program update not supported with current repository');
+        }
+        
+        emit(state.copyWith(
+          status: ProgramsStatus.loaded,
+          programBeingModified: null,
+          lastUpdated: DateTime.now(),
+        ));
+      },
+      emit,
+      (error) => state.copyWith(
         status: ProgramsStatus.error,
-        errorMessage: 'Failed to update program: ${e.toString()}',
-      ));
-    }
+        errorMessage: 'Failed to update program: ${error.message}',
+        programBeingModified: null,
+      ),
+    );
   }
 
   Future<void> _onDeleteProgram(ProgramsDeleteRequested event, Emitter<ProgramsState> emit) async {
-    try {
-      if (_repo is FirebaseProgramRepository) {
-        await (_repo as FirebaseProgramRepository).deleteProgram(event.programId);
-      } else {
+    await BlocUtils.executeWithErrorHandling(
+      () async {
         emit(state.copyWith(
-          status: ProgramsStatus.error,
-          errorMessage: 'Program deletion not supported with current repository',
+          status: ProgramsStatus.deleting,
+          errorMessage: null,
         ));
-      }
-    } catch (e) {
-      emit(state.copyWith(
+        
+        if (_repo is FirebaseProgramRepository) {
+          await (_repo as FirebaseProgramRepository).deleteProgram(event.programId);
+        } else {
+          throw Exception('Program deletion not supported with current repository');
+        }
+        
+        emit(state.copyWith(
+          status: ProgramsStatus.loaded,
+          lastUpdated: DateTime.now(),
+        ));
+      },
+      emit,
+      (error) => state.copyWith(
         status: ProgramsStatus.error,
-        errorMessage: 'Failed to delete program: ${e.toString()}',
-      ));
-    }
+        errorMessage: 'Failed to delete program: ${error.message}',
+      ),
+    );
   }
 
   Future<void> _onSeedDefault(ProgramsSeedDefaultRequested event, Emitter<ProgramsState> emit) async {
-    try {
-      if (_repo is FirebaseProgramRepository) {
-        await (_repo as FirebaseProgramRepository).seedDefaultPrograms();
-      }
-    } catch (e) {
-      emit(state.copyWith(
+    // Seeding disabled - no default programs will be created
+    print('🚫 Default program seeding is disabled');
+    emit(state.copyWith(
+      status: ProgramsStatus.loaded,
+      lastUpdated: DateTime.now(),
+    ));
+  }
+
+  Future<void> _onRefreshRequested(ProgramsRefreshRequested event, Emitter<ProgramsState> emit) async {
+    await BlocUtils.executeWithErrorHandling(
+      () async {
+        emit(state.copyWith(
+          status: ProgramsStatus.refreshing,
+          isRefreshing: true,
+          errorMessage: null,
+        ));
+        
+        try {
+          // Cancel existing subscriptions and restart them with retry mechanism
+          await _subPrograms?.cancel();
+          await _subActive?.cancel();
+          
+          int retryCount = 0;
+          const maxRetries = 3;
+          
+          while (retryCount < maxRetries) {
+            try {
+              // Seeding disabled - only load user-created programs
+              print('🔄 Refreshing user-created programs...');
+              
+              // Set up new subscriptions
+              _subPrograms = _repo.watchAll().listen(
+                (programs) {
+                  if (!isClosed) {
+                    add(_ProgramsUpdated(programs));
+                  }
+                },
+                onError: (Object error) {
+                  if (!isClosed) {
+                    add(_ProgramsErrorOccurred(error.toString()));
+                  }
+                },
+                cancelOnError: false,
+              );
+              
+              _subActive = _repo.watchActive().listen(
+                (active) {
+                  if (!isClosed) {
+                    add(_ActiveUpdated(active));
+                  }
+                },
+                onError: (Object error) {
+                  if (!isClosed) {
+                    add(_ProgramsErrorOccurred('Failed to load active program: $error'));
+                  }
+                },
+                cancelOnError: false,
+              );
+              
+              break; // Success, exit retry loop
+            } catch (e) {
+              retryCount++;
+              if (retryCount >= maxRetries) {
+                throw e; // Re-throw after max retries
+              }
+              // Wait before retry with exponential backoff
+              await Future.delayed(Duration(milliseconds: 500 * retryCount));
+            }
+          }
+          
+          emit(state.copyWith(
+            status: ProgramsStatus.loaded,
+            isRefreshing: false,
+            lastUpdated: DateTime.now(),
+          ));
+          
+          print('✅ Successfully refreshed programs');
+        } catch (e) {
+      ;
+          throw e;
+        }
+      },
+      emit,
+      (error) => state.copyWith(
         status: ProgramsStatus.error,
-        errorMessage: 'Failed to seed default programs: ${e.toString()}',
-      ));
-    }
+        errorMessage: 'Failed to refresh programs: ${error.message}',
+        isRefreshing: false,
+      ),
+    );
+  }
+
+  Future<void> _onCategoryFilterChanged(ProgramsCategoryFilterChanged event, Emitter<ProgramsState> emit) async {
+    emit(state.copyWith(
+      selectedCategory: event.category,
+      lastUpdated: DateTime.now(),
+    ));
+  }
+
+  Future<void> _onRetryRequested(ProgramsRetryRequested event, Emitter<ProgramsState> emit) async {
+    // Retry by restarting the programs loading
+    add(const ProgramsStarted());
   }
 
   @override

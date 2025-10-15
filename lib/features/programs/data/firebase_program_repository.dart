@@ -1,11 +1,14 @@
 import 'dart:async';
+import 'dart:developer' as developer;
+
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:brainblot_app/features/programs/domain/program.dart';
-import 'package:brainblot_app/features/programs/data/program_repository.dart';
-import 'package:brainblot_app/features/programs/services/drill_assignment_service.dart';
-import 'package:brainblot_app/core/di/injection.dart';
 import 'package:uuid/uuid.dart';
+
+import 'package:brainblot_app/core/di/injection.dart';
+import 'package:brainblot_app/features/programs/data/program_repository.dart';
+import 'package:brainblot_app/features/programs/domain/program.dart';
+import 'package:brainblot_app/features/programs/services/drill_assignment_service.dart';
 
 class FirebaseProgramRepository implements ProgramRepository {
   final FirebaseFirestore _firestore;
@@ -25,34 +28,134 @@ class FirebaseProgramRepository implements ProgramRepository {
 
   String? get _currentUserId => _auth.currentUser?.uid;
 
+  // Helper method to get programs shared with the current user (excluding system programs)
+  Future<List<Program>> _getSharedPrograms(String userId) async {
+    try {
+      final sharedPrograms = await _firestore
+          .collection(_programsCollection)
+          .where('sharedWith', arrayContains: userId)
+          .get();
+          
+      final programs = _mapSnapshotToPrograms(sharedPrograms);
+      
+      // Filter out system-created programs
+      return programs.where((program) => 
+        program.createdBy != null && 
+        program.createdBy != 'system'
+      ).toList();
+    } catch (e) {
+      print('Error fetching shared programs: $e');
+      return [];
+    }
+  }
+
   @override
   Stream<List<Program>> watchAll() {
-    print('🔍 FirebaseProgramRepository: Starting watchAll stream');
+    final userId = _currentUserId;
+    if (userId == null) return Stream.value([]);
+
     return _firestore
         .collection(_programsCollection)
-        .orderBy('createdAt', descending: true)
+        .where('createdBy', isEqualTo: userId) // Only user-created programs
+        .snapshots()
+        .asyncMap((snapshot) async {
+          try {
+            // Get shared programs for current user (excluding system programs)
+            final sharedPrograms = await _getSharedPrograms(userId);
+            final userPrograms = _mapSnapshotToPrograms(snapshot);
+            
+            // Combine user-created and shared programs, remove duplicates
+            final allPrograms = {...userPrograms, ...sharedPrograms}.toList();
+            
+            // Sort by createdAt in memory
+            allPrograms.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+            
+            return allPrograms;
+          } catch (e) {
+            developer.log(
+              'Error in watchAll',
+              error: e,
+              name: 'FirebaseProgramRepository',
+            );
+            return <Program>[];
+          }
+        });
+  }
+
+  @override
+  Stream<List<Program>> watchByCategory(String category) {
+    return _firestore
+        .collection(_programsCollection)
+        .where('category', isEqualTo: category)
         .snapshots()
         .map((snapshot) {
-          print('📊 FirebaseProgramRepository: Received ${snapshot.docs.length} programs from Firestore');
-          final programs = snapshot.docs
-              .map((doc) {
-                try {
-                  final data = {
-                    'id': doc.id,
-                    ...doc.data(),
-                  };
-                  print('📄 Program data: ${doc.id} - ${data['name']}');
-                  return Program.fromJson(data);
-                } catch (e) {
-                  print('❌ Error parsing program ${doc.id}: $e');
-                  return null;
-                }
-              })
-              .where((program) => program != null)
-              .cast<Program>()
-              .toList();
-          print('✅ Successfully parsed ${programs.length} programs');
-          return programs;
+          try {
+            final programs = _mapSnapshotToPrograms(snapshot);
+            // Sort by createdAt in memory
+            programs.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+            return programs;
+          } catch (e) {
+            developer.log(
+              'Error in watchByCategory',
+              error: e,
+              name: 'FirebaseProgramRepository',
+            );
+            return <Program>[];
+          }
+        });
+  }
+
+  @override
+  Stream<List<Program>> watchByLevel(String level) {
+    return _firestore
+        .collection(_programsCollection)
+        .where('level', isEqualTo: level)
+        .snapshots()
+        .map((snapshot) {
+          try {
+            final programs = _mapSnapshotToPrograms(snapshot);
+            // Sort by createdAt in memory
+            programs.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+            return programs;
+          } catch (e) {
+            developer.log(
+              'Error in watchByLevel',
+              error: e,
+              name: 'FirebaseProgramRepository',
+            );
+            return <Program>[];
+          }
+        });
+  }
+
+  @override
+  Stream<List<Program>> watchFavorites() {
+    final userId = _currentUserId;
+    if (userId == null) {
+      return Stream.value(<Program>[]);
+    }
+
+    return _firestore
+        .collection(_programsCollection)
+        .where('favorite', isEqualTo: true)
+        .snapshots()
+        .map((snapshot) {
+          try {
+            final programs = _mapSnapshotToPrograms(snapshot);
+            // Filter to only show programs user can see (their own or public ones)
+            final filtered = programs.where((program) => 
+                program.createdBy == userId || program.isPublic).toList();
+            // Sort by createdAt in memory
+            filtered.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+            return filtered;
+          } catch (e) {
+            developer.log(
+              'Error in watchFavorites',
+              error: e,
+              name: 'FirebaseProgramRepository',
+            );
+            return <Program>[];
+          }
         });
   }
 
@@ -102,32 +205,30 @@ class FirebaseProgramRepository implements ProgramRepository {
   }
 
   Future<void> createProgram(Program program) async {
-    print('🚀 FirebaseProgramRepository: Starting createProgram');
-    print('📝 Program details: ${program.name}, ${program.category}, ${program.totalDays} days');
-    
     final userId = _currentUserId;
-    print('👤 Current user ID: ${userId ?? "Anonymous"}');
     
     try {
       // Assign drills to program days
-      print('🎯 Assigning drills to program days...');
       final drillAssignmentService = getIt<DrillAssignmentService>();
       final daysWithDrills = await drillAssignmentService.assignDrillsToProgram(program);
-      print('✅ Assigned drills to ${daysWithDrills.length} days');
       
+      // Create a properly formatted program with dayWiseDrillIds
       final programWithMetadata = Program(
         id: program.id.isEmpty ? _uuid.v4() : program.id,
         name: program.name,
+        description: program.description,
         category: program.category,
-        totalDays: program.totalDays,
+        durationDays: program.durationDays,
         days: daysWithDrills, // Use days with assigned drills
         level: program.level,
         createdAt: DateTime.now(),
         createdBy: userId, // Can be null for anonymous users
+        favorite: false, // Default to not favorite
+        dayWiseDrillIds: program.dayWiseDrillIds.map(
+          (key, value) => MapEntry(key, List<String>.from(value)),
+        ),
+        selectedDrillIds: List<String>.from(program.selectedDrillIds ?? []),
       );
-
-      print('🆔 Generated program ID: ${programWithMetadata.id}');
-      print('📅 Created at: ${programWithMetadata.createdAt}');
 
       final batch = _firestore.batch();
 
@@ -136,10 +237,21 @@ class FirebaseProgramRepository implements ProgramRepository {
           .collection(_programsCollection)
           .doc(programWithMetadata.id);
       
-      final programJson = programWithMetadata.toJson();
-      print('📊 Program created with ${daysWithDrills.where((d) => d.drillId != null).length} drill assignments');
-      batch.set(programRef, programJson);
-      print('✅ Added program to global collection batch');
+      // Convert to JSON and ensure proper formatting for Firestore
+      final programData = programWithMetadata.toJson();
+      
+      // Ensure dayWiseDrillIds is properly formatted as Map<String, dynamic>
+      if (programData['dayWiseDrillIds'] != null) {
+        final dayWiseDrillIds = <String, dynamic>{};
+        (programData['dayWiseDrillIds'] as Map<dynamic, dynamic>).forEach((key, value) {
+          if (value is List) {
+            dayWiseDrillIds[key.toString()] = value;
+          }
+        });
+        programData['dayWiseDrillIds'] = dayWiseDrillIds;
+      }
+      
+      batch.set(programRef, programData);
 
       // Add to user's programs collection only if authenticated
       if (userId != null) {
@@ -153,17 +265,10 @@ class FirebaseProgramRepository implements ProgramRepository {
           'createdAt': programWithMetadata.createdAt.toIso8601String(),
           'isCustom': true,
         });
-        print('✅ Added program to user collection batch');
-      } else {
-        print('ℹ️ Skipping user collection (anonymous user)');
       }
 
-      print('🔄 Committing batch to Firestore...');
       await batch.commit();
-      print('🎉 Program created successfully in Firebase with drill assignments!');
     } catch (e) {
-      print('❌ Error creating program: $e');
-      print('📍 Stack trace: ${StackTrace.current}');
       rethrow;
     }
   }
@@ -240,6 +345,9 @@ class FirebaseProgramRepository implements ProgramRepository {
   }
 
   Future<Program?> getProgram(String programId) async {
+    final userId = _currentUserId;
+    if (userId == null) return null;
+
     final doc = await _firestore
         .collection(_programsCollection)
         .doc(programId)
@@ -247,9 +355,23 @@ class FirebaseProgramRepository implements ProgramRepository {
 
     if (!doc.exists) return null;
 
+    final data = doc.data()!;
+    final isPublic = data['isPublic'] == true;
+    final sharedWith = List<String>.from((data['sharedWith'] as List<dynamic>?)?.cast<String>() ?? <String>[]);
+    final createdBy = data['createdBy'] as String?;
+
+    // Check if user has access (is owner, is public, or is in sharedWith)
+    final hasAccess = createdBy == userId || 
+                     isPublic || 
+                     sharedWith.contains(userId);
+
+    if (!hasAccess) {
+      return null; // User doesn't have access to this program
+    }
+
     return Program.fromJson({
       'id': doc.id,
-      ...doc.data()!,
+      ...data,
     });
   }
 
@@ -262,14 +384,22 @@ class FirebaseProgramRepository implements ProgramRepository {
     return _firestore
         .collection(_programsCollection)
         .where('createdBy', isEqualTo: userId)
-        .orderBy('createdAt', descending: true)
         .snapshots()
-        .map((snapshot) => snapshot.docs
-            .map((doc) => Program.fromJson({
-                  'id': doc.id,
-                  ...doc.data(),
-                }))
-            .toList());
+        .map((snapshot) {
+          try {
+            final programs = _mapSnapshotToPrograms(snapshot);
+            // Sort by createdAt in memory
+            programs.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+            return programs;
+          } catch (e) {
+            developer.log(
+              'Error in watchUserPrograms',
+              error: e,
+              name: 'FirebaseProgramRepository',
+            );
+            return <Program>[];
+          }
+        });
   }
 
   Future<void> updateProgramProgress(String programId, int currentDay) async {
@@ -327,47 +457,62 @@ class FirebaseProgramRepository implements ProgramRepository {
   }
 
   Future<void> seedDefaultPrograms() async {
-    print('🌱 FirebaseProgramRepository: Starting seedDefaultPrograms');
-    
     try {
-      // Check if default programs already exist
-      print('🔍 Checking for existing default programs...');
+      print('🌱 Seeding default programs...');
+      
+      // Check if default programs already exist by looking for system programs
       final existingPrograms = await _firestore
           .collection(_programsCollection)
-          .where('createdBy', isNull: true)
-          .limit(1)
+          .where('isPublic', isEqualTo: true)
+          .limit(5)
           .get();
-
-      print('📊 Found ${existingPrograms.docs.length} existing default programs');
       
-      if (existingPrograms.docs.isNotEmpty) {
+      // Check if we already have some default programs
+      final hasDefaultPrograms = existingPrograms.docs.any((doc) {
+        final data = doc.data();
+        return data['createdBy'] == null || data['createdBy'] == 'system';
+      });
+      
+      if (hasDefaultPrograms) {
         print('✅ Default programs already exist, skipping seeding');
         return; // Default programs already seeded
       }
 
-      print('🏗️ Creating default programs...');
       final defaultPrograms = _createDefaultPrograms();
-      print('📝 Generated ${defaultPrograms.length} default programs');
       
       // Assign drills to each default program
       final drillAssignmentService = getIt<DrillAssignmentService>();
       final programsWithDrills = <Program>[];
       
       for (final program in defaultPrograms) {
-        print('🎯 Assigning drills to program: ${program.name}');
-        final daysWithDrills = await drillAssignmentService.assignDrillsToProgram(program);
-        final programWithDrills = Program(
-          id: program.id,
-          name: program.name,
-          category: program.category,
-          totalDays: program.totalDays,
-          days: daysWithDrills,
-          level: program.level,
-          createdAt: program.createdAt,
-          createdBy: program.createdBy,
-        );
-        programsWithDrills.add(programWithDrills);
-        print('✅ Assigned drills to ${daysWithDrills.where((d) => d.drillId != null).length} days');
+        try {
+          final daysWithDrills = await drillAssignmentService.assignDrillsToProgram(program);
+          final programWithDrills = Program(
+            id: program.id,
+            name: program.name,
+            description: program.description,
+            category: program.category,
+            durationDays: program.durationDays,
+            days: daysWithDrills,
+            level: program.level,
+            createdAt: program.createdAt,
+            createdBy: 'system', // Mark as system program
+            favorite: false,
+            isPublic: true, // Ensure it's public
+            dayWiseDrillIds: program.dayWiseDrillIds,
+            selectedDrillIds: program.selectedDrillIds,
+          );
+          programsWithDrills.add(programWithDrills);
+          print('✅ Prepared program: ${program.name}');
+        } catch (e) {
+          print('❌ Failed to prepare program ${program.name}: $e');
+          // Continue with other programs even if one fails
+        }
+      }
+      
+      if (programsWithDrills.isEmpty) {
+        print('❌ No programs to seed');
+        return;
       }
       
       final batch = _firestore.batch();
@@ -376,16 +521,17 @@ class FirebaseProgramRepository implements ProgramRepository {
         final ref = _firestore
             .collection(_programsCollection)
             .doc(program.id);
-        batch.set(ref, program.toJson());
-        print('➕ Added ${program.name} to batch');
+        
+        final programData = program.toJson();
+        programData['isPublic'] = true; // Ensure it's marked as public
+        programData['createdBy'] = 'system'; // Ensure system attribution
+        
+        batch.set(ref, programData);
       }
 
-      print('🔄 Committing default programs batch to Firestore...');
       await batch.commit();
-      print('🎉 Default programs seeded successfully!');
+      print('🎉 Successfully seeded ${programsWithDrills.length} default programs');
     } catch (e) {
-      print('❌ Error seeding default programs: $e');
-      print('📍 Stack trace: ${StackTrace.current}');
       rethrow;
     }
   }
@@ -396,11 +542,14 @@ class FirebaseProgramRepository implements ProgramRepository {
     final p1 = Program(
       id: _uuid.v4(),
       name: '4-week Agility Boost',
+      description: 'Improve your agility and reaction time with progressive training over 4 weeks.',
       category: 'agility',
-      totalDays: 28,
+      durationDays: 28,
       level: 'Beginner',
       createdAt: now,
-      createdBy: null, // System program
+      createdBy: 'system', // System program
+      favorite: false,
+      isPublic: true,
       days: List.generate(28, (i) => ProgramDay(
         dayNumber: i + 1, 
         title: 'Day ${i + 1}: ${_getAgilitydayTitle(i + 1)}', 
@@ -412,11 +561,14 @@ class FirebaseProgramRepository implements ProgramRepository {
     final p2 = Program(
       id: _uuid.v4(),
       name: 'Soccer: Decision Speed',
+      description: 'Enhance your soccer decision-making speed and field awareness through targeted training.',
       category: 'soccer',
-      totalDays: 21,
+      durationDays: 21,
       level: 'Intermediate',
       createdAt: now,
-      createdBy: null,
+      createdBy: 'system',
+      favorite: false,
+      isPublic: true,
       days: List.generate(21, (i) => ProgramDay(
         dayNumber: i + 1, 
         title: 'Day ${i + 1}: ${_getSoccerDayTitle(i + 1)}', 
@@ -428,11 +580,14 @@ class FirebaseProgramRepository implements ProgramRepository {
     final p3 = Program(
       id: _uuid.v4(),
       name: 'Basketball Elite',
+      description: 'Elite basketball training focusing on court vision and reaction speed.',
       category: 'basketball',
-      totalDays: 14,
+      durationDays: 14,
       level: 'Advanced',
       createdAt: now,
-      createdBy: null,
+      createdBy: 'system',
+      favorite: false,
+      isPublic: true,
       days: List.generate(14, (i) => ProgramDay(
         dayNumber: i + 1, 
         title: 'Day ${i + 1}: ${_getBasketballDayTitle(i + 1)}', 
@@ -444,11 +599,14 @@ class FirebaseProgramRepository implements ProgramRepository {
     final p4 = Program(
       id: _uuid.v4(),
       name: 'Tennis Precision',
+      description: 'Develop precise timing and anticipation skills for competitive tennis.',
       category: 'tennis',
-      totalDays: 35,
+      durationDays: 35,
       level: 'Intermediate',
       createdAt: now,
-      createdBy: null,
+      createdBy: 'system',
+      favorite: false,
+      isPublic: true,
       days: List.generate(35, (i) => ProgramDay(
         dayNumber: i + 1, 
         title: 'Day ${i + 1}: ${_getTennisDayTitle(i + 1)}', 
@@ -460,11 +618,14 @@ class FirebaseProgramRepository implements ProgramRepository {
     final p5 = Program(
       id: _uuid.v4(),
       name: 'Quick Start Basics',
+      description: 'A quick introduction to cognitive training fundamentals for beginners.',
       category: 'general',
-      totalDays: 7,
+      durationDays: 7,
       level: 'Beginner',
       createdAt: now,
-      createdBy: null,
+      createdBy: 'system',
+      favorite: false,
+      isPublic: true,
       days: List.generate(7, (i) => ProgramDay(
         dayNumber: i + 1, 
         title: 'Day ${i + 1}: ${_getGeneralDayTitle(i + 1)}', 
@@ -568,5 +729,331 @@ class FirebaseProgramRepository implements ProgramRepository {
       'Final assessment and progress evaluation'
     ];
     return descriptions[day - 1];
+  }
+
+  /// Helper method to safely map Firestore snapshot to Program list
+  List<Program> _mapSnapshotToPrograms(QuerySnapshot<Map<String, dynamic>> snapshot) {
+    try {
+      return snapshot.docs
+          .map((doc) {
+            try {
+              final data = Map<String, dynamic>.from(doc.data() ?? {});
+              if (data.isEmpty) return null;
+              
+              // Convert dayWiseDrillIds from Map<dynamic, dynamic> to Map<String, dynamic>
+              final dayWiseDrillIds = <String, dynamic>{};
+              if (data['dayWiseDrillIds'] != null) {
+                final dayWiseData = data['dayWiseDrillIds'] as Map<dynamic, dynamic>;
+                dayWiseData.forEach((key, value) {
+                  if (value is List) {
+                    dayWiseDrillIds[key.toString()] = value.map((e) => e.toString()).toList();
+                  } else if (value is Map) {
+                    // Handle case where value might be a MapEntry or similar
+                    dayWiseDrillIds[key.toString()] = value.values.map((e) => e.toString()).toList();
+                  }
+                });
+              }
+              
+              // Convert selectedDrillIds to List<String>
+              final selectedDrillIds = (data['selectedDrillIds'] as List<dynamic>?)?.map((e) => e.toString()).toList() ?? [];
+              
+              // Create a new map with the correct types for Firestore
+              final jsonData = Map<String, dynamic>.from(data);
+              jsonData['id'] = doc.id;
+              
+              // Only include dayWiseDrillIds if it's not empty
+              if (dayWiseDrillIds.isNotEmpty) {
+                jsonData['dayWiseDrillIds'] = dayWiseDrillIds;
+              } else {
+                jsonData.remove('dayWiseDrillIds');
+              }
+              
+              // Only include selectedDrillIds if it's not empty
+              if (selectedDrillIds.isNotEmpty) {
+                jsonData['selectedDrillIds'] = selectedDrillIds;
+              } else {
+                jsonData.remove('selectedDrillIds');
+              }
+              
+              // Convert the data to a format that Program.fromJson can handle
+              final programData = Map<String, dynamic>.from(jsonData);
+              
+              // Ensure required fields have default values
+              programData['days'] = programData['days'] ?? [];
+              programData['sharedWith'] = programData['sharedWith'] ?? [];
+              programData['isPublic'] = programData['isPublic'] ?? false;
+              programData['favorite'] = programData['favorite'] ?? false;
+              
+              return Program.fromJson(programData);
+            } catch (e, stackTrace) {
+              developer.log(
+                'Error parsing program ${doc.id}',
+                error: e,
+                stackTrace: stackTrace,
+                name: 'FirebaseProgramRepository',
+              );
+              return null;
+            }
+          })
+          .whereType<Program>()
+          .toList();
+    } catch (e, stackTrace) {
+      developer.log(
+        'Error in _mapSnapshotToPrograms',
+        error: e,
+        stackTrace: stackTrace,
+        name: 'FirebaseProgramRepository',
+      );
+      return [];
+    }
+  }
+
+  @override
+  Future<List<Program>> fetchMyPrograms({String? query, String? category, String? level}) async {
+    final userId = _currentUserId;
+    if (userId == null) {
+      return [];
+    }
+
+    try {
+      final snapshot = await _firestore
+          .collection(_programsCollection)
+          .where('createdBy', isEqualTo: userId)
+          .get();
+      
+      List<Program> programs = _mapSnapshotToPrograms(snapshot);
+
+      // Apply filters in memory to avoid complex Firestore indexes
+      if (category != null && category.isNotEmpty) {
+        programs = programs.where((p) => p.category == category).toList();
+      }
+
+      if (level != null && level.isNotEmpty) {
+        programs = programs.where((p) => p.level == level).toList();
+      }
+
+      if (query != null && query.isNotEmpty) {
+        final queryLower = query.toLowerCase();
+        programs = programs.where((program) => 
+            program.name.toLowerCase().contains(queryLower)).toList();
+      }
+
+      // Sort by createdAt
+      programs.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+
+      return programs;
+    } catch (error) {
+      developer.log(
+        'Failed to fetch my programs',
+        error: error,
+        name: 'FirebaseProgramRepository',
+      );
+      throw Exception('Failed to fetch my programs: $error');
+    }
+  }
+
+  @override
+  Future<List<Program>> fetchPublicPrograms({String? query, String? category, String? level}) async {
+    final userId = _currentUserId;
+    
+    try {
+      // Start with just public programs to avoid complex index
+      final snapshot = await _firestore
+          .collection(_programsCollection)
+          .where('isPublic', isEqualTo: true)
+          .get();
+      
+      List<Program> programs = _mapSnapshotToPrograms(snapshot);
+
+      // Apply all filters in memory to avoid complex indexes
+      if (category != null && category.isNotEmpty) {
+        programs = programs.where((p) => p.category == category).toList();
+      }
+
+      if (level != null && level.isNotEmpty) {
+        programs = programs.where((p) => p.level == level).toList();
+      }
+
+      // Filter out current user's programs
+      if (userId != null) {
+        programs = programs.where((program) => program.createdBy != userId).toList();
+      }
+
+      if (query != null && query.isNotEmpty) {
+        final queryLower = query.toLowerCase();
+        programs = programs.where((program) => 
+            program.name.toLowerCase().contains(queryLower)).toList();
+      }
+
+      // Sort by createdAt
+      programs.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+
+      return programs;
+    } catch (error) {
+      developer.log(
+        'Failed to fetch public programs',
+        error: error,
+        name: 'FirebaseProgramRepository',
+      );
+      throw Exception('Failed to fetch public programs: $error');
+    }
+  }
+
+  @override
+  Future<List<Program>> fetchAll({String? query, String? category, String? level}) async {
+    try {
+      final userId = _currentUserId;
+      if (userId == null) return [];
+
+      // Get shared programs for current user (excluding system programs)
+      final sharedPrograms = await _getSharedPrograms(userId);
+      
+      // Query for user-created programs only
+      final snapshot = await _firestore
+          .collection(_programsCollection)
+          .where('createdBy', isEqualTo: userId)
+          .get();
+      
+      final userPrograms = _mapSnapshotToPrograms(snapshot);
+      
+      // Combine and remove duplicates by ID
+      final allPrograms = <String, Program>{};
+      for (final program in [...userPrograms, ...sharedPrograms]) {
+        allPrograms[program.id] = program;
+      }
+
+      // Convert back to list
+      var result = allPrograms.values.toList();
+      
+      // Apply filters in memory to avoid complex indexes
+      if (category?.isNotEmpty ?? false) {
+        result = result.where((p) => p.category == category).toList();
+      }
+      
+      if (level?.isNotEmpty ?? false) {
+        result = result.where((p) => p.level == level).toList();
+      }
+      
+      if (query?.isNotEmpty ?? false) {
+        final queryLower = query!.toLowerCase();
+        result = result.where((program) => 
+          program.name.toLowerCase().contains(queryLower) ||
+          program.category.toLowerCase().contains(queryLower) ||
+          program.level.toLowerCase().contains(queryLower) ||
+          program.days.any((day) => 
+            day.title.toLowerCase().contains(queryLower) ||
+            day.description.toLowerCase().contains(queryLower)
+          )
+        ).toList();
+      }
+
+      // Sort by createdAt
+      result.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+
+      return result;
+    } catch (error) {
+      throw Exception('Failed to fetch all programs: $error');
+    }
+  }
+
+  @override
+  Future<List<Program>> fetchFavoritePrograms({String? query, String? category, String? level}) async {
+    final userId = _currentUserId;
+    if (userId == null) {
+      return [];
+    }
+
+    try {
+      final snapshot = await _firestore
+          .collection(_programsCollection)
+          .where('favorite', isEqualTo: true)
+          .get();
+      
+      List<Program> programs = _mapSnapshotToPrograms(snapshot);
+
+      // Filter to only show programs user can see (their own or public ones)
+      programs = programs.where((program) => 
+          program.createdBy == userId || program.isPublic).toList();
+
+      // Apply filters in memory to avoid complex indexes
+      if (category != null && category.isNotEmpty) {
+        programs = programs.where((p) => p.category == category).toList();
+      }
+
+      if (level != null && level.isNotEmpty) {
+        programs = programs.where((p) => p.level == level).toList();
+      }
+
+      if (query != null && query.isNotEmpty) {
+        final queryLower = query.toLowerCase();
+        programs = programs.where((program) => 
+            program.name.toLowerCase().contains(queryLower)).toList();
+      }
+
+      // Sort by createdAt
+      programs.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+
+      return programs;
+    } catch (error) {
+      developer.log(
+        'Failed to fetch favorite programs',
+        error: error,
+        name: 'FirebaseProgramRepository',
+      );
+      throw Exception('Failed to fetch favorite programs: $error');
+    }
+  }
+
+  @override
+  Future<void> toggleFavorite(String programId) async {
+    final userId = _currentUserId;
+    if (userId == null) {
+      throw Exception('User must be logged in to favorite programs');
+    }
+
+    try {
+      final programDoc = await _firestore
+          .collection(_programsCollection)
+          .doc(programId)
+          .get();
+
+      if (!programDoc.exists) {
+        throw Exception('Program not found');
+      }
+
+      final program = Program.fromJson({
+        'id': programDoc.id,
+        ...programDoc.data()!,
+      });
+
+      // Users can only favorite programs they can see (their own or public ones)
+      if (program.createdBy == userId || program.isPublic) {
+        await _firestore
+            .collection(_programsCollection)
+            .doc(programId)
+            .update({'favorite': !program.favorite});
+      }
+    } catch (error) {
+      throw Exception('Failed to toggle favorite: $error');
+    }
+  }
+
+  @override
+  Future<bool> isFavorite(String programId) async {
+    try {
+      final programDoc = await _firestore
+          .collection(_programsCollection)
+          .doc(programId)
+          .get();
+
+      if (!programDoc.exists) {
+        return false;
+      }
+
+      final data = programDoc.data()!;
+      return data['favorite'] as bool? ?? false;
+    } catch (error) {
+      return false;
+    }
   }
 }

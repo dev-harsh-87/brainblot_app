@@ -28,7 +28,7 @@ class _ProgramDayScreenState extends State<ProgramDayScreen> {
   late final DrillAssignmentService _drillService;
   
   ProgramDay? _currentDay;
-  Drill? _assignedDrill;
+  List<Drill> _assignedDrills = [];
   bool _isLoading = true;
   bool _isCompleting = false;
   ProgramProgress? _progress;
@@ -46,14 +46,75 @@ class _ProgramDayScreenState extends State<ProgramDayScreen> {
     setState(() => _isLoading = true);
 
     try {
-      // Find the current day
-      _currentDay = widget.program.days.firstWhere(
-        (day) => day.dayNumber == widget.dayNumber,
-      );
-
-      // Load assigned drill if available
-      if (_currentDay?.drillId != null) {
-        _assignedDrill = await _drillService.getDrillById(_currentDay!.drillId!);
+      // Handle both old format (days list) and new format (dayWiseDrillIds)
+      if (widget.program.days.isNotEmpty) {
+        // Old format: Find the current day from days list
+        try {
+          _currentDay = widget.program.days.firstWhere(
+            (day) => day.dayNumber == widget.dayNumber,
+          );
+        } catch (e) {
+          // Create fallback day if not found
+          _currentDay = ProgramDay(
+            dayNumber: widget.dayNumber,
+            title: 'Day ${widget.dayNumber}',
+            description: 'Training day',
+          );
+        }
+        
+        // Load assigned drill if available
+        if (_currentDay?.drillId != null) {
+          final drill = await _drillService.getDrillById(_currentDay!.drillId!);
+          if (drill != null) {
+            _assignedDrills = [drill];
+          }
+        }
+      } else if (widget.program.dayWiseDrillIds.isNotEmpty) {
+        // New enhanced format: Use dayWiseDrillIds
+        final drillIds = widget.program.dayWiseDrillIds[widget.dayNumber];
+        
+        if (drillIds != null && drillIds.isNotEmpty) {
+          // Load all assigned drills for this day
+          final drills = <Drill>[];
+          for (final drillId in drillIds) {
+            final drill = await _drillService.getDrillById(drillId);
+            if (drill != null) {
+              drills.add(drill);
+            }
+          }
+          _assignedDrills = drills;
+          
+          // Create program day with drill information
+          _currentDay = ProgramDay(
+            dayNumber: widget.dayNumber,
+            title: 'Day ${widget.dayNumber}',
+            description: drills.isNotEmpty 
+                ? '${drills.length} drill${drills.length > 1 ? 's' : ''} assigned for today'
+                : 'Training day',
+            drillId: drills.isNotEmpty ? drills.first.id : null,
+          );
+        } else {
+          // No drills assigned for this day
+          _currentDay = ProgramDay(
+            dayNumber: widget.dayNumber,
+            title: 'Day ${widget.dayNumber}',
+            description: 'Rest day - No drills assigned',
+          );
+        }
+      }
+      
+      // If no drills found, try to get recommended drills as fallback
+      if (_assignedDrills.isEmpty) {
+        print('ℹ️ Info: No drills assigned to day ${widget.dayNumber}, getting recommendations');
+        final recommendedDrills = await _drillService.getRecommendedDrills(
+          widget.program.category, 
+          widget.program.level,
+          limit: 1,
+        );
+        if (recommendedDrills.isNotEmpty) {
+          _assignedDrills = [recommendedDrills.first];
+          print('✅ Auto-assigned recommended drill: ${_assignedDrills.first.name}');
+        }
       }
 
       // Load latest progress if not provided
@@ -62,6 +123,12 @@ class _ProgramDayScreenState extends State<ProgramDayScreen> {
       }
     } catch (e) {
       print('❌ Error loading day data: $e');
+      // Create fallback day
+      _currentDay = ProgramDay(
+        dayNumber: widget.dayNumber,
+        title: 'Day ${widget.dayNumber}',
+        description: 'Training day',
+      );
     } finally {
       setState(() => _isLoading = false);
     }
@@ -147,7 +214,7 @@ class _ProgramDayScreenState extends State<ProgramDayScreen> {
                     ),
                   ),
                   const SizedBox(height: 8),
-                  Text('• Total Days: ${widget.program.totalDays}'),
+                  Text('• Total Days: ${widget.program.durationDays}'),
                   Text('• Category: ${widget.program.category}'),
                   Text('• Level: ${widget.program.level}'),
                   if (_progress != null)
@@ -177,15 +244,15 @@ class _ProgramDayScreenState extends State<ProgramDayScreen> {
     );
   }
 
-  void _navigateToDrill() {
-    if (_assignedDrill == null) return;
+  void _navigateToDrill([Drill? specificDrill]) {
+    final drillToRun = specificDrill ?? (_assignedDrills.isNotEmpty ? _assignedDrills.first : null);
+    if (drillToRun == null) return;
     
-    // Navigate to drill screen with the assigned drill
-    context.push('/drills/practice', extra: {
-      'drill': _assignedDrill,
-      'fromProgram': true,
+    // Navigate to drill runner with program context
+    context.push('/drill-runner', extra: {
+      'drill': drillToRun,
       'programId': widget.program.id,
-      'dayNumber': widget.dayNumber,
+      'programDayNumber': widget.dayNumber,
     });
   }
 
@@ -288,7 +355,7 @@ class _ProgramDayScreenState extends State<ProgramDayScreen> {
                       ),
                       const SizedBox(height: 8),
                       Text(
-                        'Progress: ${_progress!.completedDays.length}/${_progress!.totalDays} days (${_progress!.progressPercentage.toStringAsFixed(1)}%)',
+                        'Progress: ${_progress!.completedDays.length}/${_progress!.durationDays} days (${_progress!.progressPercentage.toStringAsFixed(1)}%)',
                         style: Theme.of(context).textTheme.bodySmall,
                       ),
                     ],
@@ -375,8 +442,8 @@ class _ProgramDayScreenState extends State<ProgramDayScreen> {
 
             const SizedBox(height: 16),
 
-            // Assigned drill section
-            if (_assignedDrill != null) ...[
+            // Assigned drills section
+            if (_assignedDrills.isNotEmpty) ...[
               Card(
                 child: Padding(
                   padding: const EdgeInsets.all(16),
@@ -391,7 +458,9 @@ class _ProgramDayScreenState extends State<ProgramDayScreen> {
                           ),
                           const SizedBox(width: 8),
                           Text(
-                            'Assigned Drill',
+                            _assignedDrills.length == 1 
+                                ? 'Assigned Drill' 
+                                : 'Assigned Drills (${_assignedDrills.length})',
                             style: Theme.of(context).textTheme.titleMedium?.copyWith(
                               fontWeight: FontWeight.bold,
                             ),
@@ -399,59 +468,116 @@ class _ProgramDayScreenState extends State<ProgramDayScreen> {
                         ],
                       ),
                       const SizedBox(height: 12),
-                      Container(
-                        width: double.infinity,
-                        padding: const EdgeInsets.all(12),
-                        decoration: BoxDecoration(
-                          border: Border.all(color: Colors.grey.withOpacity(0.3)),
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Row(
-                              children: [
-                                Expanded(
-                                  child: Text(
-                                    _assignedDrill!.name,
-                                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                                      fontWeight: FontWeight.bold,
+                      // Display all assigned drills
+                      ...(_assignedDrills.asMap().entries.map((entry) {
+                        final index = entry.key;
+                        final drill = entry.value;
+                        return Container(
+                          width: double.infinity,
+                          margin: EdgeInsets.only(bottom: index < _assignedDrills.length - 1 ? 12 : 0),
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            border: Border.all(color: Colors.grey.withOpacity(0.3)),
+                            borderRadius: BorderRadius.circular(8),
+                            color: index == 0 
+                                ? Theme.of(context).primaryColor.withOpacity(0.05)
+                                : null,
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                children: [
+                                  if (_assignedDrills.length > 1)
+                                    Container(
+                                      width: 24,
+                                      height: 24,
+                                      margin: const EdgeInsets.only(right: 8),
+                                      decoration: BoxDecoration(
+                                        color: Theme.of(context).primaryColor,
+                                        shape: BoxShape.circle,
+                                      ),
+                                      child: Center(
+                                        child: Text(
+                                          '${index + 1}',
+                                          style: const TextStyle(
+                                            color: Colors.white,
+                                            fontSize: 12,
+                                            fontWeight: FontWeight.bold,
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                  Expanded(
+                                    child: Text(
+                                      drill.name,
+                                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                                        fontWeight: FontWeight.bold,
+                                      ),
                                     ),
                                   ),
-                                ),
-                                Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                  decoration: BoxDecoration(
-                                    color: _getDifficultyColor(_assignedDrill!.difficulty).withOpacity(0.1),
-                                    borderRadius: BorderRadius.circular(8),
-                                  ),
-                                  child: Text(
-                                    _assignedDrill!.difficulty.name.toUpperCase(),
-                                    style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                                      color: _getDifficultyColor(_assignedDrill!.difficulty),
-                                      fontWeight: FontWeight.bold,
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                    decoration: BoxDecoration(
+                                      color: _getDifficultyColor(drill.difficulty).withOpacity(0.1),
+                                      borderRadius: BorderRadius.circular(8),
+                                    ),
+                                    child: Text(
+                                      drill.difficulty.name.toUpperCase(),
+                                      style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                                        color: _getDifficultyColor(drill.difficulty),
+                                        fontWeight: FontWeight.bold,
+                                      ),
                                     ),
                                   ),
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 8),
-                            Text(
-                              'Duration: ${_assignedDrill!.durationSec}s • Reps: ${_assignedDrill!.reps} • Difficulty: ${_assignedDrill!.difficulty.name}',
-                              style: Theme.of(context).textTheme.bodyMedium,
-                            ),
-                            const SizedBox(height: 12),
-                            SizedBox(
-                              width: double.infinity,
-                              child: ElevatedButton.icon(
-                                onPressed: _navigateToDrill,
-                                icon: const Icon(Icons.play_arrow),
-                                label: const Text('Start Drill'),
+                                ],
                               ),
+                              const SizedBox(height: 8),
+                              Text(
+                                'Duration: ${drill.durationSec}s • Reps: ${drill.reps} • Category: ${drill.category}',
+                                style: Theme.of(context).textTheme.bodyMedium,
+                              ),
+                              const SizedBox(height: 12),
+                              SizedBox(
+                                width: double.infinity,
+                                child: ElevatedButton.icon(
+                                  onPressed: () => _navigateToDrill(drill),
+                                  icon: const Icon(Icons.play_arrow),
+                                  label: Text(
+                                    _assignedDrills.length == 1 
+                                        ? 'Start Drill' 
+                                        : 'Start Drill ${index + 1}',
+                                  ),
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: index == 0 
+                                        ? Theme.of(context).primaryColor
+                                        : Theme.of(context).colorScheme.secondary,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        );
+                      }).toList()),
+                      // Quick start all drills button (if multiple drills)
+                      if (_assignedDrills.length > 1) ...[
+                        const SizedBox(height: 16),
+                        SizedBox(
+                          width: double.infinity,
+                          child: OutlinedButton.icon(
+                            onPressed: () {
+                              // Start with the first drill
+                              _navigateToDrill(_assignedDrills.first);
+                            },
+                            icon: const Icon(Icons.play_circle_filled),
+                            label: const Text('Start All Drills'),
+                            style: OutlinedButton.styleFrom(
+                              side: BorderSide(color: Theme.of(context).primaryColor),
+                              foregroundColor: Theme.of(context).primaryColor,
                             ),
-                          ],
+                          ),
                         ),
-                      ),
+                      ],
                     ],
                   ),
                 ),

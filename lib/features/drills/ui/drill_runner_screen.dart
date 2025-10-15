@@ -4,6 +4,7 @@ import 'package:brainblot_app/core/di/injection.dart';
 import 'package:brainblot_app/features/drills/data/session_repository.dart';
 import 'package:brainblot_app/features/drills/domain/drill.dart';
 import 'package:brainblot_app/features/drills/domain/session_result.dart';
+import 'package:brainblot_app/features/programs/services/program_progress_service.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
@@ -11,7 +12,15 @@ import 'package:uuid/uuid.dart';
 
 class DrillRunnerScreen extends StatefulWidget {
   final Drill drill;
-  const DrillRunnerScreen({super.key, required this.drill});
+  final String? programId;
+  final int? programDayNumber;
+  
+  const DrillRunnerScreen({
+    super.key, 
+    required this.drill,
+    this.programId,
+    this.programDayNumber,
+  });
 
   @override
   State<DrillRunnerScreen> createState() => _DrillRunnerScreenState();
@@ -329,6 +338,16 @@ class _DrillRunnerScreenState extends State<DrillRunnerScreen>
     
     await getIt<SessionRepository>().save(result);
     
+    // Complete program day if this was part of a program
+    if (widget.programId != null && widget.programDayNumber != null) {
+      try {
+        final progressService = getIt<ProgramProgressService>();
+        await progressService.completeProgramDay(widget.programId!, widget.programDayNumber!);
+      } catch (e) {
+        print('❌ Error completing program day: $e');
+      }
+    }
+    
     if (!mounted) return;
     
     // Show completion feedback
@@ -337,7 +356,21 @@ class _DrillRunnerScreenState extends State<DrillRunnerScreen>
     // Navigate to results after a brief delay
     Future.delayed(const Duration(milliseconds: 500), () {
       if (mounted) {
-        context.go('/drill-results', extra: result);
+        if (widget.programId != null && widget.programDayNumber != null) {
+          // Show success message for program completion
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Day ${widget.programDayNumber} completed! 🎉'),
+              backgroundColor: Colors.green,
+              duration: const Duration(seconds: 3),
+            ),
+          );
+          // Navigate back to program
+          context.go('/programs');
+        } else {
+          // Regular drill session, go to results
+          context.go('/drill-results', extra: result);
+        }
       }
     });
   }
@@ -416,16 +449,32 @@ class _DrillRunnerScreenState extends State<DrillRunnerScreen>
   }
   
   PreferredSizeWidget _buildAppBar(BuildContext context) {
+    final theme = Theme.of(context);
+    
     return AppBar(
       backgroundColor: Colors.transparent,
       elevation: 0,
       foregroundColor: Colors.white,
-      title: Text(
-        widget.drill.name,
-        style: const TextStyle(
-          color: Colors.white,
-          fontWeight: FontWeight.w600,
-        ),
+      title: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            widget.drill.name,
+            style: const TextStyle(
+              color: Colors.white,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          if (widget.programId != null && widget.programDayNumber != null)
+            Text(
+              'Program Day ${widget.programDayNumber}',
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: Colors.white.withOpacity(0.7),
+                fontSize: 12,
+              ),
+            ),
+        ],
       ),
       actions: [
         if (_state == DrillRunnerState.running)

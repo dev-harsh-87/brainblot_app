@@ -1,8 +1,6 @@
 name: brainblot_app
-description: "A new Flutter project."
-# The following line prevents the package from being accidentally published to
-# pub.dev using `flutter pub publish`. This is preferred for private packages.
-publish_to: 'none' # Remove this line if you wish to publish to pub.dev
+description: "BrainBlot - Advanced Cognitive Training App for Athletes and Fitness Enthusiasts"
+publish_to: 'none'
 
 # The following defines the version and build number for your application.
 # A version number is three numbers separated by dots, like 1.2.43
@@ -83,6 +81,8 @@ dependencies:
   pdf: ^3.11.0
   printing: ^5.13.1
   share_plus: ^10.1.2
+  url_launcher: ^6.3.0
+  package_info_plus: ^8.0.2
 
   # Monetization (optional)
   in_app_purchase: ^3.2.0

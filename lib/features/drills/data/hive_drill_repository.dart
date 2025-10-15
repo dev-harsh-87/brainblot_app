@@ -6,7 +6,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 
 class HiveDrillRepository implements DrillRepository {
-  final Box _box = Hive.box('drills');
+  final Box<dynamic> _box = Hive.box('drills');
   final _controller = StreamController<List<Drill>>.broadcast();
 
   HiveDrillRepository() {
@@ -18,7 +18,7 @@ class HiveDrillRepository implements DrillRepository {
 
   void _emit() {
     final items = _box.values
-        .whereType<Map>()
+        .whereType<Map<dynamic, dynamic>>()
         .map((e) => Drill.fromMap(Map<String, dynamic>.from(e)))
         .toList();
     _controller.add(items);
@@ -27,7 +27,7 @@ class HiveDrillRepository implements DrillRepository {
   @override
   Future<List<Drill>> fetchAll({String? query, String? category, Difficulty? difficulty}) async {
     final items = _box.values
-        .whereType<Map>()
+        .whereType<Map<dynamic, dynamic>>()
         .map((e) => Drill.fromMap(Map<String, dynamic>.from(e)))
         .toList();
     Iterable<Drill> out = items;
@@ -61,6 +61,99 @@ class HiveDrillRepository implements DrillRepository {
 
   @override
   Stream<List<Drill>> watchAll() => _controller.stream;
+
+  @override
+  Future<void> toggleFavorite(String drillId) async {
+    final drillMap = _box.get(drillId);
+    if (drillMap != null && drillMap is Map<dynamic, dynamic>) {
+      final drill = Drill.fromMap(Map<String, dynamic>.from(drillMap));
+      final updatedDrill = drill.copyWith(favorite: !drill.favorite);
+      await _box.put(drillId, updatedDrill.toMap());
+      await _syncToCloud(updatedDrill);
+    }
+  }
+
+  @override
+  Future<bool> isFavorite(String drillId) async {
+    final drillMap = _box.get(drillId);
+    if (drillMap != null && drillMap is Map<dynamic, dynamic>) {
+      final drill = Drill.fromMap(Map<String, dynamic>.from(drillMap));
+      return drill.favorite;
+    }
+    return false;
+  }
+
+  @override
+  Future<List<Drill>> fetchMyDrills({String? query, String? category, Difficulty? difficulty}) async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) return [];
+
+    final items = _box.values
+        .whereType<Map<dynamic, dynamic>>()
+        .map((e) => Drill.fromMap(Map<String, dynamic>.from(e)))
+        .where((drill) => drill.createdBy == user.uid)
+        .toList();
+    
+    Iterable<Drill> out = items;
+    if (query != null && query.isNotEmpty) {
+      out = out.where((d) => d.name.toLowerCase().contains(query.toLowerCase()));
+    }
+    if (category != null && category.isNotEmpty) {
+      out = out.where((d) => d.category == category);
+    }
+    if (difficulty != null) {
+      out = out.where((d) => d.difficulty == difficulty);
+    }
+    return out.toList(growable: false);
+  }
+
+  @override
+  Future<List<Drill>> fetchPublicDrills({String? query, String? category, Difficulty? difficulty}) async {
+    final user = FirebaseAuth.instance.currentUser;
+    
+    final items = _box.values
+        .whereType<Map<dynamic, dynamic>>()
+        .map((e) => Drill.fromMap(Map<String, dynamic>.from(e)))
+        .where((drill) => drill.isPublic && drill.createdBy != user?.uid)
+        .toList();
+    
+    Iterable<Drill> out = items;
+    if (query != null && query.isNotEmpty) {
+      out = out.where((d) => d.name.toLowerCase().contains(query.toLowerCase()));
+    }
+    if (category != null && category.isNotEmpty) {
+      out = out.where((d) => d.category == category);
+    }
+    if (difficulty != null) {
+      out = out.where((d) => d.difficulty == difficulty);
+    }
+    return out.toList(growable: false);
+  }
+
+  @override
+  Future<List<Drill>> fetchFavoriteDrills({String? query, String? category, Difficulty? difficulty}) async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) return [];
+    
+    final items = _box.values
+        .whereType<Map<dynamic, dynamic>>()
+        .map((e) => Drill.fromMap(Map<String, dynamic>.from(e)))
+        .where((drill) => drill.favorite && 
+               (drill.createdBy == user.uid || drill.isPublic))
+        .toList();
+    
+    Iterable<Drill> out = items;
+    if (query != null && query.isNotEmpty) {
+      out = out.where((d) => d.name.toLowerCase().contains(query.toLowerCase()));
+    }
+    if (category != null && category.isNotEmpty) {
+      out = out.where((d) => d.category == category);
+    }
+    if (difficulty != null) {
+      out = out.where((d) => d.difficulty == difficulty);
+    }
+    return out.toList(growable: false);
+  }
 
   Future<void> _syncToCloud(Drill drill) async {
     final user = FirebaseAuth.instance.currentUser;

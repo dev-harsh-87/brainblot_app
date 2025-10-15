@@ -1,45 +1,36 @@
 {
   "project_info": {
-    "project_number": "1055105336856",
-    "project_id": "brain-bolt-training",
-    "storage_bucket": "brain-bolt-training.firebasestorage.app"
+    "project_number": "419204986983",
+    "project_id": "brain-app-18086",
+    "storage_bucket": "brain-app-18086.firebasestorage.app"
   },
   "client": [
     {
       "client_info": {
-        "mobilesdk_app_id": "1:1055105336856:android:44161dcb9140a60050e56d",
-        "android_client_info": {
-          "package_name": "com.tbg.ai_app"
-        }
-      },
-      "oauth_client": [],
-      "api_key": [
-        {
-          "current_key": "AIzaSyDcIvHlP8NitTJHRe9ThBmMAad-mLw8oNU"
-        }
-      ],
-      "services": {
-        "appinvite_service": {
-          "other_platform_oauth_client": []
-        }
-      }
-    },
-    {
-      "client_info": {
-        "mobilesdk_app_id": "1:1055105336856:android:6eda36592f09e30c50e56d",
+        "mobilesdk_app_id": "1:419204986983:android:f1df26bf9f7ffcfcef3cc2",
         "android_client_info": {
           "package_name": "com.tbg.brainblot_app"
         }
       },
-      "oauth_client": [],
+      "oauth_client": [
+        {
+          "client_id": "419204986983-sg1gojgbes0foe75ted6csrkk5h13bd0.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
       "api_key": [
         {
-          "current_key": "AIzaSyDcIvHlP8NitTJHRe9ThBmMAad-mLw8oNU"
+          "current_key": "AIzaSyAbuoRosy4Zn4c8Y5Xmmej31DWu1417ACY"
         }
       ],
       "services": {
         "appinvite_service": {
-          "other_platform_oauth_client": []
+          "other_platform_oauth_client": [
+            {
+              "client_id": "419204986983-sg1gojgbes0foe75ted6csrkk5h13bd0.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
         }
       }
     }

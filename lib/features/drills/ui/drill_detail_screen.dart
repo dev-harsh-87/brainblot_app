@@ -1,10 +1,119 @@
 import 'package:brainblot_app/features/drills/domain/drill.dart';
+import 'package:brainblot_app/features/drills/data/drill_repository.dart';
+import 'package:brainblot_app/features/drills/bloc/drill_library_bloc.dart';
+import 'package:brainblot_app/features/sharing/ui/sharing_screen.dart';
+import 'package:brainblot_app/features/sharing/ui/privacy_control_widget.dart';
+import 'package:brainblot_app/features/sharing/services/sharing_service.dart';
+import 'package:brainblot_app/core/di/injection.dart';
+import 'package:brainblot_app/core/widgets/confirmation_dialog.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
+import 'package:share_plus/share_plus.dart';
+import 'package:uuid/uuid.dart';
 
-class DrillDetailScreen extends StatelessWidget {
+class DrillDetailScreen extends StatefulWidget {
   final Drill drill;
   const DrillDetailScreen({super.key, required this.drill});
+
+  @override
+  State<DrillDetailScreen> createState() => _DrillDetailScreenState();
+}
+
+class _DrillDetailScreenState extends State<DrillDetailScreen> {
+  late DrillRepository _drillRepository;
+  late SharingService _sharingService;
+  late Drill _currentDrill;
+  bool _isLoading = false;
+  bool _isOwner = false;
+  bool _privacyLoading = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _drillRepository = getIt<DrillRepository>();
+    _sharingService = getIt<SharingService>();
+    _currentDrill = widget.drill;
+    _loadOwnershipInfo();
+  }
+
+  Future<void> _loadOwnershipInfo() async {
+    try {
+      print('🔍 Checking ownership for drill: ${_currentDrill.id}');
+      final isOwner = await _sharingService.isOwner('drill', _currentDrill.id);
+      print('👤 Ownership result: $isOwner');
+      if (mounted) {
+        setState(() => _isOwner = isOwner);
+      }
+    } catch (e) {
+      // Ownership check failure shouldn't block the UI
+      print('❌ Failed to check ownership: $e');
+      // For custom drills, assume ownership if check fails
+      if (!_currentDrill.isPreset && mounted) {
+        setState(() => _isOwner = true);
+      }
+    }
+  }
+
+  Future<void> _togglePrivacy() async {
+    if (!_isOwner) return;
+
+    // Show confirmation dialog
+    final confirmed = await ConfirmationDialog.showPrivacyConfirmation(
+      context,
+      isCurrentlyPublic: _currentDrill.isPublic,
+      itemType: 'drill',
+      itemName: _currentDrill.name,
+    );
+
+    if (confirmed != true) return;
+
+    setState(() => _privacyLoading = true);
+    
+    try {
+      await _sharingService.togglePrivacy('drill', _currentDrill.id, !_currentDrill.isPublic);
+      
+      if (mounted) {
+        setState(() {
+          _currentDrill = _currentDrill.copyWith(isPublic: !_currentDrill.isPublic);
+          _privacyLoading = false;
+        });
+        
+        HapticFeedback.lightImpact();
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Row(
+              children: [
+                Icon(
+                  _currentDrill.isPublic ? Icons.public : Icons.lock,
+                  color: Colors.white,
+                  size: 20,
+                ),
+                const SizedBox(width: 8),
+                Text(_currentDrill.isPublic 
+                    ? 'Drill is now public! 🌍'
+                    : 'Drill is now private 🔒'),
+              ],
+            ),
+            backgroundColor: _currentDrill.isPublic ? Colors.green : Colors.grey,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _privacyLoading = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to update privacy: $e'),
+            backgroundColor: Colors.red,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -13,7 +122,9 @@ class DrillDetailScreen extends StatelessWidget {
 
     return Scaffold(
       backgroundColor: colorScheme.surface,
-      body: CustomScrollView(
+      body: Stack(
+        children: [
+          CustomScrollView(
         slivers: [
           // Hero Header
           SliverAppBar(
@@ -23,7 +134,7 @@ class DrillDetailScreen extends StatelessWidget {
             foregroundColor: colorScheme.onSurface,
             flexibleSpace: FlexibleSpaceBar(
               title: Text(
-                drill.name,
+                _currentDrill.name,
                 style: theme.textTheme.headlineSmall?.copyWith(
                   fontWeight: FontWeight.bold,
                   color: colorScheme.onSurface,
@@ -33,8 +144,8 @@ class DrillDetailScreen extends StatelessWidget {
                 decoration: BoxDecoration(
                   gradient: LinearGradient(
                     colors: [
-                      _getDifficultyColor(drill.difficulty).withOpacity(0.8),
-                      _getDifficultyColor(drill.difficulty).withOpacity(0.4),
+                      _getDifficultyColor(_currentDrill.difficulty).withOpacity(0.8),
+                      _getDifficultyColor(_currentDrill.difficulty).withOpacity(0.4),
                     ],
                     begin: Alignment.topCenter,
                     end: Alignment.bottomCenter,
@@ -51,69 +162,57 @@ class DrillDetailScreen extends StatelessWidget {
                           shape: BoxShape.circle,
                         ),
                         child: Icon(
-                          _getCategoryIcon(drill.category),
+                          _getCategoryIcon(_currentDrill.category),
                           size: 60,
                           color: Colors.white,
                         ),
                       ),
                     ),
-                    Positioned(
-                      top: 100,
-                      right: 20,
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                        decoration: BoxDecoration(
-                          color: Colors.white.withOpacity(0.9),
-                          borderRadius: BorderRadius.circular(20),
-                        ),
-                        child: Text(
-                          drill.difficulty.name.toUpperCase(),
-                          style: theme.textTheme.bodySmall?.copyWith(
-                            color: _getDifficultyColor(drill.difficulty),
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ),
-                    ),
+
                   ],
                 ),
               ),
             ),
             actions: [
               IconButton(
-                onPressed: () {
-                  // TODO: Toggle favorite
-                },
+                onPressed: _isLoading ? null : _toggleFavorite,
                 icon: Icon(
-                  drill.favorite ? Icons.favorite : Icons.favorite_border,
-                  color: drill.favorite ? colorScheme.error : null,
+                  _currentDrill.favorite ? Icons.favorite : Icons.favorite_border,
+                  color: _currentDrill.favorite ? colorScheme.error : null,
                 ),
               ),
+              PrivacyToggleIconButton(
+                isPublic: _currentDrill.isPublic,
+                isOwner: _isOwner,
+                onToggle: _isOwner && !_privacyLoading ? _togglePrivacy : null,
+                isLoading: _privacyLoading,
+              ),
               PopupMenuButton<String>(
-                onSelected: (value) {
+                onSelected: _isLoading ? null : (value) {
                   switch (value) {
                     case 'edit':
-                      context.go('/drill-builder', extra: drill);
+                      _editDrill();
                       break;
                     case 'duplicate':
-                      // TODO: Duplicate drill
+                      _duplicateDrill();
                       break;
                     case 'share':
-                      // TODO: Share drill
+                      _shareDrill();
                       break;
                   }
                 },
                 itemBuilder: (context) => [
-                  const PopupMenuItem(
-                    value: 'edit',
-                    child: Row(
-                      children: [
-                        Icon(Icons.edit),
-                        SizedBox(width: 8),
-                        Text('Edit'),
-                      ],
+                  if (!_currentDrill.isPreset)
+                    const PopupMenuItem(
+                      value: 'edit',
+                      child: Row(
+                        children: [
+                          Icon(Icons.edit),
+                          SizedBox(width: 8),
+                          Text('Edit'),
+                        ],
+                      ),
                     ),
-                  ),
                   const PopupMenuItem(
                     value: 'duplicate',
                     child: Row(
@@ -146,7 +245,9 @@ class DrillDetailScreen extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   // Category and Tags
-                  Row(
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
                     children: [
                       Container(
                         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
@@ -155,15 +256,31 @@ class DrillDetailScreen extends StatelessWidget {
                           borderRadius: BorderRadius.circular(16),
                         ),
                         child: Text(
-                          drill.category.toUpperCase(),
+                          _currentDrill.category.toUpperCase(),
                           style: theme.textTheme.bodySmall?.copyWith(
                             color: colorScheme.onPrimaryContainer,
                             fontWeight: FontWeight.w600,
                           ),
                         ),
                       ),
-                      const SizedBox(width: 8),
-                      if (drill.isPreset)
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                        decoration: BoxDecoration(
+                          color: _getDifficultyColor(_currentDrill.difficulty).withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(16),
+                          border: Border.all(
+                            color: _getDifficultyColor(_currentDrill.difficulty).withOpacity(0.3),
+                          ),
+                        ),
+                        child: Text(
+                          _currentDrill.difficulty.name.toUpperCase(),
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color: _getDifficultyColor(_currentDrill.difficulty),
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                      if (_currentDrill.isPreset)
                         Container(
                           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                           decoration: BoxDecoration(
@@ -190,7 +307,7 @@ class DrillDetailScreen extends StatelessWidget {
                           context,
                           Icons.timer,
                           'Duration',
-                          '${drill.durationSec}s',
+                          '${_currentDrill.durationSec}s',
                           colorScheme.primary,
                         ),
                       ),
@@ -200,7 +317,7 @@ class DrillDetailScreen extends StatelessWidget {
                           context,
                           Icons.repeat,
                           'Repetitions',
-                          '${drill.reps}x',
+                          '${_currentDrill.reps}x',
                           colorScheme.secondary,
                         ),
                       ),
@@ -210,7 +327,7 @@ class DrillDetailScreen extends StatelessWidget {
                           context,
                           Icons.pause,
                           'Rest',
-                          '${drill.restSec}s',
+                          '${_currentDrill.restSec}s',
                           colorScheme.tertiary,
                         ),
                       ),
@@ -229,7 +346,7 @@ class DrillDetailScreen extends StatelessWidget {
                   Wrap(
                     spacing: 8,
                     runSpacing: 8,
-                    children: drill.stimulusTypes.map((type) => _buildStimulusChip(context, type)).toList(),
+                    children: _currentDrill.stimulusTypes.map((type) => _buildStimulusChip(context, type)).toList(),
                   ),
                   const SizedBox(height: 24),
                   
@@ -249,7 +366,7 @@ class DrillDetailScreen extends StatelessWidget {
                       borderRadius: BorderRadius.circular(16),
                       border: Border.all(color: colorScheme.outline.withOpacity(0.3)),
                     ),
-                    child: _buildZoneVisualization(drill.zones),
+                    child: _buildZoneVisualization(_currentDrill.zones),
                   ),
                   const SizedBox(height: 24),
                   
@@ -270,7 +387,7 @@ class DrillDetailScreen extends StatelessWidget {
                       Expanded(
                         flex: 2,
                         child: FilledButton.icon(
-                          onPressed: () => context.go('/drill-runner', extra: drill),
+                          onPressed: () => context.push('/drill-runner', extra: _currentDrill),
                           icon: const Icon(Icons.play_arrow),
                           label: const Text('Start Drill'),
                           style: FilledButton.styleFrom(
@@ -283,22 +400,7 @@ class DrillDetailScreen extends StatelessWidget {
                           ),
                         ),
                       ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: OutlinedButton.icon(
-                          onPressed: () {
-                            // TODO: Preview drill
-                          },
-                          icon: const Icon(Icons.visibility),
-                          label: const Text('Preview'),
-                          style: OutlinedButton.styleFrom(
-                            padding: const EdgeInsets.symmetric(vertical: 16),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                          ),
-                        ),
-                      ),
+
                     ],
                   ),
                   const SizedBox(height: 20),
@@ -306,6 +408,28 @@ class DrillDetailScreen extends StatelessWidget {
               ),
             ),
           ),
+        ],
+      ),
+          // Loading overlay
+          if (_isLoading)
+            Container(
+              color: Colors.black.withOpacity(0.3),
+              child: const Center(
+                child: Card(
+                  child: Padding(
+                    padding: EdgeInsets.all(20),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        CircularProgressIndicator(),
+                        SizedBox(height: 16),
+                        Text('Processing...'),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ),
         ],
       ),
     );
@@ -400,11 +524,11 @@ class DrillDetailScreen extends StatelessWidget {
       ),
       child: Column(
         children: [
-          _buildConfigRow(context, 'Number of Stimuli', '${drill.numberOfStimuli}'),
+          _buildConfigRow(context, 'Number of Stimuli', '${_currentDrill.numberOfStimuli}'),
           const Divider(),
-          _buildConfigRow(context, 'Colors Used', '${drill.colors.length} colors'),
+          _buildConfigRow(context, 'Colors Used', '${_currentDrill.colors.length} colors'),
           const Divider(),
-          _buildConfigRow(context, 'Total Duration', '${(drill.durationSec * drill.reps + drill.restSec * (drill.reps - 1))}s'),
+          _buildConfigRow(context, 'Total Duration', '${(_currentDrill.durationSec * _currentDrill.reps + _currentDrill.restSec * (_currentDrill.reps - 1))}s'),
         ],
       ),
     );
@@ -434,6 +558,174 @@ class DrillDetailScreen extends StatelessWidget {
         ],
       ),
     );
+  }
+
+  // Functionality Methods
+  Future<void> _toggleFavorite() async {
+    if (_isLoading) return;
+    
+    print('🔄 Toggling favorite for drill: ${_currentDrill.id}, current: ${_currentDrill.favorite}');
+    setState(() => _isLoading = true);
+    
+    try {
+      await _drillRepository.toggleFavorite(_currentDrill.id);
+      setState(() {
+        _currentDrill = _currentDrill.copyWith(favorite: !_currentDrill.favorite);
+      });
+      print('✅ Favorite toggled successfully, new state: ${_currentDrill.favorite}');
+      
+      // Refresh the drill library to update the UI
+      try {
+        final drillLibraryBloc = getIt<DrillLibraryBloc>();
+        drillLibraryBloc.add(const DrillLibraryRefreshRequested());
+      } catch (e) {
+        // DrillLibraryBloc might not be available, that's okay
+        print('DrillLibraryBloc not available for refresh: $e');
+      }
+      
+      // Show feedback
+      if (mounted) {
+        HapticFeedback.lightImpact();
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              _currentDrill.favorite 
+                ? 'Added to favorites' 
+                : 'Removed from favorites',
+            ),
+            duration: const Duration(seconds: 2),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to update favorite: $e'),
+            backgroundColor: Theme.of(context).colorScheme.error,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
+    }
+  }
+
+  Future<void> _editDrill() async {
+    print('✏️ Editing drill: ${_currentDrill.id}, isPreset: ${_currentDrill.isPreset}, isOwner: $_isOwner');
+    HapticFeedback.lightImpact();
+    
+    final editedDrill = await context.push<Drill>('/drill-builder', extra: _currentDrill);
+    print('📝 Edit result: ${editedDrill != null ? "Success" : "Cancelled"}');
+    
+    if (editedDrill != null && mounted) {
+      // Update the drill in the repository
+      try {
+        await _drillRepository.upsert(editedDrill);
+        
+        // Update the current drill state
+        setState(() {
+          _currentDrill = editedDrill;
+        });
+        
+        // Show success message
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Drill updated successfully!'),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      } catch (e) {
+        // Show error message
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to update drill: $e'),
+            backgroundColor: Theme.of(context).colorScheme.error,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    }
+  }
+
+  Future<void> _duplicateDrill() async {
+    if (_isLoading) return;
+    
+    setState(() => _isLoading = true);
+    
+    try {
+      HapticFeedback.lightImpact();
+      
+      // Create a copy with new ID and modified name
+      final duplicatedDrill = _currentDrill.copyWith(
+        id: const Uuid().v4(),
+        name: '${_currentDrill.name} (Copy)',
+        favorite: false,
+        isPreset: false,
+      );
+      
+      await _drillRepository.upsert(duplicatedDrill);
+      
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: const Text('Drill duplicated successfully'),
+            action: SnackBarAction(
+              label: 'View',
+              onPressed: () {
+                context.pushReplacement('/drill-detail', extra: duplicatedDrill);
+              },
+            ),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to duplicate drill: $e'),
+            backgroundColor: Theme.of(context).colorScheme.error,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
+    }
+  }
+
+  Future<void> _shareDrill() async {
+    try {
+      HapticFeedback.lightImpact();
+      
+      // Navigate to sharing screen
+      await Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (context) => SharingScreen(
+            itemType: 'drill',
+            itemId: _currentDrill.id,
+            itemName: _currentDrill.name,
+          ),
+        ),
+      );
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to share drill: $e'),
+            backgroundColor: Theme.of(context).colorScheme.error,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    }
   }
 
   Color _getDifficultyColor(Difficulty difficulty) {

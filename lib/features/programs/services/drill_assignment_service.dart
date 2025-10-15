@@ -1,5 +1,7 @@
-import 'package:brainblot_app/features/drills/domain/drill.dart';
+import 'dart:async';
+
 import 'package:brainblot_app/features/drills/data/drill_repository.dart';
+import 'package:brainblot_app/features/drills/domain/drill.dart';
 import 'package:brainblot_app/features/programs/domain/program.dart';
 
 class DrillAssignmentService {
@@ -99,75 +101,75 @@ class DrillAssignmentService {
     }
   }
 
-  /// Assigns drills to program days with progressive difficulty
-  List<ProgramDay> _assignDrillsToDays(List<ProgramDay> days, List<Drill> availableDrills, String programLevel) {
+  /// Assigns drills to program days based on program duration and available drills
+  Future<List<ProgramDay>> _assignDrillsToDays(
+    List<ProgramDay> programDays,
+    List<Drill> availableDrills,
+    String programLevel,
+  ) async {
     if (availableDrills.isEmpty) {
-      return days; // Return original days if no drills available
+      // Return empty days if no drills available
+      return List<ProgramDay>.generate(
+        programDays.length,
+        (index) => ProgramDay(
+          dayNumber: index + 1,
+          title: 'Day ${index + 1}',
+          description: 'No drills available',
+        ),
+      );
     }
 
-    final totalDays = days.length;
-    final assignedDays = <ProgramDay>[];
+    final List<ProgramDay> days = [];
+    final int totalDays = programDays.length;
     
-    for (int i = 0; i < totalDays; i++) {
-      final day = days[i];
-      final progressRatio = i / (totalDays - 1); // 0.0 to 1.0
-      
-      // Select drill based on progression through program
-      final drill = _selectDrillForDay(availableDrills, progressRatio, programLevel, i);
-      
-      assignedDays.add(ProgramDay(
-        dayNumber: day.dayNumber,
-        title: day.title,
-        description: drill != null 
-            ? '${day.description}\n\nAssigned Drill: ${drill.name}'
-            : day.description,
-        drillId: drill?.id,
-      ));
-    }
-    
-    return assignedDays;
-  }
-
-  /// Selects appropriate drill for a specific day based on progression
-  Drill? _selectDrillForDay(List<Drill> drills, double progressRatio, String programLevel, int dayIndex) {
-    if (drills.isEmpty) return null;
-    
-    // Group drills by difficulty
-    final beginnerDrills = drills.where((d) => d.difficulty == Difficulty.beginner).toList();
-    final intermediateDrills = drills.where((d) => d.difficulty == Difficulty.intermediate).toList();
-    final advancedDrills = drills.where((d) => d.difficulty == Difficulty.advanced).toList();
-    
-    // Progressive difficulty selection based on program progression
-    List<Drill> candidateDrills;
-    
-    if (programLevel.toLowerCase() == 'beginner') {
-      // Beginner programs: mostly beginner drills, some intermediate later
-      candidateDrills = progressRatio < 0.7 ? beginnerDrills : 
-                       (intermediateDrills.isNotEmpty ? intermediateDrills : beginnerDrills);
-    } else if (programLevel.toLowerCase() == 'intermediate') {
-      // Intermediate programs: mix of beginner and intermediate, some advanced later
-      if (progressRatio < 0.3) {
-        candidateDrills = beginnerDrills.isNotEmpty ? beginnerDrills : intermediateDrills;
-      } else if (progressRatio < 0.8) {
-        candidateDrills = intermediateDrills.isNotEmpty ? intermediateDrills : beginnerDrills;
-      } else {
-        candidateDrills = advancedDrills.isNotEmpty ? advancedDrills : intermediateDrills;
-      }
+    // Calculate how many drills to assign per day based on program duration
+    int drillsPerDay;
+    if (totalDays <= 7) {
+      drillsPerDay = 3; // Shorter programs get more drills per day
+    } else if (totalDays <= 14) {
+      drillsPerDay = 2;
     } else {
-      // Advanced programs: mix of intermediate and advanced
-      candidateDrills = progressRatio < 0.4 ? 
-                       (intermediateDrills.isNotEmpty ? intermediateDrills : advancedDrills) :
-                       (advancedDrills.isNotEmpty ? advancedDrills : intermediateDrills);
+      drillsPerDay = 1; // Longer programs get fewer drills per day
+    }
+
+    // Shuffle drills for variety
+    availableDrills.shuffle();
+    
+    // Assign drills to each day
+    int drillIndex = 0;
+    for (int day = 1; day <= totalDays; day++) {
+      // Select drills for this day
+      final List<Drill> dayDrills = [];
+      for (int i = 0; i < drillsPerDay && availableDrills.isNotEmpty; i++) {
+        // Get the next drill, cycling back to start if needed
+        final drill = availableDrills[drillIndex % availableDrills.length];
+        dayDrills.add(drill);
+        drillIndex++;
+      }
+
+      // Create the program day
+      if (dayDrills.isNotEmpty) {
+        // Use the first drill's details for the day
+        final mainDrill = dayDrills.first;
+        days.add(ProgramDay(
+          dayNumber: day,
+          title: 'Day $day: ${mainDrill.name}',
+          description: 'Complete ${dayDrills.length} drill${dayDrills.length > 1 ? 's' : ''} for today',
+          drillId: mainDrill.id,
+        ),);
+      } else {
+        // Fallback if no drills could be assigned
+        days.add(ProgramDay(
+          dayNumber: day,
+          title: 'Day $day',
+          description: 'Rest day',
+        ),);
+      }
     }
     
-    if (candidateDrills.isEmpty) {
-      candidateDrills = drills; // Fallback to all available drills
-    }
-    
-    // Select drill with some variety (not always the same drill)
-    final drillIndex = dayIndex % candidateDrills.length;
-    return candidateDrills[drillIndex];
+    return days;
   }
+
 
   /// Gets a specific drill by ID
   Future<Drill?> getDrillById(String drillId) async {
@@ -186,11 +188,12 @@ class DrillAssignmentService {
     final levelDrills = _filterDrillsByLevel(categoryDrills, level);
     
     // Sort by preset drills first, then by name
-    levelDrills.sort((a, b) {
-      if (a.isPreset && !b.isPreset) return -1;
-      if (!a.isPreset && b.isPreset) return 1;
-      return a.name.compareTo(b.name);
-    });
+    levelDrills
+      ..sort((a, b) {
+        if (a.isPreset && !b.isPreset) return -1;
+        if (!a.isPreset && b.isPreset) return 1;
+        return a.name.compareTo(b.name);
+      });
     
     return levelDrills.take(limit).toList();
   }

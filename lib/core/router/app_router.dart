@@ -24,11 +24,10 @@ import 'package:brainblot_app/features/programs/ui/program_stats_screen.dart';
 import 'package:brainblot_app/features/programs/domain/program.dart';
 import 'package:brainblot_app/features/stats/stats_screen.dart';
 import 'package:brainblot_app/features/stats/bloc/stats_bloc.dart';
-import 'package:brainblot_app/features/team/team_screen.dart';
-import 'package:brainblot_app/features/team/bloc/team_bloc.dart';
 import 'package:brainblot_app/features/settings/settings_screen.dart';
 import 'package:brainblot_app/features/settings/bloc/settings_bloc.dart';
 import 'package:brainblot_app/features/auth/register_screen.dart';
+import 'package:brainblot_app/features/auth/forgot_password_screen.dart';
 import 'package:brainblot_app/features/drills/domain/drill.dart';
 import 'package:brainblot_app/features/drills/domain/session_result.dart';
 
@@ -41,7 +40,9 @@ class AppRouter {
     initialLocation: '/login',
     redirect: (context, state) {
       final authState = _authBloc.state;
-      final isAuthRoute = state.uri.toString() == '/login' || state.uri.toString() == '/register';
+      final isAuthRoute = state.uri.toString() == '/login' || 
+                         state.uri.toString() == '/register' || 
+                         state.uri.toString() == '/forgot-password';
       
       if (authState.status == AuthStatus.authenticated && isAuthRoute) {
         return '/';
@@ -66,6 +67,11 @@ class AppRouter {
         builder: (BuildContext context, GoRouterState state) => const RegisterScreen(),
       ),
       GoRoute(
+        path: '/forgot-password',
+        name: 'forgot-password',
+        builder: (BuildContext context, GoRouterState state) => const ForgotPasswordScreen(),
+      ),
+      GoRoute(
         path: '/',
         name: 'home',
         builder: (BuildContext context, GoRouterState state) => AuthGuard(
@@ -83,16 +89,16 @@ class AppRouter {
           GoRoute(
             path: 'drills',
             name: 'drills',
-            builder: (context, state) => BlocProvider(
-              create: (_) => DrillLibraryBloc(getIt())..add(const DrillLibraryStarted()),
+            builder: (context, state) => BlocProvider.value(
+              value: getIt<DrillLibraryBloc>(),
               child: const DrillLibraryScreen(),
             ),
           ),
           GoRoute(
             path: 'programs',
             name: 'programs',
-            builder: (context, state) => BlocProvider(
-              create: (_) => ProgramsBloc(getIt())..add(const ProgramsStarted()),
+            builder: (context, state) => BlocProvider.value(
+              value: getIt<ProgramsBloc>(),
               child: const ProgramsScreen(),
             ),
           ),
@@ -105,18 +111,10 @@ class AppRouter {
             ),
           ),
           GoRoute(
-            path: 'team',
-            name: 'team',
-            builder: (context, state) => BlocProvider(
-              create: (_) => TeamBloc(getIt(), getIt(), getIt())..add(const TeamStarted()),
-              child: const TeamScreen(),
-            ),
-          ),
-          GoRoute(
             path: 'settings',
             name: 'settings',
-            builder: (context, state) => BlocProvider(
-              create: (_) => SettingsBloc(getIt())..add(const SettingsStarted()),
+            builder: (context, state) => BlocProvider.value(
+              value: getIt<SettingsBloc>()..add(const SettingsStarted()),
               child: const SettingsScreen(),
             ),
           ),
@@ -125,14 +123,11 @@ class AppRouter {
             name: 'profile',
             builder: (context, state) => MultiBlocProvider(
               providers: [
-                BlocProvider(
-                  create: (_) => SettingsBloc(getIt())..add(const SettingsStarted()),
+                BlocProvider.value(
+                  value: getIt<SettingsBloc>()..add(const SettingsStarted()),
                 ),
                 BlocProvider(
                   create: (_) => StatsBloc(getIt())..add(const StatsStarted()),
-                ),
-                BlocProvider(
-                  create: (_) => TeamBloc(getIt(), getIt(), getIt())..add(const TeamStarted()),
                 ),
               ],
               child: const ProfileScreen(),
@@ -161,8 +156,20 @@ class AppRouter {
         path: '/drill-runner',
         name: 'drill-runner',
         builder: (context, state) {
-          final drill = state.extra as Drill;
-          return DrillRunnerScreen(drill: drill);
+          if (state.extra is Map<String, dynamic>) {
+            final extras = state.extra as Map<String, dynamic>;
+            final drill = extras['drill'] as Drill;
+            final programId = extras['programId'] as String?;
+            final programDayNumber = extras['programDayNumber'] as int?;
+            return DrillRunnerScreen(
+              drill: drill,
+              programId: programId,
+              programDayNumber: programDayNumber,
+            );
+          } else {
+            final drill = state.extra as Drill;
+            return DrillRunnerScreen(drill: drill);
+          }
         },
       ),
       GoRoute(

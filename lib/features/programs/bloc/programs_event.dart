@@ -56,6 +56,21 @@ class ProgramsSeedDefaultRequested extends ProgramsEvent {
   const ProgramsSeedDefaultRequested();
 }
 
+class ProgramsRefreshRequested extends ProgramsEvent {
+  const ProgramsRefreshRequested();
+}
+
+class ProgramsCategoryFilterChanged extends ProgramsEvent {
+  final String? category;
+  const ProgramsCategoryFilterChanged(this.category);
+  @override
+  List<Object?> get props => [category];
+}
+
+class ProgramsRetryRequested extends ProgramsEvent {
+  const ProgramsRetryRequested();
+}
+
 class _ProgramsErrorOccurred extends ProgramsEvent {
   final String error;
   const _ProgramsErrorOccurred(this.error);

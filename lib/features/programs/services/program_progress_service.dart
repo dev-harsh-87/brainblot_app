@@ -35,7 +35,7 @@ class ProgramProgressService {
     }
 
     final activeData = activeDoc.data()!;
-    final currentDay = activeData['currentDay'] as int;
+    final currentDay = (activeData['currentDay'] as int?) ?? 1;
     final completedDays = List<int>.from((activeData['completedDays'] as List<dynamic>?) ?? <dynamic>[]);
 
     // Add day to completed days if not already completed
@@ -50,15 +50,15 @@ class ProgramProgressService {
       // Find next incomplete day
       final program = await _getProgram(programId);
       if (program != null) {
-        for (int i = currentDay + 1; i <= program.totalDays; i++) {
+        for (int i = currentDay + 1; i <= program.durationDays; i++) {
           if (!completedDays.contains(i)) {
             nextDay = i;
             break;
           }
         }
         // If all days are completed, set to total days + 1 to indicate completion
-        if (completedDays.length == program.totalDays) {
-          nextDay = program.totalDays + 1;
+        if (completedDays.length == program.durationDays) {
+          nextDay = program.durationDays + 1;
         }
       }
     }
@@ -90,7 +90,7 @@ class ProgramProgressService {
 
     // Check if program is fully completed
     final program = await _getProgram(programId);
-    if (program != null && completedDays.length >= program.totalDays) {
+    if (program != null && completedDays.length >= program.durationDays) {
       await _completeProgram(programId, userId);
     }
   }
@@ -112,15 +112,17 @@ class ProgramProgressService {
       if (data['programId'] != programId) return null;
 
       final completedDays = List<int>.from((data['completedDays'] as List<dynamic>?) ?? <dynamic>[]);
-      final currentDay = data['currentDay'] as int;
-      final totalDays = data['totalDays'] as int;
-      final startedAt = DateTime.parse(data['startedAt'] as String);
+      final currentDay = (data['currentDay'] as int?) ?? 1;
+      final totalDays = (data['totalDays'] as int?) ?? (data['durationDays'] as int?) ?? 30;
+      final startedAt = data['startedAt'] != null 
+          ? DateTime.parse(data['startedAt'] as String)
+          : DateTime.now();
 
       return ProgramProgress(
         programId: programId,
         currentDay: currentDay,
         completedDays: completedDays,
-        totalDays: totalDays,
+        durationDays: totalDays,
         startedAt: startedAt,
         progressPercentage: _calculateProgressPercentage(completedDays.length, totalDays),
         lastCompletedAt: data['lastCompletedAt'] != null 
@@ -149,15 +151,17 @@ class ProgramProgressService {
       if (data['programId'] != programId) return null;
 
       final completedDays = List<int>.from((data['completedDays'] as List<dynamic>?) ?? <dynamic>[]);
-      final currentDay = data['currentDay'] as int;
-      final totalDays = data['totalDays'] as int;
-      final startedAt = DateTime.parse(data['startedAt'] as String);
+      final currentDay = (data['currentDay'] as int?) ?? 1;
+      final totalDays = (data['totalDays'] as int?) ?? (data['durationDays'] as int?) ?? 30;
+      final startedAt = data['startedAt'] != null 
+          ? DateTime.parse(data['startedAt'] as String)
+          : DateTime.now();
 
       return ProgramProgress(
         programId: programId,
         currentDay: currentDay,
         completedDays: completedDays,
-        totalDays: totalDays,
+        durationDays: totalDays,
         startedAt: startedAt,
         progressPercentage: _calculateProgressPercentage(completedDays.length, totalDays),
         lastCompletedAt: data['lastCompletedAt'] != null 
@@ -382,7 +386,7 @@ class ProgramProgress {
   final String programId;
   final int currentDay;
   final List<int> completedDays;
-  final int totalDays;
+  final int durationDays; // Changed from totalDays for consistency
   final DateTime startedAt;
   final double progressPercentage;
   final DateTime? lastCompletedAt;
@@ -391,15 +395,15 @@ class ProgramProgress {
     required this.programId,
     required this.currentDay,
     required this.completedDays,
-    required this.totalDays,
+    required this.durationDays,
     required this.startedAt,
     required this.progressPercentage,
     this.lastCompletedAt,
   });
 
-  bool get isCompleted => completedDays.length >= totalDays;
+  bool get isCompleted => completedDays.length >= durationDays;
   bool isDayCompleted(int dayNumber) => completedDays.contains(dayNumber);
-  int get remainingDays => totalDays - completedDays.length;
+  int get remainingDays => durationDays - completedDays.length;
   Duration get timeActive => DateTime.now().difference(startedAt);
 }
 

@@ -36,3 +36,10 @@ class AuthUserChanged extends AuthEvent {
 class AuthCheckRequested extends AuthEvent {
   const AuthCheckRequested();
 }
+
+class AuthForgotPasswordSubmitted extends AuthEvent {
+  final String email;
+  const AuthForgotPasswordSubmitted({required this.email});
+  @override
+  List<Object?> get props => [email];
+}

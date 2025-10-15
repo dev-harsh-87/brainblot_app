@@ -25,9 +25,33 @@ class DrillLibraryFilterChanged extends DrillLibraryEvent {
   List<Object?> get props => [category, difficulty];
 }
 
+class DrillLibraryRefreshRequested extends DrillLibraryEvent {
+  const DrillLibraryRefreshRequested();
+}
+
+class DrillLibraryFiltersCleared extends DrillLibraryEvent {
+  const DrillLibraryFiltersCleared();
+}
+
+class DrillLibraryViewChanged extends DrillLibraryEvent {
+  final DrillLibraryView view;
+  const DrillLibraryViewChanged(this.view);
+  @override
+  List<Object?> get props => [view];
+}
+
+enum DrillLibraryView { all, favorites, custom }
+
 class _DrillLibraryItemsUpdated extends DrillLibraryEvent {
   final List<Drill> items;
   const _DrillLibraryItemsUpdated(this.items);
   @override
   List<Object?> get props => [items];
+}
+
+class _DrillLibraryErrorOccurred extends DrillLibraryEvent {
+  final String error;
+  const _DrillLibraryErrorOccurred(this.error);
+  @override
+  List<Object?> get props => [error];
 }
