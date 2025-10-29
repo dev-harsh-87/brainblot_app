@@ -56,64 +56,7 @@ class _DrillDetailScreenState extends State<DrillDetailScreen> {
     }
   }
 
-  Future<void> _togglePrivacy() async {
-    if (!_isOwner) return;
-
-    // Show confirmation dialog
-    final confirmed = await ConfirmationDialog.showPrivacyConfirmation(
-      context,
-      isCurrentlyPublic: _currentDrill.isPublic,
-      itemType: 'drill',
-      itemName: _currentDrill.name,
-    );
-
-    if (confirmed != true) return;
-
-    setState(() => _privacyLoading = true);
-    
-    try {
-      await _sharingService.togglePrivacy('drill', _currentDrill.id, !_currentDrill.isPublic);
-      
-      if (mounted) {
-        setState(() {
-          _currentDrill = _currentDrill.copyWith(isPublic: !_currentDrill.isPublic);
-          _privacyLoading = false;
-        });
-        
-        HapticFeedback.lightImpact();
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Row(
-              children: [
-                Icon(
-                  _currentDrill.isPublic ? Icons.public : Icons.lock,
-                  color: Colors.white,
-                  size: 20,
-                ),
-                const SizedBox(width: 8),
-                Text(_currentDrill.isPublic 
-                    ? 'Drill is now public! 🌍'
-                    : 'Drill is now private 🔒'),
-              ],
-            ),
-            backgroundColor: _currentDrill.isPublic ? Colors.green : Colors.grey,
-            behavior: SnackBarBehavior.floating,
-          ),
-        );
-      }
-    } catch (e) {
-      if (mounted) {
-        setState(() => _privacyLoading = false);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Failed to update privacy: $e'),
-            backgroundColor: Colors.red,
-            behavior: SnackBarBehavior.floating,
-          ),
-        );
-      }
-    }
-  }
+  // Privacy toggle functionality removed - all drills are now private by default
 
   @override
   Widget build(BuildContext context) {
@@ -181,12 +124,7 @@ class _DrillDetailScreenState extends State<DrillDetailScreen> {
                   color: _currentDrill.favorite ? colorScheme.error : null,
                 ),
               ),
-              PrivacyToggleIconButton(
-                isPublic: _currentDrill.isPublic,
-                isOwner: _isOwner,
-                onToggle: _isOwner && !_privacyLoading ? _togglePrivacy : null,
-                isLoading: _privacyLoading,
-              ),
+              // Privacy toggle removed - all drills are private by default
               PopupMenuButton<String>(
                 onSelected: _isLoading ? null : (value) {
                   switch (value) {

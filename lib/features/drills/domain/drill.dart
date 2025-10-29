@@ -22,7 +22,6 @@ class Drill {
   final bool isPreset; // preset vs user-created
   final String? createdBy; // user ID who created the drill
   final List<String> sharedWith; // user IDs who have access to this drill
-  final bool isPublic; // whether drill is publicly visible
   final DateTime createdAt; // when the drill was created
 
   Drill({
@@ -41,7 +40,6 @@ class Drill {
     this.isPreset = false,
     this.createdBy,
     this.sharedWith = const [],
-    this.isPublic = false,
     DateTime? createdAt,
   }) : createdAt = createdAt ?? DateTime.now();
 
@@ -61,7 +59,6 @@ class Drill {
     bool? isPreset,
     String? createdBy,
     List<String>? sharedWith,
-    bool? isPublic,
     DateTime? createdAt,
   }) => Drill(
         id: id ?? this.id,
@@ -79,7 +76,6 @@ class Drill {
         isPreset: isPreset ?? this.isPreset,
         createdBy: createdBy ?? this.createdBy,
         sharedWith: sharedWith ?? this.sharedWith,
-        isPublic: isPublic ?? this.isPublic,
         createdAt: createdAt ?? this.createdAt,
       );
 
@@ -99,7 +95,6 @@ class Drill {
         'isPreset': isPreset,
         'createdBy': createdBy,
         'sharedWith': sharedWith,
-        'isPublic': isPublic,
         'createdAt': createdAt.toIso8601String(),
       };
 
@@ -119,7 +114,6 @@ class Drill {
         isPreset: (map['isPreset'] as bool?) ?? false,
         createdBy: map['createdBy'] as String?,
         sharedWith: List<String>.from((map['sharedWith'] as List?) ?? []),
-        isPublic: (map['isPublic'] as bool?) ?? false,
         createdAt: map['createdAt'] != null ? DateTime.parse(map['createdAt'] as String) : DateTime.now(),
       );
 }

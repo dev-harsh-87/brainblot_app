@@ -11,6 +11,7 @@ import 'package:brainblot_app/features/auth/bloc/auth_bloc.dart';
 import 'package:brainblot_app/core/auth/auth_wrapper.dart';
 import 'package:brainblot_app/features/sharing/services/user_profile_setup_service.dart';
 import 'package:brainblot_app/core/services/preferences_service.dart';
+import 'package:brainblot_app/core/services/app_initialization_service.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
 Future<void> main() async {
@@ -22,6 +23,9 @@ Future<void> main() async {
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
   await AppStorage.init();
   await configureDependencies();
+  
+  // Initialize database with default admin and subscription plans
+  await AppInitializationService.initialize();
   
   // Check for auto-login
   await _checkAutoLogin();

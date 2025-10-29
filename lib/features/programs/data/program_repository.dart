@@ -63,8 +63,8 @@ class InMemoryProgramRepository implements ProgramRepository {
       if (currentUserId == null) return <Program>[];
       
       return programs.where((p) => 
-          p.favorite && 
-          (p.createdBy == currentUserId || p.isPublic)
+          p.favorite &&
+          p.createdBy == currentUserId
       ).toList();
     });
   }
@@ -82,7 +82,6 @@ class InMemoryProgramRepository implements ProgramRepository {
     final newProgram = program.copyWith(
       id: program.id.isEmpty ? _uuid.v4() : program.id,
       createdBy: currentUserId,
-      isPublic: false, // Private by default
     );
     
     _programs = [..._programs, newProgram];
@@ -194,8 +193,8 @@ class InMemoryProgramRepository implements ProgramRepository {
     final currentUserId = FirebaseAuth.instance.currentUser?.uid;
     
     // Only return public programs that are not created by current user
-    Iterable<Program> out = _programs.where((program) => 
-        program.isPublic && program.createdBy != currentUserId);
+    Iterable<Program> out = _programs.where((program) =>
+        program.createdBy != currentUserId);
     
     if (query != null && query.isNotEmpty) {
       out = out.where((p) => p.name.toLowerCase().contains(query.toLowerCase()));
@@ -219,8 +218,8 @@ class InMemoryProgramRepository implements ProgramRepository {
     
     // Return favorite programs that user can see (their own or public ones)
     Iterable<Program> out = _programs.where((program) => 
-        program.favorite && 
-        (program.createdBy == currentUserId || program.isPublic));
+        program.favorite &&
+        program.createdBy == currentUserId);
     
     if (query != null && query.isNotEmpty) {
       out = out.where((p) => p.name.toLowerCase().contains(query.toLowerCase()));
@@ -244,8 +243,8 @@ class InMemoryProgramRepository implements ProgramRepository {
     final index = _programs.indexWhere((program) => program.id == programId);
     if (index != -1) {
       final program = _programs[index];
-      // Users can only favorite programs they can see (their own or public ones)
-      if (program.createdBy == currentUserId || program.isPublic) {
+      // Users can only favorite their own programs
+      if (program.createdBy == currentUserId) {
         _programs = [
           ..._programs.sublist(0, index),
           _programs[index].copyWith(favorite: !_programs[index].favorite),

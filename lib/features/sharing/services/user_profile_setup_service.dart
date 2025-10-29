@@ -51,7 +51,6 @@ class UserProfileSetupService {
         'displayName': user.displayName ?? user.email?.split('@').first ?? 'User',
         'photoUrl': user.photoURL,
         'profileImageUrl': user.photoURL,
-        'isPublic': true, // Searchable by default
         'createdAt': FieldValue.serverTimestamp(),
         'lastActiveAt': FieldValue.serverTimestamp(),
         'preferences': {
@@ -83,7 +82,6 @@ class UserProfileSetupService {
       print('✅ Created profile for: ${user.email}');
       print('📧 Email: ${userData['email']}');
       print('👤 Display Name: ${userData['displayName']}');
-      print('🔓 Is Public: ${userData['isPublic']}');
     } catch (e) {
       print('❌ Failed to create user profile: $e');
       rethrow;
@@ -123,7 +121,6 @@ class UserProfileSetupService {
         print('ID: ${doc.id}');
         print('Email: ${data['email']}');
         print('Display Name: ${data['displayName']}');
-        print('Is Public: ${data['isPublic']}');
       }
     } catch (e) {
       print('❌ Failed to list users: $e');

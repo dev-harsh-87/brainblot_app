@@ -25,7 +25,7 @@ class FirebaseUserRepository {
     required String email,
     String? displayName,
     String? profileImageUrl,
-    bool? isPublic,
+    String? role,
   }) async {
     try {
       final userData = {
@@ -34,7 +34,7 @@ class FirebaseUserRepository {
         'displayName': displayName ?? email.split('@').first,
         'profileImageUrl': profileImageUrl,
         'photoUrl': profileImageUrl, // Alias for compatibility
-        'isPublic': isPublic ?? true, // Public by default for sharing
+        'role': role ?? 'user', // Default role is 'user'
         'createdAt': FieldValue.serverTimestamp(),
         'lastActiveAt': FieldValue.serverTimestamp(),
         'preferences': {

@@ -55,7 +55,6 @@ class ProfileService {
       photoUrl: user.photoURL,
       createdAt: DateTime.now(),
       lastActiveAt: DateTime.now(),
-      isPublic: true,
     );
 
     await _firestore
@@ -69,7 +68,6 @@ class ProfileService {
   /// Update user profile
   Future<void> updateProfile({
     String? displayName,
-    bool? isPublic,
   }) async {
     final userId = currentUserId;
     if (userId == null) throw Exception('User not authenticated');
@@ -84,9 +82,6 @@ class ProfileService {
       await currentUser?.updateDisplayName(displayName);
     }
 
-    if (isPublic != null) {
-      updates['isPublic'] = isPublic;
-    }
 
     await _firestore
         .collection('user_profiles')

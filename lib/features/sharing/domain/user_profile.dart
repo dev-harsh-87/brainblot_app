@@ -5,8 +5,7 @@ class UserProfile {
   final String? photoUrl;
   final DateTime createdAt;
   final DateTime lastActiveAt;
-  final bool isPublic; // whether user can be found in search
-  
+
   const UserProfile({
     required this.id,
     required this.email,
@@ -14,7 +13,6 @@ class UserProfile {
     this.photoUrl,
     required this.createdAt,
     required this.lastActiveAt,
-    this.isPublic = true,
   });
 
   factory UserProfile.fromJson(Map<String, dynamic> json) {
@@ -39,7 +37,6 @@ class UserProfile {
       photoUrl: json['photoUrl'] as String? ?? json['profileImageUrl'] as String?,
       createdAt: parseDate(json['createdAt']),
       lastActiveAt: parseDate(json['lastActiveAt']),
-      isPublic: (json['isPublic'] as bool?) ?? true,
     );
   }
 
@@ -50,7 +47,6 @@ class UserProfile {
     'photoUrl': photoUrl,
     'createdAt': createdAt.toIso8601String(),
     'lastActiveAt': lastActiveAt.toIso8601String(),
-    'isPublic': isPublic,
   };
 
   UserProfile copyWith({
@@ -60,7 +56,6 @@ class UserProfile {
     String? photoUrl,
     DateTime? createdAt,
     DateTime? lastActiveAt,
-    bool? isPublic,
   }) {
     return UserProfile(
       id: id ?? this.id,
@@ -69,7 +64,6 @@ class UserProfile {
       photoUrl: photoUrl ?? this.photoUrl,
       createdAt: createdAt ?? this.createdAt,
       lastActiveAt: lastActiveAt ?? this.lastActiveAt,
-      isPublic: isPublic ?? this.isPublic,
     );
   }
 }

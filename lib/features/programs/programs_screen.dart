@@ -1852,12 +1852,8 @@ class _ProgramsScreenState extends State<ProgramsScreen>
         final isOwner = snapshot.data ?? false;
         final isLoading = snapshot.connectionState == ConnectionState.waiting;
         
-        return PrivacyToggleButton(
-          isPublic: program.isPublic,
-          isOwner: isOwner,
-          onToggle: isOwner ? () => _toggleProgramPrivacy(program) : null,
-          isLoading: isLoading,
-        );
+        // Privacy toggle removed - all programs are private by default
+        return const SizedBox.shrink();
       },
     );
   }
@@ -1877,51 +1873,24 @@ class _ProgramsScreenState extends State<ProgramsScreen>
   }
 
   Future<void> _toggleProgramPrivacy(Program program) async {
-    // Show confirmation dialog
-    final confirmed = await ConfirmationDialog.showPrivacyConfirmation(
-      context,
-      isCurrentlyPublic: program.isPublic,
-      itemType: 'program',
-      itemName: program.name,
+    // Privacy toggle functionality removed - all programs are now private by default
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Row(
+          children: [
+            Icon(
+              Icons.lock,
+              color: Colors.white,
+              size: 20,
+            ),
+            SizedBox(width: 8),
+            Text('All programs are private by default 🔒'),
+          ],
+        ),
+        backgroundColor: Colors.grey,
+        behavior: SnackBarBehavior.floating,
+      ),
     );
-
-    if (confirmed != true) return;
-
-    try {
-      await _sharingService.togglePrivacy('program', program.id, !program.isPublic);
-      
-      HapticFeedback.lightImpact();
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Row(
-            children: [
-              Icon(
-                !program.isPublic ? Icons.public : Icons.lock,
-                color: Colors.white,
-                size: 20,
-              ),
-              const SizedBox(width: 8),
-              Text(!program.isPublic 
-                  ? 'Program is now public! 🌍'
-                  : 'Program is now private 🔒'),
-            ],
-          ),
-          backgroundColor: !program.isPublic ? Colors.green : Colors.grey,
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
-      
-      // Refresh the programs list to show updated privacy status
-      context.read<ProgramsBloc>().add(const ProgramsStarted());
-    } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Failed to update privacy: $e'),
-          backgroundColor: Colors.red,
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
-    }
   }
 }
 

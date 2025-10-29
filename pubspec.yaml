@@ -75,6 +75,9 @@ dependencies:
   vibration: ^3.1.4
   permission_handler: ^11.3.1
   connectivity_plus: ^6.1.0
+  
+  # Bluetooth & P2P Connection
+  nearby_connections: ^4.3.0
 
   # Sharing / Export
   csv: ^6.0.0

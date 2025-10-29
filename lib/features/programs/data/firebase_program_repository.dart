@@ -143,8 +143,8 @@ class FirebaseProgramRepository implements ProgramRepository {
           try {
             final programs = _mapSnapshotToPrograms(snapshot);
             // Filter to only show programs user can see (their own or public ones)
-            final filtered = programs.where((program) => 
-                program.createdBy == userId || program.isPublic).toList();
+            final filtered = programs.where((program) =>
+                program.createdBy == userId).toList();
             // Sort by createdAt in memory
             filtered.sort((a, b) => b.createdAt.compareTo(a.createdAt));
             return filtered;
@@ -356,13 +356,11 @@ class FirebaseProgramRepository implements ProgramRepository {
     if (!doc.exists) return null;
 
     final data = doc.data()!;
-    final isPublic = data['isPublic'] == true;
     final sharedWith = List<String>.from((data['sharedWith'] as List<dynamic>?)?.cast<String>() ?? <String>[]);
     final createdBy = data['createdBy'] as String?;
 
     // Check if user has access (is owner, is public, or is in sharedWith)
-    final hasAccess = createdBy == userId || 
-                     isPublic || 
+    final hasAccess = createdBy == userId ||
                      sharedWith.contains(userId);
 
     if (!hasAccess) {
@@ -463,7 +461,6 @@ class FirebaseProgramRepository implements ProgramRepository {
       // Check if default programs already exist by looking for system programs
       final existingPrograms = await _firestore
           .collection(_programsCollection)
-          .where('isPublic', isEqualTo: true)
           .limit(5)
           .get();
       
@@ -498,7 +495,6 @@ class FirebaseProgramRepository implements ProgramRepository {
             createdAt: program.createdAt,
             createdBy: 'system', // Mark as system program
             favorite: false,
-            isPublic: true, // Ensure it's public
             dayWiseDrillIds: program.dayWiseDrillIds,
             selectedDrillIds: program.selectedDrillIds,
           );
@@ -523,7 +519,6 @@ class FirebaseProgramRepository implements ProgramRepository {
             .doc(program.id);
         
         final programData = program.toJson();
-        programData['isPublic'] = true; // Ensure it's marked as public
         programData['createdBy'] = 'system'; // Ensure system attribution
         
         batch.set(ref, programData);
@@ -549,7 +544,6 @@ class FirebaseProgramRepository implements ProgramRepository {
       createdAt: now,
       createdBy: 'system', // System program
       favorite: false,
-      isPublic: true,
       days: List.generate(28, (i) => ProgramDay(
         dayNumber: i + 1, 
         title: 'Day ${i + 1}: ${_getAgilitydayTitle(i + 1)}', 
@@ -568,7 +562,6 @@ class FirebaseProgramRepository implements ProgramRepository {
       createdAt: now,
       createdBy: 'system',
       favorite: false,
-      isPublic: true,
       days: List.generate(21, (i) => ProgramDay(
         dayNumber: i + 1, 
         title: 'Day ${i + 1}: ${_getSoccerDayTitle(i + 1)}', 
@@ -587,7 +580,6 @@ class FirebaseProgramRepository implements ProgramRepository {
       createdAt: now,
       createdBy: 'system',
       favorite: false,
-      isPublic: true,
       days: List.generate(14, (i) => ProgramDay(
         dayNumber: i + 1, 
         title: 'Day ${i + 1}: ${_getBasketballDayTitle(i + 1)}', 
@@ -606,7 +598,6 @@ class FirebaseProgramRepository implements ProgramRepository {
       createdAt: now,
       createdBy: 'system',
       favorite: false,
-      isPublic: true,
       days: List.generate(35, (i) => ProgramDay(
         dayNumber: i + 1, 
         title: 'Day ${i + 1}: ${_getTennisDayTitle(i + 1)}', 
@@ -625,7 +616,6 @@ class FirebaseProgramRepository implements ProgramRepository {
       createdAt: now,
       createdBy: 'system',
       favorite: false,
-      isPublic: true,
       days: List.generate(7, (i) => ProgramDay(
         dayNumber: i + 1, 
         title: 'Day ${i + 1}: ${_getGeneralDayTitle(i + 1)}', 
@@ -781,7 +771,6 @@ class FirebaseProgramRepository implements ProgramRepository {
               // Ensure required fields have default values
               programData['days'] = programData['days'] ?? [];
               programData['sharedWith'] = programData['sharedWith'] ?? [];
-              programData['isPublic'] = programData['isPublic'] ?? false;
               programData['favorite'] = programData['favorite'] ?? false;
               
               return Program.fromJson(programData);
@@ -860,7 +849,6 @@ class FirebaseProgramRepository implements ProgramRepository {
       // Start with just public programs to avoid complex index
       final snapshot = await _firestore
           .collection(_programsCollection)
-          .where('isPublic', isEqualTo: true)
           .get();
       
       List<Program> programs = _mapSnapshotToPrograms(snapshot);
@@ -972,8 +960,8 @@ class FirebaseProgramRepository implements ProgramRepository {
       List<Program> programs = _mapSnapshotToPrograms(snapshot);
 
       // Filter to only show programs user can see (their own or public ones)
-      programs = programs.where((program) => 
-          program.createdBy == userId || program.isPublic).toList();
+      programs = programs.where((program) =>
+          program.createdBy == userId).toList();
 
       // Apply filters in memory to avoid complex indexes
       if (category != null && category.isNotEmpty) {
@@ -1026,8 +1014,8 @@ class FirebaseProgramRepository implements ProgramRepository {
         ...programDoc.data()!,
       });
 
-      // Users can only favorite programs they can see (their own or public ones)
-      if (program.createdBy == userId || program.isPublic) {
+      // Users can only favorite their own programs
+      if (program.createdBy == userId) {
         await _firestore
             .collection(_programsCollection)
             .doc(programId)

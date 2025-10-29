@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 
 import 'package:brainblot_app/core/di/injection.dart';
 import 'package:brainblot_app/features/auth/bloc/auth_bloc.dart';
@@ -446,20 +447,16 @@ class _ProfileScreenState extends State<ProfileScreen> with AutoRefreshMixin {
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
               decoration: BoxDecoration(
                 gradient: LinearGradient(
-                  colors: profile.isPublic 
-                      ? [Colors.green.withOpacity(0.15), Colors.green.withOpacity(0.05)]
-                      : [Colors.orange.withOpacity(0.15), Colors.orange.withOpacity(0.05)],
+                  colors: [Colors.blue.withOpacity(0.15), Colors.blue.withOpacity(0.05)],
                 ),
                 borderRadius: BorderRadius.circular(24),
                 border: Border.all(
-                  color: profile.isPublic 
-                      ? Colors.green.withOpacity(0.2)
-                      : Colors.orange.withOpacity(0.2),
+                  color: Colors.blue.withOpacity(0.2),
                   width: 1.5,
                 ),
                 boxShadow: [
                   BoxShadow(
-                    color: (profile.isPublic ? Colors.green : Colors.orange).withOpacity(0.1),
+                    color: Colors.blue.withOpacity(0.1),
                     blurRadius: 8,
                     offset: const Offset(0, 2),
                   ),
@@ -470,21 +467,21 @@ class _ProfileScreenState extends State<ProfileScreen> with AutoRefreshMixin {
                 children: [
                   Container(
                     padding: const EdgeInsets.all(6),
-                    decoration: BoxDecoration(
-                      color: profile.isPublic ? Colors.green : Colors.orange,
+                    decoration: const BoxDecoration(
+                      color: Colors.blue,
                       shape: BoxShape.circle,
                     ),
-                    child: Icon(
-                      profile.isPublic ? Icons.public_rounded : Icons.lock_rounded,
+                    child: const Icon(
+                      Icons.person_rounded,
                       size: 16,
                       color: Colors.white,
                     ),
                   ),
                   const SizedBox(width: 10),
                   Text(
-                    profile.isPublic ? 'Public Profile' : 'Private Profile',
+                    'User Profile',
                     style: theme.textTheme.labelMedium?.copyWith(
-                      color: profile.isPublic ? Colors.green.shade700 : Colors.orange.shade700,
+                      color: Colors.blue.shade700,
                       fontWeight: FontWeight.w600,
                       letterSpacing: 0.3,
                     ),
@@ -1409,6 +1406,7 @@ class _ProfileScreenState extends State<ProfileScreen> with AutoRefreshMixin {
   Widget _buildQuickActions(BuildContext context) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
+    final isAdmin = FirebaseAuth.instance.currentUser?.email == 'admin@brainblot.com';
     
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 20),
@@ -1432,6 +1430,8 @@ class _ProfileScreenState extends State<ProfileScreen> with AutoRefreshMixin {
             ],
           ),
           const SizedBox(height: 16),
+          
+          // Standard actions for all users
           Row(
             children: [
               Expanded(
@@ -1461,6 +1461,104 @@ class _ProfileScreenState extends State<ProfileScreen> with AutoRefreshMixin {
               ),
             ],
           ),
+          
+          // Add subscription button for all users
+          const SizedBox(height: 12),
+          SizedBox(
+            width: double.infinity,
+            child: _buildActionButton(
+              context,
+              'Subscription Plans',
+              Icons.workspace_premium,
+              Colors.amber,
+              () {
+                HapticFeedback.lightImpact();
+                context.push('/subscription');
+              },
+            ),
+          ),
+          
+          // Admin-specific actions
+          if (isAdmin) ...[
+            const SizedBox(height: 20),
+            Row(
+              children: [
+                Icon(
+                  Icons.admin_panel_settings,
+                  color: Colors.red,
+                  size: 24,
+                ),
+                const SizedBox(width: 8),
+                Text(
+                  'Admin Controls',
+                  style: theme.textTheme.titleLarge?.copyWith(
+                    fontWeight: FontWeight.bold,
+                    color: Colors.red,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            Row(
+              children: [
+                Expanded(
+                  child: _buildActionButton(
+                    context,
+                    'Admin Panel',
+                    Icons.dashboard,
+                    Colors.red,
+                    () {
+                      HapticFeedback.lightImpact();
+                      context.push('/admin');
+                    },
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: _buildActionButton(
+                    context,
+                    'User Management',
+                    Icons.people,
+                    Colors.deepPurple,
+                    () {
+                      HapticFeedback.lightImpact();
+                      context.push('/admin/users');
+                    },
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                Expanded(
+                  child: _buildActionButton(
+                    context,
+                    'Subscriptions',
+                    Icons.card_membership,
+                    Colors.teal,
+                    () {
+                      HapticFeedback.lightImpact();
+                      context.push('/admin/subscriptions');
+                    },
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: _buildActionButton(
+                    context,
+                    'Analytics',
+                    Icons.bar_chart,
+                    Colors.orange,
+                    () {
+                      HapticFeedback.lightImpact();
+                      context.push('/admin/analytics');
+                    },
+                  ),
+                ),
+              ],
+            ),
+          ],
         ],
       ),
     );
@@ -1580,7 +1678,6 @@ class _ProfileScreenState extends State<ProfileScreen> with AutoRefreshMixin {
 
     final displayNameController = TextEditingController(text: profile.displayName);
     final formKey = GlobalKey<FormState>();
-    bool isPublic = profile.isPublic;
     bool isLoading = false;
 
     showDialog(
@@ -1617,19 +1714,6 @@ class _ProfileScreenState extends State<ProfileScreen> with AutoRefreshMixin {
                     return null;
                   },
                 ),
-                const SizedBox(height: 16),
-                SwitchListTile(
-                  title: const Text('Public Profile'),
-                  subtitle: Text(
-                    isPublic 
-                        ? 'Others can find and share with you'
-                        : 'Your profile is private',
-                  ),
-                  value: isPublic,
-                  onChanged: (value) {
-                    setState(() => isPublic = value);
-                  },
-                ),
               ],
             ),
           ),
@@ -1646,7 +1730,6 @@ class _ProfileScreenState extends State<ProfileScreen> with AutoRefreshMixin {
                   try {
                     await _profileService.updateProfile(
                       displayName: displayNameController.text.trim(),
-                      isPublic: isPublic,
                     );
                     
                     if (mounted) {

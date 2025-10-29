@@ -43,7 +43,6 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
             email: event.email,
             displayName: cred.user!.displayName ?? event.email.split('@').first,
             profileImageUrl: cred.user!.photoURL,
-            isPublic: true, // Default to searchable
           );
         } catch (profileError) {
           // Profile update failure shouldn't block login
@@ -72,7 +71,6 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
             email: event.email,
             displayName: cred.user!.displayName ?? event.email.split('@').first,
             profileImageUrl: cred.user!.photoURL,
-            isPublic: true, // Users are searchable by default
           );
         } catch (profileError) {
           // Profile creation failure shouldn't block registration

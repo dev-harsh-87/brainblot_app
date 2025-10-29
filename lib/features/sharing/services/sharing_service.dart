@@ -2,7 +2,6 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:brainblot_app/features/sharing/domain/user_profile.dart';
 import 'package:brainblot_app/core/services/auto_refresh_service.dart';
-import 'package:brainblot_app/core/di/injection.dart';
 import 'package:uuid/uuid.dart';
 import 'package:url_launcher/url_launcher.dart';
 
@@ -36,7 +35,6 @@ class SharingService {
       // This works without indexes but is slower
       final snapshot = await _firestore
           .collection('users')
-          .where('isPublic', isEqualTo: true)
           .limit(50) // Limit to prevent too much data
           .get();
 
@@ -648,7 +646,6 @@ Making minds sharper, one drill at a time.
       
       // Update privacy status
       await docRef.update({
-        'isPublic': makePublic,
         'updatedAt': FieldValue.serverTimestamp(),
       });
       
@@ -683,16 +680,20 @@ Making minds sharper, one drill at a time.
     }
   }
 
-  /// Get privacy status of item
+  /// Get privacy status of item (deprecated - all items are now private)
   Future<bool> isPublic(String itemType, String itemId) async {
+    return false; // All items are private by default
+  }
+
+  /// Old implementation removed
+  Future<bool> _oldIsPublic(String itemType, String itemId) async {
     try {
       final collection = itemType == 'drill' ? 'drills' : 'programs';
       final doc = await _firestore.collection(collection).doc(itemId).get();
       
       if (!doc.exists) return false;
       
-      final data = doc.data()!;
-      return data['isPublic'] as bool? ?? false;
+      return false;
     } catch (e) {
       return false;
     }
@@ -726,7 +727,6 @@ Making minds sharper, one drill at a time.
       final collection = itemType == 'drill' ? 'drills' : 'programs';
       final querySnapshot = await _firestore
           .collection(collection)
-          .where('isPublic', isEqualTo: true)
           .orderBy('createdAt', descending: true)
           .limit(50) // Limit to prevent too much data
           .get();

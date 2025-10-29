@@ -35,7 +35,6 @@ class _SharingScreenState extends State<SharingScreen> with SingleTickerProvider
   bool _isSearching = false;
   bool _isLoadingShared = false;
   bool _isOwner = false;
-  bool _isPublic = false;
   bool _privacyLoading = false;
 
   @override
@@ -64,12 +63,10 @@ class _SharingScreenState extends State<SharingScreen> with SingleTickerProvider
 
   Future<void> _loadPrivacyInfo() async {
     try {
-      final isPublic = await _sharingService.isPublic(widget.itemType, widget.itemId);
       final isOwner = await _sharingService.isOwner(widget.itemType, widget.itemId);
 
       if (mounted) {
         setState(() {
-          _isPublic = isPublic;
           _isOwner = isOwner;
         });
       }
@@ -241,7 +238,7 @@ class _SharingScreenState extends State<SharingScreen> with SingleTickerProvider
     // Show confirmation dialog
     final confirmed = await ConfirmationDialog.showPrivacyConfirmation(
       context,
-      isCurrentlyPublic: _isPublic,
+      isCurrentlyPublic: false,
       itemType: widget.itemType,
       itemName: widget.itemName,
     );
@@ -250,26 +247,14 @@ class _SharingScreenState extends State<SharingScreen> with SingleTickerProvider
 
     setState(() => _privacyLoading = true);
 
-    try {
-      await _sharingService.togglePrivacy(widget.itemType, widget.itemId, !_isPublic);
-
-      if (mounted) {
-        setState(() {
-          _isPublic = !_isPublic;
-          _privacyLoading = false;
-        });
-
-        _showSuccess(_isPublic
-            ? 'Now public! 🌍'
-            : 'Now private 🔒');
-      }
-    } catch (e) {
-      if (mounted) {
-        setState(() => _privacyLoading = false);
-        _showError('Failed to update privacy: $e');
-      }
+    // Privacy toggle functionality removed - all items are now private
+    if (mounted) {
+      setState(() => _privacyLoading = false);
+      
+      _showSuccess('All items are private by default 🔒');
     }
   }
+
 
   void _showError(String message) {
     if (mounted) {
@@ -382,13 +367,13 @@ class _SharingScreenState extends State<SharingScreen> with SingleTickerProvider
                       Row(
                         children: [
                           Icon(
-                            _isPublic ? Icons.public : Icons.lock,
-                            size: isSmallScreen ? 12 : 14,
+                            Icons.lock,
+                            size: 14,
                             color: colorScheme.onSurface.withOpacity(0.6),
                           ),
                           const SizedBox(width: 4),
                           Text(
-                            _isPublic ? 'Public' : 'Private',
+                            'Private',
                             style: theme.textTheme.bodySmall?.copyWith(
                               color: colorScheme.onSurface.withOpacity(0.6),
                               fontSize: isSmallScreen ? 11 : null,
@@ -738,22 +723,18 @@ class _SharingScreenState extends State<SharingScreen> with SingleTickerProvider
           child: Column(
             children: [
               SwitchListTile(
-                value: _isPublic,
-                onChanged: _isOwner && !_privacyLoading
-                    ? (_) => _togglePrivacy()
-                    : null,
+                value: false,
+                onChanged: null,
                 title: Text(
                   'Public ${widget.itemType.toUpperCase()}',
                   style: const TextStyle(fontWeight: FontWeight.w600),
                 ),
-                subtitle: Text(
-                  _isPublic
-                      ? 'Anyone can discover and use this ${widget.itemType}'
-                      : 'Only you and shared users can access',
+                subtitle: const Text(
+                  'All items are private by default',
                 ),
-                secondary: Icon(
-                  _isPublic ? Icons.public : Icons.lock,
-                  color: _isPublic ? Colors.green : Colors.grey,
+                secondary: const Icon(
+                  Icons.lock,
+                  color: Colors.grey,
                 ),
               ),
               if (_privacyLoading)

@@ -33,7 +33,6 @@ class Program {
   final DateTime createdAt;
   final String? createdBy; // user ID who created the program
   final List<String> sharedWith; // user IDs who have access to this program
-  final bool isPublic; // whether program is publicly visible
   final bool favorite; // whether program is favorited by current user
   
   // Enhanced features for new program creation
@@ -51,7 +50,6 @@ class Program {
     required this.createdAt,
     this.createdBy,
     this.sharedWith = const [],
-    this.isPublic = false,
     this.favorite = false,
     this.dayWiseDrillIds = const {},
     this.selectedDrillIds = const [],
@@ -69,7 +67,6 @@ class Program {
     required this.selectedDrillIds,
     this.createdBy,
     this.sharedWith = const [],
-    this.isPublic = false,
     this.favorite = false,
     this.level = 'Beginner',
   }) : days = const []; // Empty days for enhanced programs
@@ -85,7 +82,6 @@ class Program {
     DateTime? createdAt,
     String? createdBy,
     List<String>? sharedWith,
-    bool? isPublic,
     bool? favorite,
     Map<int, List<String>>? dayWiseDrillIds,
     List<String>? selectedDrillIds,
@@ -100,7 +96,6 @@ class Program {
         createdAt: createdAt ?? this.createdAt,
         createdBy: createdBy ?? this.createdBy,
         sharedWith: sharedWith ?? this.sharedWith,
-        isPublic: isPublic ?? this.isPublic,
         favorite: favorite ?? this.favorite,
         dayWiseDrillIds: dayWiseDrillIds ?? this.dayWiseDrillIds,
         selectedDrillIds: selectedDrillIds ?? this.selectedDrillIds,

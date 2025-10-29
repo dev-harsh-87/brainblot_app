@@ -135,9 +135,9 @@ class FirebaseDrillRepository implements DrillRepository {
         .map((snapshot) {
           try {
             final drills = _mapSnapshotToDrills(snapshot);
-            // Filter to only show drills user can see (their own or public ones)
-            final filtered = drills.where((drill) => 
-                drill.createdBy == userId || drill.isPublic).toList();
+            // Filter to only show user's own drills
+            final filtered = drills.where((drill) =>
+                drill.createdBy == userId).toList();
             // Sort by createdAt in memory
             filtered.sort((a, b) => b.createdAt.compareTo(a.createdAt));
             return filtered;
@@ -220,7 +220,6 @@ class FirebaseDrillRepository implements DrillRepository {
       }
 
       final data = doc.data()!; // Safe to use ! here as we checked data() != null
-      final isPublic = data['isPublic'] == true;
       final List<String> sharedWith = (data['sharedWith'] as List<dynamic>?)
               ?.whereType<String>()
               .where((s) => s.isNotEmpty)
@@ -229,8 +228,7 @@ class FirebaseDrillRepository implements DrillRepository {
       final createdBy = data['createdBy'] as String?;
 
       // Check if user has access (is owner, is public, or is in sharedWith)
-      final hasAccess = createdBy == userId || 
-                       isPublic || 
+      final hasAccess = createdBy == userId ||
                        sharedWith.contains(userId);
 
       if (!hasAccess) {
@@ -408,8 +406,8 @@ class FirebaseDrillRepository implements DrillRepository {
 
       final drill = _firestoreDataToDrill(drillDoc.id, drillDoc.data()!);
       
-      // Users can only favorite drills they can see (their own or public ones)
-      if (drill.createdBy == userId || drill.isPublic) {
+      // Users can only favorite their own drills
+      if (drill.createdBy == userId) {
         await _firestore
             .collection(_drillsCollection)
             .doc(drillId)
@@ -480,7 +478,6 @@ class FirebaseDrillRepository implements DrillRepository {
     return drill.copyWith(
       id: drill.id.isEmpty ? _uuid.v4() : drill.id,
       createdBy: drill.createdBy ?? userId,
-      isPublic: drill.isPublic, // Keep user's privacy setting
       isPreset: false, // All user-created drills are NOT presets
     );
   }
@@ -490,7 +487,6 @@ class FirebaseDrillRepository implements DrillRepository {
     
     // Ensure required Firestore fields are set correctly
     data['createdBy'] = drill.createdBy ?? _currentUserId;
-    data['isPublic'] = drill.isPublic;
     data['isPreset'] = false; // No more preset drills
     data['sharedWith'] = drill.sharedWith.isNotEmpty ? drill.sharedWith : [];
     data['favorite'] = drill.favorite;
@@ -571,7 +567,6 @@ class FirebaseDrillRepository implements DrillRepository {
       isPreset: data['isPreset'] as bool? ?? false,
       createdBy: data['createdBy'] as String?,
       sharedWith: List<String>.from((data['sharedWith'] as List<dynamic>?)?.cast<String>() ?? <String>[]),
-      isPublic: data['isPublic'] as bool? ?? false,
       createdAt: createdAt,
     );
   }
@@ -631,7 +626,6 @@ class FirebaseDrillRepository implements DrillRepository {
       // Start with just public drills to avoid complex index
       final snapshot = await _firestore
           .collection(_drillsCollection)
-          .where('isPublic', isEqualTo: true)
           .get();
       
       List<Drill> drills = _mapSnapshotToDrills(snapshot);
@@ -682,8 +676,8 @@ class FirebaseDrillRepository implements DrillRepository {
       List<Drill> drills = _mapSnapshotToDrills(snapshot);
 
       // Filter to only show drills user can see (their own or public ones)
-      drills = drills.where((drill) => 
-          drill.createdBy == userId || drill.isPublic).toList();
+      drills = drills.where((drill) =>
+          drill.createdBy == userId).toList();
 
       // Apply filters in memory to avoid complex indexes
       if (category != null && category.isNotEmpty) {

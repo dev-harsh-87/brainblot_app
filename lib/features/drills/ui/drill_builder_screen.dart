@@ -108,7 +108,6 @@ class _DrillBuilderScreenState extends State<DrillBuilderScreen>
       isPreset: initial?.isPreset ?? false,
       createdBy: initial?.createdBy,
       sharedWith: initial?.sharedWith ?? [],
-      isPublic: initial?.isPublic ?? false,
     );
   }
 

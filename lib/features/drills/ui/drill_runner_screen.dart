@@ -14,12 +14,16 @@ class DrillRunnerScreen extends StatefulWidget {
   final Drill drill;
   final String? programId;
   final int? programDayNumber;
+  final bool isMultiplayerMode;
+  final Function(SessionResult)? onDrillComplete;
   
   const DrillRunnerScreen({
     super.key, 
     required this.drill,
     this.programId,
     this.programDayNumber,
+    this.isMultiplayerMode = false,
+    this.onDrillComplete,
   });
 
   @override
@@ -356,7 +360,10 @@ class _DrillRunnerScreenState extends State<DrillRunnerScreen>
     // Navigate to results after a brief delay
     Future.delayed(const Duration(milliseconds: 500), () {
       if (mounted) {
-        if (widget.programId != null && widget.programDayNumber != null) {
+        if (widget.isMultiplayerMode) {
+          // Multiplayer mode - call completion callback
+          widget.onDrillComplete?.call(result);
+        } else if (widget.programId != null && widget.programDayNumber != null) {
           // Show success message for program completion
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(

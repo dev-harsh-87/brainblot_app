@@ -37,7 +37,6 @@ Program _$ProgramFromJson(Map<String, dynamic> json) => Program(
               ?.map((e) => e as String)
               .toList() ??
           const [],
-      isPublic: json['isPublic'] as bool? ?? false,
       favorite: json['favorite'] as bool? ?? false,
       dayWiseDrillIds: (json['dayWiseDrillIds'] as Map<String, dynamic>?)?.map(
             (k, e) => MapEntry(int.parse(k),
@@ -61,7 +60,6 @@ Map<String, dynamic> _$ProgramToJson(Program instance) => <String, dynamic>{
       'createdAt': instance.createdAt.toIso8601String(),
       'createdBy': instance.createdBy,
       'sharedWith': instance.sharedWith,
-      'isPublic': instance.isPublic,
       'favorite': instance.favorite,
       'dayWiseDrillIds':
           instance.dayWiseDrillIds.map((k, e) => MapEntry(k.toString(), e)),

@@ -23,6 +23,11 @@ import 'package:brainblot_app/features/profile/services/profile_service.dart';
 import 'package:brainblot_app/core/services/auto_refresh_service.dart';
 import 'package:brainblot_app/features/drills/services/drill_creation_service.dart';
 import 'package:brainblot_app/features/programs/services/program_creation_service.dart';
+import 'package:brainblot_app/features/multiplayer/services/bluetooth_connection_service.dart';
+import 'package:brainblot_app/features/multiplayer/services/session_sync_service.dart';
+import 'package:brainblot_app/core/auth/services/permission_service.dart';
+import 'package:brainblot_app/features/subscription/data/subscription_plan_repository.dart';
+import 'package:brainblot_app/core/services/database_initialization_service.dart';
 
 final GetIt getIt = GetIt.instance;
 
@@ -50,6 +55,11 @@ Future<void> configureDependencies() async {
     );
     print('🔧 DI: Created FirebaseDrillRepository instance');
     return repo;
+  });
+  
+  // Also register the concrete type for cases where it's needed specifically
+  getIt.registerLazySingleton<FirebaseDrillRepository>(() {
+    return getIt<DrillRepository>() as FirebaseDrillRepository;
   });
   
   getIt.registerLazySingleton<SessionRepository>(() {
@@ -103,7 +113,28 @@ Future<void> configureDependencies() async {
   // Creation Services with Auto-Refresh
   getIt.registerLazySingleton<DrillCreationService>(() => DrillCreationService());
   getIt.registerLazySingleton<ProgramCreationService>(() => ProgramCreationService());
+
+  // Multiplayer Services
+  getIt.registerLazySingleton<BluetoothConnectionService>(() => BluetoothConnectionService());
+  getIt.registerLazySingleton<SessionSyncService>(() => SessionSyncService(getIt<BluetoothConnectionService>()));
+  
+  // RBAC Services
+  print('🔧 DI: Registering RBAC services');
+  getIt.registerLazySingleton<PermissionService>(() => PermissionService(
+    firestore: firebaseFirestore,
+    auth: firebaseAuth,
+  ));
+  getIt.registerLazySingleton<SubscriptionPlanRepository>(() => SubscriptionPlanRepository(
+    firestore: firebaseFirestore,
+  ));
+  getIt.registerLazySingleton<DatabaseInitializationService>(() => DatabaseInitializationService(
+    firestore: firebaseFirestore,
+    auth: firebaseAuth,
+    planRepository: getIt<SubscriptionPlanRepository>(),
+  ));
   
   print('🔧 DI: Professional Firebase dependency injection configuration completed successfully');
   print('🔧 DI: Available repositories: Firebase (primary), Hive (local fallback)');
+  print('🔧 DI: RBAC system initialized with PermissionService and SubscriptionPlanRepository');
+  print('🔧 DI: Database initialization service registered');
 }

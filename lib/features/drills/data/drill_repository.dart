@@ -52,15 +52,13 @@ class InMemoryDrillRepository implements DrillRepository {
     final idx = _items.indexWhere((e) => e.id == drill.id);
     if (idx == -1) {
       // Creating new drill - ensure it belongs to current user and is private by default
-      final toAdd = drill.id.isEmpty 
+      final toAdd = drill.id.isEmpty
           ? drill.copyWith(
               id: _uuid.v4(),
               createdBy: currentUserId,
-              isPublic: false, // Private by default
             )
           : drill.copyWith(
               createdBy: currentUserId,
-              isPublic: false, // Private by default
             );
       _items.add(toAdd);
       _emit();
@@ -108,8 +106,8 @@ class InMemoryDrillRepository implements DrillRepository {
     final index = _items.indexWhere((drill) => drill.id == drillId);
     if (index != -1) {
       final drill = _items[index];
-      // Users can only favorite drills they can see (their own or public ones)
-      if (drill.createdBy == currentUserId || drill.isPublic) {
+      // Users can only favorite their own drills
+      if (drill.createdBy == currentUserId) {
         _items[index] = _items[index].copyWith(favorite: !_items[index].favorite);
         _emit();
       }
@@ -148,8 +146,8 @@ class InMemoryDrillRepository implements DrillRepository {
     final currentUserId = FirebaseAuth.instance.currentUser?.uid;
     
     // Only return public drills that are not created by current user
-    Iterable<Drill> out = _items.where((drill) => 
-        drill.isPublic && drill.createdBy != currentUserId);
+    Iterable<Drill> out = _items.where((drill) =>
+        drill.createdBy != currentUserId);
     
     if (query != null && query.isNotEmpty) {
       out = out.where((d) => d.name.toLowerCase().contains(query.toLowerCase()));
@@ -173,8 +171,8 @@ class InMemoryDrillRepository implements DrillRepository {
     
     // Return favorite drills that user can see (their own or public ones)
     Iterable<Drill> out = _items.where((drill) => 
-        drill.favorite && 
-        (drill.createdBy == currentUserId || drill.isPublic));
+        drill.favorite &&
+        drill.createdBy == currentUserId);
     
     if (query != null && query.isNotEmpty) {
       out = out.where((d) => d.name.toLowerCase().contains(query.toLowerCase()));

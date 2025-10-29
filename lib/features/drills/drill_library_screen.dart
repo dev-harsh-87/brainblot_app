@@ -945,52 +945,6 @@ class _DrillLibraryScreenState extends State<DrillLibraryScreen>
               ),
               textAlign: TextAlign.center,
             ),
-            const SizedBox(height: 32),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                OutlinedButton.icon(
-                  onPressed: () async {
-                    HapticFeedback.lightImpact();
-                    try {
-                      final repo = getIt<DrillRepository>();
-                      if (repo is FirebaseDrillRepository) {
-                        await repo.seedDefaultDrills();
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                            content: Text('Default drills loaded successfully!'),
-                            behavior: SnackBarBehavior.floating,
-                          ),
-                        );
-                        context.read<DrillLibraryBloc>().add(const DrillLibraryRefreshRequested());
-                      }
-                    } catch (e) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          content: Text('Failed to load default drills: $e'),
-                          backgroundColor: Theme.of(context).colorScheme.error,
-                          behavior: SnackBarBehavior.floating,
-                        ),
-                      );
-                    }
-                  },
-                  icon: const Icon(Icons.download),
-                  label: const Text('Load Default Drills'),
-                ),
-                const SizedBox(width: 16),
-                FilledButton.icon(
-                  onPressed: () async {
-                    HapticFeedback.mediumImpact();
-                    final result = await context.push('/drill-builder');
-                    if (result is Drill && mounted) {
-                      await getIt<DrillRepository>().upsert(result);
-                    }
-                  },
-                  icon: const Icon(Icons.add),
-                  label: const Text('Create Drill'),
-                ),
-              ],
-            ),
           ],
         ),
       ),
@@ -1455,12 +1409,8 @@ class _DrillLibraryScreenState extends State<DrillLibraryScreen>
         final isOwner = snapshot.data ?? false;
         final isLoading = snapshot.connectionState == ConnectionState.waiting;
 
-        return PrivacyToggleButton(
-          isPublic: drill.isPublic,
-          isOwner: isOwner,
-          onToggle: isOwner ? () => _toggleDrillPrivacy(drill) : null,
-          isLoading: isLoading,
-        );
+        // Privacy toggle removed - all drills are private by default
+        return const SizedBox.shrink();
       },
     );
   }
@@ -1548,50 +1498,23 @@ class _DrillLibraryScreenState extends State<DrillLibraryScreen>
   }
 
   Future<void> _toggleDrillPrivacy(Drill drill) async {
-    // Show confirmation dialog
-    final confirmed = await ConfirmationDialog.showPrivacyConfirmation(
-      context,
-      isCurrentlyPublic: drill.isPublic,
-      itemType: 'drill',
-      itemName: drill.name,
+    // Privacy toggle functionality removed - all drills are now private by default
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Row(
+          children: [
+            Icon(
+              Icons.lock,
+              color: Colors.white,
+              size: 20,
+            ),
+            SizedBox(width: 8),
+            Text('All drills are private by default 🔒'),
+          ],
+        ),
+        backgroundColor: Colors.grey,
+        behavior: SnackBarBehavior.floating,
+      ),
     );
-
-    if (confirmed != true) return;
-
-    try {
-      await _sharingService.togglePrivacy('drill', drill.id, !drill.isPublic);
-
-      HapticFeedback.lightImpact();
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Row(
-            children: [
-              Icon(
-                !drill.isPublic ? Icons.public : Icons.lock,
-                color: Colors.white,
-                size: 20,
-              ),
-              const SizedBox(width: 8),
-              Text(!drill.isPublic
-                  ? 'Drill is now public! 🌍'
-                  : 'Drill is now private 🔒'),
-            ],
-          ),
-          backgroundColor: !drill.isPublic ? Colors.green : Colors.grey,
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
-
-      // Refresh the drills list to show updated privacy status
-      context.read<DrillLibraryBloc>().add(const DrillLibraryRefreshRequested());
-    } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Failed to update privacy: $e'),
-          backgroundColor: Colors.red,
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
-    }
   }
 }

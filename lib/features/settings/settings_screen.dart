@@ -5,6 +5,8 @@ import 'package:go_router/go_router.dart';
 
 import 'package:brainblot_app/features/settings/bloc/settings_bloc.dart';
 import 'package:brainblot_app/features/settings/data/settings_repository.dart';
+import 'package:brainblot_app/features/auth/bloc/auth_bloc.dart';
+import 'package:brainblot_app/core/router/app_router.dart';
 
 class SettingsScreen extends StatelessWidget {
   const SettingsScreen({super.key});
@@ -94,7 +96,9 @@ class SettingsScreen extends StatelessWidget {
               ),
               const SizedBox(height: 16),
               _buildAboutCard(context),
-              const SizedBox(height: 20),
+              const SizedBox(height: 24),
+              
+
             ],
           );
         },

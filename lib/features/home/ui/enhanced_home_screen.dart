@@ -1,3 +1,4 @@
+import 'package:brainblot_app/features/auth/bloc/auth_bloc.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -219,6 +220,27 @@ class _EnhancedHomeScreenState extends State<EnhancedHomeScreen>
         ),
       ),
       actions: [
+        IconButton(onPressed: (){
+          context.read<AuthBloc>().add(const AuthLogoutRequested());
+        }, icon: Icon(Icons.logout)),
+        IconButton(
+          onPressed: () => context.push('/multiplayer'),
+          icon: Icon(
+            Icons.wifi_tethering_rounded,
+            color: colorScheme.onPrimary,
+            size: 24,
+          ),
+          tooltip: 'Multiplayer Training',
+        ),
+        IconButton(
+          onPressed: () => context.push('/settings'),
+          icon: Icon(
+            Icons.settings_rounded,
+            color: colorScheme.onPrimary,
+            size: 24,
+          ),
+          tooltip: 'Settings',
+        ),
         IconButton(
           onPressed: () => context.push('/profile'),
           icon: CircleAvatar(
@@ -235,6 +257,7 @@ class _EnhancedHomeScreenState extends State<EnhancedHomeScreen>
               ),
             ),
           ),
+          tooltip: 'Profile',
         ),
         const SizedBox(width: 8),
       ],
@@ -410,8 +433,7 @@ class _EnhancedHomeScreenState extends State<EnhancedHomeScreen>
                   Icons.add_circle_rounded,
                   Colors.blue,
                   () {
-                    // Navigate to drill creation
-                    // After creation, auto-refresh will trigger
+                    context.go('/drills');
                     context.triggerAutoRefresh(AutoRefreshService.drills);
                   },
                 ),
@@ -425,9 +447,39 @@ class _EnhancedHomeScreenState extends State<EnhancedHomeScreen>
                   Icons.playlist_add_rounded,
                   Colors.green,
                   () {
-                    // Navigate to program creation
-                    // After creation, auto-refresh will trigger
+                    context.go('/programs');
                     context.triggerAutoRefresh(AutoRefreshService.programs);
+                  },
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          Row(
+            children: [
+              Expanded(
+                child: _buildActionCard(
+                  context,
+                  'My Stats',
+                  'View training progress',
+                  Icons.analytics_rounded,
+                  Colors.purple,
+                  () {
+                    context.push('/stats');
+                  },
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: _buildActionCard(
+                  context,
+                  'Explore',
+                  'Discover new content',
+                  Icons.explore_rounded,
+                  Colors.orange,
+                  () {
+                    // Navigate to explore/browse section
+                    // This could be sharing screen or community features
                   },
                 ),
               ),

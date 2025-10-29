@@ -114,7 +114,7 @@ class HiveDrillRepository implements DrillRepository {
     final items = _box.values
         .whereType<Map<dynamic, dynamic>>()
         .map((e) => Drill.fromMap(Map<String, dynamic>.from(e)))
-        .where((drill) => drill.isPublic && drill.createdBy != user?.uid)
+        .where((drill) => drill.createdBy != user?.uid)
         .toList();
     
     Iterable<Drill> out = items;
@@ -138,8 +138,8 @@ class HiveDrillRepository implements DrillRepository {
     final items = _box.values
         .whereType<Map<dynamic, dynamic>>()
         .map((e) => Drill.fromMap(Map<String, dynamic>.from(e)))
-        .where((drill) => drill.favorite && 
-               (drill.createdBy == user.uid || drill.isPublic))
+        .where((drill) => drill.favorite &&
+               drill.createdBy == user.uid)
         .toList();
     
     Iterable<Drill> out = items;
