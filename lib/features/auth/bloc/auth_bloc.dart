@@ -4,6 +4,8 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:brainblot_app/features/auth/data/auth_repository.dart';
 import 'package:brainblot_app/features/auth/data/firebase_user_repository.dart';
 import 'package:brainblot_app/core/services/preferences_service.dart';
+import 'package:brainblot_app/core/auth/services/session_management_service.dart';
+import 'package:brainblot_app/core/di/injection.dart';
 import 'dart:async';
 
 part 'auth_event.dart';
@@ -12,10 +14,15 @@ part 'auth_state.dart';
 class AuthBloc extends Bloc<AuthEvent, AuthState> {
   final AuthRepository _repo;
   final FirebaseUserRepository? _userRepo;
+  final SessionManagementService? _sessionService;
   late final StreamSubscription<User?> _authSubscription;
   
-  AuthBloc(this._repo, {FirebaseUserRepository? userRepo}) 
-      : _userRepo = userRepo,
+  AuthBloc(
+    this._repo, {
+    FirebaseUserRepository? userRepo,
+    SessionManagementService? sessionService,
+  })  : _userRepo = userRepo,
+        _sessionService = sessionService ?? getIt<SessionManagementService>(),
         super(const AuthState.initial()) {
     on<AuthLoginSubmitted>(_onLogin);
     on<AuthRegisterSubmitted>(_onRegister);
@@ -35,21 +42,7 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
     try {
       final cred = await _repo.signInWithEmailPassword(email: event.email, password: event.password);
       
-      // Ensure user profile exists and update last active
-      if (_userRepo != null && cred.user != null) {
-        try {
-          await _userRepo!.createOrUpdateUserProfile(
-            userId: cred.user!.uid,
-            email: event.email,
-            displayName: cred.user!.displayName ?? event.email.split('@').first,
-            profileImageUrl: cred.user!.photoURL,
-          );
-        } catch (profileError) {
-          // Profile update failure shouldn't block login
-          print('Failed to update user profile: $profileError');
-        }
-      }
-      
+      // Profile creation is now handled by SessionManagementService
       emit(state.copyWith(status: AuthStatus.authenticated, user: cred.user));
     } on FirebaseAuthException catch (e) {
       emit(state.copyWith(status: AuthStatus.failure, error: e.message ?? 'Authentication failed'));
@@ -63,21 +56,7 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
     try {
       final cred = await _repo.registerWithEmailPassword(email: event.email, password: event.password);
       
-      // Create user profile in Firestore for sharing functionality
-      if (_userRepo != null && cred.user != null) {
-        try {
-          await _userRepo!.createOrUpdateUserProfile(
-            userId: cred.user!.uid,
-            email: event.email,
-            displayName: cred.user!.displayName ?? event.email.split('@').first,
-            profileImageUrl: cred.user!.photoURL,
-          );
-        } catch (profileError) {
-          // Profile creation failure shouldn't block registration
-          print('Failed to create user profile: $profileError');
-        }
-      }
-      
+      // Profile creation is now handled by SessionManagementService
       emit(state.copyWith(status: AuthStatus.authenticated, user: cred.user));
     } on FirebaseAuthException catch (e) {
       emit(state.copyWith(status: AuthStatus.failure, error: e.message ?? 'Registration failed'));
@@ -89,13 +68,13 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
   Future<void> _onLogout(AuthLogoutRequested event, Emitter<AuthState> emit) async {
     emit(state.copyWith(status: AuthStatus.loading));
     try {
-      await _repo.signOut();
+      // Always use session service for logout (handles cleanup automatically)
+      await _sessionService!.signOut();
       
-      // Clear saved credentials on logout
-      final prefs = await PreferencesService.getInstance();
-      await prefs.clearSavedCredentials();
-      
+      // Clear state completely
       emit(const AuthState.initial());
+      
+      print("✅ Logout successful - session and credentials cleared");
     } catch (e) {
       emit(state.copyWith(status: AuthStatus.failure, error: 'Logout failed: ${e.toString()}'));
     }

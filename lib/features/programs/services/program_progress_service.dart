@@ -23,13 +23,23 @@ class ProgramProgressService {
 
     final batch = _firestore.batch();
 
-    // Update active program progress
-    final activeProgramRef = _firestore
-        .collection('active_programs')
-        .doc(userId);
+    // Update program progress (unified collection)
+    // Find the active program progress document
+    final progressQuery = await _firestore
+        .collection('program_progress')
+        .where('userId', isEqualTo: userId)
+        .where('programId', isEqualTo: programId)
+        .where('status', isEqualTo: 'active')
+        .limit(1)
+        .get();
 
-    // Get current active program
-    final activeDoc = await activeProgramRef.get();
+    if (progressQuery.docs.isEmpty) {
+      throw Exception('No active program found');
+    }
+
+    final progressDoc = progressQuery.docs.first;
+    final activeProgramRef = progressDoc.reference;
+    final activeDoc = progressDoc;
     if (!activeDoc.exists) {
       throw Exception('No active program found');
     }
@@ -101,15 +111,17 @@ class ProgramProgressService {
     if (userId == null) return null;
 
     try {
-      final activeDoc = await _firestore
-          .collection('active_programs')
-          .doc(userId)
+      final progressQuery = await _firestore
+          .collection('program_progress')
+          .where('userId', isEqualTo: userId)
+          .where('programId', isEqualTo: programId)
+          .where('status', isEqualTo: 'active')
+          .limit(1)
           .get();
 
-      if (!activeDoc.exists) return null;
+      if (progressQuery.docs.isEmpty) return null;
 
-      final data = activeDoc.data()!;
-      if (data['programId'] != programId) return null;
+      final data = progressQuery.docs.first.data();
 
       final completedDays = List<int>.from((data['completedDays'] as List<dynamic>?) ?? <dynamic>[]);
       final currentDay = (data['currentDay'] as int?) ?? 1;
@@ -141,14 +153,16 @@ class ProgramProgressService {
     if (userId == null) return Stream.value(null);
 
     return _firestore
-        .collection('active_programs')
-        .doc(userId)
+        .collection('program_progress')
+        .where('userId', isEqualTo: userId)
+        .where('programId', isEqualTo: programId)
+        .where('status', isEqualTo: 'active')
+        .limit(1)
         .snapshots()
-        .map((doc) {
-      if (!doc.exists) return null;
+        .map((snapshot) {
+      if (snapshot.docs.isEmpty) return null;
 
-      final data = doc.data()!;
-      if (data['programId'] != programId) return null;
+      final data = snapshot.docs.first.data();
 
       final completedDays = List<int>.from((data['completedDays'] as List<dynamic>?) ?? <dynamic>[]);
       final currentDay = (data['currentDay'] as int?) ?? 1;
@@ -185,36 +199,30 @@ class ProgramProgressService {
     }
 
     try {
-      // Get completed programs count
-      final completedSnapshot = await _firestore
-          .collection('completed_programs')
-          .doc(userId)
-          .collection('programs')
-          .get();
-
-      // Get total days completed
-      final progressSnapshot = await _firestore
+      // Get all program progress (both active and completed)
+      final allProgressSnapshot = await _firestore
           .collection('program_progress')
-          .doc(userId)
-          .collection('completions')
+          .where('userId', isEqualTo: userId)
           .get();
 
-      // Get active programs (started but not completed)
-      final activeDoc = await _firestore
-          .collection('active_programs')
-          .doc(userId)
-          .get();
+      final completedCount = allProgressSnapshot.docs
+          .where((doc) => doc.data()['status'] == 'completed')
+          .length;
 
-      final hasActiveProgram = activeDoc.exists;
-      final totalStarted = completedSnapshot.docs.length + (hasActiveProgram ? 1 : 0);
+      final totalStarted = allProgressSnapshot.docs.length;
+
+      // Get total days completed from all programs
+      final totalDaysCompleted = allProgressSnapshot.docs
+          .map((doc) => (doc.data()['completedDays'] as List?)?.length ?? 0)
+          .fold<int>(0, (sum, count) => sum + count);
 
       // Calculate streaks based on completion dates
       final streaks = await _calculateStreaks(userId);
 
       return ProgramStats(
         totalProgramsStarted: totalStarted,
-        totalProgramsCompleted: completedSnapshot.docs.length,
-        totalDaysCompleted: progressSnapshot.docs.length,
+        totalProgramsCompleted: completedCount,
+        totalDaysCompleted: totalDaysCompleted,
         currentStreak: streaks['current'] ?? 0,
         longestStreak: streaks['longest'] ?? 0,
       );
@@ -237,29 +245,30 @@ class ProgramProgressService {
 
     final batch = _firestore.batch();
 
-    // Reset active program to day 1
-    final activeProgramRef = _firestore
-        .collection('active_programs')
-        .doc(userId);
+    // Reset program progress to day 1
+    final progressQuery = await _firestore
+        .collection('program_progress')
+        .where('userId', isEqualTo: userId)
+        .where('programId', isEqualTo: programId)
+        .limit(1)
+        .get();
 
-    batch.update(activeProgramRef, {
+    if (progressQuery.docs.isEmpty) {
+      throw Exception('Program progress not found');
+    }
+
+    final progressRef = progressQuery.docs.first.reference;
+    batch.update(progressRef, {
       'currentDay': 1,
       'completedDays': [],
       'lastCompletedAt': null,
-      'progressPercentage': 0.0,
+      'status': 'active',
+      'stats': {
+        'totalSessions': 0,
+        'averageScore': 0.0,
+        'completionPercentage': 0.0,
+      },
     });
-
-    // Delete all progress records for this program
-    final progressQuery = await _firestore
-        .collection('program_progress')
-        .doc(userId)
-        .collection('completions')
-        .where('programId', isEqualTo: programId)
-        .get();
-
-    for (final doc in progressQuery.docs) {
-      batch.delete(doc.reference);
-    }
 
     await batch.commit();
     print('🔄 Program progress reset for $programId');
@@ -289,24 +298,23 @@ class ProgramProgressService {
 
     final batch = _firestore.batch();
 
-    // Remove from active programs
-    final activeProgramRef = _firestore
-        .collection('active_programs')
-        .doc(userId);
-    batch.delete(activeProgramRef);
+    // Update program progress status to completed
+    final progressQuery = await _firestore
+        .collection('program_progress')
+        .where('userId', isEqualTo: userId)
+        .where('programId', isEqualTo: programId)
+        .where('status', isEqualTo: 'active')
+        .limit(1)
+        .get();
 
-    // Add to completed programs
-    final completedRef = _firestore
-        .collection('completed_programs')
-        .doc(userId)
-        .collection('programs')
-        .doc(programId);
-
-    batch.set(completedRef, {
-      'programId': programId,
-      'completedAt': DateTime.now().toIso8601String(),
-      'userId': userId,
-    });
+    if (progressQuery.docs.isNotEmpty) {
+      final progressRef = progressQuery.docs.first.reference;
+      batch.update(progressRef, {
+        'status': 'completed',
+        'completedAt': DateTime.now().toIso8601String(),
+        'stats.completionPercentage': 100.0,
+      });
+    }
 
     await batch.commit();
     print('🎉 Program completed and moved to completed programs!');
@@ -319,19 +327,28 @@ class ProgramProgressService {
 
   Future<Map<String, int>> _calculateStreaks(String userId) async {
     try {
-      final completions = await _firestore
+      // Get all completed program progress sorted by completion date
+      final progressDocs = await _firestore
           .collection('program_progress')
-          .doc(userId)
-          .collection('completions')
-          .orderBy('completedAt', descending: true)
+          .where('userId', isEqualTo: userId)
+          .where('status', whereIn: ['active', 'completed'])
           .get();
 
-      if (completions.docs.isEmpty) {
+      // Extract completion dates from all programs
+      final completionDates = <DateTime>[];
+      for (final doc in progressDocs.docs) {
+        final data = doc.data();
+        final lastCompleted = data['lastCompletedAt'];
+        if (lastCompleted != null) {
+          completionDates.add(DateTime.parse(lastCompleted as String));
+        }
+      }
+
+      if (completionDates.isEmpty) {
         return {'current': 0, 'longest': 0};
       }
 
-      final dates = completions.docs
-          .map((doc) => DateTime.parse(doc.data()['completedAt'] as String))
+      final dates = completionDates
           .map((date) => DateTime(date.year, date.month, date.day))
           .toSet()
           .toList();

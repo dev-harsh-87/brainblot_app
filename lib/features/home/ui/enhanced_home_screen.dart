@@ -1,4 +1,7 @@
 import 'package:brainblot_app/features/auth/bloc/auth_bloc.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:brainblot_app/core/auth/services/session_management_service.dart';
+import 'package:brainblot_app/core/di/injection.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -6,10 +9,14 @@ import 'package:go_router/go_router.dart';
 
 import 'package:brainblot_app/core/di/injection.dart';
 import 'package:brainblot_app/core/services/auto_refresh_service.dart';
+import 'package:brainblot_app/core/auth/services/permission_service.dart';
+import 'package:brainblot_app/core/auth/services/subscription_permission_service.dart';
 import 'package:brainblot_app/features/drills/bloc/drill_library_bloc.dart';
 import 'package:brainblot_app/features/programs/bloc/programs_bloc.dart';
 import 'package:brainblot_app/features/profile/services/profile_service.dart';
 import 'package:brainblot_app/features/sharing/domain/user_profile.dart';
+import 'package:brainblot_app/core/auth/guards/role_guard.dart';
+import 'package:brainblot_app/core/auth/models/user_role.dart';
 
 /// Enhanced home screen with comprehensive auto-refresh functionality
 class EnhancedHomeScreen extends StatefulWidget {
@@ -19,24 +26,26 @@ class EnhancedHomeScreen extends StatefulWidget {
   State<EnhancedHomeScreen> createState() => _EnhancedHomeScreenState();
 }
 
-class _EnhancedHomeScreenState extends State<EnhancedHomeScreen> 
+class _EnhancedHomeScreenState extends State<EnhancedHomeScreen>
     with AutoRefreshMixin, TickerProviderStateMixin {
-  
   late final ProfileService _profileService;
   late final AutoRefreshService _autoRefreshService;
+  late final PermissionService _permissionService;
   late AnimationController _refreshAnimationController;
   late Animation<double> _refreshAnimation;
-  
+
   UserProfile? _userProfile;
   Map<String, dynamic> _quickStats = {};
   bool _isRefreshing = false;
+  bool _isAdmin = false;
 
   @override
   void initState() {
     super.initState();
     _profileService = getIt<ProfileService>();
     _autoRefreshService = getIt<AutoRefreshService>();
-    
+    _permissionService = getIt<PermissionService>();
+
     _refreshAnimationController = AnimationController(
       duration: const Duration(milliseconds: 1000),
       vsync: this,
@@ -45,9 +54,10 @@ class _EnhancedHomeScreenState extends State<EnhancedHomeScreen>
       parent: _refreshAnimationController,
       curve: Curves.easeInOut,
     );
-    
+
     _loadHomeData();
     _setupAutoRefresh();
+    _checkAdminAccess();
   }
 
   void _setupAutoRefresh() {
@@ -61,10 +71,29 @@ class _EnhancedHomeScreenState extends State<EnhancedHomeScreen>
     });
   }
 
+  Future<void> _checkAdminAccess() async {
+    try {
+      final isAdmin = await _permissionService.isAdmin();
+      if (mounted) {
+        setState(() {
+          _isAdmin = isAdmin;
+        });
+      }
+    } catch (e) {
+      // Handle error silently
+      if (mounted) {
+        setState(() {
+          _isAdmin = false;
+        });
+      }
+    }
+  }
+
   Future<void> _loadHomeData() async {
     await Future.wait([
       _loadUserProfile(),
       _loadQuickStats(),
+      _checkAdminAccess(),
     ]);
   }
 
@@ -96,16 +125,16 @@ class _EnhancedHomeScreenState extends State<EnhancedHomeScreen>
 
   Future<void> _refreshHomeData() async {
     if (_isRefreshing) return;
-    
+
     setState(() {
       _isRefreshing = true;
     });
-    
+
     _refreshAnimationController.repeat();
-    
+
     try {
       await _loadHomeData();
-      
+
       // Also refresh BLoCs
       if (mounted) {
         context.read<DrillLibraryBloc>().add(DrillLibraryRefreshRequested());
@@ -153,7 +182,11 @@ class _EnhancedHomeScreenState extends State<EnhancedHomeScreen>
                   const SizedBox(height: 24),
                   _buildQuickActions(context),
                   const SizedBox(height: 24),
-                  _buildRecentActivity(context),
+                  RoleBasedWidget(
+                    permissionService: _permissionService,
+                    requiredRole: UserRole.admin,
+                    child: _buildAdminSection(context),
+                  ),
                   const SizedBox(height: 32),
                 ],
               ),
@@ -161,7 +194,6 @@ class _EnhancedHomeScreenState extends State<EnhancedHomeScreen>
           ],
         ),
       ),
-      floatingActionButton: _buildAutoRefreshFab(context),
     );
   }
 
@@ -220,18 +252,12 @@ class _EnhancedHomeScreenState extends State<EnhancedHomeScreen>
         ),
       ),
       actions: [
-        IconButton(onPressed: (){
-          context.read<AuthBloc>().add(const AuthLogoutRequested());
-        }, icon: Icon(Icons.logout)),
         IconButton(
-          onPressed: () => context.push('/multiplayer'),
-          icon: Icon(
-            Icons.wifi_tethering_rounded,
-            color: colorScheme.onPrimary,
-            size: 24,
-          ),
-          tooltip: 'Multiplayer Training',
-        ),
+            onPressed: () {
+              context.read<AuthBloc>().add(const AuthLogoutRequested());
+            },
+            icon: Icon(Icons.logout)),
+
         IconButton(
           onPressed: () => context.push('/settings'),
           icon: Icon(
@@ -247,7 +273,7 @@ class _EnhancedHomeScreenState extends State<EnhancedHomeScreen>
             radius: 16,
             backgroundColor: colorScheme.onPrimary,
             child: Text(
-              _userProfile != null 
+              _userProfile != null
                   ? _profileService.getUserInitials(_userProfile!.displayName)
                   : 'U',
               style: TextStyle(
@@ -473,16 +499,16 @@ class _EnhancedHomeScreenState extends State<EnhancedHomeScreen>
               Expanded(
                 child: _buildActionCard(
                   context,
-                  'Explore',
-                  'Discover new content',
-                  Icons.explore_rounded,
+                  'Host',
+                  'ConnectMultiplayer Training',
+                  Icons.wifi_tethering_rounded,
                   Colors.orange,
                   () {
-                    // Navigate to explore/browse section
-                    // This could be sharing screen or community features
+                context.push('/multiplayer');
                   },
                 ),
               ),
+      
             ],
           ),
         ],
@@ -557,56 +583,176 @@ class _EnhancedHomeScreenState extends State<EnhancedHomeScreen>
     );
   }
 
-  Widget _buildRecentActivity(BuildContext context) {
+  Widget _buildActionButton(
+    BuildContext context,
+    String label,
+    IconData icon,
+    Color color,
+    VoidCallback onPressed,
+  ) {
+    final theme = Theme.of(context);
+
+    return SizedBox(
+      width: double.infinity,
+      child: FilledButton.icon(
+        onPressed: onPressed,
+        icon: Icon(icon),
+        label: Text(label),
+        style: FilledButton.styleFrom(
+          backgroundColor: color,
+          foregroundColor: Colors.white,
+          padding: const EdgeInsets.symmetric(vertical: 16),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildAdminSection(BuildContext context) {
     final theme = Theme.of(context);
     
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 20),
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: [
+            Colors.red.withOpacity(0.1),
+            Colors.orange.withOpacity(0.05),
+          ],
+        ),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: Colors.red.withOpacity(0.2),
+          width: 1,
+        ),
+      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            'Recent Activity',
-            style: theme.textTheme.titleLarge?.copyWith(
-              fontWeight: FontWeight.bold,
-            ),
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: Colors.red.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: const Icon(
+                  Icons.admin_panel_settings,
+                  color: Colors.red,
+                  size: 24,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Text(
+                'Admin Controls',
+                style: theme.textTheme.titleLarge?.copyWith(
+                  fontWeight: FontWeight.bold,
+                  color: Colors.red[700],
+                ),
+              ),
+            ],
           ),
           const SizedBox(height: 16),
           Text(
-            'Your recent activities will appear here.',
+            'You have administrator privileges to manage users, subscriptions, and system settings.',
             style: theme.textTheme.bodyMedium?.copyWith(
-              color: theme.colorScheme.onSurface.withOpacity(0.6),
+              color: Colors.red[600],
             ),
+          ),
+          const SizedBox(height: 16),
+          Row(
+            children: [
+              Expanded(
+                child: _buildAdminActionCard(
+                  context,
+                  'Admin Panel',
+                  'Dashboard & Analytics',
+                  Icons.dashboard,
+                  Colors.red,
+                  () {
+                    HapticFeedback.lightImpact();
+                    context.push('/admin');
+                  },
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: _buildAdminActionCard(
+                  context,
+                  'User Management',
+                  'Manage Users & Roles',
+                  Icons.people,
+                  Colors.orange,
+                  () {
+                    HapticFeedback.lightImpact();
+                    context.push('/admin/users');
+                  },
+                ),
+              ),
+            ],
           ),
         ],
       ),
     );
   }
 
-  Widget _buildAutoRefreshFab(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
+  Widget _buildAdminActionCard(
+    BuildContext context,
+    String title,
+    String subtitle,
+    IconData icon,
+    Color color,
+    VoidCallback onTap,
+  ) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
 
-    return FloatingActionButton(
-      onPressed: () {
-        HapticFeedback.mediumImpact();
-        _autoRefreshService.triggerGlobalRefresh();
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('🔄 Refreshing all data...'),
-            duration: Duration(seconds: 2),
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: colorScheme.surface,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: color.withOpacity(0.2),
           ),
-        );
-      },
-      backgroundColor: colorScheme.primary,
-      foregroundColor: colorScheme.onPrimary,
-      child: AnimatedBuilder(
-        animation: _refreshAnimation,
-        builder: (context, child) {
-          return Transform.rotate(
-            angle: _refreshAnimation.value * 2 * 3.14159,
-            child: const Icon(Icons.refresh_rounded),
-          );
-        },
+          boxShadow: [
+            BoxShadow(
+              color: colorScheme.shadow.withOpacity(0.05),
+              blurRadius: 4,
+              offset: const Offset(0, 2),
+            ),
+          ],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Icon(
+              icon,
+              color: color,
+              size: 20,
+            ),
+            const SizedBox(height: 8),
+            Text(
+              title,
+              style: theme.textTheme.titleSmall?.copyWith(
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            const SizedBox(height: 2),
+            Text(
+              subtitle,
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: colorScheme.onSurface.withOpacity(0.6),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

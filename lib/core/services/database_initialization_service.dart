@@ -10,10 +10,8 @@ class DatabaseInitializationService {
   final FirebaseAuth _auth;
   final SubscriptionPlanRepository _planRepository;
 
-  static const String _defaultAdminEmail = 'admin@brainblot.com';
+  static const String _defaultAdminEmail = 'admin@brianblot.com';
   static const String _defaultAdminPassword = 'Admin@123456';
-  static const String _defaultSuperAdminEmail = 'superadmin@brainblot.com';
-  static const String _defaultSuperAdminPassword = 'SuperAdmin@123456';
 
   DatabaseInitializationService({
     FirebaseFirestore? firestore,
@@ -60,8 +58,8 @@ class DatabaseInitializationService {
       // Initialize subscription plans
       await _initializeSubscriptionPlans();
 
-      // Create default super admin user
-      await _createDefaultSuperAdmin();
+      // Create default admin user
+      await _createDefaultAdmin();
 
       // Create default admin user
       await _createDefaultAdmin();
@@ -81,67 +79,6 @@ class DatabaseInitializationService {
       print('✅ Subscription plans initialized');
     } catch (e) {
       print('❌ Failed to initialize subscription plans: $e');
-      rethrow;
-    }
-  }
-
-  /// Create default super admin user
-  Future<void> _createDefaultSuperAdmin() async {
-    try {
-      print('👤 Creating default super admin user...');
-
-      // Check if super admin already exists
-      final existingUsers = await _firestore
-          .collection('users')
-          .where('email', isEqualTo: _defaultSuperAdminEmail)
-          .get();
-
-      if (existingUsers.docs.isNotEmpty) {
-        print('ℹ️ Default super admin user already exists');
-        return;
-      }
-
-      // Create super admin auth user
-      UserCredential userCredential;
-      try {
-        userCredential = await _auth.createUserWithEmailAndPassword(
-          email: _defaultSuperAdminEmail,
-          password: _defaultSuperAdminPassword,
-        );
-      } catch (e) {
-        // If user exists in auth but not in Firestore, sign in
-        userCredential = await _auth.signInWithEmailAndPassword(
-          email: _defaultSuperAdminEmail,
-          password: _defaultSuperAdminPassword,
-        );
-      }
-
-      final userId = userCredential.user!.uid;
-
-      // Create super admin user document
-      final superAdmin = AppUser(
-        id: userId,
-        email: _defaultSuperAdminEmail,
-        displayName: 'Super Administrator',
-        role: UserRole.superAdmin,
-        subscription: UserSubscription.institute(), // Super admin gets full access
-        preferences: const UserPreferences(),
-        stats: const UserStats(),
-        createdAt: DateTime.now(),
-        lastActiveAt: DateTime.now(),
-        updatedAt: DateTime.now(),
-      );
-
-      await _firestore
-          .collection('users')
-          .doc(userId)
-          .set(superAdmin.toFirestore());
-
-      print('✅ Default super admin user created');
-      print('📧 Email: $_defaultSuperAdminEmail');
-      print('🔑 Password: $_defaultSuperAdminPassword');
-    } catch (e) {
-      print('❌ Failed to create default super admin: $e');
       rethrow;
     }
   }
@@ -180,12 +117,12 @@ class DatabaseInitializationService {
       final userId = userCredential.user!.uid;
 
       // Create admin user document
-      final adminUser = AppUser(
+      final admin = AppUser(
         id: userId,
         email: _defaultAdminEmail,
-        displayName: 'System Administrator',
-        role: UserRole.user,
-        subscription: UserSubscription.institute(), // Gets full access via Institute plan
+        displayName: 'Administrator',
+        role: UserRole.admin,
+        subscription: UserSubscription.institute(), // Admin gets full access
         preferences: const UserPreferences(),
         stats: const UserStats(),
         createdAt: DateTime.now(),
@@ -196,7 +133,7 @@ class DatabaseInitializationService {
       await _firestore
           .collection('users')
           .doc(userId)
-          .set(adminUser.toFirestore());
+          .set(admin.toFirestore());
 
       print('✅ Default admin user created');
       print('📧 Email: $_defaultAdminEmail');
@@ -206,6 +143,7 @@ class DatabaseInitializationService {
       rethrow;
     }
   }
+
 
   /// Reset database and reinitialize with fresh data
   Future<void> resetDatabase() async {
@@ -229,13 +167,6 @@ class DatabaseInitializationService {
       final plans = await _planRepository.getAllPlans();
       if (plans.isEmpty) return false;
 
-      // Check if super admin user exists
-      final superAdminUsers = await _firestore
-          .collection('users')
-          .where('email', isEqualTo: _defaultSuperAdminEmail)
-          .get();
-      if (superAdminUsers.docs.isEmpty) return false;
-
       // Check if admin user exists
       final adminUsers = await _firestore
           .collection('users')
@@ -257,24 +188,16 @@ class DatabaseInitializationService {
     };
   }
 
-  /// Get default super admin credentials
-  Map<String, String> getDefaultSuperAdminCredentials() {
-    return {
-      'email': _defaultSuperAdminEmail,
-      'password': _defaultSuperAdminPassword,
-    };
-  }
-
-  /// Create a super admin user
-  Future<void> createSuperAdmin({
+  /// Create an admin user
+  Future<void> createAdmin({
     required String email,
     required String password,
     required String displayName,
   }) async {
     try {
-      print('👤 Creating super admin user...');
+      print('👤 Creating admin user...');
 
-      // Create super admin auth user
+      // Create admin auth user
       final userCredential = await _auth.createUserWithEmailAndPassword(
         email: email,
         password: password,
@@ -282,13 +205,13 @@ class DatabaseInitializationService {
 
       final userId = userCredential.user!.uid;
 
-      // Create super admin user document
-      final superAdmin = AppUser(
+      // Create admin user document
+      final admin = AppUser(
         id: userId,
         email: email,
         displayName: displayName,
-        role: UserRole.superAdmin,
-        subscription: UserSubscription.institute(), // Super admin gets full access
+        role: UserRole.admin,
+        subscription: UserSubscription.institute(), // Admin gets full access
         preferences: const UserPreferences(),
         stats: const UserStats(),
         createdAt: DateTime.now(),
@@ -299,11 +222,11 @@ class DatabaseInitializationService {
       await _firestore
           .collection('users')
           .doc(userId)
-          .set(superAdmin.toFirestore());
+          .set(admin.toFirestore());
 
-      print('✅ Super admin user created');
+      print('✅ Admin user created');
     } catch (e) {
-      print('❌ Failed to create super admin: $e');
+      print('❌ Failed to create admin: $e');
       rethrow;
     }
   }

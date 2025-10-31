@@ -418,23 +418,24 @@ class FirebaseProgramRepository implements ProgramRepository {
     final userId = _currentUserId;
     if (userId == null) throw Exception('User not authenticated');
 
-    // Remove from active programs
-    await _firestore
-        .collection(_activeProgramsCollection)
-        .doc(userId)
-        .delete();
+    // Update program progress to completed status
+    final progressQuery = await _firestore
+        .collection('program_progress')
+        .where('userId', isEqualTo: userId)
+        .where('programId', isEqualTo: programId)
+        .where('status', isEqualTo: 'active')
+        .limit(1)
+        .get();
 
-    // Add to completed programs
-    await _firestore
-        .collection('completed_programs')
-        .doc(userId)
-        .collection('programs')
-        .doc(programId)
-        .set({
-      'programId': programId,
-      'completedAt': DateTime.now().toIso8601String(),
-      'userId': userId,
-    });
+    if (progressQuery.docs.isNotEmpty) {
+      await progressQuery.docs.first.reference.update({
+        'status': 'completed',
+        'completedAt': DateTime.now().toIso8601String(),
+        'stats': {
+          'completionPercentage': 100.0,
+        },
+      });
+    }
   }
 
   Stream<List<String>> watchCompletedPrograms() {
@@ -444,9 +445,9 @@ class FirebaseProgramRepository implements ProgramRepository {
     }
 
     return _firestore
-        .collection('completed_programs')
-        .doc(userId)
-        .collection('programs')
+        .collection('program_progress')
+        .where('userId', isEqualTo: userId)
+        .where('status', isEqualTo: 'completed')
         .orderBy('completedAt', descending: true)
         .snapshots()
         .map((snapshot) => snapshot.docs

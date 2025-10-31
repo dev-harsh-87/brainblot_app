@@ -22,19 +22,14 @@ class AppInitializationService {
         print('📝 Database not initialized. Setting up...');
         await initService.initializeDatabase();
         
-        final superAdminCreds = initService.getDefaultSuperAdminCredentials();
         final adminCreds = initService.getDefaultAdminCredentials();
         print('✅ Database initialized successfully!');
         print('');
-        print('👑 Super Admin Account:');
-        print('📧 Email: ${superAdminCreds['email']}');
-        print('🔑 Password: ${superAdminCreds['password']}');
-        print('');
-        print('👤 Admin Account:');
+        print('👑 Admin Account:');
         print('📧 Email: ${adminCreds['email']}');
         print('🔑 Password: ${adminCreds['password']}');
         print('');
-        print('⚠️ Please change these passwords after first login!');
+        print('⚠️ Please change the admin password after first login!');
       } else {
         print('✅ Database already initialized');
       }

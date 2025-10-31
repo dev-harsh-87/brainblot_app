@@ -100,8 +100,8 @@ class AdminGuard extends StatelessWidget {
       return await permissionService.hasRole(requiredRole!);
     }
     
-    // Default to checking if user is super admin
-    return await permissionService.isSuperAdmin();
+    // Default to checking if user is admin
+    return await permissionService.isAdmin();
   }
 }
 

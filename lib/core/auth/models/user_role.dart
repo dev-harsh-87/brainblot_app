@@ -1,9 +1,9 @@
 /// User roles for role-based access control
-/// Only 2 roles: Super Admin for system administration, User for regular users
+/// Only 2 roles: Admin for system administration, User for regular users
 /// Access to modules is controlled by subscription plans, not roles
 enum UserRole {
-  /// Super admin with full system access and management capabilities
-  superAdmin('super_admin', 'Super Admin', 100),
+  /// Admin with full system access and management capabilities
+  admin('admin', 'Admin', 100),
   
   /// Standard user - access controlled by subscription plan
   user('user', 'User', 10);
@@ -25,8 +25,8 @@ enum UserRole {
     return priority >= requiredRole.priority;
   }
 
-  bool isSuperAdmin() {
-    return this == UserRole.superAdmin;
+  bool isAdmin() {
+    return this == UserRole.admin;
   }
 
   bool isUser() {

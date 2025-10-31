@@ -109,17 +109,17 @@ class AppUser extends Equatable {
   bool canAccessAdminContent() {
     return subscription.plan == 'player' ||
            subscription.plan == 'institute' ||
-           role.isSuperAdmin();
+           role.isAdmin();
   }
 
   bool canCreatePrograms() {
     return subscription.plan == 'player' ||
            subscription.plan == 'institute' ||
-           role.isSuperAdmin();
+           role.isAdmin();
   }
 
   bool canManageUsers() {
-    return subscription.plan == 'institute' || role.isSuperAdmin();
+    return subscription.plan == 'institute' || role.isAdmin();
   }
 
   @override

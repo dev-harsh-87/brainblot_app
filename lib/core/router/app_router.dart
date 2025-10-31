@@ -1,3 +1,6 @@
+import 'package:brainblot_app/features/admin/enhanced_admin_dashboard_screen.dart';
+import 'package:brainblot_app/features/admin/ui/enhanced_subscription_management_screen.dart';
+import 'package:brainblot_app/features/admin/ui/enhanced_user_management_screen.dart';
 import 'package:brainblot_app/features/home/ui/enhanced_home_screen.dart';
 import 'package:brainblot_app/features/programs/services/program_progress_service.dart';
 import 'package:flutter/material.dart';
@@ -9,7 +12,6 @@ import 'package:brainblot_app/features/auth/bloc/auth_bloc.dart';
 import 'package:brainblot_app/core/di/injection.dart';
 import 'package:brainblot_app/core/auth/auth_wrapper.dart';
 import 'package:brainblot_app/core/router/go_router_refresh_stream.dart';
-import 'package:brainblot_app/features/home/home_dashboard_screen.dart';
 import 'package:brainblot_app/features/home/bloc/home_bloc.dart';
 import 'package:brainblot_app/features/training/training_screen.dart';
 import 'package:brainblot_app/features/drills/drill_library_screen.dart';
@@ -34,15 +36,15 @@ import 'package:brainblot_app/features/drills/domain/session_result.dart';
 import 'package:brainblot_app/features/multiplayer/ui/multiplayer_selection_screen.dart';
 import 'package:brainblot_app/features/multiplayer/ui/host_session_screen.dart';
 import 'package:brainblot_app/features/multiplayer/ui/join_session_screen.dart';
-import 'package:brainblot_app/features/admin/admin_dashboard_screen.dart';
-import 'package:brainblot_app/features/admin/ui/user_management_screen.dart';
-import 'package:brainblot_app/features/admin/ui/subscription_management_screen.dart';
 import 'package:brainblot_app/features/admin/ui/permission_management_screen.dart';
 import 'package:brainblot_app/features/admin/ui/analytics_screen.dart';
 import 'package:brainblot_app/core/auth/services/permission_service.dart';
+import 'package:brainblot_app/core/auth/services/subscription_permission_service.dart';
 import 'package:brainblot_app/features/admin/ui/admin_setup_screen.dart';
 import 'package:brainblot_app/core/services/database_initialization_service.dart';
 import 'package:brainblot_app/features/subscription/ui/subscription_screen.dart';
+import 'package:brainblot_app/core/auth/guards/admin_guard.dart';
+import 'package:brainblot_app/core/auth/models/user_role.dart';
 
 class AppRouter {
   final AuthBloc _authBloc;
@@ -53,8 +55,8 @@ class AppRouter {
     initialLocation: '/login',
     redirect: (context, state) {
       final authState = _authBloc.state;
-      final isAuthRoute = state.uri.toString() == '/login' || 
-                         state.uri.toString() == '/register' || 
+      final isAuthRoute = state.uri.toString() == '/login' ||
+                         state.uri.toString() == '/register' ||
                          state.uri.toString() == '/forgot-password';
       
       if (authState.status == AuthStatus.authenticated && isAuthRoute) {
@@ -65,6 +67,7 @@ class AppRouter {
         return '/login';
       }
       
+      // Admin routes will be protected by AdminGuard widgets
       return null;
     },
     refreshListenable: GoRouterRefreshStream(_authBloc.stream),
@@ -251,40 +254,60 @@ class AppRouter {
           ),
         ],
       ),
-      // Admin routes
+      // Admin routes - Protected with AdminGuard
       GoRoute(
         path: '/admin',
         name: 'admin',
-        builder: (context, state) => AdminDashboardScreen(
+        builder: (context, state) => AdminGuard(
           permissionService: getIt<PermissionService>(),
+          requiredRole: UserRole.admin,
+          child: EnhancedAdminDashboardScreen(
+            permissionService: getIt<PermissionService>(),
+          ),
         ),
         routes: [
           GoRoute(
             path: 'users',
             name: 'admin-users',
-            builder: (context, state) => UserManagementScreen(
+            builder: (context, state) => AdminGuard(
               permissionService: getIt<PermissionService>(),
+              requiredRole: UserRole.admin,
+              child: EnhancedUserManagementScreen(
+                permissionService: getIt<PermissionService>(),
+              ),
             ),
           ),
           GoRoute(
             path: 'subscriptions',
             name: 'admin-subscriptions',
-            builder: (context, state) => SubscriptionManagementScreen(
+            builder: (context, state) => AdminGuard(
               permissionService: getIt<PermissionService>(),
+              requiredRole: UserRole.admin,
+              child: EnhancedSubscriptionManagementScreen(
+                permissionService: getIt<PermissionService>(),
+              ),
             ),
           ),
           GoRoute(
             path: 'permissions',
             name: 'admin-permissions',
-            builder: (context, state) => PermissionManagementScreen(
+            builder: (context, state) => AdminGuard(
               permissionService: getIt<PermissionService>(),
+              requiredRole: UserRole.admin,
+              child: PermissionManagementScreen(
+                permissionService: getIt<PermissionService>(),
+              ),
             ),
           ),
           GoRoute(
             path: 'analytics',
             name: 'admin-analytics',
-            builder: (context, state) => AnalyticsScreen(
+            builder: (context, state) => AdminGuard(
               permissionService: getIt<PermissionService>(),
+              requiredRole: UserRole.admin,
+              child: AnalyticsScreen(
+                permissionService: getIt<PermissionService>(),
+              ),
             ),
           ),
         ],

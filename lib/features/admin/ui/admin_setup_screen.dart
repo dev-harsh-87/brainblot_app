@@ -24,7 +24,7 @@ class _AdminSetupScreenState extends State<AdminSetupScreen> {
   bool _isLoading = false;
   bool _obscurePassword = true;
   bool _obscureConfirmPassword = true;
-  bool _isSuperAdmin = false;
+  bool _isAdmin = false;
 
   @override
   void dispose() {
@@ -165,11 +165,11 @@ class _AdminSetupScreenState extends State<AdminSetupScreen> {
               const SizedBox(height: 16),
               CheckboxListTile(
                 title: const Text('Create as Super Admin'),
-                subtitle: const Text('Super Admin has highest privileges'),
-                value: _isSuperAdmin,
+                subtitle: const Text('Admin has full system privileges'),
+                value: _isAdmin,
                 onChanged: (value) {
                   setState(() {
-                    _isSuperAdmin = value ?? false;
+                    _isAdmin = value ?? false;
                   });
                 },
                 controlAffinity: ListTileControlAffinity.leading,
@@ -192,7 +192,7 @@ class _AdminSetupScreenState extends State<AdminSetupScreen> {
                         ),
                       )
                     : Text(
-                        _isSuperAdmin ? 'Create Super Admin' : 'Create Admin',
+                        _isAdmin ? 'Create Admin' : 'Create User',
                         style: const TextStyle(
                           fontSize: 16,
                           fontWeight: FontWeight.bold,
@@ -219,8 +219,8 @@ class _AdminSetupScreenState extends State<AdminSetupScreen> {
     });
 
     try {
-      if (_isSuperAdmin) {
-        await widget.initService.createSuperAdmin(
+      if (_isAdmin) {
+        await widget.initService.createAdmin(
           email: _emailController.text.trim(),
           password: _passwordController.text,
           displayName: _displayNameController.text.trim(),
@@ -237,8 +237,8 @@ class _AdminSetupScreenState extends State<AdminSetupScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(
-              _isSuperAdmin
-                  ? 'Super Admin created successfully!'
+              _isAdmin
+                  ? 'Admin created successfully!'
                   : 'Admin created successfully!',
             ),
             backgroundColor: Colors.green,

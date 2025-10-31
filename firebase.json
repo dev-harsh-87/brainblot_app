@@ -1,1 +1,34 @@
-{"flutter":{"platforms":{"android":{"default":{"projectId":"brain-app-18086","appId":"1:419204986983:android:f1df26bf9f7ffcfcef3cc2","fileOutput":"android/app/google-services.json"}},"ios":{"default":{"projectId":"brain-app-18086","appId":"1:419204986983:ios:878d5eecb97fd94def3cc2","uploadDebugSymbols":false,"fileOutput":"ios/Runner/GoogleService-Info.plist"}},"dart":{"lib/firebase_options.dart":{"projectId":"brain-app-18086","configurations":{"android":"1:419204986983:android:f1df26bf9f7ffcfcef3cc2","ios":"1:419204986983:ios:878d5eecb97fd94def3cc2"}}}}}}
+{
+  "firestore": {
+    "rules": "firestore.rules",
+    "indexes": "firestore.indexes.json"
+  },
+  "flutter": {
+    "platforms": {
+      "android": {
+        "default": {
+          "projectId": "brain-app-18086",
+          "appId": "1:419204986983:android:f1df26bf9f7ffcfcef3cc2",
+          "fileOutput": "android/app/google-services.json"
+        }
+      },
+      "ios": {
+        "default": {
+          "projectId": "brain-app-18086",
+          "appId": "1:419204986983:ios:878d5eecb97fd94def3cc2",
+          "uploadDebugSymbols": false,
+          "fileOutput": "ios/Runner/GoogleService-Info.plist"
+        }
+      },
+      "dart": {
+        "lib/firebase_options.dart": {
+          "projectId": "brain-app-18086",
+          "configurations": {
+            "android": "1:419204986983:android:f1df26bf9f7ffcfcef3cc2",
+            "ios": "1:419204986983:ios:878d5eecb97fd94def3cc2"
+          }
+        }
+      }
+    }
+  }
+}

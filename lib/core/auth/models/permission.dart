@@ -4,17 +4,17 @@ import 'package:brainblot_app/core/auth/models/user_role.dart';
 /// Note: Module access is now controlled by subscription plans, not permissions
 /// Permissions are only for system administration features
 enum Permission {
-  // Super Admin only permissions
-  manageUsers('manage_users', 'Manage Users', [UserRole.superAdmin]),
-  manageSubscriptions('manage_subscriptions', 'Manage Subscriptions', [UserRole.superAdmin]),
-  managePlans('manage_plans', 'Manage Plans', [UserRole.superAdmin]),
-  viewAnalytics('view_analytics', 'View Analytics', [UserRole.superAdmin]),
-  manageSettings('manage_settings', 'Manage Settings', [UserRole.superAdmin]),
+  // Admin only permissions
+  manageUsers('manage_users', 'Manage Users', [UserRole.admin]),
+  manageSubscriptions('manage_subscriptions', 'Manage Subscriptions', [UserRole.admin]),
+  managePlans('manage_plans', 'Manage Plans', [UserRole.admin]),
+  viewAnalytics('view_analytics', 'View Analytics', [UserRole.admin]),
+  manageSettings('manage_settings', 'Manage Settings', [UserRole.admin]),
   
-  // System operations (Super Admin only)
-  systemConfiguration('system_configuration', 'System Configuration', [UserRole.superAdmin]),
-  userRoleManagement('user_role_management', 'User Role Management', [UserRole.superAdmin]),
-  databaseAccess('database_access', 'Database Access', [UserRole.superAdmin]);
+  // System operations (Admin only)
+  systemConfiguration('system_configuration', 'System Configuration', [UserRole.admin]),
+  userRoleManagement('user_role_management', 'User Role Management', [UserRole.admin]),
+  databaseAccess('database_access', 'Database Access', [UserRole.admin]);
 
   final String value;
   final String displayName;

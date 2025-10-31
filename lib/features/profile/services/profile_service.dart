@@ -23,7 +23,7 @@ class ProfileService {
 
     try {
       final doc = await _firestore
-          .collection('user_profiles')
+          .collection('users')
           .doc(userId)
           .get();
 
@@ -58,7 +58,7 @@ class ProfileService {
     );
 
     await _firestore
-        .collection('user_profiles')
+        .collection('users')
         .doc(user.uid)
         .set(profile.toJson());
 
@@ -84,7 +84,7 @@ class ProfileService {
 
 
     await _firestore
-        .collection('user_profiles')
+        .collection('users')
         .doc(userId)
         .update(updates);
   }
@@ -109,8 +109,8 @@ class ProfileService {
     try {
       final batch = _firestore.batch();
 
-      // Delete user profile
-      batch.delete(_firestore.collection('user_profiles').doc(userId));
+      // Delete user profile from users collection
+      batch.delete(_firestore.collection('users').doc(userId));
 
       // Delete user's drills
       final userDrills = await _firestore
@@ -142,8 +142,15 @@ class ProfileService {
         batch.delete(doc.reference);
       }
 
-      // Delete active programs
-      batch.delete(_firestore.collection('active_programs').doc(userId));
+      // Delete program progress (replaces active_programs)
+      final programProgress = await _firestore
+          .collection('program_progress')
+          .where('userId', isEqualTo: userId)
+          .get();
+      
+      for (final doc in programProgress.docs) {
+        batch.delete(doc.reference);
+      }
 
       // Delete user programs collection
       final userProgramsCollection = await _firestore
@@ -159,18 +166,18 @@ class ProfileService {
       // Delete user programs document
       batch.delete(_firestore.collection('user_programs').doc(userId));
 
-      // Delete share invitations
-      final shareInvitations = await _firestore
-          .collection('share_invitations')
+      // Delete invitations (unified collection)
+      final sentInvitations = await _firestore
+          .collection('invitations')
           .where('fromUserId', isEqualTo: userId)
           .get();
       
-      for (final doc in shareInvitations.docs) {
+      for (final doc in sentInvitations.docs) {
         batch.delete(doc.reference);
       }
 
       final receivedInvitations = await _firestore
-          .collection('share_invitations')
+          .collection('invitations')
           .where('toUserId', isEqualTo: userId)
           .get();
       
@@ -275,9 +282,9 @@ class ProfileService {
       // Update email in Firebase Auth
       await user.updateEmail(newEmail);
 
-      // Update email in user profile
+      // Update email in users collection
       await _firestore
-          .collection('user_profiles')
+          .collection('users')
           .doc(user.uid)
           .update({
             'email': newEmail,

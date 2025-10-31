@@ -21,19 +21,14 @@ service cloud.firestore {
       return isAuthenticated() && getUserData().role == role;
     }
     
-    // Check if user is admin or super admin
+    // Check if user is admin
     function isAdmin() {
-      return isAuthenticated() && getUserData().role in ['admin', 'super_admin'];
-    }
-    
-    // Check if user is super admin
-    function isSuperAdmin() {
-      return isAuthenticated() && getUserData().role == 'super_admin';
+      return isAuthenticated() && getUserData().role == 'admin';
     }
     
     // Check if user is premium or higher
     function isPremiumUser() {
-      return isAuthenticated() && getUserData().role in ['premium', 'admin', 'super_admin'];
+      return isAuthenticated() && getUserData().role in ['premium', 'admin'];
     }
     
     // Check if user owns the resource
@@ -56,12 +51,11 @@ service cloud.firestore {
       );
     }
     
-    // Check if user can modify role (only admins, and can't modify super_admin)
+    // Check if user can modify role (only admins)
     function canModifyRole() {
-      return isAdmin() && 
-             (!request.resource.data.keys().hasAny(['role']) || 
-              request.resource.data.role != 'super_admin' ||
-              isSuperAdmin());
+      return isAdmin() &&
+             (!request.resource.data.keys().hasAny(['role']) ||
+              request.resource.data.role != 'admin');
     }
     
     // ========================================
@@ -83,8 +77,8 @@ service cloud.firestore {
                         !request.resource.data.diff(resource.data).affectedKeys().hasAny(['role', 'subscription'])) ||
                        (isAdmin() && canModifyRole());
       
-      // Only super admins can delete users
-      allow delete: if isSuperAdmin();
+      // Only admins can delete users
+      allow delete: if isAdmin();
     }
     
     // ========================================

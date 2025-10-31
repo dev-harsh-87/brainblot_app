@@ -26,8 +26,9 @@ import 'package:brainblot_app/features/programs/services/program_creation_servic
 import 'package:brainblot_app/features/multiplayer/services/bluetooth_connection_service.dart';
 import 'package:brainblot_app/features/multiplayer/services/session_sync_service.dart';
 import 'package:brainblot_app/core/auth/services/permission_service.dart';
+import 'package:brainblot_app/core/auth/services/subscription_permission_service.dart';
 import 'package:brainblot_app/features/subscription/data/subscription_plan_repository.dart';
-import 'package:brainblot_app/core/services/database_initialization_service.dart';
+import 'package:brainblot_app/core/auth/services/session_management_service.dart';
 
 final GetIt getIt = GetIt.instance;
 
@@ -127,14 +128,21 @@ Future<void> configureDependencies() async {
   getIt.registerLazySingleton<SubscriptionPlanRepository>(() => SubscriptionPlanRepository(
     firestore: firebaseFirestore,
   ));
-  getIt.registerLazySingleton<DatabaseInitializationService>(() => DatabaseInitializationService(
-    firestore: firebaseFirestore,
+// Register Session Management Service (singleton for app-wide session tracking)
+  getIt.registerLazySingleton<SessionManagementService>(() => SessionManagementService(
     auth: firebaseAuth,
-    planRepository: getIt<SubscriptionPlanRepository>(),
+    firestore: firebaseFirestore,
+    permissionService: getIt<PermissionService>(),
+  ));
+  
+  // Register Subscription Permission Service
+  getIt.registerLazySingleton<SubscriptionPermissionService>(() => SubscriptionPermissionService(
+    auth: firebaseAuth,
+    firestore: firebaseFirestore,
   ));
   
   print('🔧 DI: Professional Firebase dependency injection configuration completed successfully');
   print('🔧 DI: Available repositories: Firebase (primary), Hive (local fallback)');
   print('🔧 DI: RBAC system initialized with PermissionService and SubscriptionPlanRepository');
-  print('🔧 DI: Database initialization service registered');
+  print("🔧 DI: Session management service registered - centralized auth handling enabled");
 }

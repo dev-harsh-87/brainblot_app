@@ -8,6 +8,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:brainblot_app/core/di/injection.dart';
 import 'package:brainblot_app/features/auth/bloc/auth_bloc.dart';
 import 'package:brainblot_app/features/settings/bloc/settings_bloc.dart';
+import 'package:brainblot_app/core/auth/services/session_management_service.dart';
 import 'package:brainblot_app/features/settings/data/settings_repository.dart';
 import 'package:brainblot_app/features/stats/bloc/stats_bloc.dart';
 import 'package:brainblot_app/features/drills/domain/session_result.dart';
@@ -1406,7 +1407,8 @@ class _ProfileScreenState extends State<ProfileScreen> with AutoRefreshMixin {
   Widget _buildQuickActions(BuildContext context) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
-    final isAdmin = FirebaseAuth.instance.currentUser?.email == 'admin@brainblot.com';
+    final sessionService = getIt<SessionManagementService>();
+    final isAdmin = sessionService.isAdmin();
     
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 20),

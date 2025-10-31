@@ -23,7 +23,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
   Widget build(BuildContext context) {
     return AdminGuard(
       permissionService: widget.permissionService,
-      requiredRole: UserRole.superAdmin,
+      requiredRole: UserRole.admin,
       child: Scaffold(
         appBar: AppBar(
           title: const Text('Analytics'),
@@ -70,7 +70,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
         final totalUsers = users.length;
         final activeUsers = users.where((doc) {
           final data = doc.data() as Map<String, dynamic>;
-          final lastActive = data['lastActiveAt'] as Timestamp?;
+          final lastActive = _parseTimestamp(data['lastActiveAt']);
           if (lastActive == null) return false;
           final daysSinceActive = DateTime.now().difference(lastActive.toDate()).inDays;
           return daysSinceActive <= 7;
@@ -246,5 +246,29 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
         ),
       ],
     );
+  }
+
+  Timestamp? _parseTimestamp(dynamic timestampData) {
+    if (timestampData == null) {
+      return null;
+    }
+    
+    if (timestampData is Timestamp) {
+      return timestampData;
+    }
+    
+    if (timestampData is String) {
+      try {
+        // Try to parse the string as DateTime and convert to Timestamp
+        final dateTime = DateTime.parse(timestampData);
+        return Timestamp.fromDate(dateTime);
+      } catch (e) {
+        // If parsing fails, return null
+        return null;
+      }
+    }
+    
+    // If it's neither Timestamp nor String, return null
+    return null;
   }
 }

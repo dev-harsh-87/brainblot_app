@@ -34,8 +34,8 @@ class SubscriptionPermissionService {
     final appUser = await getCurrentUser();
     if (appUser == null) return false;
 
-    // Super admin always has access to all modules
-    if (appUser.role.isSuperAdmin()) return true;
+    // Admin always has access to all modules
+    if (appUser.role.isAdmin()) return true;
 
     return appUser.hasModuleAccess(module);
   }
@@ -72,12 +72,12 @@ class SubscriptionPermissionService {
     return appUser.canManageUsers();
   }
 
-  /// Check if user is super admin
-  Future<bool> isSuperAdmin() async {
+  /// Check if user is admin
+  Future<bool> isAdmin() async {
     final appUser = await getCurrentUser();
     if (appUser == null) return false;
 
-    return appUser.role.isSuperAdmin();
+    return appUser.role.isAdmin();
   }
 
   /// Check if user has specific permission
@@ -131,8 +131,8 @@ class SubscriptionPermissionService {
     DateTime? expiresAt,
   }) async {
     final currentUser = await getCurrentUser();
-    if (currentUser == null || !currentUser.role.isSuperAdmin()) {
-      throw Exception('Only super admins can update subscriptions');
+    if (currentUser == null || !currentUser.role.isAdmin()) {
+      throw Exception('Only admins can update subscriptions');
     }
 
     await _firestore.collection('users').doc(userId).update({
@@ -164,7 +164,7 @@ class SubscriptionPermissionService {
       'canCreatePrograms': appUser.canCreatePrograms(),
       'canManageUsers': appUser.canManageUsers(),
       'moduleAccess': appUser.subscription.moduleAccess,
-      'isSuperAdmin': appUser.role.isSuperAdmin(),
+      'isAdmin': appUser.role.isAdmin(),
     };
   }
 }

@@ -110,9 +110,12 @@ class SharingService {
       );
 
       await _firestore
-          .collection('shareInvitations')
+          .collection('invitations')
           .doc(invitation.id)
-          .set(invitation.toJson());
+          .set({
+            ...invitation.toJson(),
+            'type': 'in_app',
+          });
 
       // Create notification for target user
       await _createNotification(
@@ -157,9 +160,12 @@ class SharingService {
       );
 
       await _firestore
-          .collection('shareInvitations')
+          .collection('invitations')
           .doc(invitation.id)
-          .set(invitation.toJson());
+          .set({
+            ...invitation.toJson(),
+            'type': 'in_app',
+          });
 
       // Create notification for target user
       await _createNotification(
@@ -183,7 +189,8 @@ class SharingService {
 
     try {
       final query = await _firestore
-          .collection('shareInvitations')
+          .collection('invitations')
+          .where('type', isEqualTo: 'in_app')
           .where('toUserId', isEqualTo: currentUserId)
           .where('status', isEqualTo: ShareInvitationStatus.pending.name)
           .orderBy('createdAt', descending: true)
@@ -208,7 +215,7 @@ class SharingService {
     try {
       await _firestore.runTransaction((transaction) async {
         // Get invitation
-        final invitationRef = _firestore.collection('shareInvitations').doc(invitationId);
+        final invitationRef = _firestore.collection('invitations').doc(invitationId);
         final invitationDoc = await transaction.get(invitationRef);
         
         if (!invitationDoc.exists) {
@@ -255,7 +262,7 @@ class SharingService {
 
     try {
       await _firestore
-          .collection('shareInvitations')
+          .collection('invitations')
           .doc(invitationId)
           .update({
             'status': ShareInvitationStatus.declined.name,
@@ -292,7 +299,8 @@ class SharingService {
         
         // Update any related share invitations to mark them as revoked
         final invitationsQuery = await _firestore
-            .collection('shareInvitations')
+            .collection('invitations')
+            .where('type', isEqualTo: 'in_app')
             .where('itemType', isEqualTo: itemType)
             .where('itemId', isEqualTo: itemId)
             .where('toUserId', isEqualTo: userId)
@@ -456,7 +464,10 @@ class SharingService {
         'downloadLink': _generateDownloadLink(itemType, itemId),
       };
 
-      await _firestore.collection('emailInvitations').add(invitation);
+      await _firestore.collection('invitations').add({
+        ...invitation,
+        'type': 'email',
+      });
 
       // Generate email content
       final emailContent = _generateEmailContent(
@@ -594,13 +605,15 @@ Making minds sharper, one drill at a time.
       
       // Count in-app shares
       final inAppShares = await _firestore
-          .collection('shareInvitations')
+          .collection('invitations')
+          .where('type', isEqualTo: 'in_app')
           .where('fromUserId', isEqualTo: currentUserId)
           .get();
       
       // Count email shares
       final emailShares = await _firestore
-          .collection('emailInvitations')
+          .collection('invitations')
+          .where('type', isEqualTo: 'email')
           .where('fromUserId', isEqualTo: currentUserId)
           .get();
       

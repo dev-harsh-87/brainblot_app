@@ -7,28 +7,79 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 class PermissionService {
   final FirebaseAuth _auth;
   final FirebaseFirestore _firestore;
+  
+  // Cache for user roles to avoid repeated Firestore queries
+  final Map<String, UserRole> _roleCache = {};
+  String? _currentUserId;
 
   PermissionService({
     FirebaseAuth? auth,
     FirebaseFirestore? firestore,
   })  : _auth = auth ?? FirebaseAuth.instance,
-        _firestore = firestore ?? FirebaseFirestore.instance;
+        _firestore = firestore ?? FirebaseFirestore.instance {
+    // Listen to auth state changes to clear cache on user change
+    _auth.authStateChanges().listen((user) {
+      final newUserId = user?.uid;
+      if (newUserId != _currentUserId) {
+        print('🔄 Auth state changed from $_currentUserId to $newUserId - clearing role cache');
+        _currentUserId = newUserId;
+        _roleCache.clear();
+        
+        // Don't preload role here - let it load on-demand to avoid redundant calls
+      }
+    });
+  }
 
-  /// Get current user's role from Firestore
+
+  /// Get current user's role from Firestore (with caching)
   Future<UserRole> getCurrentUserRole() async {
     final user = _auth.currentUser;
     if (user == null) return UserRole.user;
 
+    // Check cache first
+    if (_roleCache.containsKey(user.uid)) {
+      return _roleCache[user.uid]!;
+    }
+
     try {
       final doc = await _firestore.collection('users').doc(user.uid).get();
-      if (!doc.exists || doc.data() == null) return UserRole.user;
+      if (!doc.exists || doc.data() == null) {
+        _roleCache[user.uid] = UserRole.user;
+        return UserRole.user;
+      }
 
       final data = doc.data()!;
       final roleString = data['role'] as String?;
-      return UserRole.fromString(roleString ?? 'user');
+      final role = UserRole.fromString(roleString ?? 'user');
+      
+      // Cache the role
+      _roleCache[user.uid] = role;
+      return role;
     } catch (e) {
+      // On error, return cached value if available, otherwise default to user
+      if (_roleCache.containsKey(user.uid)) {
+        return _roleCache[user.uid]!;
+      }
       return UserRole.user;
     }
+  }
+
+  /// Clear the role cache (useful after role updates)
+  void clearCache() {
+    print('🗑️ Clearing permission service role cache');
+    _roleCache.clear();
+  }
+
+  /// Force refresh current user's role from Firestore
+  Future<UserRole> refreshCurrentUserRole() async {
+    final user = _auth.currentUser;
+    if (user == null) return UserRole.user;
+
+    // Clear cached role for current user
+    _roleCache.remove(user.uid);
+    
+    // Fetch fresh role from Firestore
+    return await getCurrentUserRole();
   }
 
   /// Get user role by user ID
@@ -57,24 +108,30 @@ class PermissionService {
     return role.hasPermission(requiredRole);
   }
 
-  /// Check if current user is super admin
-  Future<bool> isSuperAdmin() async {
+  /// Check if current user is admin
+  Future<bool> isAdmin() async {
     final role = await getCurrentUserRole();
-    return role.isSuperAdmin();
+    return role.isAdmin();
   }
 
   /// Update user role (admin only)
   Future<void> updateUserRole(String userId, UserRole newRole) async {
     final currentRole = await getCurrentUserRole();
     
-    if (!currentRole.isSuperAdmin()) {
-      throw Exception('Only super admins can update user roles');
+    if (!currentRole.isAdmin()) {
+      throw Exception('Only admins can update user roles');
     }
 
     await _firestore.collection('users').doc(userId).update({
       'role': newRole.value,
       'updatedAt': FieldValue.serverTimestamp(),
     });
+    
+    // Clear cache after role update
+    _roleCache.remove(userId);
+    if (_auth.currentUser?.uid == userId) {
+      clearCache();
+    }
   }
 
   /// Get all permissions for current user
@@ -155,8 +212,8 @@ class PermissionService {
   Future<void> grantPermissions(String userId, List<String> permissions) async {
     final currentRole = await getCurrentUserRole();
     
-    if (!currentRole.isSuperAdmin()) {
-      throw Exception('Only super admins can grant permissions');
+    if (!currentRole.isAdmin()) {
+      throw Exception('Only admins can grant permissions');
     }
 
     await _firestore.collection('users').doc(userId).update({
@@ -169,8 +226,8 @@ class PermissionService {
   Future<void> revokePermissions(String userId, List<String> permissions) async {
     final currentRole = await getCurrentUserRole();
     
-    if (!currentRole.isSuperAdmin()) {
-      throw Exception('Only super admins can revoke permissions');
+    if (!currentRole.isAdmin()) {
+      throw Exception('Only admins can revoke permissions');
     }
 
     await _firestore.collection('users').doc(userId).update({

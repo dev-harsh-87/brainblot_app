@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:brainblot_app/core/utils/create_super_admin.dart';
+import 'package:brainblot_app/core/utils/create_super_admin.dart' as create_admin;
 
 /// Debug screen to check and create Super Admin account
 class AdminDebugScreen extends StatefulWidget {
@@ -14,15 +14,15 @@ class AdminDebugScreen extends StatefulWidget {
 class _AdminDebugScreenState extends State<AdminDebugScreen> {
   String _status = 'Checking...';
   bool _isLoading = true;
-  Map<String, dynamic>? _superAdminData;
+  Map<String, dynamic>? _adminData;
 
   @override
   void initState() {
     super.initState();
-    _checkSuperAdmin();
+    _checkAdmin();
   }
 
-  Future<void> _checkSuperAdmin() async {
+  Future<void> _checkAdmin() async {
     setState(() {
       _isLoading = true;
       _status = 'Checking database...';
@@ -34,20 +34,20 @@ class _AdminDebugScreenState extends State<AdminDebugScreen> {
       // Check for super admin in Firestore
       final querySnapshot = await firestore
           .collection('users')
-          .where('email', isEqualTo: 'superadmin@brainblot.com')
+          .where('email', isEqualTo: 'admin@brainblot.com')
           .get();
 
       if (querySnapshot.docs.isEmpty) {
         setState(() {
-          _status = 'Super Admin NOT found in database';
-          _superAdminData = null;
+          _status = 'Admin NOT found in database';
+          _adminData = null;
           _isLoading = false;
         });
       } else {
         final doc = querySnapshot.docs.first;
         setState(() {
-          _status = 'Super Admin found!';
-          _superAdminData = doc.data();
+          _status = 'Admin found!';
+          _adminData = doc.data();
           _isLoading = false;
         });
       }
@@ -59,15 +59,15 @@ class _AdminDebugScreenState extends State<AdminDebugScreen> {
     }
   }
 
-  Future<void> _createSuperAdmin() async {
+  Future<void> _createAdmin() async {
     setState(() {
       _isLoading = true;
       _status = 'Creating Super Admin...';
     });
 
     try {
-      await CreateSuperAdmin.create();
-      await _checkSuperAdmin();
+      await create_admin.CreateAdmin.create();
+      await _checkAdmin();
     } catch (e) {
       setState(() {
         _status = 'Error creating Super Admin: $e';
@@ -84,7 +84,7 @@ class _AdminDebugScreenState extends State<AdminDebugScreen> {
 
     try {
       final auth = FirebaseAuth.instance;
-      final credentials = CreateSuperAdmin.getCredentials();
+      final credentials = create_admin.CreateAdmin.getCredentials();
       
       await auth.signInWithEmailAndPassword(
         email: credentials['email']!,
@@ -119,7 +119,7 @@ class _AdminDebugScreenState extends State<AdminDebugScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final credentials = CreateSuperAdmin.getCredentials();
+    final credentials = create_admin.CreateAdmin.getCredentials();
 
     return Scaffold(
       appBar: AppBar(
@@ -135,7 +135,7 @@ class _AdminDebugScreenState extends State<AdminDebugScreen> {
                 children: [
                   // Status Card
                   Card(
-                    color: _superAdminData != null ? Colors.green[50] : Colors.orange[50],
+                    color: _adminData != null ? Colors.green[50] : Colors.orange[50],
                     child: Padding(
                       padding: const EdgeInsets.all(16),
                       child: Column(
@@ -150,7 +150,7 @@ class _AdminDebugScreenState extends State<AdminDebugScreen> {
                             _status,
                             style: TextStyle(
                               fontSize: 16,
-                              color: _superAdminData != null ? Colors.green[900] : Colors.orange[900],
+                              color: _adminData != null ? Colors.green[900] : Colors.orange[900],
                               fontWeight: FontWeight.bold,
                             ),
                           ),
@@ -183,7 +183,7 @@ class _AdminDebugScreenState extends State<AdminDebugScreen> {
                   const SizedBox(height: 16),
 
                   // Data Card (if exists)
-                  if (_superAdminData != null) ...[
+                  if (_adminData != null) ...[
                     Card(
                       color: Colors.purple[50],
                       child: Padding(
@@ -196,11 +196,11 @@ class _AdminDebugScreenState extends State<AdminDebugScreen> {
                               style: Theme.of(context).textTheme.titleLarge,
                             ),
                             const SizedBox(height: 16),
-                            _buildDataRow('ID:', _superAdminData!['id']?.toString()),
-                            _buildDataRow('Email:', _superAdminData!['email']?.toString()),
-                            _buildDataRow('Display Name:', _superAdminData!['displayName']?.toString()),
-                            _buildDataRow('Role:', _superAdminData!['role']?.toString()),
-                            _buildDataRow('Created:', _superAdminData!['createdAt']?.toString() ?? 'N/A'),
+                            _buildDataRow('ID:', _adminData!['id']?.toString()),
+                            _buildDataRow('Email:', _adminData!['email']?.toString()),
+                            _buildDataRow('Display Name:', _adminData!['displayName']?.toString()),
+                            _buildDataRow('Role:', _adminData!['role']?.toString()),
+                            _buildDataRow('Created:', _adminData!['createdAt']?.toString() ?? 'N/A'),
                           ],
                         ),
                       ),
@@ -209,11 +209,11 @@ class _AdminDebugScreenState extends State<AdminDebugScreen> {
                   ],
 
                   // Action Buttons
-                  if (_superAdminData == null) ...[
+                  if (_adminData == null) ...[
                     SizedBox(
                       width: double.infinity,
                       child: ElevatedButton.icon(
-                        onPressed: _createSuperAdmin,
+                        onPressed: _createAdmin,
                         icon: const Icon(Icons.add_circle),
                         label: const Text('Create Super Admin'),
                         style: ElevatedButton.styleFrom(
@@ -242,7 +242,7 @@ class _AdminDebugScreenState extends State<AdminDebugScreen> {
                   SizedBox(
                     width: double.infinity,
                     child: OutlinedButton.icon(
-                      onPressed: _checkSuperAdmin,
+                      onPressed: _checkAdmin,
                       icon: const Icon(Icons.refresh),
                       label: const Text('Refresh'),
                       style: OutlinedButton.styleFrom(

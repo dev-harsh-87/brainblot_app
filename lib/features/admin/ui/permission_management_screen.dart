@@ -16,7 +16,7 @@ class PermissionManagementScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     return AdminGuard(
       permissionService: permissionService,
-      requiredRole: UserRole.superAdmin,
+      requiredRole: UserRole.admin,
       child: Scaffold(
         appBar: AppBar(
           title: const Text('Permission Management'),
@@ -95,7 +95,7 @@ class PermissionManagementScreen extends StatelessWidget {
 
   Color _getRoleColor(UserRole role) {
     switch (role) {
-      case UserRole.superAdmin:
+      case UserRole.admin:
         return Colors.red;
       case UserRole.user:
         return Colors.blue;
@@ -104,7 +104,7 @@ class PermissionManagementScreen extends StatelessWidget {
 
   IconData _getRoleIcon(UserRole role) {
     switch (role) {
-      case UserRole.superAdmin:
+      case UserRole.admin:
         return Icons.admin_panel_settings;
       case UserRole.user:
         return Icons.person;
