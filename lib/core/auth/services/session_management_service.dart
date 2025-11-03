@@ -326,20 +326,39 @@ class SessionManagementService {
   Future<void> _createUserProfile(User firebaseUser) async {
     try {
       final userRole = _determineUserRole(firebaseUser.email);
+      final isAdmin = userRole == 'admin';
       print('🔑 Assigning $userRole role to: ${firebaseUser.email}');
       
       // Create proper AppUser object and convert to Firestore format
       final appUser = AppUser(
         id: firebaseUser.uid,
         email: firebaseUser.email?.toLowerCase() ?? '',
-        displayName: firebaseUser.displayName ?? firebaseUser.email?.split('@').first ?? 'User',
+        displayName: firebaseUser.displayName ?? (isAdmin ? 'Admin' : firebaseUser.email?.split('@').first ?? 'User'),
         profileImageUrl: firebaseUser.photoURL,
         role: UserRole.fromString(userRole),
-        subscription: const UserSubscription(
-          plan: 'free',
-          status: 'active',
-          moduleAccess: ['drills', 'profile', 'stats', 'analysis'],
-        ),
+        subscription: isAdmin
+            ? const UserSubscription(
+                plan: 'institute',
+                status: 'active',
+                moduleAccess: [
+                  'drills',
+                  'profile',
+                  'stats',
+                  'analysis',
+                  'admin_drills',
+                  'admin_programs',
+                  'programs',
+                  'multiplayer',
+                  'user_management',
+                  'team_management',
+                  'bulk_operations',
+                ],
+              )
+            : const UserSubscription(
+                plan: 'free',
+                status: 'active',
+                moduleAccess: ['drills', 'profile', 'stats', 'analysis'],
+              ),
         preferences: const UserPreferences(
           theme: 'system',
           notifications: true,
@@ -374,8 +393,11 @@ class SessionManagementService {
     
     const adminEmails = [
       'admin@brainblot.com',
+      'admin@brianblot.com',  // Fixed spelling - user's actual admin email
       'support@brainblot.com',
+      'support@brianblot.com',
       'root@brainblot.com',
+      'root@brianblot.com',
     ];
     
     if (adminEmails.contains(email.toLowerCase())) {

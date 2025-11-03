@@ -154,11 +154,12 @@ class PermissionService {
       
       if (subscription == null) return false;
 
-      final features = subscription['features'] as List<dynamic>?;
-      if (features == null) return false;
+      final moduleAccess = subscription['moduleAccess'] as List<dynamic>?;
+      if (moduleAccess == null) return false;
 
-      return features.contains(module);
+      return moduleAccess.contains(module);
     } catch (e) {
+      print('Error checking module access: $e');
       return false;
     }
   }
@@ -177,12 +178,59 @@ class PermissionService {
       
       if (subscription == null) return false;
 
-      final planId = subscription['planId'] as String?;
+      final plan = subscription['plan'] as String?;
       // Advanced features available for Player and Institute plans
-      return planId == 'player' || planId == 'institute';
+      return plan == 'player' || plan == 'institute';
     } catch (e) {
+      print('Error checking advanced features access: $e');
       return false;
     }
+  }
+
+  /// Get current user's full profile with role and subscription details
+  Future<Map<String, dynamic>?> getCurrentUserProfile() async {
+    final user = _auth.currentUser;
+    if (user == null) return null;
+
+    try {
+      final doc = await _firestore.collection('users').doc(user.uid).get();
+      if (!doc.exists || doc.data() == null) return null;
+
+      return doc.data();
+    } catch (e) {
+      print('Error getting user profile: $e');
+      return null;
+    }
+  }
+
+  /// Check if user can manage other users (institute plan or admin role)
+  Future<bool> canManageUsers() async {
+    final role = await getCurrentUserRole();
+    if (role.isAdmin()) return true;
+
+    final profile = await getCurrentUserProfile();
+    if (profile == null) return false;
+
+    final subscription = profile['subscription'] as Map<String, dynamic>?;
+    if (subscription == null) return false;
+
+    final plan = subscription['plan'] as String?;
+    return plan == 'institute';
+  }
+
+  /// Check if user can create programs (player/institute plan or admin role)
+  Future<bool> canCreatePrograms() async {
+    final role = await getCurrentUserRole();
+    if (role.isAdmin()) return true;
+
+    final profile = await getCurrentUserProfile();
+    if (profile == null) return false;
+
+    final subscription = profile['subscription'] as Map<String, dynamic>?;
+    if (subscription == null) return false;
+
+    final plan = subscription['plan'] as String?;
+    return plan == 'player' || plan == 'institute';
   }
 
   /// Check multiple permissions at once

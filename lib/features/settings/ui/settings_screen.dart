@@ -308,6 +308,14 @@ class _SettingsScreenState extends State<SettingsScreen> with AutoRefreshMixin {
           Icons.privacy_tip_rounded,
           () => _openPrivacyPolicy(),
         ),
+        const Divider(height: 32),
+        _buildActionSetting(
+          context,
+          'Logout',
+          'Sign out of your account',
+          Icons.logout_rounded,
+          () => _handleLogout(),
+        ),
       ],
     );
   }
@@ -981,6 +989,35 @@ class _SettingsScreenState extends State<SettingsScreen> with AutoRefreshMixin {
       context: context,
       applicationName: 'BrainBlot',
       applicationVersion: '1.0.0',
+    );
+  }
+
+  void _handleLogout() {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text("Logout"),
+        content: const Text("Are you sure you want to logout?"),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text("Cancel"),
+          ),
+          FilledButton(
+            onPressed: () {
+              Navigator.of(context).pop();
+              // Trigger logout via AuthBloc
+              context.read<AuthBloc>().add(const AuthLogoutRequested());
+              // Navigate to auth screen
+              context.go("/auth");
+            },
+            style: FilledButton.styleFrom(
+              backgroundColor: Colors.red,
+            ),
+            child: const Text("Logout"),
+          ),
+        ],
+      ),
     );
   }
 }

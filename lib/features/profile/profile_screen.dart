@@ -1408,7 +1408,6 @@ class _ProfileScreenState extends State<ProfileScreen> with AutoRefreshMixin {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
     final sessionService = getIt<SessionManagementService>();
-    final isAdmin = sessionService.isAdmin();
     
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 20),
@@ -1480,87 +1479,6 @@ class _ProfileScreenState extends State<ProfileScreen> with AutoRefreshMixin {
             ),
           ),
           
-          // Admin-specific actions
-          if (isAdmin) ...[
-            const SizedBox(height: 20),
-            Row(
-              children: [
-                Icon(
-                  Icons.admin_panel_settings,
-                  color: Colors.red,
-                  size: 24,
-                ),
-                const SizedBox(width: 8),
-                Text(
-                  'Admin Controls',
-                  style: theme.textTheme.titleLarge?.copyWith(
-                    fontWeight: FontWeight.bold,
-                    color: Colors.red,
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 16),
-            Row(
-              children: [
-                Expanded(
-                  child: _buildActionButton(
-                    context,
-                    'Admin Panel',
-                    Icons.dashboard,
-                    Colors.red,
-                    () {
-                      HapticFeedback.lightImpact();
-                      context.push('/admin');
-                    },
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: _buildActionButton(
-                    context,
-                    'User Management',
-                    Icons.people,
-                    Colors.deepPurple,
-                    () {
-                      HapticFeedback.lightImpact();
-                      context.push('/admin/users');
-                    },
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 12),
-            Row(
-              children: [
-                Expanded(
-                  child: _buildActionButton(
-                    context,
-                    'Subscriptions',
-                    Icons.card_membership,
-                    Colors.teal,
-                    () {
-                      HapticFeedback.lightImpact();
-                      context.push('/admin/subscriptions');
-                    },
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: _buildActionButton(
-                    context,
-                    'Analytics',
-                    Icons.bar_chart,
-                    Colors.orange,
-                    () {
-                      HapticFeedback.lightImpact();
-                      context.push('/admin/analytics');
-                    },
-                  ),
-                ),
-              ],
-            ),
-          ],
         ],
       ),
     );

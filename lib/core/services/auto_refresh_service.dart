@@ -99,19 +99,21 @@ class AutoRefreshService {
     scheduleMultipleRefresh([sharing, drills, programs, stats]);
   }
 
-  /// Start periodic refresh for specific data type
+  /// Start periodic refresh for specific data type - DISABLED
+  /// This method is now disabled to prevent automatic refreshing
+  /// Data will only refresh when manually triggered or when relevant actions occur
   void startPeriodicRefresh(
-    String dataType, 
+    String dataType,
     {Duration interval = const Duration(minutes: 5)}
   ) {
-    _refreshTimers['${dataType}_periodic']?.cancel();
-    _refreshTimers['${dataType}_periodic'] = Timer.periodic(interval, (_) {
-      triggerRefresh(dataType);
-    });
+    // Periodic refresh disabled - data refreshes only when needed
+    // No automatic background refreshing every few minutes
   }
 
-  /// Stop periodic refresh for specific data type
+  /// Stop periodic refresh for specific data type - DISABLED
+  /// This method is now disabled as periodic refresh is not used
   void stopPeriodicRefresh(String dataType) {
+    // Periodic refresh disabled - no timers to cancel
     _refreshTimers['${dataType}_periodic']?.cancel();
     _refreshTimers.remove('${dataType}_periodic');
   }

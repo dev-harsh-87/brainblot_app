@@ -1,12 +1,13 @@
-import 'package:flutter/material.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:brainblot_app/core/auth/services/permission_service.dart';
-import 'package:brainblot_app/core/auth/guards/admin_guard.dart';
-import 'package:brainblot_app/core/auth/models/user_role.dart';
-import 'package:brainblot_app/features/admin/ui/enhanced_user_management_screen.dart';
-import 'package:brainblot_app/features/admin/ui/enhanced_subscription_management_screen.dart';
-import 'package:brainblot_app/features/admin/ui/analytics_screen.dart';
-import 'package:brainblot_app/features/admin/ui/permission_management_screen.dart';
+import "package:flutter/material.dart";
+import "package:cloud_firestore/cloud_firestore.dart";
+import "package:brainblot_app/core/auth/services/permission_service.dart";
+import "package:brainblot_app/core/auth/guards/admin_guard.dart";
+import "package:brainblot_app/core/auth/models/user_role.dart";
+import "package:brainblot_app/features/admin/ui/user_management_screen.dart";
+import "package:brainblot_app/features/admin/ui/subscription_management_screen.dart";
+import "package:brainblot_app/features/admin/ui/analytics_screen.dart";
+import "package:brainblot_app/features/admin/ui/plan_requests_screen.dart";
+
 
 class EnhancedAdminDashboardScreen extends StatelessWidget {
   final PermissionService permissionService;
@@ -54,26 +55,9 @@ class EnhancedAdminDashboardScreen extends StatelessWidget {
 
   PreferredSizeWidget _buildAppBar(BuildContext context) {
     return AppBar(
-      title: const Text('Admin Dashboard'),
+      title: const Text("Admin Dashboard"),
       elevation: 0,
-      actions: [
-        IconButton(
-          icon: const Icon(Icons.notifications_outlined),
-          onPressed: () {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('Notifications coming soon')),
-            );
-          },
-        ),
-        IconButton(
-          icon: const Icon(Icons.settings_outlined),
-          onPressed: () {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('Settings coming soon')),
-            );
-          },
-        ),
-      ],
+
     );
   }
 
@@ -82,14 +66,14 @@ class EnhancedAdminDashboardScreen extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          'Welcome, Admin',
+          "Welcome, Admin",
           style: Theme.of(context).textTheme.headlineMedium?.copyWith(
                 fontWeight: FontWeight.bold,
               ),
         ),
         const SizedBox(height: 8),
         Text(
-          'Manage your platform from this central hub',
+          "Manage your platform from this central hub",
           style: Theme.of(context).textTheme.bodyLarge?.copyWith(
                 color: Colors.grey[600],
               ),
@@ -100,16 +84,16 @@ class EnhancedAdminDashboardScreen extends StatelessWidget {
 
   Widget _buildRealTimeStats(BuildContext context) {
     return StreamBuilder<QuerySnapshot>(
-      stream: FirebaseFirestore.instance.collection('users').snapshots(),
+      stream: FirebaseFirestore.instance.collection("users").snapshots(),
       builder: (context, userSnapshot) {
         return FutureBuilder<QuerySnapshot>(
           future:
-              FirebaseFirestore.instance.collection('subscription_plans').get(),
+              FirebaseFirestore.instance.collection("subscription_plans").get(),
           builder: (context, planSnapshot) {
             final totalUsers = userSnapshot.data?.docs.length ?? 0;
             final activeUsers = userSnapshot.data?.docs.where((doc) {
                   final data = doc.data() as Map<String, dynamic>;
-                  final lastActive = _parseTimestamp(data['lastActiveAt']);
+                  final lastActive = _parseTimestamp(data["lastActiveAt"]);
                   if (lastActive == null) return false;
                   final date = lastActive.toDate();
                   return date.isAfter(
@@ -119,13 +103,13 @@ class EnhancedAdminDashboardScreen extends StatelessWidget {
 
             final adminCount = userSnapshot.data?.docs.where((doc) {
                   final data = doc.data() as Map<String, dynamic>;
-                  return data['role'] == 'admin';
+                  return data["role"] == "admin";
                 }).length ??
                 0;
 
             final activePlans = planSnapshot.data?.docs.where((doc) {
                   final data = doc.data() as Map<String, dynamic>;
-                  return data['isActive'] == true;
+                  return data["isActive"] == true;
                 }).length ??
                 0;
 
@@ -139,28 +123,28 @@ class EnhancedAdminDashboardScreen extends StatelessWidget {
               children: [
                 _buildStatCard(
                   context,
-                  title: 'Total Users',
+                  title: "Total Users",
                   value: totalUsers.toString(),
                   icon: Icons.people,
                   color: Colors.blue,
                 ),
                 _buildStatCard(
                   context,
-                  title: 'Active Users',
+                  title: "Active Users",
                   value: activeUsers.toString(),
                   icon: Icons.trending_up,
                   color: Colors.green,
                 ),
                 _buildStatCard(
                   context,
-                  title: 'Administrators',
+                  title: "Administrators",
                   value: adminCount.toString(),
                   icon: Icons.admin_panel_settings,
                   color: Colors.red,
                 ),
                 _buildStatCard(
                   context,
-                  title: 'Active Plans',
+                  title: "Active Plans",
                   value: activePlans.toString(),
                   icon: Icons.card_membership,
                   color: Colors.purple,
@@ -256,7 +240,7 @@ Widget _buildStatCard(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          'Quick Actions',
+          "Quick Actions",
           style: Theme.of(context).textTheme.titleLarge?.copyWith(
                 fontWeight: FontWeight.bold,
               ),
@@ -268,60 +252,52 @@ Widget _buildStatCard(
             children: [
               _buildQuickActionChip(
                 context,
-                'Add User',
+                "Add User",
                 Icons.person_add,
                 Colors.blue,
                 () => Navigator.push(
                   context,
                   MaterialPageRoute(
-                    builder: (_) => EnhancedUserManagementScreen(
-                      permissionService: permissionService,
-                    ),
+                    builder: (context) => const UserManagementScreen(),
                   ),
                 ),
               ),
               const SizedBox(width: 12),
               _buildQuickActionChip(
                 context,
-                'Create Plan',
+                "Manage Plans",
                 Icons.add_card,
                 Colors.green,
                 () => Navigator.push(
                   context,
                   MaterialPageRoute(
-                    builder: (_) => EnhancedSubscriptionManagementScreen(
-                      permissionService: permissionService,
-                    ),
+                    builder: (context) => const SubscriptionManagementScreen(),
                   ),
                 ),
               ),
               const SizedBox(width: 12),
               _buildQuickActionChip(
                 context,
-                'View Analytics',
+                "View Analytics",
                 Icons.analytics,
                 Colors.purple,
                 () => Navigator.push(
                   context,
                   MaterialPageRoute(
-                    builder: (_) => AnalyticsScreen(
-                      permissionService: permissionService,
-                    ),
+                    builder: (context) => const AnalyticsScreen(),
                   ),
                 ),
               ),
               const SizedBox(width: 12),
               _buildQuickActionChip(
                 context,
-                'Permissions',
-                Icons.security,
+                "Plan Requests",
+                Icons.receipt_long,
                 Colors.orange,
                 () => Navigator.push(
                   context,
                   MaterialPageRoute(
-                    builder: (_) => PermissionManagementScreen(
-                      permissionService: permissionService,
-                    ),
+                    builder: (context) => const PlanRequestsScreen(),
                   ),
                 ),
               ),
@@ -380,7 +356,7 @@ Widget _buildStatCard(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          'Management Tools',
+          "Management Tools",
           style: Theme.of(context).textTheme.titleLarge?.copyWith(
                 fontWeight: FontWeight.bold,
               ),
@@ -396,61 +372,53 @@ Widget _buildStatCard(
           children: [
             _buildManagementCard(
               context,
-              title: 'User Management',
-              description: 'Manage users, roles & permissions',
+              title: "User Management",
+              description: "Manage users, roles & permissions",
               icon: Icons.people_outline,
               color: Colors.blue,
               onTap: () => Navigator.push(
                 context,
                 MaterialPageRoute(
-                  builder: (_) => EnhancedUserManagementScreen(
-                    permissionService: permissionService,
-                  ),
+                  builder: (context) => const UserManagementScreen(),
                 ),
               ),
             ),
             _buildManagementCard(
               context,
-              title: 'Subscriptions',
-              description: 'Manage plans & pricing',
+              title: "Subscriptions",
+              description: "Manage plans & pricing",
               icon: Icons.card_membership_outlined,
               color: Colors.green,
               onTap: () => Navigator.push(
                 context,
                 MaterialPageRoute(
-                  builder: (_) => EnhancedSubscriptionManagementScreen(
-                    permissionService: permissionService,
-                  ),
+                  builder: (context) => const SubscriptionManagementScreen(),
                 ),
               ),
             ),
             _buildManagementCard(
               context,
-              title: 'Permissions',
-              description: 'Configure access control',
-              icon: Icons.security_outlined,
+              title: "Plan Requests",
+              description: "Review subscription requests",
+              icon: Icons.receipt_long_outlined,
               color: Colors.orange,
               onTap: () => Navigator.push(
                 context,
                 MaterialPageRoute(
-                  builder: (_) => PermissionManagementScreen(
-                    permissionService: permissionService,
-                  ),
+                  builder: (context) => const PlanRequestsScreen(),
                 ),
               ),
             ),
             _buildManagementCard(
               context,
-              title: 'Analytics',
-              description: 'View insights & reports',
+              title: "Analytics",
+              description: "View insights & reports",
               icon: Icons.analytics_outlined,
               color: Colors.purple,
               onTap: () => Navigator.push(
                 context,
                 MaterialPageRoute(
-                  builder: (_) => AnalyticsScreen(
-                    permissionService: permissionService,
-                  ),
+                  builder: (context) => const AnalyticsScreen(),
                 ),
               ),
             ),
@@ -500,7 +468,7 @@ Widget _buildManagementCard(
               color: color.withOpacity(0.1),
               borderRadius: BorderRadius.circular(10),
             ),
-            child: Icon(icon, color: color, size: 20), // 👈 smaller icon
+            child: Icon(icon, color: color, size: 20),
           ),
 
           const SizedBox(height: 10),
@@ -510,7 +478,7 @@ Widget _buildManagementCard(
             title,
             style: theme.textTheme.titleSmall?.copyWith(
               fontWeight: FontWeight.w600,
-              fontSize: 13, // 👈 smaller text
+              fontSize: 13,
               color: theme.textTheme.bodyLarge?.color,
             ),
           ),
@@ -521,7 +489,7 @@ Widget _buildManagementCard(
           Text(
             description,
             style: theme.textTheme.bodySmall?.copyWith(
-              fontSize: 11, // 👈 smaller text
+              fontSize: 11,
               color: Colors.grey[600],
               height: 1.3,
             ),
@@ -543,7 +511,7 @@ Widget _buildManagementCard(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
             Text(
-              'Recent Activity',
+              "Recent Activity",
               style: Theme.of(context).textTheme.titleLarge?.copyWith(
                     fontWeight: FontWeight.bold,
                   ),
@@ -552,18 +520,18 @@ Widget _buildManagementCard(
               onPressed: () {
                 ScaffoldMessenger.of(context).showSnackBar(
                   const SnackBar(
-                      content: Text('Full activity log coming soon')),
+                      content: Text("Full activity log coming soon")),
                 );
               },
-              child: const Text('View All'),
+              child: const Text("View All"),
             ),
           ],
         ),
         const SizedBox(height: 16),
         StreamBuilder<QuerySnapshot>(
           stream: FirebaseFirestore.instance
-              .collection('users')
-              .orderBy('createdAt', descending: true)
+              .collection("users")
+              .orderBy("createdAt", descending: true)
               .limit(5)
               .snapshots(),
           builder: (context, snapshot) {
@@ -576,7 +544,7 @@ Widget _buildManagementCard(
                 ),
                 child: Center(
                   child: Text(
-                    'No recent activity',
+                    "No recent activity",
                     style: TextStyle(color: Colors.grey[600]),
                   ),
                 ),
@@ -605,18 +573,18 @@ Widget _buildManagementCard(
                   final doc = snapshot.data!.docs[index];
                   final data = doc.data() as Map<String, dynamic>;
                   final displayName =
-                      data['displayName'] as String? ?? 'Unknown';
-                  final createdAt = _parseTimestamp(data['createdAt']);
+                      data["displayName"] as String? ?? "Unknown";
+                  final createdAt = _parseTimestamp(data["createdAt"]);
 
                   return ListTile(
                     leading: CircleAvatar(
                       backgroundColor: Colors.blue.withOpacity(0.1),
                       child:
-                          Icon(Icons.person_add, color: Colors.blue, size: 20),
+                          const Icon(Icons.person_add, color: Colors.blue, size: 20),
                     ),
-                    title: Text(
-                      'New user registered',
-                      style: const TextStyle(fontWeight: FontWeight.w600),
+                    title: const Text(
+                      "New user registered",
+                      style: TextStyle(fontWeight: FontWeight.w600),
                     ),
                     subtitle: Text(displayName),
                     trailing: createdAt != null
@@ -664,15 +632,15 @@ Timestamp? _parseTimestamp(dynamic timestampData) {
     final difference = now.difference(date);
 
     if (difference.inMinutes < 1) {
-      return 'Just now';
+      return "Just now";
     } else if (difference.inHours < 1) {
-      return '${difference.inMinutes}m ago';
+      return "${difference.inMinutes}m ago";
     } else if (difference.inDays < 1) {
-      return '${difference.inHours}h ago';
+      return "${difference.inHours}h ago";
     } else if (difference.inDays < 7) {
-      return '${difference.inDays}d ago';
+      return "${difference.inDays}d ago";
     } else {
-      return '${(difference.inDays / 7).floor()}w ago';
+      return "${(difference.inDays / 7).floor()}w ago";
     }
   }
 }

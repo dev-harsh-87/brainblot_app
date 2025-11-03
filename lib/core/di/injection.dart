@@ -29,6 +29,7 @@ import 'package:brainblot_app/core/auth/services/permission_service.dart';
 import 'package:brainblot_app/core/auth/services/subscription_permission_service.dart';
 import 'package:brainblot_app/features/subscription/data/subscription_plan_repository.dart';
 import 'package:brainblot_app/core/auth/services/session_management_service.dart';
+import 'package:brainblot_app/core/auth/services/user_management_service.dart';
 
 final GetIt getIt = GetIt.instance;
 
@@ -140,6 +141,8 @@ Future<void> configureDependencies() async {
     auth: firebaseAuth,
     firestore: firebaseFirestore,
   ));
+// Register User Management Service
+  getIt.registerLazySingleton<UserManagementService>(() => UserManagementService());
   
   print('🔧 DI: Professional Firebase dependency injection configuration completed successfully');
   print('🔧 DI: Available repositories: Firebase (primary), Hive (local fallback)');

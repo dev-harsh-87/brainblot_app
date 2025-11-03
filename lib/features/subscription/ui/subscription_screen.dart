@@ -3,6 +3,8 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:brainblot_app/features/subscription/domain/subscription_plan.dart';
 import 'package:brainblot_app/core/auth/models/app_user.dart';
+import 'package:brainblot_app/features/subscription/services/subscription_request_service.dart';
+import 'package:brainblot_app/features/subscription/domain/subscription_request.dart';
 
 class SubscriptionScreen extends StatefulWidget {
   const SubscriptionScreen({super.key});
@@ -15,6 +17,7 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
   bool _isLoading = true;
   AppUser? _currentUser;
   List<SubscriptionPlan> _plans = [];
+  List<SubscriptionRequest> _userRequests = [];
   String? _error;
 
   @override
@@ -153,6 +156,40 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
                 _buildCurrentPlanCard(isSmallScreen),
                 
                 const SizedBox(height: 32),
+                
+                // User Requests Section
+                StreamBuilder<List<SubscriptionRequest>>(
+                  stream: SubscriptionRequestService().getUserRequests(),
+                  builder: (context, snapshot) {
+                    if (snapshot.hasData && snapshot.data!.isNotEmpty) {
+                      return Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          Text(
+                            'Your Subscription Requests',
+                            style: theme.textTheme.headlineSmall?.copyWith(
+                              fontWeight: FontWeight.bold,
+                              color: colorScheme.onSurface,
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            'Track the status of your upgrade requests',
+                            style: theme.textTheme.bodyMedium?.copyWith(
+                              color: colorScheme.onSurface.withOpacity(0.7),
+                            ),
+                          ),
+                          const SizedBox(height: 16),
+                          ...snapshot.data!.map((request) =>
+                            _buildRequestCard(request, isSmallScreen)
+                          ),
+                          const SizedBox(height: 32),
+                        ],
+                      );
+                    }
+                    return const SizedBox.shrink();
+                  },
+                ),
                 
                 // Section Header
                 Text(
@@ -567,7 +604,7 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
                     label: const Text('Current Plan'),
                   )
                 : FilledButton.icon(
-                    onPressed: () => _showUpgradeDialog(plan),
+                    onPressed: () => _showRequestUpgradeDialog(plan),
                     style: FilledButton.styleFrom(
                       backgroundColor: colorScheme.primary,
                       foregroundColor: colorScheme.onPrimary,
@@ -576,9 +613,9 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
                       ),
                       elevation: 2,
                     ),
-                    icon: const Icon(Icons.upgrade, size: 20),
+                    icon: const Icon(Icons.send, size: 20),
                     label: Text(
-                      _getActionButtonText(plan),
+                      "Request ${plan.name}",
                       style: const TextStyle(
                         fontSize: 15,
                         fontWeight: FontWeight.bold,
@@ -617,6 +654,148 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
       return 'Downgrade to ${plan.name}';
     } else {
       return 'Switch to ${plan.name}';
+    }
+  }
+
+  void _showRequestUpgradeDialog(SubscriptionPlan plan) {
+    final reasonController = TextEditingController();
+    final formKey = GlobalKey<FormState>();
+    
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text("Request ${plan.name} Plan"),
+        content: Form(
+          key: formKey,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Request upgrade to ${plan.name} plan for \$${plan.price.toStringAsFixed(0)}/${plan.billingPeriod}',
+                style: Theme.of(context).textTheme.bodyMedium,
+              ),
+              const SizedBox(height: 16),
+              TextFormField(
+                controller: reasonController,
+                decoration: const InputDecoration(
+                  labelText: "Reason for upgrade",
+                  hintText: "Why do you need this plan?",
+                  border: OutlineInputBorder(),
+                ),
+                maxLines: 3,
+                validator: (value) {
+                  if (value == null || value.trim().isEmpty) {
+                    return "Please provide a reason";
+                  }
+                  if (value.trim().length < 10) {
+                    return "Please provide more details (at least 10 characters)";
+                  }
+                  return null;
+                },
+              ),
+              const SizedBox(height: 12),
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Theme.of(context).colorScheme.surfaceContainerHighest,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Row(
+                  children: [
+                    Icon(
+                      Icons.info_outline,
+                      size: 20,
+                      color: Theme.of(context).colorScheme.primary,
+                    ),
+                    const SizedBox(width: 8),
+                    const Expanded(
+                      child: Text(
+                        'Your request will be reviewed by an admin',
+                        style: TextStyle(fontSize: 13),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () {
+              reasonController.dispose();
+              Navigator.pop(context);
+            },
+            child: const Text("Cancel"),
+          ),
+          FilledButton(
+            onPressed: () async {
+              if (formKey.currentState?.validate() ?? false) {
+                final reason = reasonController.text.trim();
+                reasonController.dispose();
+                Navigator.pop(context);
+                await _submitUpgradeRequest(plan, reason);
+              }
+            },
+            child: const Text("Submit Request"),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _submitUpgradeRequest(SubscriptionPlan plan, String reason) async {
+    try {
+      // Show loading
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (context) => const Center(child: CircularProgressIndicator()),
+      );
+
+      final service = SubscriptionRequestService();
+      await service.createUpgradeRequest(
+        requestedPlan: plan.id,
+        reason: reason,
+      );
+
+      if (!mounted) return;
+      Navigator.pop(context); // Close loading
+
+      // Show success
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Row(
+            children: [
+              const Icon(Icons.check_circle, color: Colors.white),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text("Upgrade request submitted for ${plan.name} plan!"),
+              ),
+            ],
+          ),
+          backgroundColor: Colors.green,
+          behavior: SnackBarBehavior.floating,
+          action: SnackBarAction(
+            label: 'OK',
+            textColor: Colors.white,
+            onPressed: () {},
+          ),
+          duration: const Duration(seconds: 4),
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      Navigator.pop(context); // Close loading
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text("Failed to submit request: $e"),
+          backgroundColor: Colors.red,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
     }
   }
 
@@ -711,5 +890,208 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
         duration: const Duration(seconds: 3),
       ),
     );
+  }
+
+  Widget _buildRequestCard(SubscriptionRequest request, bool isSmallScreen) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    
+    // Determine status color and icon
+    MaterialColor statusColor;
+    Color statusDark;
+    IconData statusIcon;
+    String statusText;
+    
+    if (request.isPending) {
+      statusColor = Colors.orange;
+      statusDark = Colors.orange.shade700;
+      statusIcon = Icons.pending;
+      statusText = 'PENDING';
+    } else if (request.isApproved) {
+      statusColor = Colors.green;
+      statusDark = Colors.green.shade700;
+      statusIcon = Icons.check_circle;
+      statusText = 'APPROVED';
+    } else {
+      statusColor = Colors.red;
+      statusDark = Colors.red.shade700;
+      statusIcon = Icons.cancel;
+      statusText = 'REJECTED';
+    }
+    
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      decoration: BoxDecoration(
+        border: Border.all(
+          color: statusColor.withOpacity(0.3),
+          width: 1.5,
+        ),
+        borderRadius: BorderRadius.circular(12),
+        color: colorScheme.surfaceContainerHigh,
+      ),
+      child: Padding(
+        padding: EdgeInsets.all(isSmallScreen ? 16.0 : 20.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Header with status
+            Row(
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Upgrade to ${request.requestedPlan.toUpperCase()}',
+                        style: theme.textTheme.titleMedium?.copyWith(
+                          fontWeight: FontWeight.bold,
+                          fontSize: isSmallScreen ? 15 : 17,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        'From ${request.currentPlan} plan',
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: colorScheme.onSurface.withOpacity(0.6),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: statusColor.withOpacity(0.15),
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(color: statusColor, width: 1.5),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        statusIcon,
+                        size: 16,
+                        color: statusDark,
+                      ),
+                      const SizedBox(width: 6),
+                      Text(
+                        statusText,
+                        style: theme.textTheme.labelSmall?.copyWith(
+                          color: statusDark,
+                          fontWeight: FontWeight.bold,
+                          letterSpacing: 0.5,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            
+            const SizedBox(height: 12),
+            
+            // Reason
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: colorScheme.surfaceContainerHighest.withOpacity(0.5),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Reason:',
+                    style: theme.textTheme.labelSmall?.copyWith(
+                      fontWeight: FontWeight.bold,
+                      color: colorScheme.onSurface.withOpacity(0.7),
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    request.reason,
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: colorScheme.onSurface.withOpacity(0.8),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            
+            // Rejection reason if rejected
+            if (request.isRejected && request.rejectionReason != null) ...[
+              const SizedBox(height: 12),
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.red.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: Colors.red.withOpacity(0.3)),
+                ),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Icon(
+                      Icons.info_outline,
+                      size: 18,
+                      color: Colors.red[700],
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Rejection Reason:',
+                            style: theme.textTheme.labelSmall?.copyWith(
+                              fontWeight: FontWeight.bold,
+                              color: Colors.red[700],
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            request.rejectionReason!,
+                            style: theme.textTheme.bodySmall?.copyWith(
+                              color: Colors.red[800],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+            
+            // Admin info if processed
+            if (request.adminName != null) ...[
+              const SizedBox(height: 8),
+              Text(
+                'Processed by ${request.adminName}',
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: colorScheme.onSurface.withOpacity(0.5),
+                  fontStyle: FontStyle.italic,
+                ),
+              ),
+            ],
+            
+            // Date
+            const SizedBox(height: 8),
+            Text(
+              'Requested on ${_formatDate(request.createdAt)}',
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: colorScheme.onSurface.withOpacity(0.5),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+  
+  String _formatDate(DateTime date) {
+    final months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+                    'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    return '${months[date.month - 1]} ${date.day}, ${date.year}';
   }
 }
