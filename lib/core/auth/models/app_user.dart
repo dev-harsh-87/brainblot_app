@@ -103,23 +103,42 @@ class AppUser extends Equatable {
   }
 
   bool hasModuleAccess(String module) {
+    // Admin always has access
+    if (role.isAdmin()) return true;
+    
+    // Check if subscription is active
+    if (!subscription.isActive()) return false;
+    
+    // Check module access
     return subscription.hasModuleAccess(module);
   }
 
   bool canAccessAdminContent() {
-    return subscription.plan == 'player' ||
-           subscription.plan == 'institute' ||
-           role.isAdmin();
+    // Admin always has access
+    if (role.isAdmin()) return true;
+    
+    // Check if subscription is active and has required modules
+    return subscription.isActive() &&
+           (subscription.hasModuleAccess('admin_drills') ||
+            subscription.hasModuleAccess('admin_programs'));
   }
 
   bool canCreatePrograms() {
-    return subscription.plan == 'player' ||
-           subscription.plan == 'institute' ||
-           role.isAdmin();
+    // Admin always has access
+    if (role.isAdmin()) return true;
+    
+    // Check if subscription is active and has programs module
+    return subscription.isActive() &&
+           subscription.hasModuleAccess('programs');
   }
 
   bool canManageUsers() {
-    return subscription.plan == 'institute' || role.isAdmin();
+    // Admin always has access
+    if (role.isAdmin()) return true;
+    
+    // Check if subscription is active and has user management module
+    return subscription.isActive() &&
+           subscription.hasModuleAccess('user_management');
   }
 
   @override
@@ -170,45 +189,6 @@ class UserSubscription extends Equatable {
       _$UserSubscriptionFromJson(json);
 
   Map<String, dynamic> toJson() => _$UserSubscriptionToJson(this);
-
-  factory UserSubscription.free() => const UserSubscription(
-        plan: 'free',
-        status: 'active',
-        moduleAccess: ['drills', 'profile', 'stats', 'analysis'],
-      );
-
-  factory UserSubscription.player() => const UserSubscription(
-        plan: 'player',
-        status: 'active',
-        moduleAccess: [
-          'drills',
-          'profile',
-          'stats',
-          'analysis',
-          'admin_drills',
-          'admin_programs',
-          'programs',
-          'multiplayer',
-        ],
-      );
-
-  factory UserSubscription.institute() => const UserSubscription(
-        plan: 'institute',
-        status: 'active',
-        moduleAccess: [
-          'drills',
-          'profile',
-          'stats',
-          'analysis',
-          'admin_drills',
-          'admin_programs',
-          'programs',
-          'multiplayer',
-          'user_management',
-          'team_management',
-          'bulk_operations',
-        ],
-      );
 
   bool hasModuleAccess(String module) {
     return moduleAccess.contains(module);

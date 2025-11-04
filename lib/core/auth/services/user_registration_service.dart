@@ -115,7 +115,11 @@ class UserRegistrationService {
         email: email,
         displayName: displayName,
         role: UserRole.user, // Default role
-        subscription: UserSubscription.free(), // Default subscription
+        subscription: const UserSubscription(
+          plan: "free",
+          status: "active",
+          moduleAccess: ["drills", "profile", "stats", "analysis"],
+        ), // Default subscription
         preferences: const UserPreferences(),
         stats: const UserStats(),
         createdAt: DateTime.now(),

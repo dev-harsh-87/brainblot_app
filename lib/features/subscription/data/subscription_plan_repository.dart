@@ -4,7 +4,7 @@ import 'package:brainblot_app/features/subscription/domain/subscription_plan.dar
 /// Repository for managing subscription plans in Firestore
 class SubscriptionPlanRepository {
   final FirebaseFirestore _firestore;
-  
+
   static const String _plansCollection = 'subscription_plans';
 
   SubscriptionPlanRepository({
@@ -38,10 +38,7 @@ class SubscriptionPlanRepository {
   /// Delete a subscription plan (admin only)
   Future<void> deletePlan(String planId) async {
     try {
-      await _firestore
-          .collection(_plansCollection)
-          .doc(planId)
-          .delete();
+      await _firestore.collection(_plansCollection).doc(planId).delete();
     } catch (e) {
       throw Exception('Failed to delete subscription plan: $e');
     }
@@ -50,10 +47,8 @@ class SubscriptionPlanRepository {
   /// Get a specific subscription plan by ID
   Future<SubscriptionPlan?> getPlan(String planId) async {
     try {
-      final doc = await _firestore
-          .collection(_plansCollection)
-          .doc(planId)
-          .get();
+      final doc =
+          await _firestore.collection(_plansCollection).doc(planId).get();
 
       if (!doc.exists) return null;
 
@@ -111,10 +106,7 @@ class SubscriptionPlanRepository {
   /// Toggle plan active status (admin only)
   Future<void> togglePlanStatus(String planId, bool isActive) async {
     try {
-      await _firestore
-          .collection(_plansCollection)
-          .doc(planId)
-          .update({
+      await _firestore.collection(_plansCollection).doc(planId).update({
         'isActive': isActive,
         'updatedAt': FieldValue.serverTimestamp(),
       });
@@ -123,30 +115,13 @@ class SubscriptionPlanRepository {
     }
   }
 
-  /// Initialize default plans (one-time setup)
+  /// Initialize default plans (one-time setup) - REMOVED
+  /// Plans should be created dynamically by admins through the admin panel
+  /// This ensures complete flexibility and no hardcoded data
+  @Deprecated('Use admin panel to create plans dynamically')
   Future<void> initializeDefaultPlans() async {
-    try {
-      final existingPlans = await getAllPlans();
-      
-      if (existingPlans.isEmpty) {
-        // Create default plans
-        await createPlan(SubscriptionPlan.freePlan.copyWith(
-          createdAt: DateTime.now(),
-          updatedAt: DateTime.now(),
-        ));
-        
-        await createPlan(SubscriptionPlan.playerPlan.copyWith(
-          createdAt: DateTime.now(),
-          updatedAt: DateTime.now(),
-        ));
-        
-        await createPlan(SubscriptionPlan.institutePlan.copyWith(
-          createdAt: DateTime.now(),
-          updatedAt: DateTime.now(),
-        ));
-      }
-    } catch (e) {
-      throw Exception('Failed to initialize default plans: $e');
-    }
+    // No longer initializes hardcoded plans
+    // Admins should create plans through the subscription management screen
+    print('⚠️ initializeDefaultPlans is deprecated. Use admin panel to create plans.');
   }
 }

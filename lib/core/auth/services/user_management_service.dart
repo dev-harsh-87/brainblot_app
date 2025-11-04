@@ -90,7 +90,11 @@ class UserManagementService {
         role: role,
         subscription: subscriptionData != null
             ? UserSubscription.fromJson(subscriptionData)
-            : UserSubscription.free(),
+            : const UserSubscription(
+                plan: 'free',
+                status: 'active',
+                moduleAccess: ['drills', 'profile', 'stats', 'analysis'],
+              ),
         preferences: const UserPreferences(),
         stats: const UserStats(),
         createdAt: DateTime.now(),
@@ -220,7 +224,11 @@ class UserManagementService {
         role: role,
         subscription: subscriptionData != null
             ? UserSubscription.fromJson(subscriptionData)
-            : UserSubscription.free(),
+            : const UserSubscription(
+                plan: 'free',
+                status: 'active',
+                moduleAccess: ['drills', 'profile', 'stats', 'analysis'],
+              ),
         preferences: const UserPreferences(),
         stats: const UserStats(),
         createdAt: DateTime.now(),
@@ -272,10 +280,17 @@ class UserManagementService {
   /// Updates user subscription
   Future<void> updateUserSubscription(String userId, Map<String, dynamic> subscriptionData) async {
     try {
-      await _firestore.collection('users').doc(userId).update({
-        'subscription': subscriptionData,
+      // Use dot notation to update nested subscription fields properly
+      Map<String, dynamic> updateData = {
         'updatedAt': FieldValue.serverTimestamp(),
+      };
+      
+      // Add subscription fields with dot notation
+      subscriptionData.forEach((key, value) {
+        updateData['subscription.$key'] = value;
       });
+      
+      await _firestore.collection('users').doc(userId).update(updateData);
     } catch (e) {
       throw Exception('Failed to update user subscription: $e');
     }

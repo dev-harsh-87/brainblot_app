@@ -15,6 +15,7 @@ import 'package:brainblot_app/features/sharing/ui/privacy_control_widget.dart';
 import 'package:brainblot_app/features/sharing/ui/sharing_screen.dart';
 import 'package:brainblot_app/core/services/auto_refresh_service.dart';
 import 'package:brainblot_app/core/widgets/confirmation_dialog.dart';
+import 'package:brainblot_app/core/ui/edge_to_edge.dart';
 
 class ProgramsScreen extends StatefulWidget {
   const ProgramsScreen({super.key});
@@ -75,8 +76,13 @@ class _ProgramsScreenState extends State<ProgramsScreen>
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
 
-    return Scaffold(
+    // Set system UI for primary colored app bar
+    EdgeToEdge.setPrimarySystemUI(context);
+
+    return EdgeToEdgeScaffold(
       backgroundColor: colorScheme.surface,
+      appBar: _buildAppBar(context),
+      extendBodyBehindAppBar: false,
       body: NestedScrollView(
         headerSliverBuilder: (context, innerBoxIsScrolled) => [
           SliverAppBar(
@@ -86,13 +92,6 @@ class _ProgramsScreenState extends State<ProgramsScreen>
             backgroundColor: colorScheme.surface,
             foregroundColor: colorScheme.onSurface,
             flexibleSpace: FlexibleSpaceBar(
-              // title: Text(
-              //   'Training Programs',
-              //   style: theme.textTheme.headlineSmall?.copyWith(
-              //     fontWeight: FontWeight.bold,
-              //     color: colorScheme.onSurface,
-              //   ),
-              // ),
               background: Container(
                 decoration: BoxDecoration(
                   gradient: LinearGradient(
@@ -106,7 +105,6 @@ class _ProgramsScreenState extends State<ProgramsScreen>
                 ),
                 child: Stack(
                   children: [
-
                     Positioned(
                       right: -30,
                       top: -30,
@@ -242,45 +240,80 @@ class _ProgramsScreenState extends State<ProgramsScreen>
     );
   }
 
+  PreferredSizeWidget _buildAppBar(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+
+    return AppBar(
+      elevation: 0,
+      backgroundColor: colorScheme.primary,
+      foregroundColor: colorScheme.onPrimary,
+      title: Text(
+        'Training Programs',
+        style: theme.textTheme.headlineSmall?.copyWith(
+          color: colorScheme.onPrimary,
+          fontWeight: FontWeight.w700,
+          letterSpacing: 0.5,
+        ),
+      ),
+      centerTitle: true,
+      flexibleSpace: Container(
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [
+              colorScheme.primary,
+              colorScheme.primary.withOpacity(0.9),
+              colorScheme.secondary.withOpacity(0.8),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   Widget _buildLoadingState() {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
     
     return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Container(
-            padding: const EdgeInsets.all(24),
-            decoration: BoxDecoration(
-              color: colorScheme.surfaceContainerHighest,
-              borderRadius: BorderRadius.circular(16),
-            ),
-            child: Column(
-              children: [
-                CircularProgressIndicator(
-                  color: colorScheme.primary,
-                  strokeWidth: 3,
-                ),
-                const SizedBox(height: 16),
-                Text(
-                  'Loading programs...',
-                  style: theme.textTheme.bodyLarge?.copyWith(
-                    color: colorScheme.onSurface.withOpacity(0.7),
-                    fontWeight: FontWeight.w500,
+      child: Padding(
+        padding: const EdgeInsets.all(64),
+        child: Column(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(24),
+              decoration: BoxDecoration(
+                color: colorScheme.surfaceContainerHighest,
+                borderRadius: BorderRadius.circular(16),
+              ),
+              child: Column(
+                children: [
+                  CircularProgressIndicator(
+                    color: colorScheme.primary,
+                    strokeWidth: 3,
                   ),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  'Setting up your training programs',
-                  style: theme.textTheme.bodySmall?.copyWith(
-                    color: colorScheme.onSurface.withOpacity(0.5),
+                  const SizedBox(height: 16),
+                  Text(
+                    'Loading programs...',
+                    style: theme.textTheme.bodyLarge?.copyWith(
+                      color: colorScheme.onSurface.withOpacity(0.7),
+                      fontWeight: FontWeight.w500,
+                    ),
                   ),
-                ),
-              ],
+                  const SizedBox(height: 8),
+                  Text(
+                    'Setting up your training programs',
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: colorScheme.onSurface.withOpacity(0.5),
+                    ),
+                  ),
+                ],
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -293,7 +326,6 @@ class _ProgramsScreenState extends State<ProgramsScreen>
       child: Padding(
         padding: const EdgeInsets.all(32),
         child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Container(
               width: 120,
@@ -310,7 +342,7 @@ class _ProgramsScreenState extends State<ProgramsScreen>
             ),
             const SizedBox(height: 24),
             Text(
-              'Something went wrong',
+              'Failed to load programs',
               style: theme.textTheme.headlineSmall?.copyWith(
                 color: colorScheme.onSurface,
                 fontWeight: FontWeight.w600,
@@ -325,25 +357,12 @@ class _ProgramsScreenState extends State<ProgramsScreen>
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 32),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                OutlinedButton.icon(
-                  onPressed: () {
-                    context.read<ProgramsBloc>().add(const ProgramsRetryRequested());
-                  },
-                  icon: const Icon(Icons.refresh),
-                  label: const Text('Retry'),
-                ),
-                const SizedBox(width: 16),
-                FilledButton.icon(
-                  onPressed: () {
-                    context.read<ProgramsBloc>().add(const ProgramsSeedDefaultRequested());
-                  },
-                  icon: const Icon(Icons.download),
-                  label: const Text('Load Defaults'),
-                ),
-              ],
+            FilledButton.icon(
+              onPressed: () {
+                context.read<ProgramsBloc>().add(const ProgramsRetryRequested());
+              },
+              icon: const Icon(Icons.refresh),
+              label: const Text('Retry'),
             ),
           ],
         ),

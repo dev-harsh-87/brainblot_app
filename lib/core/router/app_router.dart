@@ -37,6 +37,7 @@ import 'package:brainblot_app/features/multiplayer/ui/host_session_screen.dart';
 import 'package:brainblot_app/features/multiplayer/ui/join_session_screen.dart';
 import 'package:brainblot_app/core/auth/services/permission_service.dart';
 import 'package:brainblot_app/features/subscription/ui/subscription_screen.dart';
+import 'package:brainblot_app/features/subscription/ui/user_requests_screen.dart';
 import 'package:brainblot_app/core/auth/guards/admin_guard.dart';
 import 'package:brainblot_app/core/auth/models/user_role.dart';
 
@@ -260,11 +261,16 @@ class AppRouter {
           ),
         ),
       ),
-      // Subscription route
+      // Subscription routes
       GoRoute(
         path: '/subscription',
         name: 'subscription',
         builder: (context, state) => const SubscriptionScreen(),
+      ),
+      GoRoute(
+        path: '/user-requests',
+        name: 'user-requests',
+        builder: (context, state) => const UserRequestsScreen(),
       ),
     ],
   );

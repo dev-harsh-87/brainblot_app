@@ -10,6 +10,7 @@ import 'package:brainblot_app/core/storage/app_storage.dart';
 import 'package:brainblot_app/features/auth/bloc/auth_bloc.dart';
 import 'package:brainblot_app/core/auth/auth_wrapper.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:brainblot_app/features/subscription/services/subscription_fix_service.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -26,9 +27,28 @@ Future<void> main() async {
   // Configure dependency injection
   await configureDependencies();
   
-  // Profile creation is now handled by SessionManagementService
+  // Fix subscription for current user if logged in
+  _fixSubscriptionOnStartup();
   
   runApp(const CogniTrainApp());
+}
+
+/// Fix subscription synchronization on app startup
+void _fixSubscriptionOnStartup() {
+  // Run after a short delay to ensure auth is ready
+  Future.delayed(const Duration(seconds: 2), () async {
+    final currentUser = FirebaseAuth.instance.currentUser;
+    if (currentUser != null) {
+      print("🔧 Running subscription fix for logged-in user...");
+      try {
+        final fixService = SubscriptionFixService();
+        await fixService.fixCurrentUserSubscription();
+        print("✅ Subscription fix completed");
+      } catch (e) {
+        print("❌ Subscription fix failed: $e");
+      }
+    }
+  });
 }
 
 

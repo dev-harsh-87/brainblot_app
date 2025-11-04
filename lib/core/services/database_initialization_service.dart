@@ -122,7 +122,23 @@ class DatabaseInitializationService {
         email: _defaultAdminEmail,
         displayName: 'Administrator',
         role: UserRole.admin,
-        subscription: UserSubscription.institute(), // Admin gets full access
+        subscription: const UserSubscription(
+          plan: "free",
+          status: "active",
+          moduleAccess: [
+            "drills",
+            "profile",
+            "stats",
+            "analysis",
+            "admin_drills",
+            "admin_programs",
+            "programs",
+            "multiplayer",
+            "user_management",
+            "team_management",
+            "bulk_operations",
+          ],
+        ), // Admin gets full access (note: plan ID should be from DB, but using "free" with full modules for admin)
         preferences: const UserPreferences(),
         stats: const UserStats(),
         createdAt: DateTime.now(),
@@ -211,7 +227,23 @@ class DatabaseInitializationService {
         email: email,
         displayName: displayName,
         role: UserRole.admin,
-        subscription: UserSubscription.institute(), // Admin gets full access
+        subscription: const UserSubscription(
+          plan: "free",
+          status: "active",
+          moduleAccess: [
+            "drills",
+            "profile",
+            "stats",
+            "analysis",
+            "admin_drills",
+            "admin_programs",
+            "programs",
+            "multiplayer",
+            "user_management",
+            "team_management",
+            "bulk_operations",
+          ],
+        ), // Admin gets full access
         preferences: const UserPreferences(),
         stats: const UserStats(),
         createdAt: DateTime.now(),
@@ -254,7 +286,23 @@ class DatabaseInitializationService {
         email: email,
         displayName: displayName,
         role: UserRole.user,
-        subscription: UserSubscription.institute(), // Gets full access via Institute plan
+        subscription: const UserSubscription(
+          plan: "free",
+          status: "active",
+          moduleAccess: [
+            "drills",
+            "profile",
+            "stats",
+            "analysis",
+            "admin_drills",
+            "admin_programs",
+            "programs",
+            "multiplayer",
+            "user_management",
+            "team_management",
+            "bulk_operations",
+          ],
+        ), // Gets full access
         preferences: const UserPreferences(),
         stats: const UserStats(),
         createdAt: DateTime.now(),

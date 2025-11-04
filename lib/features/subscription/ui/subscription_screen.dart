@@ -157,40 +157,6 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
                 
                 const SizedBox(height: 32),
                 
-                // User Requests Section
-                StreamBuilder<List<SubscriptionRequest>>(
-                  stream: SubscriptionRequestService().getUserRequests(),
-                  builder: (context, snapshot) {
-                    if (snapshot.hasData && snapshot.data!.isNotEmpty) {
-                      return Column(
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
-                        children: [
-                          Text(
-                            'Your Subscription Requests',
-                            style: theme.textTheme.headlineSmall?.copyWith(
-                              fontWeight: FontWeight.bold,
-                              color: colorScheme.onSurface,
-                            ),
-                          ),
-                          const SizedBox(height: 8),
-                          Text(
-                            'Track the status of your upgrade requests',
-                            style: theme.textTheme.bodyMedium?.copyWith(
-                              color: colorScheme.onSurface.withOpacity(0.7),
-                            ),
-                          ),
-                          const SizedBox(height: 16),
-                          ...snapshot.data!.map((request) =>
-                            _buildRequestCard(request, isSmallScreen)
-                          ),
-                          const SizedBox(height: 32),
-                        ],
-                      );
-                    }
-                    return const SizedBox.shrink();
-                  },
-                ),
-                
                 // Section Header
                 Text(
                   'Available Plans',
@@ -629,6 +595,13 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
   }
 
   String _getPlanDescription(String planId) {
+    // Try to find the plan in the loaded plans list first
+    final plan = _plans.where((p) => p.id.toLowerCase() == planId.toLowerCase()).firstOrNull;
+    if (plan != null) {
+      return plan.description;
+    }
+    
+    // Fallback descriptions for common plan IDs if not found in database
     switch (planId.toLowerCase()) {
       case 'free':
         return 'Basic features for getting started';
@@ -641,21 +614,6 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
     }
   }
 
-  String _getActionButtonText(SubscriptionPlan plan) {
-    final currentPlan = _currentUser?.subscription.plan ?? 'free';
-    final planOrder = {'free': 0, 'player': 1, 'institute': 2};
-    
-    final currentOrder = planOrder[currentPlan.toLowerCase()] ?? 0;
-    final targetOrder = planOrder[plan.id.toLowerCase()] ?? 0;
-
-    if (targetOrder > currentOrder) {
-      return 'Upgrade to ${plan.name}';
-    } else if (targetOrder < currentOrder) {
-      return 'Downgrade to ${plan.name}';
-    } else {
-      return 'Switch to ${plan.name}';
-    }
-  }
 
   void _showRequestUpgradeDialog(SubscriptionPlan plan) {
     final reasonController = TextEditingController();
@@ -724,8 +682,8 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
         actions: [
           TextButton(
             onPressed: () {
-              reasonController.dispose();
               Navigator.pop(context);
+              reasonController.dispose();
             },
             child: const Text("Cancel"),
           ),
@@ -733,8 +691,8 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
             onPressed: () async {
               if (formKey.currentState?.validate() ?? false) {
                 final reason = reasonController.text.trim();
-                reasonController.dispose();
                 Navigator.pop(context);
+                reasonController.dispose();
                 await _submitUpgradeRequest(plan, reason);
               }
             },
@@ -799,299 +757,9 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
     }
   }
 
-  void _showUpgradeDialog(SubscriptionPlan plan) {
-    final theme = Theme.of(context);
-    
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Text('Upgrade to ${plan.name}'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'Price: \$${plan.price.toStringAsFixed(2)} / ${plan.billingPeriod}',
-              style: theme.textTheme.titleMedium?.copyWith(
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            const SizedBox(height: 16),
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: theme.colorScheme.surfaceContainerHighest,
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Row(
-                children: [
-                  Icon(
-                    Icons.info_outline,
-                    size: 20,
-                    color: theme.colorScheme.primary,
-                  ),
-                  const SizedBox(width: 8),
-                  const Expanded(
-                    child: Text(
-                      'Payment integration coming soon!',
-                      style: TextStyle(fontSize: 13),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 12),
-            Text(
-              'This is a demonstration of the subscription system. In production, this would integrate with a payment provider like Stripe or PayPal.',
-              style: theme.textTheme.bodySmall?.copyWith(
-                color: theme.colorScheme.onSurface.withOpacity(0.6),
-              ),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
-          ),
-          FilledButton(
-            onPressed: () {
-              Navigator.pop(context);
-              _showDemoUpgradeSuccess(plan);
-            },
-            child: const Text('Demo Upgrade'),
-          ),
-        ],
-      ),
-    );
-  }
-
-  void _showDemoUpgradeSuccess(SubscriptionPlan plan) {
-    if (!mounted) return;
-    
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Row(
-          children: [
-            const Icon(Icons.check_circle, color: Colors.white),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Text('Demo: Successfully upgraded to ${plan.name} plan'),
-            ),
-          ],
-        ),
-        backgroundColor: Colors.green,
-        behavior: SnackBarBehavior.floating,
-        action: SnackBarAction(
-          label: 'OK',
-          textColor: Colors.white,
-          onPressed: () {},
-        ),
-        duration: const Duration(seconds: 3),
-      ),
-    );
-  }
-
-  Widget _buildRequestCard(SubscriptionRequest request, bool isSmallScreen) {
-    final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
-    
-    // Determine status color and icon
-    MaterialColor statusColor;
-    Color statusDark;
-    IconData statusIcon;
-    String statusText;
-    
-    if (request.isPending) {
-      statusColor = Colors.orange;
-      statusDark = Colors.orange.shade700;
-      statusIcon = Icons.pending;
-      statusText = 'PENDING';
-    } else if (request.isApproved) {
-      statusColor = Colors.green;
-      statusDark = Colors.green.shade700;
-      statusIcon = Icons.check_circle;
-      statusText = 'APPROVED';
-    } else {
-      statusColor = Colors.red;
-      statusDark = Colors.red.shade700;
-      statusIcon = Icons.cancel;
-      statusText = 'REJECTED';
-    }
-    
-    return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      decoration: BoxDecoration(
-        border: Border.all(
-          color: statusColor.withOpacity(0.3),
-          width: 1.5,
-        ),
-        borderRadius: BorderRadius.circular(12),
-        color: colorScheme.surfaceContainerHigh,
-      ),
-      child: Padding(
-        padding: EdgeInsets.all(isSmallScreen ? 16.0 : 20.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Header with status
-            Row(
-              children: [
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Upgrade to ${request.requestedPlan.toUpperCase()}',
-                        style: theme.textTheme.titleMedium?.copyWith(
-                          fontWeight: FontWeight.bold,
-                          fontSize: isSmallScreen ? 15 : 17,
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        'From ${request.currentPlan} plan',
-                        style: theme.textTheme.bodySmall?.copyWith(
-                          color: colorScheme.onSurface.withOpacity(0.6),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                  decoration: BoxDecoration(
-                    color: statusColor.withOpacity(0.15),
-                    borderRadius: BorderRadius.circular(20),
-                    border: Border.all(color: statusColor, width: 1.5),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(
-                        statusIcon,
-                        size: 16,
-                        color: statusDark,
-                      ),
-                      const SizedBox(width: 6),
-                      Text(
-                        statusText,
-                        style: theme.textTheme.labelSmall?.copyWith(
-                          color: statusDark,
-                          fontWeight: FontWeight.bold,
-                          letterSpacing: 0.5,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-            
-            const SizedBox(height: 12),
-            
-            // Reason
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: colorScheme.surfaceContainerHighest.withOpacity(0.5),
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Reason:',
-                    style: theme.textTheme.labelSmall?.copyWith(
-                      fontWeight: FontWeight.bold,
-                      color: colorScheme.onSurface.withOpacity(0.7),
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    request.reason,
-                    style: theme.textTheme.bodySmall?.copyWith(
-                      color: colorScheme.onSurface.withOpacity(0.8),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            
-            // Rejection reason if rejected
-            if (request.isRejected && request.rejectionReason != null) ...[
-              const SizedBox(height: 12),
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: Colors.red.withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: Colors.red.withOpacity(0.3)),
-                ),
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Icon(
-                      Icons.info_outline,
-                      size: 18,
-                      color: Colors.red[700],
-                    ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            'Rejection Reason:',
-                            style: theme.textTheme.labelSmall?.copyWith(
-                              fontWeight: FontWeight.bold,
-                              color: Colors.red[700],
-                            ),
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            request.rejectionReason!,
-                            style: theme.textTheme.bodySmall?.copyWith(
-                              color: Colors.red[800],
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-            
-            // Admin info if processed
-            if (request.adminName != null) ...[
-              const SizedBox(height: 8),
-              Text(
-                'Processed by ${request.adminName}',
-                style: theme.textTheme.bodySmall?.copyWith(
-                  color: colorScheme.onSurface.withOpacity(0.5),
-                  fontStyle: FontStyle.italic,
-                ),
-              ),
-            ],
-            
-            // Date
-            const SizedBox(height: 8),
-            Text(
-              'Requested on ${_formatDate(request.createdAt)}',
-              style: theme.textTheme.bodySmall?.copyWith(
-                color: colorScheme.onSurface.withOpacity(0.5),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
   
-  String _formatDate(DateTime date) {
-    final months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
-                    'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-    return '${months[date.month - 1]} ${date.day}, ${date.year}';
-  }
+
+  
+  
+
 }

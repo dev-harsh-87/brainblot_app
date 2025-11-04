@@ -930,10 +930,17 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
         subscriptionData["expiresAt"] = FieldValue.delete();
       }
 
-      await _firestore.collection("users").doc(userId).update({
-        "subscription": subscriptionData,
+      // Use dot notation to update nested subscription fields properly
+      Map<String, dynamic> updateData = {
         "updatedAt": FieldValue.serverTimestamp(),
+      };
+      
+      // Add subscription fields with dot notation
+      subscriptionData.forEach((key, value) {
+        updateData["subscription.$key"] = value;
       });
+      
+      await _firestore.collection("users").doc(userId).update(updateData);
 
       if (mounted) {
         Navigator.pop(context); // Close loading dialog

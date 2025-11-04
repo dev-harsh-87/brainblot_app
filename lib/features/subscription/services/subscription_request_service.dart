@@ -59,12 +59,15 @@ class SubscriptionRequestService {
     return _firestore
         .collection("subscription_requests")
         .where("status", isEqualTo: "pending")
-        .orderBy("createdAt", descending: true)
         .snapshots()
         .map((snapshot) {
-      return snapshot.docs
+      final requests = snapshot.docs
           .map((doc) => SubscriptionRequest.fromFirestore(doc))
           .toList();
+      
+      // Sort in memory to avoid index requirement
+      requests.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+      return requests;
     });
   }
 
@@ -72,12 +75,15 @@ class SubscriptionRequestService {
   Stream<List<SubscriptionRequest>> getAllRequests() {
     return _firestore
         .collection("subscription_requests")
-        .orderBy("createdAt", descending: true)
         .snapshots()
         .map((snapshot) {
-      return snapshot.docs
+      final requests = snapshot.docs
           .map((doc) => SubscriptionRequest.fromFirestore(doc))
           .toList();
+      
+      // Sort in memory to avoid index requirement
+      requests.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+      return requests;
     });
   }
 
@@ -91,12 +97,15 @@ class SubscriptionRequestService {
     return _firestore
         .collection("subscription_requests")
         .where("userId", isEqualTo: currentUser.uid)
-        .orderBy("createdAt", descending: true)
         .snapshots()
         .map((snapshot) {
-      return snapshot.docs
+      final requests = snapshot.docs
           .map((doc) => SubscriptionRequest.fromFirestore(doc))
           .toList();
+      
+      // Sort in memory to avoid index requirement
+      requests.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+      return requests;
     });
   }
 
@@ -124,52 +133,64 @@ class SubscriptionRequestService {
 
       final request = SubscriptionRequest.fromFirestore(requestDoc);
 
-      // Define module access based on plan
-      List<String> moduleAccess;
-      switch (request.requestedPlan) {
-        case "free":
-          moduleAccess = ["drills", "profile", "stats", "analysis"];
+      // Get the actual subscription plan from the repository to ensure consistency
+      final planDoc = await _firestore
+          .collection("subscription_plans")
+          .doc(request.requestedPlan)
+          .get();
+
+      // ONLY use plans from database - no hardcoded fallbacks
+      if (!planDoc.exists) {
+        throw Exception("Subscription plan '${request.requestedPlan}' not found in database. Please ensure the plan is created by an admin first.");
+      }
+
+      final planData = planDoc.data()!;
+      
+      // Get module access from plan
+      final moduleAccessData = planData['moduleAccess'];
+      final moduleAccess = moduleAccessData is List
+          ? List<String>.from(moduleAccessData)
+          : <String>[];
+      
+      print("✅ Using plan-defined module access for '${request.requestedPlan}': $moduleAccess");
+
+      // Calculate expiration date based on plan billing period
+      final billingPeriod = planData['billingPeriod'] as String? ?? 'monthly';
+      final now = DateTime.now();
+      
+      DateTime? expiresAt;
+      switch (billingPeriod) {
+        case 'monthly':
+          expiresAt = now.add(const Duration(days: 30));
           break;
-        case "player":
-          moduleAccess = [
-            "drills",
-            "profile",
-            "stats",
-            "analysis",
-            "admin_drills",
-            "admin_programs",
-            "programs",
-            "multiplayer",
-          ];
+        case 'yearly':
+          expiresAt = now.add(const Duration(days: 365));
           break;
-        case "institute":
-          moduleAccess = [
-            "drills",
-            "profile",
-            "stats",
-            "analysis",
-            "admin_drills",
-            "admin_programs",
-            "programs",
-            "multiplayer",
-            "user_management",
-            "team_management",
-            "bulk_operations",
-          ];
+        case 'lifetime':
+          expiresAt = null; // No expiration for lifetime plans
           break;
         default:
-          moduleAccess = ["drills", "profile", "stats", "analysis"];
+          expiresAt = now.add(const Duration(days: 30)); // Default to monthly
       }
 
       // Update user's subscription in Firestore
-      await _firestore.collection("users").doc(request.userId).update({
-        "subscription": {
-          "plan": request.requestedPlan,
-          "status": "active",
-          "moduleAccess": moduleAccess,
-        },
+      // Use dot notation to update nested fields properly
+      final updateData = {
+        "subscription.plan": request.requestedPlan,
+        "subscription.status": "active",
+        "subscription.moduleAccess": moduleAccess,
         "updatedAt": FieldValue.serverTimestamp(),
-      });
+      };
+
+      // Only set expiration if it's not null (lifetime plans don't expire)
+      if (expiresAt != null) {
+        updateData["subscription.expiresAt"] = Timestamp.fromDate(expiresAt);
+      } else {
+        // Remove expiration for lifetime plans
+        updateData["subscription.expiresAt"] = FieldValue.delete();
+      }
+
+      await _firestore.collection("users").doc(request.userId).update(updateData);
 
       // Update request status
       await _firestore.collection("subscription_requests").doc(requestId).update({
@@ -181,6 +202,7 @@ class SubscriptionRequestService {
       });
 
       print("✅ Subscription request approved and user plan upgraded");
+      print("📅 Plan expires at: ${expiresAt?.toString() ?? 'Never (lifetime)'}");
       
       // If the upgraded user is currently logged in, refresh their session
       // The SessionManagementService listens to user document changes,

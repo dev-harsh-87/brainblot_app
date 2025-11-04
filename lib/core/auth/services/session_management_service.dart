@@ -4,6 +4,7 @@ import 'package:brainblot_app/core/auth/models/app_user.dart';
 import 'package:brainblot_app/core/auth/models/user_role.dart';
 import 'package:brainblot_app/core/services/preferences_service.dart';
 import 'package:brainblot_app/core/auth/services/permission_service.dart';
+import 'package:brainblot_app/features/subscription/services/subscription_sync_service.dart';
 import 'dart:async';
 
 /// Centralized session management service
@@ -12,6 +13,7 @@ class SessionManagementService {
   final FirebaseAuth _auth;
   final FirebaseFirestore _firestore;
   final PermissionService? _permissionService;
+  final SubscriptionSyncService _subscriptionSync;
   
   // Session state
   AppUser? _currentSession;
@@ -25,14 +27,21 @@ class SessionManagementService {
     FirebaseAuth? auth,
     FirebaseFirestore? firestore,
     PermissionService? permissionService,
+    SubscriptionSyncService? subscriptionSync,
   })  : _auth = auth ?? FirebaseAuth.instance,
         _firestore = firestore ?? FirebaseFirestore.instance,
-        _permissionService = permissionService {
+        _permissionService = permissionService,
+        _subscriptionSync = subscriptionSync ?? SubscriptionSyncService() {
     _initializeSessionMonitoring();
   }
 
   /// Initialize session monitoring
   void _initializeSessionMonitoring() {
+    // Initialize subscription sync service
+    _subscriptionSync.initialize().catchError((e) {
+      print("⚠️ Failed to initialize subscription sync: $e");
+    });
+    
     // Listen to Firebase Auth state changes
     _authSubscription = _auth.authStateChanges().listen(_handleAuthStateChange);
   }
@@ -56,6 +65,11 @@ class SessionManagementService {
       await _userSubscription?.cancel();
       
       // First ensure user profile exists
+// CRITICAL: Sync subscription BEFORE listening to snapshots
+      // This ensures the user gets the correct moduleAccess from their plan
+      print("🔄 Syncing subscription before establishing session...");
+      await _subscriptionSync.syncUserOnLogin(firebaseUser.uid);
+      print("✅ Subscription synced");
       await _ensureUserProfileExists(firebaseUser);
       
       // Listen to user document changes for real-time role/permission updates
@@ -68,6 +82,10 @@ class SessionManagementService {
           try {
             _currentSession = AppUser.fromFirestore(doc);
             _notifySessionListeners(_currentSession);
+// Sync user subscription on login
+            _subscriptionSync.syncUserOnLogin(doc.id).catchError((e) {
+              print('⚠️ Failed to sync subscription: $e');
+            });
             
             // Only clear cache if role actually changed
             if (_permissionService != null) {
@@ -411,6 +429,7 @@ class SessionManagementService {
   Future<void> dispose() async {
     await _authSubscription?.cancel();
     await _userSubscription?.cancel();
+    await _subscriptionSync.dispose();
     _sessionListeners.clear();
   }
 }

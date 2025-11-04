@@ -7,6 +7,7 @@ import 'package:brainblot_app/features/sharing/ui/privacy_control_widget.dart';
 import 'package:brainblot_app/features/sharing/services/sharing_service.dart';
 import 'package:brainblot_app/core/services/auto_refresh_service.dart';
 import 'package:brainblot_app/core/widgets/confirmation_dialog.dart';
+import 'package:brainblot_app/core/ui/edge_to_edge.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -103,219 +104,71 @@ class _DrillLibraryScreenState extends State<DrillLibraryScreen>
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
 
-    return Scaffold(
+    // Set system UI for primary colored app bar
+    EdgeToEdge.setPrimarySystemUI(context);
+
+    return EdgeToEdgeScaffold(
       backgroundColor: colorScheme.surface,
-      body: NestedScrollView(
-        headerSliverBuilder: (context, innerBoxIsScrolled) => [
-          SliverAppBar(
-            expandedHeight: 200,
-            floating: false,
-            pinned: true,
-            backgroundColor: colorScheme.surface,
-            foregroundColor: colorScheme.onSurface,
-            flexibleSpace: FlexibleSpaceBar(
-              background: Container(
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    colors: [
-                      colorScheme.primaryContainer,
-                      colorScheme.secondaryContainer,
-                    ],
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                  ),
-                ),
-                child: Stack(
+      appBar: _buildAppBar(context),
+      extendBodyBehindAppBar: false,
+      body: Column(
+        children: [
+          // Search and Filter Section
+          _buildSearchAndFilterSection(context),
+          // Drill Content
+          Expanded(
+            child: BlocBuilder<DrillLibraryBloc, DrillLibraryState>(
+              builder: (context, state) {
+                print('🔍 Drill Library State: ${state.status}, Items: ${state.items.length}');
+                
+                if (state.status == DrillLibraryStatus.loading) {
+                  return _buildLoadingState();
+                }
+                
+                if (state.status == DrillLibraryStatus.error) {
+                  return _buildErrorState(state.errorMessage ?? 'Unknown error');
+                }
+
+                final drills = state.items;
+                print('📊 Loaded ${drills.length} drills');
+                
+                if (drills.isEmpty) {
+                  return _buildEmptyState();
+                }
+
+                return Stack(
                   children: [
-                    Positioned(
-                      right: -50,
-                      top: -50,
-                      child: Container(
-                        width: 200,
-                        height: 200,
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          color: colorScheme.primary.withOpacity(0.1),
-                        ),
-                      ),
-                    ),
-                    Positioned(
-                      left: -30,
-                      bottom: -30,
-                      child: Container(
-                        width: 150,
-                        height: 150,
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          color: colorScheme.secondary.withOpacity(0.1),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-            actions: [
-              IconButton(
-                onPressed: () => setState(() => _isGridView = !_isGridView),
-                icon: Icon(_isGridView ? Icons.view_list : Icons.grid_view),
-                tooltip: _isGridView ? 'List View' : 'Grid View',
-              ),
-              const SizedBox(width: 8),
-            ],
-            bottom: PreferredSize(
-              preferredSize: const Size.fromHeight(120),
-              child: Container(
-                padding: const EdgeInsets.all(16),
-                child: Column(
-                  children: [
-                    // Search Bar
-                    Container(
-                      decoration: BoxDecoration(
-                        color: colorScheme.surfaceContainerHighest,
-                        borderRadius: BorderRadius.circular(16),
-                        boxShadow: [
-                          BoxShadow(
-                            color: colorScheme.shadow.withOpacity(0.1),
-                            blurRadius: 8,
-                            offset: const Offset(0, 2),
-                          ),
-                        ],
-                      ),
-                      child: TextField(
-                        controller: _searchController,
-                        decoration: InputDecoration(
-                          hintText: 'Search drills...',
-                          prefixIcon: Icon(Icons.search, color: colorScheme.primary),
-                          suffixIcon: _searchController.text.isNotEmpty
-                              ? IconButton(
-                                  icon: Icon(Icons.clear, color: colorScheme.onSurface.withOpacity(0.6)),
-                                  onPressed: () {
-                                    _searchController.clear();
-                                    context.read<DrillLibraryBloc>().add(const DrillLibraryQueryChanged(''));
-                                  },
-                                )
-                              : null,
-                          border: InputBorder.none,
-                          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                        ),
-                        onChanged: (query) {
-                          setState(() {});
-                          print('🔍 Search query changed: "$query"');
-                          context.read<DrillLibraryBloc>().add(DrillLibraryQueryChanged(query));
-                        },
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    // Filter Tabs
-                    TabBar(
+                    TabBarView(
                       controller: _tabController,
-                      labelColor: colorScheme.primary,
-                      unselectedLabelColor: colorScheme.onSurface.withOpacity(0.6),
-                      indicatorColor: colorScheme.primary,
-                      indicatorWeight: 3,
-                      tabs: const [
-                        Tab(text: 'All'),
-                        Tab(text: 'My Drills'),
-                        Tab(text: 'Public'),
-                        Tab(text: 'Favorites'),
+                      children: [
+                        _buildDrillViewWithRefresh(drills, state), // All drills
+                        _buildMyDrillsViewWithRefresh(state), // My drills only
+                        _buildPublicDrillsViewWithRefresh(state), // Public drills only
+                        _buildDrillViewWithRefresh(drills.where((d) => d.favorite).toList(), state), // Favorites
                       ],
                     ),
-                  ],
-                ),
-              ),
-            ),
-          ),
-        ],
-        body: Column(
-          children: [
-            // Filter Chips
-            Container(
-              height: 60,
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: SingleChildScrollView(
-                      scrollDirection: Axis.horizontal,
-                      child: Row(
-                        children: [
-                          _buildFilterChip('Category', _selectedCategory.isEmpty ? 'All' : _selectedCategory, () => _showCategoryFilter()),
-                          const SizedBox(width: 8),
-                          _buildFilterChip('Difficulty', _selectedDifficulty?.name ?? 'All', () => _showDifficultyFilter()),
-                          const SizedBox(width: 8),
-                          _buildFilterChip('Sport', _selectedCategory.isEmpty ? 'All Sports' : _selectedCategory.toUpperCase(), () => _showSportFilter()),
-                        ],
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            // Stats Bar
-            // BlocBuilder<DrillLibraryBloc, DrillLibraryState>(
-            //   builder: (context, state) {
-            //     if (state.status == DrillLibraryStatus.loaded) {
-            //       return _buildStatsBar(state.items);
-            //     }
-            //     return const SizedBox.shrink();
-            //   },
-            // ),
-            // Drill List/Grid
-            Expanded(
-              child: BlocBuilder<DrillLibraryBloc, DrillLibraryState>(
-                builder: (context, state) {
-                  print('🔍 Drill Library State: ${state.status}, Items: ${state.items.length}');
-                  
-                  if (state.status == DrillLibraryStatus.loading) {
-                    return _buildLoadingState();
-                  }
-                  
-                  if (state.status == DrillLibraryStatus.error) {
-                    return _buildErrorState(state.errorMessage ?? 'Unknown error');
-                  }
-
-                  final drills = state.items;
-                  print('📊 Loaded ${drills.length} drills');
-                  
-                  if (drills.isEmpty) {
-                    return _buildEmptyState();
-                  }
-
-                  return Stack(
-                    children: [
-                      TabBarView(
-                        controller: _tabController,
-                        children: [
-                          _buildDrillViewWithRefresh(drills, state), // All drills
-                          _buildMyDrillsViewWithRefresh(state), // My drills only
-                          _buildPublicDrillsViewWithRefresh(state), // Public drills only
-                          _buildDrillViewWithRefresh(drills.where((d) => d.favorite).toList(), state), // Favorites
-                        ],
-                      ),
-                      // Show refreshing indicator
-                      if (state.isRefreshing)
-                        Positioned(
-                          top: 0,
-                          left: 0,
-                          right: 0,
-                          child: Container(
-                            height: 4,
-                            child: LinearProgressIndicator(
-                              backgroundColor: Colors.transparent,
-                              valueColor: AlwaysStoppedAnimation<Color>(
-                                Theme.of(context).colorScheme.primary,
-                              ),
+                    // Show refreshing indicator
+                    if (state.isRefreshing)
+                      Positioned(
+                        top: 0,
+                        left: 0,
+                        right: 0,
+                        child: Container(
+                          height: 4,
+                          child: LinearProgressIndicator(
+                            backgroundColor: Colors.transparent,
+                            valueColor: AlwaysStoppedAnimation<Color>(
+                              Theme.of(context).colorScheme.primary,
                             ),
                           ),
                         ),
-                    ],
-                  );
-                },
-              ),
+                      ),
+                  ],
+                );
+              },
             ),
-          ],
-        ),
+          ),
+        ],
       ),
       floatingActionButton: ScaleTransition(
         scale: _fabAnimation,
@@ -341,6 +194,241 @@ class _DrillLibraryScreenState extends State<DrillLibraryScreen>
           backgroundColor: colorScheme.primary,
           foregroundColor: colorScheme.onPrimary,
           elevation: 8,
+        ),
+      ),
+    );
+  }
+
+  PreferredSizeWidget _buildAppBar(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+
+    return AppBar(
+      elevation: 0,
+      backgroundColor: colorScheme.primary,
+      foregroundColor: colorScheme.onPrimary,
+      title: Text(
+        'Drill Library',
+        style: theme.textTheme.headlineSmall?.copyWith(
+          color: colorScheme.onPrimary,
+          fontWeight: FontWeight.w700,
+          letterSpacing: 0.5,
+        ),
+      ),
+      centerTitle: true,
+      flexibleSpace: Container(
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [
+              colorScheme.primary,
+              colorScheme.primary.withOpacity(0.9),
+              colorScheme.secondary.withOpacity(0.8),
+            ],
+          ),
+        ),
+      ),
+      actions: [
+        IconButton(
+          onPressed: () => setState(() => _isGridView = !_isGridView),
+          icon: Icon(_isGridView ? Icons.view_list : Icons.grid_view),
+          tooltip: _isGridView ? 'List View' : 'Grid View',
+          color: colorScheme.onPrimary,
+        ),
+        const SizedBox(width: 8),
+      ],
+    );
+  }
+
+  Widget _buildSearchAndFilterSection(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+
+    return Container(
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            colorScheme.primaryContainer.withOpacity(0.3),
+            colorScheme.secondaryContainer.withOpacity(0.2),
+          ],
+        ),
+        border: Border(
+          bottom: BorderSide(
+            color: colorScheme.outline.withOpacity(0.1),
+            width: 1,
+          ),
+        ),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          children: [
+            // Search Bar
+            Container(
+              decoration: BoxDecoration(
+                color: colorScheme.surface,
+                borderRadius: BorderRadius.circular(16),
+                boxShadow: [
+                  BoxShadow(
+                    color: colorScheme.shadow.withOpacity(0.08),
+                    blurRadius: 12,
+                    offset: const Offset(0, 3),
+                    spreadRadius: 0,
+                  ),
+                ],
+                border: Border.all(
+                  color: colorScheme.outline.withOpacity(0.08),
+                  width: 1,
+                ),
+              ),
+              child: TextField(
+                controller: _searchController,
+                decoration: InputDecoration(
+                  hintText: 'Search drills...',
+                  prefixIcon: Icon(Icons.search, color: colorScheme.primary),
+                  suffixIcon: _searchController.text.isNotEmpty
+                      ? IconButton(
+                          icon: Icon(Icons.clear, color: colorScheme.onSurface.withOpacity(0.6)),
+                          onPressed: () {
+                            _searchController.clear();
+                            context.read<DrillLibraryBloc>().add(const DrillLibraryQueryChanged(''));
+                          },
+                        )
+                      : null,
+                  border: InputBorder.none,
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+                ),
+                onChanged: (query) {
+                  setState(() {});
+                  print('🔍 Search query changed: "$query"');
+                  context.read<DrillLibraryBloc>().add(DrillLibraryQueryChanged(query));
+                },
+              ),
+            ),
+            const SizedBox(height: 16),
+            
+            // Filter Tabs
+            Container(
+              decoration: BoxDecoration(
+                color: colorScheme.surface,
+                borderRadius: BorderRadius.circular(12),
+                boxShadow: [
+                  BoxShadow(
+                    color: colorScheme.shadow.withOpacity(0.04),
+                    blurRadius: 8,
+                    offset: const Offset(0, 2),
+                    spreadRadius: 0,
+                  ),
+                ],
+              ),
+              child: TabBar(
+                controller: _tabController,
+                labelColor: colorScheme.primary,
+                unselectedLabelColor: colorScheme.onSurface.withOpacity(0.6),
+                indicatorColor: colorScheme.primary,
+                indicatorWeight: 3,
+                indicatorSize: TabBarIndicatorSize.tab,
+                dividerColor: Colors.transparent,
+                tabs: const [
+                  Tab(text: 'All'),
+                  Tab(text: 'My Drills'),
+                  Tab(text: 'Public'),
+                  Tab(text: 'Favorites'),
+                ],
+              ),
+            ),
+            const SizedBox(height: 16),
+            
+            // Filter Chips
+            SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: Row(
+                children: [
+                  _buildEnhancedFilterChip('Category', _selectedCategory.isEmpty ? 'All' : _selectedCategory, () => _showCategoryFilter()),
+                  const SizedBox(width: 8),
+                  _buildEnhancedFilterChip('Difficulty', _selectedDifficulty?.name ?? 'All', () => _showDifficultyFilter()),
+                  const SizedBox(width: 8),
+                  _buildEnhancedFilterChip('Sport', _selectedCategory.isEmpty ? 'All Sports' : _selectedCategory.toUpperCase(), () => _showSportFilter()),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildEnhancedFilterChip(String label, String value, VoidCallback onTap) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final isActive = (label == 'Category' && _selectedCategory.isNotEmpty) ||
+                     (label == 'Difficulty' && _selectedDifficulty != null) ||
+                     (label == 'Sport' && _selectedCategory.isNotEmpty);
+
+    return GestureDetector(
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+        decoration: BoxDecoration(
+          gradient: isActive
+              ? LinearGradient(
+                  colors: [
+                    colorScheme.primary.withOpacity(0.15),
+                    colorScheme.primary.withOpacity(0.05),
+                  ],
+                )
+              : null,
+          color: isActive ? null : colorScheme.surface,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(
+            color: isActive
+                ? colorScheme.primary.withOpacity(0.3)
+                : colorScheme.outline.withOpacity(0.2),
+            width: isActive ? 1.5 : 1,
+          ),
+          boxShadow: isActive ? [
+            BoxShadow(
+              color: colorScheme.primary.withOpacity(0.1),
+              blurRadius: 8,
+              offset: const Offset(0, 2),
+              spreadRadius: 0,
+            ),
+          ] : null,
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (isActive)
+              Padding(
+                padding: const EdgeInsets.only(right: 6),
+                child: Icon(
+                  Icons.filter_alt,
+                  size: 16,
+                  color: colorScheme.primary,
+                ),
+              ),
+            Text(
+              '$label: $value',
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: isActive
+                    ? colorScheme.primary
+                    : colorScheme.onSurface,
+                fontWeight: isActive ? FontWeight.w600 : FontWeight.w500,
+              ),
+            ),
+            const SizedBox(width: 4),
+            Icon(
+              Icons.keyboard_arrow_down,
+              size: 16,
+              color: isActive
+                  ? colorScheme.primary
+                  : colorScheme.onSurface.withOpacity(0.6),
+            ),
+          ],
         ),
       ),
     );
@@ -413,42 +501,44 @@ class _DrillLibraryScreenState extends State<DrillLibraryScreen>
   Widget _buildLoadingState() {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
-
+    
     return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Container(
-            padding: const EdgeInsets.all(24),
-            decoration: BoxDecoration(
-              color: colorScheme.surfaceContainerHighest,
-              borderRadius: BorderRadius.circular(16),
-            ),
-            child: Column(
-              children: [
-                CircularProgressIndicator(
-                  color: colorScheme.primary,
-                  strokeWidth: 3,
-                ),
-                const SizedBox(height: 16),
-                Text(
-                  'Loading drills...',
-                  style: theme.textTheme.bodyLarge?.copyWith(
-                    color: colorScheme.onSurface.withOpacity(0.7),
-                    fontWeight: FontWeight.w500,
+      child: Padding(
+        padding: const EdgeInsets.all(64),
+        child: Column(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(24),
+              decoration: BoxDecoration(
+                color: colorScheme.surfaceContainerHighest,
+                borderRadius: BorderRadius.circular(16),
+              ),
+              child: Column(
+                children: [
+                  CircularProgressIndicator(
+                    color: colorScheme.primary,
+                    strokeWidth: 3,
                   ),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  'Fetching the latest data',
-                  style: theme.textTheme.bodySmall?.copyWith(
-                    color: colorScheme.onSurface.withOpacity(0.5),
+                  const SizedBox(height: 16),
+                  Text(
+                    'Loading drills...',
+                    style: theme.textTheme.bodyLarge?.copyWith(
+                      color: colorScheme.onSurface.withOpacity(0.7),
+                      fontWeight: FontWeight.w500,
+                    ),
                   ),
-                ),
-              ],
+                  const SizedBox(height: 8),
+                  Text(
+                    'Fetching the latest drill library',
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: colorScheme.onSurface.withOpacity(0.5),
+                    ),
+                  ),
+                ],
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -456,44 +546,51 @@ class _DrillLibraryScreenState extends State<DrillLibraryScreen>
   Widget _buildErrorState(String error) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
-
+    
     return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(
-            Icons.error_outline,
-            size: 64,
-            color: colorScheme.error,
-          ),
-          const SizedBox(height: 16),
-          Text(
-            'Failed to load drills',
-            style: theme.textTheme.titleLarge?.copyWith(
-              color: colorScheme.error,
-              fontWeight: FontWeight.w600,
+      child: Padding(
+        padding: const EdgeInsets.all(32),
+        child: Column(
+          children: [
+            Container(
+              width: 120,
+              height: 120,
+              decoration: BoxDecoration(
+                color: colorScheme.errorContainer,
+                shape: BoxShape.circle,
+              ),
+              child: Icon(
+                Icons.error_outline,
+                size: 60,
+                color: colorScheme.onErrorContainer,
+              ),
             ),
-          ),
-          const SizedBox(height: 8),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 32),
-            child: Text(
+            const SizedBox(height: 24),
+            Text(
+              'Failed to load drills',
+              style: theme.textTheme.headlineSmall?.copyWith(
+                color: colorScheme.onSurface,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
               error,
-              textAlign: TextAlign.center,
               style: theme.textTheme.bodyMedium?.copyWith(
                 color: colorScheme.onSurface.withOpacity(0.7),
               ),
+              textAlign: TextAlign.center,
             ),
-          ),
-          const SizedBox(height: 24),
-          FilledButton.icon(
-            onPressed: () {
-              context.read<DrillLibraryBloc>().add(const DrillLibraryRefreshRequested());
-            },
-            icon: const Icon(Icons.refresh),
-            label: const Text('Retry'),
-          ),
-        ],
+            const SizedBox(height: 32),
+            FilledButton.icon(
+              onPressed: () {
+                context.read<DrillLibraryBloc>().add(const DrillLibraryRefreshRequested());
+              },
+              icon: const Icon(Icons.refresh),
+              label: const Text('Retry'),
+            ),
+          ],
+        ),
       ),
     );
   }
