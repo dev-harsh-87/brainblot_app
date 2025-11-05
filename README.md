@@ -1,8 +1,8 @@
-# 🧠 BrainBlot - Cognitive Training App
+# 🧠 Spark - Cognitive Training App
 
 **Advanced cognitive training platform for athletes and fitness enthusiasts**
 
-BrainBlot is a cutting-edge mobile application designed to enhance cognitive performance through targeted brain training exercises. Built with Flutter and Firebase, it offers personalized training programs, real-time performance tracking, and a comprehensive suite of cognitive drills.
+Spark is a cutting-edge mobile application designed to enhance cognitive performance through targeted brain training exercises. Built with Flutter and Firebase, it offers personalized training programs, real-time performance tracking, and a comprehensive suite of cognitive drills.
 
 ## ✨ Features
 
@@ -41,7 +41,7 @@ BrainBlot is a cutting-edge mobile application designed to enhance cognitive per
 1. **Clone the repository**
    ```bash
    git clone <repository-url>
-   cd brainblot_app
+   cd spark_app
    ```
 
 2. **Install dependencies**

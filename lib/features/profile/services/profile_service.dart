@@ -1,7 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
-import 'package:brainblot_app/features/sharing/domain/user_profile.dart';
+import 'package:spark_app/features/sharing/domain/user_profile.dart';
 
 class ProfileService {
   final FirebaseFirestore _firestore;

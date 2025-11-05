@@ -1,5 +1,5 @@
 import 'package:firebase_core/firebase_core.dart';
-import 'package:brainblot_app/core/services/database_initialization_service.dart';
+import 'package:spark_app/core/services/database_initialization_service.dart';
 
 /// Service to initialize the app with database setup
 class AppInitializationService {

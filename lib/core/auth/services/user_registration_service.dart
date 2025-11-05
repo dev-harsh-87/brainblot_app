@@ -1,7 +1,7 @@
-import 'package:brainblot_app/core/auth/models/user_role.dart';
+import 'package:spark_app/core/auth/models/user_role.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:brainblot_app/core/auth/models/app_user.dart';
+import 'package:spark_app/core/auth/models/app_user.dart';
 
 /// Service for handling user registration including pre-created profiles
 class UserRegistrationService {

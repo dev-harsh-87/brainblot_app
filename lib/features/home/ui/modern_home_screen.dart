@@ -1,18 +1,18 @@
-import 'package:brainblot_app/features/home/ui/admin_section_enhanced.dart';
+import 'package:spark_app/features/home/ui/admin_section_enhanced.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
-import 'package:brainblot_app/core/theme/app_theme.dart';
-import 'package:brainblot_app/core/widgets/subscription_widgets.dart';
-import 'package:brainblot_app/core/widgets/enhanced_subscription_card.dart';
-import 'package:brainblot_app/core/auth/models/user_role.dart';
-import 'package:brainblot_app/core/auth/models/app_user.dart';
-import 'package:brainblot_app/features/subscription/domain/subscription_plan.dart';
-import 'package:brainblot_app/features/subscription/domain/subscription_request.dart';
-import 'package:brainblot_app/features/subscription/services/subscription_request_service.dart';
-import 'package:brainblot_app/features/auth/bloc/auth_bloc.dart';
+import 'package:spark_app/core/theme/app_theme.dart';
+import 'package:spark_app/core/widgets/subscription_widgets.dart';
+import 'package:spark_app/core/widgets/enhanced_subscription_card.dart';
+import 'package:spark_app/core/auth/models/user_role.dart';
+import 'package:spark_app/core/auth/models/app_user.dart';
+import 'package:spark_app/features/subscription/domain/subscription_plan.dart';
+import 'package:spark_app/features/subscription/domain/subscription_request.dart';
+import 'package:spark_app/features/subscription/services/subscription_request_service.dart';
+import 'package:spark_app/features/auth/bloc/auth_bloc.dart';
 import "package:cloud_firestore/cloud_firestore.dart";
-import "package:brainblot_app/features/subscription/data/subscription_plan_repository.dart";
+import "package:spark_app/features/subscription/data/subscription_plan_repository.dart";
 import 'package:firebase_auth/firebase_auth.dart';
 
 /// Modern home screen with professional UI design
@@ -110,7 +110,7 @@ class _ModernHomeScreenState extends State<ModernHomeScreen>
       backgroundColor: colorScheme.surface,
       appBar: AppBar(
         title: Text(
-          'BrainBlot',
+          'Spark',
           style: theme.textTheme.headlineMedium?.copyWith(
             fontWeight: FontWeight.w800,
             color: colorScheme.primary,

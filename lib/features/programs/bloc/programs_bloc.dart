@@ -1,12 +1,12 @@
 import 'dart:async';
-import 'package:brainblot_app/features/programs/data/firebase_program_repository.dart';
+import 'package:spark_app/features/programs/data/firebase_program_repository.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:equatable/equatable.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:collection/collection.dart';
-import 'package:brainblot_app/features/programs/data/program_repository.dart';
-import 'package:brainblot_app/features/programs/domain/program.dart';
-import 'package:brainblot_app/core/bloc/bloc_utils.dart';
+import 'package:spark_app/features/programs/data/program_repository.dart';
+import 'package:spark_app/features/programs/domain/program.dart';
+import 'package:spark_app/core/bloc/bloc_utils.dart';
 
 part 'programs_event.dart';
 part 'programs_state.dart';

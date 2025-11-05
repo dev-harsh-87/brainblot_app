@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
-import 'package:brainblot_app/features/programs/domain/program.dart';
-import 'package:brainblot_app/features/programs/services/program_progress_service.dart';
-import 'package:brainblot_app/features/programs/services/drill_assignment_service.dart';
-import 'package:brainblot_app/features/drills/domain/drill.dart';
-import 'package:brainblot_app/core/di/injection.dart';
+import 'package:spark_app/features/programs/domain/program.dart';
+import 'package:spark_app/features/programs/services/program_progress_service.dart';
+import 'package:spark_app/features/programs/services/drill_assignment_service.dart';
+import 'package:spark_app/features/drills/domain/drill.dart';
+import 'package:spark_app/core/di/injection.dart';
 
 class ProgramDayScreen extends StatefulWidget {
   final Program program;

@@ -1,10 +1,10 @@
 import 'dart:async';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:brainblot_app/features/drills/data/firebase_drill_repository.dart';
-import 'package:brainblot_app/features/drills/data/firebase_session_repository.dart';
-import 'package:brainblot_app/features/programs/data/firebase_program_repository.dart';
-import 'package:brainblot_app/features/auth/data/firebase_user_repository.dart';
+import 'package:spark_app/features/drills/data/firebase_drill_repository.dart';
+import 'package:spark_app/features/drills/data/firebase_session_repository.dart';
+import 'package:spark_app/features/programs/data/firebase_program_repository.dart';
+import 'package:spark_app/features/auth/data/firebase_user_repository.dart';
 
 /// Professional data migration service for transitioning to the new Firestore structure
 /// Handles migration from old schema to new professional schema safely

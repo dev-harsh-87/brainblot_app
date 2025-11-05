@@ -1171,21 +1171,21 @@ class _HostSessionScreenState extends State<HostSessionScreen>
                         ),
                         const SizedBox(height: 12),
                         _buildIOSStep('1', 'Tap "Open iOS Settings" below'),
-                        _buildIOSStep('2', 'Look for "BrainBlot" in the app list'),
+                        _buildIOSStep('2', 'Look for "Spark" in the app list'),
                         _buildIOSStep('3', 'If you see it, enable any permissions shown'),
                         const SizedBox(height: 8),
                         Text(
-                          'If BrainBlot is not in the app list:',
+                          'If Spark is not in the app list:',
                           style: theme.textTheme.bodyMedium?.copyWith(
                             fontWeight: FontWeight.bold,
                           ),
                         ),
                         const SizedBox(height: 4),
                         _buildIOSStep('A', 'Go to Settings > Privacy & Security'),
-                        _buildIOSStep('B', 'Tap "Bluetooth" → Enable for BrainBlot'),
+                        _buildIOSStep('B', 'Tap "Bluetooth" → Enable for Spark'),
                         _buildIOSStep('C', 'Go back, tap "Location Services"'),
-                        _buildIOSStep('D', 'Enable Location for BrainBlot'),
-                        _buildIOSStep('E', 'Return to BrainBlot and try again'),
+                        _buildIOSStep('D', 'Enable Location for Spark'),
+                        _buildIOSStep('E', 'Return to Spark and try again'),
                       ],
                     ),
                   ),
@@ -1225,7 +1225,7 @@ class _HostSessionScreenState extends State<HostSessionScreen>
                     ScaffoldMessenger.of(context).showSnackBar(
                       SnackBar(
                         content: const Text(
-                          'After enabling permissions, return to BrainBlot and try again',
+                          'After enabling permissions, return to Spark and try again',
                         ),
                         duration: const Duration(seconds: 5),
                         action: SnackBarAction(

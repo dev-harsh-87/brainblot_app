@@ -1,4 +1,4 @@
-import 'package:brainblot_app/core/auth/models/user_role.dart';
+import 'package:spark_app/core/auth/models/user_role.dart';
 
 /// System permissions for fine-grained access control
 /// Note: Module access is now controlled by subscription plans, not permissions

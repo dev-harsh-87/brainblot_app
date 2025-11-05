@@ -1,5 +1,5 @@
 import 'dart:async';
-import 'package:brainblot_app/features/drills/domain/session_result.dart';
+import 'package:spark_app/features/drills/domain/session_result.dart';
 
 abstract class SessionRepository {
   Stream<List<SessionResult>> watchAll();

@@ -1,5 +1,5 @@
-import 'package:brainblot_app/core/auth/models/user_role.dart';
-import 'package:brainblot_app/core/auth/models/permission.dart';
+import 'package:spark_app/core/auth/models/user_role.dart';
+import 'package:spark_app/core/auth/models/permission.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 

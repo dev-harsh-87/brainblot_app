@@ -5,7 +5,7 @@
 	<key>CFBundleDevelopmentRegion</key>
 	<string>$(DEVELOPMENT_LANGUAGE)</string>
 	<key>CFBundleDisplayName</key>
-	<string>Brainblot App</string>
+	<string>Spark App</string>
 	<key>CFBundleExecutable</key>
 	<string>$(EXECUTABLE_NAME)</string>
 	<key>CFBundleIdentifier</key>
@@ -13,7 +13,7 @@
 	<key>CFBundleInfoDictionaryVersion</key>
 	<string>6.0</string>
 	<key>CFBundleName</key>
-	<string>brainblot_app</string>
+	<string>spark_app</string>
 	<key>CFBundlePackageType</key>
 	<string>APPL</string>
 	<key>CFBundleShortVersionString</key>
@@ -48,16 +48,16 @@
 	
 	<!-- Bluetooth permissions -->
 	<key>NSBluetoothAlwaysUsageDescription</key>
-	<string>BrainBlot uses Bluetooth to connect with other devices for multiplayer training sessions. This allows you to train together with friends and synchronize drill timing across devices.</string>
+	<string>Spark uses Bluetooth to connect with other devices for multiplayer training sessions. This allows you to train together with friends and synchronize drill timing across devices.</string>
 	
 	<!-- Location permissions (required for Bluetooth on iOS) -->
 	<key>NSLocationWhenInUseUsageDescription</key>
-	<string>BrainBlot needs location access to discover nearby devices for multiplayer training sessions via Bluetooth.</string>
+	<string>Spark needs location access to discover nearby devices for multiplayer training sessions via Bluetooth.</string>
 	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
-	<string>BrainBlot needs location access to discover nearby devices for multiplayer training sessions via Bluetooth.</string>
+	<string>Spark needs location access to discover nearby devices for multiplayer training sessions via Bluetooth.</string>
 	
 	<!-- Local Network permissions -->
 	<key>NSLocalNetworkUsageDescription</key>
-	<string>BrainBlot uses local network access to connect with nearby devices for multiplayer training sessions.</string>
+	<string>Spark uses local network access to connect with nearby devices for multiplayer training sessions.</string>
 </dict>
 </plist>

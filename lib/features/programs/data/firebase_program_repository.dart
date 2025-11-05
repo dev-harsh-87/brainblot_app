@@ -5,10 +5,10 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:uuid/uuid.dart';
 
-import 'package:brainblot_app/core/di/injection.dart';
-import 'package:brainblot_app/features/programs/data/program_repository.dart';
-import 'package:brainblot_app/features/programs/domain/program.dart';
-import 'package:brainblot_app/features/programs/services/drill_assignment_service.dart';
+import 'package:spark_app/core/di/injection.dart';
+import 'package:spark_app/features/programs/data/program_repository.dart';
+import 'package:spark_app/features/programs/domain/program.dart';
+import 'package:spark_app/features/programs/services/drill_assignment_service.dart';
 
 class FirebaseProgramRepository implements ProgramRepository {
   final FirebaseFirestore _firestore;

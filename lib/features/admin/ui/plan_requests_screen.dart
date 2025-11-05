@@ -1,7 +1,7 @@
 import "package:flutter/material.dart";
 import "package:intl/intl.dart";
-import "package:brainblot_app/features/subscription/domain/subscription_request.dart";
-import "package:brainblot_app/features/subscription/services/subscription_request_service.dart";
+import "package:spark_app/features/subscription/domain/subscription_request.dart";
+import "package:spark_app/features/subscription/services/subscription_request_service.dart";
 
 class PlanRequestsScreen extends StatefulWidget {
   const PlanRequestsScreen({super.key});

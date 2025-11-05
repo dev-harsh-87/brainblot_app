@@ -1,13 +1,13 @@
-import 'package:brainblot_app/core/di/injection.dart';
-import 'package:brainblot_app/features/drills/bloc/drill_library_bloc.dart';
-import 'package:brainblot_app/features/drills/data/drill_repository.dart';
-import 'package:brainblot_app/features/drills/data/firebase_drill_repository.dart';
-import 'package:brainblot_app/features/drills/domain/drill.dart';
-import 'package:brainblot_app/features/sharing/ui/privacy_control_widget.dart';
-import 'package:brainblot_app/features/sharing/services/sharing_service.dart';
-import 'package:brainblot_app/core/services/auto_refresh_service.dart';
-import 'package:brainblot_app/core/widgets/confirmation_dialog.dart';
-import 'package:brainblot_app/core/ui/edge_to_edge.dart';
+import 'package:spark_app/core/di/injection.dart';
+import 'package:spark_app/features/drills/bloc/drill_library_bloc.dart';
+import 'package:spark_app/features/drills/data/drill_repository.dart';
+import 'package:spark_app/features/drills/data/firebase_drill_repository.dart';
+import 'package:spark_app/features/drills/domain/drill.dart';
+import 'package:spark_app/features/sharing/ui/privacy_control_widget.dart';
+import 'package:spark_app/features/sharing/services/sharing_service.dart';
+import 'package:spark_app/core/services/auto_refresh_service.dart';
+import 'package:spark_app/core/widgets/confirmation_dialog.dart';
+import 'package:spark_app/core/ui/edge_to_edge.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -27,7 +27,6 @@ class _DrillLibraryScreenState extends State<DrillLibraryScreen>
   late Animation<double> _fabAnimation;
   late SharingService _sharingService;
   late DrillRepository _drillRepository;
-  bool _isGridView = true;
   String _selectedCategory = '';
   Difficulty? _selectedDifficulty;
   final TextEditingController _searchController = TextEditingController();
@@ -230,12 +229,6 @@ class _DrillLibraryScreenState extends State<DrillLibraryScreen>
         ),
       ),
       actions: [
-        IconButton(
-          onPressed: () => setState(() => _isGridView = !_isGridView),
-          icon: Icon(_isGridView ? Icons.view_list : Icons.grid_view),
-          tooltip: _isGridView ? 'List View' : 'Grid View',
-          color: colorScheme.onPrimary,
-        ),
         const SizedBox(width: 8),
       ],
     );
@@ -616,7 +609,7 @@ class _DrillLibraryScreenState extends State<DrillLibraryScreen>
       onRefresh: () async {
         context.read<DrillLibraryBloc>().add(const DrillLibraryRefreshRequested());
       },
-      child: _isGridView ? _buildGridView(drills) : _buildListView(drills),
+      child: _buildListView(drills),
     );
   }
 
@@ -643,29 +636,10 @@ class _DrillLibraryScreenState extends State<DrillLibraryScreen>
       return _buildEmptyStateForTab();
     }
 
-    if (_isGridView) {
-      return _buildGridView(drills);
-    } else {
-      return _buildListView(drills);
-    }
+    return _buildListView(drills);
   }
 
-  Widget _buildGridView(List<Drill> drills) {
-    return Padding(
-      padding: const EdgeInsets.all(16),
-      child: GridView.builder(
-        controller: _scrollController,
-        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-          crossAxisCount: 2,
-          childAspectRatio: 0.8,
-          crossAxisSpacing: 16,
-          mainAxisSpacing: 16,
-        ),
-        itemCount: drills.length,
-        itemBuilder: (context, index) => _buildDrillCard(drills[index]),
-      ),
-    );
-  }
+  
 
   Widget _buildListView(List<Drill> drills) {
     return ListView.separated(
@@ -676,149 +650,8 @@ class _DrillLibraryScreenState extends State<DrillLibraryScreen>
       itemBuilder: (context, index) => _buildDrillListTile(drills[index]),
     );
   }
-  Widget _buildDrillCard(Drill drill) {
-    final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
-    final size = MediaQuery.of(context).size;
+  
 
-    // Dynamically adjust padding, font sizes, and spacing based on screen width
-    final isCompact = size.width < 400;
-    final padding = EdgeInsets.all(isCompact ? 12 : 16);
-    final iconSize = isCompact ? 14.0 : 16.0;
-    final smallFont = theme.textTheme.bodySmall?.copyWith(fontSize: isCompact ? 10 : 12);
-    final labelFont = theme.textTheme.labelSmall?.copyWith(
-      fontSize: isCompact ? 12 : 14,
-      fontWeight: FontWeight.w600,
-    );
-
-    return LayoutBuilder(
-
-
-      builder: (context, constraints) {
-        return Card(
-          elevation: 2,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-          clipBehavior: Clip.antiAlias,
-          child: InkWell(
-            onTap: () {
-              HapticFeedback.lightImpact();
-              context.push('/drill-detail', extra: drill);
-            },
-            borderRadius: BorderRadius.circular(16),
-            child: Padding(
-              padding: padding,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  /// Header Row (icon + name)
-                  Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.all(6),
-                        decoration: BoxDecoration(
-                          color: _getDifficultyColor(drill.difficulty).withOpacity(0.1),
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: Icon(
-                          _getCategoryIcon(drill.category),
-                          color: _getDifficultyColor(drill.difficulty),
-                          size: iconSize,
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: Text(
-                          drill.name,
-                          style: labelFont,
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ),
-                    ],
-                  ),
-
-                  const SizedBox(height: 8),
-
-                  /// Category
-                  Text(
-                    drill.category.toUpperCase(),
-                    style: smallFont?.copyWith(
-                      color: colorScheme.primary,
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-
-                  const SizedBox(height: 6),
-
-                  /// Chips (duration + reps)
-                  Wrap(
-                    spacing: 8,
-                    runSpacing: 4,
-                    children: [
-                      _buildInfoChip(Icons.timer, '${drill.durationSec}s'),
-                      _buildInfoChip(Icons.repeat, '${drill.reps}x',),
-                    ],
-                  ),
-
-                  const SizedBox(height: 6),
-
-                  /// Privacy indicator
-                  Flexible(child: _buildPrivacyIndicator(drill)),
-
-                  const SizedBox(height: 6),
-
-                  /// Shared / Custom tags
-                  Wrap(
-                    spacing: 4,
-                    runSpacing: 4,
-                    alignment: WrapAlignment.end,
-                    children: [
-                      if (drill.sharedWith.isNotEmpty)
-                        _buildTag(
-                          icon: Icons.people,
-                          text: 'SHARED',
-                          color: Colors.blue,
-                          theme: theme,
-                          fontSize: isCompact ? 8 : 10,
-                        ),
-                      if (!drill.isPreset)
-                        _buildTag(
-                          text: 'CUSTOM',
-                          color: Colors.orange,
-                          theme: theme,
-                          fontSize: isCompact ? 8 : 10,
-                        ),
-                    ],
-                  ),
-
-                  const SizedBox(height: 6),
-
-                  /// Difficulty badge
-                  Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.symmetric(vertical: 8),
-                    decoration: BoxDecoration(
-                      color: _getDifficultyColor(drill.difficulty).withOpacity(0.1),
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Text(
-                      drill.difficulty.name.toUpperCase(),
-                      textAlign: TextAlign.center,
-                      style: smallFont?.copyWith(
-                        color: _getDifficultyColor(drill.difficulty),
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        );
-      },
-    );
-  }
 
 
 
@@ -854,123 +687,272 @@ class _DrillLibraryScreenState extends State<DrillLibraryScreen>
       ),
     );
   }
+Widget _buildCompactStatChip(IconData icon, String text, Color color) {
+    final theme = Theme.of(context);
+    
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.08),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(
+          color: color.withOpacity(0.2),
+          width: 1,
+        ),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(
+            icon,
+            color: color,
+            size: 12,
+          ),
+          const SizedBox(width: 4),
+          Text(
+            text,
+            style: theme.textTheme.labelSmall?.copyWith(
+              color: color,
+              fontWeight: FontWeight.w600,
+              fontSize: 10,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 
   Widget _buildDrillListTile(Drill drill) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
 
-    return Card(
-      elevation: 1,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      child: ListTile(
-        onTap: () {
-          HapticFeedback.lightImpact();
-          context.push('/drill-detail', extra: drill);
-        },
-        contentPadding: const EdgeInsets.all(16),
-        leading: Container(
-          padding: const EdgeInsets.all(12),
-          decoration: BoxDecoration(
-            color: _getDifficultyColor(drill.difficulty).withOpacity(0.1),
-            borderRadius: BorderRadius.circular(12),
-          ),
-          child: Icon(
-            _getCategoryIcon(drill.category),
-            color: _getDifficultyColor(drill.difficulty),
-            size: 24,
-          ),
-        ),
-        title: Row(
-          children: [
-            Expanded(
-              child: Text(
-                drill.name,
-                style: theme.textTheme.labelMedium?.copyWith(
-                  fontWeight: FontWeight.w600,
-                ),
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-              ),
-
-
-            ),
-            if (!drill.isPreset) const SizedBox(width: 2),
-            // Privacy indicator - always show, load ownership async
-            Flexible(child: _buildPrivacyIndicator(drill)),
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(16),
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            colorScheme.surface,
+            colorScheme.surface.withOpacity(0.8),
           ],
         ),
-        subtitle: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.end,
-              mainAxisSize: MainAxisSize.min,
+        boxShadow: [
+          BoxShadow(
+            color: colorScheme.shadow.withOpacity(0.08),
+            blurRadius: 16,
+            offset: const Offset(0, 4),
+            spreadRadius: 0,
+          ),
+          BoxShadow(
+            color: _getDifficultyColor(drill.difficulty).withOpacity(0.04),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+            spreadRadius: 0,
+          ),
+        ],
+        border: Border.all(
+          color: _getDifficultyColor(drill.difficulty).withOpacity(0.1),
+          width: 1,
+        ),
+      ),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: () {
+            HapticFeedback.lightImpact();
+            context.push('/drill-detail', extra: drill);
+          },
+          borderRadius: BorderRadius.circular(16),
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Row(
               children: [
-                if (drill.sharedWith.isNotEmpty)
-                  Flexible(
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                      decoration: BoxDecoration(
-                        color: Colors.blue.withOpacity(0.1),
-                        borderRadius: BorderRadius.circular(4),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
+                // Leading icon
+                Container(
+                  padding: const EdgeInsets.all(14),
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: [
+                        _getDifficultyColor(drill.difficulty).withOpacity(0.15),
+                        _getDifficultyColor(drill.difficulty).withOpacity(0.05),
+                      ],
+                    ),
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(
+                      color: _getDifficultyColor(drill.difficulty).withOpacity(0.2),
+                      width: 1,
+                    ),
+                  ),
+                  child: Icon(
+                    _getCategoryIcon(drill.category),
+                    color: _getDifficultyColor(drill.difficulty),
+                    size: 24,
+                  ),
+                ),
+                
+                const SizedBox(width: 16),
+                
+                // Content
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // Title row with favorite
+                      Row(
                         children: [
-                          Icon(Icons.people, color: Colors.blue, size: 10),
-                          const SizedBox(width: 2),
-                          Text(
-                            'SHARED',
-                            style: theme.textTheme.bodySmall?.copyWith(
-                              color: Colors.blue,
-                              fontSize: 8,
-                              fontWeight: FontWeight.bold,
+                          Expanded(
+                            child: Text(
+                              drill.name,
+                              style: theme.textTheme.titleMedium?.copyWith(
+                                fontWeight: FontWeight.w700,
+                                color: colorScheme.onSurface,
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                          GestureDetector(
+                            onTap: () => _toggleFavorite(drill),
+                            child: Container(
+                              padding: const EdgeInsets.all(6),
+                              decoration: BoxDecoration(
+
+                                color: drill.favorite
+                                    ? Colors.red.withOpacity(0.1)
+                                    : colorScheme.surfaceContainerHighest,
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: Icon(
+                                drill.favorite ? Icons.favorite : Icons.favorite_border,
+                                color: drill.favorite ? Colors.red : colorScheme.onSurface.withOpacity(0.6),
+                                size: 16,
+                              ),
                             ),
                           ),
                         ],
                       ),
-                    ),
-                  ),
-                if (drill.sharedWith.isNotEmpty) const SizedBox(width: 4),
-                if (!drill.isPreset)
-                  Flexible(
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                      decoration: BoxDecoration(
-                        color: Colors.orange.withOpacity(0.1),
-                        borderRadius: BorderRadius.circular(4),
+                      
+                      const SizedBox(height: 8),
+                      
+                      // Category and difficulty
+                      Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                            decoration: BoxDecoration(
+                              color: colorScheme.primary.withOpacity(0.1),
+                              borderRadius: BorderRadius.circular(6),
+                            ),
+                            child: Text(
+                              drill.category.toUpperCase(),
+                              style: theme.textTheme.labelSmall?.copyWith(
+                                color: colorScheme.primary,
+                                fontWeight: FontWeight.w600,
+                                fontSize: 10,
+                                letterSpacing: 0.5,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                            decoration: BoxDecoration(
+                              color: _getDifficultyColor(drill.difficulty).withOpacity(0.1),
+                              borderRadius: BorderRadius.circular(6),
+                              border: Border.all(
+                                color: _getDifficultyColor(drill.difficulty).withOpacity(0.3),
+                                width: 1,
+                              ),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Container(
+                                  width: 6,
+                                  height: 6,
+                                  decoration: BoxDecoration(
+                                    color: _getDifficultyColor(drill.difficulty),
+                                    shape: BoxShape.circle,
+                                  ),
+                                ),
+                                const SizedBox(width: 4),
+                                Text(
+                                  drill.difficulty.name.toUpperCase(),
+                                  style: theme.textTheme.labelSmall?.copyWith(
+                                    color: _getDifficultyColor(drill.difficulty),
+                                    fontWeight: FontWeight.w600,
+                                    fontSize: 10,
+                                    letterSpacing: 0.5,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
                       ),
-                      child: Text(
-                        'CUSTOM',
-                        style: theme.textTheme.bodySmall?.copyWith(
-                          color: Colors.orange,
-                          fontSize: 8,
-                          fontWeight: FontWeight.bold,
-                        ),
+                      
+                      const SizedBox(height: 12),
+                      
+                      // Stats and tags row
+                      Row(
+                        children: [
+                          _buildCompactStatChip(Icons.timer_outlined, '${drill.durationSec}s', colorScheme.primary),
+                          const SizedBox(width: 8),
+                          _buildCompactStatChip(Icons.repeat_rounded, '${drill.reps}x', Colors.orange),
+                          const SizedBox(width: 8),
+                          _buildCompactStatChip(Icons.pause_circle_outline, '${drill.restSec}s', Colors.grey),
+                          const Spacer(),
+                          if (drill.sharedWith.isNotEmpty)
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                              decoration: BoxDecoration(
+                                color: Colors.blue.withOpacity(0.1),
+                                borderRadius: BorderRadius.circular(4),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(Icons.people_outline, color: Colors.blue, size: 10),
+                                  const SizedBox(width: 2),
+                                  Text(
+                                    'SHARED',
+                                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                      color: Colors.blue,
+                                      fontSize: 8,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          if (drill.sharedWith.isNotEmpty && !drill.isPreset)
+                            const SizedBox(width: 6),
+                          if (!drill.isPreset)
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                              decoration: BoxDecoration(
+                                color: Colors.orange.withOpacity(0.1),
+                                borderRadius: BorderRadius.circular(4),
+                              ),
+                              child: Text(
+                                'CUSTOM',
+                                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                  color: Colors.orange,
+                                  fontSize: 8,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ),
+                        ],
                       ),
-                    ),
+                    ],
                   ),
+                ),
               ],
             ),
-            const SizedBox(height: 4),
-            Text(
-              '${drill.category.toUpperCase()} • ${drill.difficulty.name.toUpperCase()}',
-              style: theme.textTheme.bodySmall?.copyWith(
-                color: colorScheme.primary,
-                fontWeight: FontWeight.w500,
-              ),
-            ),
-            const SizedBox(height: 8),
-            Row(
-              children: [
-                _buildInfoChip(Icons.timer, '${drill.durationSec}s'),
-                const SizedBox(width: 8),
-                _buildInfoChip(Icons.repeat, '${drill.reps}x'),
-                const SizedBox(width: 8),
-                _buildInfoChip(Icons.pause, '${drill.restSec}s rest'),
-              ],
-            ),
-          ],
+          ),
         ),
       ),
     );

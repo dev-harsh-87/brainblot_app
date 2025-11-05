@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:brainblot_app/core/error/app_error.dart';
+import 'package:spark_app/core/error/app_error.dart';
 
 /// Reusable error widget for consistent error display
 class AppErrorWidget extends StatelessWidget {

@@ -4,8 +4,8 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 
-import 'package:brainblot_app/features/drills/data/session_repository.dart';
-import 'package:brainblot_app/features/drills/domain/session_result.dart';
+import 'package:spark_app/features/drills/data/session_repository.dart';
+import 'package:spark_app/features/drills/domain/session_result.dart';
 
 class HiveSessionRepository implements SessionRepository {
   final Box<dynamic> _box = Hive.box('sessions');

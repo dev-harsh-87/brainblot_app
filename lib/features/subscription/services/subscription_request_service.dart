@@ -1,8 +1,8 @@
 import "package:cloud_firestore/cloud_firestore.dart";
 import "package:firebase_auth/firebase_auth.dart";
-import "package:brainblot_app/features/subscription/domain/subscription_request.dart";
-import "package:brainblot_app/core/di/injection.dart";
-import "package:brainblot_app/core/auth/services/session_management_service.dart";
+import "package:spark_app/features/subscription/domain/subscription_request.dart";
+import "package:spark_app/core/di/injection.dart";
+import "package:spark_app/core/auth/services/session_management_service.dart";
 
 /// Service for managing subscription upgrade requests
 class SubscriptionRequestService {

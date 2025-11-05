@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:brainblot_app/core/auth/models/app_user.dart';
-import 'package:brainblot_app/core/auth/models/user_role.dart';
-import 'package:brainblot_app/core/auth/services/user_management_service.dart';
-import 'package:brainblot_app/core/theme/app_theme.dart';
+import 'package:spark_app/core/auth/models/app_user.dart';
+import 'package:spark_app/core/auth/models/user_role.dart';
+import 'package:spark_app/core/auth/services/user_management_service.dart';
+import 'package:spark_app/core/theme/app_theme.dart';
 import 'package:get_it/get_it.dart';
 
 class UserManagementScreen extends StatefulWidget {

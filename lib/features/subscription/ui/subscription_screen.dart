@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:brainblot_app/features/subscription/domain/subscription_plan.dart';
-import 'package:brainblot_app/core/auth/models/app_user.dart';
-import 'package:brainblot_app/features/subscription/services/subscription_request_service.dart';
-import 'package:brainblot_app/features/subscription/domain/subscription_request.dart';
+import 'package:spark_app/features/subscription/domain/subscription_plan.dart';
+import 'package:spark_app/core/auth/models/app_user.dart';
+import 'package:spark_app/features/subscription/services/subscription_request_service.dart';
+import 'package:spark_app/features/subscription/domain/subscription_request.dart';
 
 class SubscriptionScreen extends StatefulWidget {
   const SubscriptionScreen({super.key});

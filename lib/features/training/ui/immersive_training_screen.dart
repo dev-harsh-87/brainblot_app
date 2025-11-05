@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:brainblot_app/core/ui/edge_to_edge.dart';
+import 'package:spark_app/core/ui/edge_to_edge.dart';
 
 /// Immersive training screen with full edge-to-edge experience
 class ImmersiveTrainingScreen extends StatefulWidget {

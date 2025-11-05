@@ -1,5 +1,5 @@
 import 'dart:async';
-import 'package:brainblot_app/features/drills/domain/drill.dart';
+import 'package:spark_app/features/drills/domain/drill.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:uuid/uuid.dart';

@@ -1,15 +1,15 @@
-import 'package:brainblot_app/core/services/auto_refresh_service.dart';
+import 'package:spark_app/core/services/auto_refresh_service.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 
-import 'package:brainblot_app/core/di/injection.dart';
-import 'package:brainblot_app/features/auth/bloc/auth_bloc.dart';
-import 'package:brainblot_app/features/settings/bloc/settings_bloc.dart';
-import 'package:brainblot_app/features/settings/data/settings_repository.dart';
-import 'package:brainblot_app/features/profile/services/profile_service.dart';
-import 'package:brainblot_app/core/ui/edge_to_edge.dart';
+import 'package:spark_app/core/di/injection.dart';
+import 'package:spark_app/features/auth/bloc/auth_bloc.dart';
+import 'package:spark_app/features/settings/bloc/settings_bloc.dart';
+import 'package:spark_app/features/settings/data/settings_repository.dart';
+import 'package:spark_app/features/profile/services/profile_service.dart';
+import 'package:spark_app/core/ui/edge_to_edge.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
@@ -344,7 +344,7 @@ class _SettingsScreenState extends State<SettingsScreen> with AutoRefreshMixin {
         _buildActionSetting(
           context,
           'Rate App',
-          'Rate BrainBlot on the App Store',
+          'Rate Spark on the App Store',
           Icons.star_rounded,
           () => _rateApp(),
         ),
@@ -987,7 +987,7 @@ class _SettingsScreenState extends State<SettingsScreen> with AutoRefreshMixin {
   void _showLicenses() {
     showLicensePage(
       context: context,
-      applicationName: 'BrainBlot',
+      applicationName: 'Spark',
       applicationVersion: '1.0.0',
     );
   }

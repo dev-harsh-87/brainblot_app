@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:brainblot_app/features/programs/services/program_progress_service.dart';
-import 'package:brainblot_app/core/di/injection.dart';
+import 'package:spark_app/features/programs/services/program_progress_service.dart';
+import 'package:spark_app/core/di/injection.dart';
 
 class ProgramStatsScreen extends StatefulWidget {
   const ProgramStatsScreen({super.key});

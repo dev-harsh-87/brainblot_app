@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:uuid/uuid.dart';
-import 'package:brainblot_app/core/di/injection.dart';
-import 'package:brainblot_app/features/drills/domain/drill.dart';
-import 'package:brainblot_app/features/drills/services/drill_creation_service.dart';
+import 'package:spark_app/core/di/injection.dart';
+import 'package:spark_app/features/drills/domain/drill.dart';
+import 'package:spark_app/features/drills/services/drill_creation_service.dart';
 
 class DrillBuilderScreen extends StatefulWidget {
   final Drill? initial;
@@ -130,12 +130,7 @@ class _DrillBuilderScreenState extends State<DrillBuilderScreen>
               opacity: _fadeAnimation,
               child: PageView(
                 controller: _pageController,
-                onPageChanged: (index) {
-                  setState(() {
-                    _currentStep = index;
-                  });
-                  HapticFeedback.lightImpact();
-                },
+                physics: const NeverScrollableScrollPhysics(),
                 children: [
                   _buildBasicInfoStep(),
                   _buildConfigurationStep(),
@@ -155,19 +150,46 @@ class _DrillBuilderScreenState extends State<DrillBuilderScreen>
 
   PreferredSizeWidget _buildAppBar(BuildContext context) {
     final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
     
     return AppBar(
+      elevation: 0,
+      backgroundColor: colorScheme.primary,
+      foregroundColor: colorScheme.onPrimary,
       title: Text(
         widget.initial == null ? 'Create Drill' : 'Edit Drill',
-        style: const TextStyle(fontWeight: FontWeight.w600),
+        style: theme.textTheme.headlineSmall?.copyWith(
+          color: colorScheme.onPrimary,
+          fontWeight: FontWeight.w700,
+          letterSpacing: 0.5,
+        ),
       ),
-      backgroundColor: theme.colorScheme.surface,
-      elevation: 0,
+      centerTitle: true,
+      flexibleSpace: Container(
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [
+              colorScheme.primary,
+              colorScheme.primary.withOpacity(0.9),
+              colorScheme.secondary.withOpacity(0.8),
+            ],
+          ),
+        ),
+      ),
       actions: [
         TextButton(
           onPressed: () => Navigator.of(context).pop(),
-          child: const Text('Cancel'),
+          child: Text(
+            'Cancel',
+            style: TextStyle(
+              color: colorScheme.onPrimary,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
         ),
+        const SizedBox(width: 8),
       ],
     );
   }
@@ -370,7 +392,7 @@ class _DrillBuilderScreenState extends State<DrillBuilderScreen>
         HapticFeedback.lightImpact();
       },
       child: Container(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
           color: isSelected 
               ? getDifficultyColor().withOpacity(0.1)
@@ -393,7 +415,7 @@ class _DrillBuilderScreenState extends State<DrillBuilderScreen>
             const SizedBox(height: 8),
             Text(
               difficulty.name.toUpperCase(),
-              style: theme.textTheme.bodySmall?.copyWith(
+              style: theme.textTheme.labelSmall?.copyWith(
                 fontWeight: FontWeight.w600,
                 color: isSelected ? getDifficultyColor() : colorScheme.onSurface,
               ),
@@ -468,19 +490,42 @@ class _DrillBuilderScreenState extends State<DrillBuilderScreen>
 
   void _nextStep() {
     if (_currentStep < _totalSteps - 1) {
+      // Validate current step before proceeding
+      final stepErrors = _getStepValidationErrors(_currentStep);
+      if (stepErrors.isNotEmpty) {
+        // Show validation errors
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Please fix the following: ${stepErrors.join(', ')}'),
+            backgroundColor: Colors.red,
+            duration: const Duration(seconds: 4),
+          ),
+        );
+        HapticFeedback.heavyImpact();
+        return;
+      }
+      
+      setState(() {
+        _currentStep++;
+      });
       _pageController.nextPage(
         duration: const Duration(milliseconds: 300),
         curve: Curves.easeInOut,
       );
+      HapticFeedback.lightImpact();
     }
   }
 
   void _previousStep() {
     if (_currentStep > 0) {
+      setState(() {
+        _currentStep--;
+      });
       _pageController.previousPage(
         duration: const Duration(milliseconds: 300),
         curve: Curves.easeInOut,
       );
+      HapticFeedback.lightImpact();
     }
   }
 
@@ -1186,6 +1231,50 @@ class _DrillBuilderScreenState extends State<DrillBuilderScreen>
     
     if (_selectedColors.length < 2) {
       errors.add('Please select at least 2 colors');
+    }
+    
+    return errors;
+  }
+
+  List<String> _getStepValidationErrors(int step) {
+    final errors = <String>[];
+    
+    switch (step) {
+      case 0: // Basic Information
+        if (_name.text.trim().isEmpty) {
+          errors.add('Drill name is required');
+        }
+        if (_name.text.trim().length < 3) {
+          errors.add('Drill name must be at least 3 characters');
+        }
+        break;
+        
+      case 1: // Configuration
+        if (_duration < 60) {
+          errors.add('Duration must be at least 60 seconds');
+        }
+        if (_reps < 1) {
+          errors.add('Repetitions must be at least 1');
+        }
+        if (_rest < 0) {
+          errors.add('Rest time cannot be negative');
+        }
+        break;
+        
+      case 2: // Stimulus & Zones
+        if (_stimuli.isEmpty) {
+          errors.add('Select at least one stimulus type');
+        }
+        if (_zones.isEmpty) {
+          errors.add('Select at least one reaction zone');
+        }
+        if (_stimuli.contains(StimulusType.color) && _selectedColors.length < 2) {
+          errors.add('Select at least 2 colors for color stimulus');
+        }
+        break;
+        
+      case 3: // Review - no additional validation needed
+        break;
     }
     
     return errors;

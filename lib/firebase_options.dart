@@ -64,6 +64,6 @@ class DefaultFirebaseOptions {
     projectId: 'brain-app-18086',
     storageBucket: 'brain-app-18086.firebasestorage.app',
     iosClientId: '419204986983-rl9cel8fkecnpjc146t0vtnsekie26f0.apps.googleusercontent.com',
-    iosBundleId: 'com.tbg.brainblotApp',
+    iosBundleId: 'com.tbg.sparkApp',
   );
 }

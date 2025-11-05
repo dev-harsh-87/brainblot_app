@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:brainblot_app/core/services/auto_refresh_service.dart';
+import 'package:spark_app/core/services/auto_refresh_service.dart';
 
 /// Wrapper widget that automatically refreshes BLoC events when data changes
 class AutoRefreshWrapper<B extends BlocBase<S>, S> extends StatefulWidget {

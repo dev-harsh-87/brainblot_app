@@ -5,18 +5,18 @@ import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
-import 'package:brainblot_app/core/di/injection.dart';
-import 'package:brainblot_app/features/auth/bloc/auth_bloc.dart';
-import 'package:brainblot_app/features/settings/bloc/settings_bloc.dart';
-import 'package:brainblot_app/core/auth/services/session_management_service.dart';
-import 'package:brainblot_app/features/settings/data/settings_repository.dart';
-import 'package:brainblot_app/features/stats/bloc/stats_bloc.dart';
-import 'package:brainblot_app/features/drills/domain/session_result.dart';
-import 'package:brainblot_app/features/profile/services/profile_service.dart';
-import 'package:brainblot_app/features/sharing/domain/user_profile.dart';
-import 'package:brainblot_app/features/settings/ui/settings_screen.dart';
-import 'package:brainblot_app/core/ui/edge_to_edge.dart';
-import 'package:brainblot_app/core/services/auto_refresh_service.dart';
+import 'package:spark_app/core/di/injection.dart';
+import 'package:spark_app/features/auth/bloc/auth_bloc.dart';
+import 'package:spark_app/features/settings/bloc/settings_bloc.dart';
+import 'package:spark_app/core/auth/services/session_management_service.dart';
+import 'package:spark_app/features/settings/data/settings_repository.dart';
+import 'package:spark_app/features/stats/bloc/stats_bloc.dart';
+import 'package:spark_app/features/drills/domain/session_result.dart';
+import 'package:spark_app/features/profile/services/profile_service.dart';
+import 'package:spark_app/features/sharing/domain/user_profile.dart';
+import 'package:spark_app/features/settings/ui/settings_screen.dart';
+import 'package:spark_app/core/ui/edge_to_edge.dart';
+import 'package:spark_app/core/services/auto_refresh_service.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -145,14 +145,7 @@ class _ProfileScreenState extends State<ProfileScreen> with AutoRefreshMixin {
           onSelected: (value) {
             switch (value) {
               case 'settings':
-                Navigator.of(context).push(
-                  MaterialPageRoute(
-                    builder: (context) => BlocProvider.value(
-                      value: context.read<SettingsBloc>(),
-                      child: const SettingsScreen(),
-                    ),
-                  ),
-                );
+                context.go('/settings');
                 break;
               case 'change_password':
                 _showChangePasswordDialog();

@@ -1,5 +1,5 @@
-import 'package:brainblot_app/features/drills/domain/session_result.dart';
-import 'package:brainblot_app/features/drills/domain/drill.dart';
+import 'package:spark_app/features/drills/domain/session_result.dart';
+import 'package:spark_app/features/drills/domain/drill.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -635,7 +635,7 @@ class _DrillResultsScreenState extends State<DrillResultsScreen>
       final duration = (widget.result.durationMs / 1000).toStringAsFixed(0);
       
       final shareText = '''
-🧠 BrainBlot Drill Results 🧠
+🧠 Spark Drill Results 🧠
 
 📋 Drill: ${drill.name}
 🎯 Category: ${drill.category.toUpperCase()}
@@ -649,17 +649,17 @@ class _DrillResultsScreenState extends State<DrillResultsScreen>
 
 ${_getPerformanceEmoji(widget.result.accuracy)} ${_getPerformanceMessage(widget.result.accuracy)}
 
-#BrainBlot #ReactionTraining #CognitiveTraining
+#Spark #ReactionTraining #CognitiveTraining
       '''.trim();
 
       await Share.share(
         shareText,
-        subject: 'My BrainBlot Drill Results - ${drill.name}',
+        subject: 'My Spark Drill Results - ${drill.name}',
       );
     } catch (e) {
       // Fallback to clipboard if sharing fails
       await Clipboard.setData(ClipboardData(
-        text: 'BrainBlot Drill Results: ${widget.result.drill.name} - Accuracy: ${(widget.result.accuracy * 100).toStringAsFixed(1)}%'
+        text: 'Spark Drill Results: ${widget.result.drill.name} - Accuracy: ${(widget.result.accuracy * 100).toStringAsFixed(1)}%'
       ));
       
       if (mounted) {

@@ -3,19 +3,19 @@ import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 
-import 'package:brainblot_app/core/di/injection.dart';
-import 'package:brainblot_app/features/programs/bloc/programs_bloc.dart';
-import 'package:brainblot_app/features/programs/domain/program.dart';
-import 'package:brainblot_app/features/programs/services/drill_assignment_service.dart';
-import 'package:brainblot_app/features/programs/services/program_progress_service.dart';
-import 'package:brainblot_app/features/programs/ui/program_creation_dialog.dart';
-import 'package:brainblot_app/features/programs/ui/program_day_screen.dart';
-import 'package:brainblot_app/features/sharing/services/sharing_service.dart';
-import 'package:brainblot_app/features/sharing/ui/privacy_control_widget.dart';
-import 'package:brainblot_app/features/sharing/ui/sharing_screen.dart';
-import 'package:brainblot_app/core/services/auto_refresh_service.dart';
-import 'package:brainblot_app/core/widgets/confirmation_dialog.dart';
-import 'package:brainblot_app/core/ui/edge_to_edge.dart';
+import 'package:spark_app/core/di/injection.dart';
+import 'package:spark_app/features/programs/bloc/programs_bloc.dart';
+import 'package:spark_app/features/programs/domain/program.dart';
+import 'package:spark_app/features/programs/services/drill_assignment_service.dart';
+import 'package:spark_app/features/programs/services/program_progress_service.dart';
+import 'package:spark_app/features/programs/ui/program_creation_dialog.dart';
+import 'package:spark_app/features/programs/ui/program_day_screen.dart';
+import 'package:spark_app/features/sharing/services/sharing_service.dart';
+import 'package:spark_app/features/sharing/ui/privacy_control_widget.dart';
+import 'package:spark_app/features/sharing/ui/sharing_screen.dart';
+import 'package:spark_app/core/services/auto_refresh_service.dart';
+import 'package:spark_app/core/widgets/confirmation_dialog.dart';
+import 'package:spark_app/core/ui/edge_to_edge.dart';
 
 class ProgramsScreen extends StatefulWidget {
   const ProgramsScreen({super.key});
@@ -83,149 +83,66 @@ class _ProgramsScreenState extends State<ProgramsScreen>
       backgroundColor: colorScheme.surface,
       appBar: _buildAppBar(context),
       extendBodyBehindAppBar: false,
-      body: NestedScrollView(
-        headerSliverBuilder: (context, innerBoxIsScrolled) => [
-          SliverAppBar(
-            expandedHeight: 280,
-            floating: false,
-            pinned: true,
-            backgroundColor: colorScheme.surface,
-            foregroundColor: colorScheme.onSurface,
-            flexibleSpace: FlexibleSpaceBar(
-              background: Container(
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    colors: [
-                      colorScheme.primaryContainer,
-                      colorScheme.secondaryContainer,
+      body: Column(
+        children: [
+          // Search and Filter Section
+          _buildSearchAndFilterSection(context),
+          // Program Content
+          Expanded(
+            child: BlocListener<ProgramsBloc, ProgramsState>(
+              listener: (context, state) {
+                if (state.status == ProgramsStatus.error && state.errorMessage != null) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text(state.errorMessage!),
+                      backgroundColor: Colors.red,
+                    ),
+                  );
+                }
+              },
+              child: BlocBuilder<ProgramsBloc, ProgramsState>(
+                builder: (context, state) {
+                  if (state.status == ProgramsStatus.loading) {
+                    return _buildLoadingState();
+                  }
+                  
+                  if (state.status == ProgramsStatus.error) {
+                    return _buildErrorState(state.errorMessage ?? 'Unknown error occurred');
+                  }
+
+                  return Stack(
+                    children: [
+                      TabBarView(
+                        controller: _tabController,
+                        children: [
+                          _buildActiveTabWithRefresh(state),
+                          _buildBrowseTabWithRefresh(state),
+                          _buildCompletedTabWithRefresh(state),
+                        ],
+                      ),
+                      // Show refreshing indicator
+                      if (state.isRefreshing)
+                        Positioned(
+                          top: 0,
+                          left: 0,
+                          right: 0,
+                          child: Container(
+                            height: 4,
+                            child: LinearProgressIndicator(
+                              backgroundColor: Colors.transparent,
+                              valueColor: AlwaysStoppedAnimation<Color>(
+                                colorScheme.primary,
+                              ),
+                            ),
+                          ),
+                        ),
                     ],
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                  ),
-                ),
-                child: Stack(
-                  children: [
-                    Positioned(
-                      right: -30,
-                      top: -30,
-                      child: Container(
-                        width: 150,
-                        height: 150,
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          color: colorScheme.primary.withOpacity(0.1),
-                        ),
-                      ),
-                    ),
-                    Positioned(
-                      left: -50,
-                      bottom: -50,
-                      child: Container(
-                        width: 200,
-                        height: 200,
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          color: colorScheme.secondary.withOpacity(0.1),
-                        ),
-                      ),
-                    ),
-                    Positioned(
-                      top: 100,
-                      right: 20,
-                      child: FadeTransition(
-                        opacity: _headerAnimation,
-                        child: Icon(
-                          Icons.psychology,
-                          size: 80,
-                          color: colorScheme.primary.withOpacity(0.3),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-            bottom: PreferredSize(
-              preferredSize: const Size.fromHeight(60),
-              child: Container(
-                padding: const EdgeInsets.all(16),
-                child: TabBar(
-                  controller: _tabController,
-                  labelColor: colorScheme.primary,
-                  unselectedLabelColor: colorScheme.onSurface.withOpacity(0.6),
-                  indicatorColor: colorScheme.primary,
-                  indicatorWeight: 3,
-                  tabs: const [
-                    Tab(text: 'Active'),
-                    Tab(text: 'Browse'),
-                    Tab(text: 'Completed'),
-                  ],
-                ),
+                  );
+                },
               ),
             ),
           ),
         ],
-        body: BlocListener<ProgramsBloc, ProgramsState>(
-          listener: (context, state) {
-            if (state.status == ProgramsStatus.error && state.errorMessage != null) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text(state.errorMessage!),
-                  backgroundColor: Colors.red,
-                ),
-              );
-            }
-          },
-          child: BlocBuilder<ProgramsBloc, ProgramsState>(
-            builder: (context, state) {
-              if (state.status == ProgramsStatus.loading) {
-                return _buildLoadingState();
-              }
-              
-              if (state.status == ProgramsStatus.error) {
-                return _buildErrorState(state.errorMessage ?? 'Unknown error occurred');
-              }
-
-              return Column(
-                children: [
-                  // Filter Bar
-                  _buildFilterBar(state.programs),
-                  // Tab Content
-                  Expanded(
-                    child: Stack(
-                      children: [
-                        TabBarView(
-                          controller: _tabController,
-                          children: [
-                            _buildActiveTabWithRefresh(state),
-                            _buildBrowseTabWithRefresh(state),
-                            _buildCompletedTabWithRefresh(state),
-                          ],
-                        ),
-                        // Show refreshing indicator
-                        if (state.isRefreshing)
-                          Positioned(
-                            top: 0,
-                            left: 0,
-                            right: 0,
-                            child: Container(
-                              height: 4,
-                              child: LinearProgressIndicator(
-                                backgroundColor: Colors.transparent,
-                                valueColor: AlwaysStoppedAnimation<Color>(
-                                  colorScheme.primary,
-                                ),
-                              ),
-                            ),
-                          ),
-                      ],
-                    ),
-                  ),
-                ],
-              );
-            },
-          ),
-        ),
       ),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () {
@@ -370,133 +287,186 @@ class _ProgramsScreenState extends State<ProgramsScreen>
     );
   }
 
-  Widget _buildFilterBar(List<Program> programs) {
-    final categories = programs.map((p) => p.category).toSet().toList()..sort();
-    final levels = programs.map((p) => p.level).toSet().toList()..sort();
-    final filteredPrograms = _applyFilters(programs);
-    
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.surfaceContainerHighest.withOpacity(0.3),
-        border: Border(
-          bottom: BorderSide(
-            color: Theme.of(context).colorScheme.outline.withOpacity(0.1),
-          ),
-        ),
-      ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Row(
-            children: [
-              Expanded(
-                child: SingleChildScrollView(
-                  scrollDirection: Axis.horizontal,
-                  child: Row(
-                    children: [
-                      _buildFilterChip(
-                        'Category', 
-                        _selectedCategory.isEmpty ? 'All' : _formatCategoryName(_selectedCategory), 
-                        () => _showCategoryFilter(categories),
-                        isActive: _selectedCategory.isNotEmpty,
-                      ),
-                      const SizedBox(width: 8),
-                      _buildFilterChip(
-                        'Level', 
-                        _selectedLevel.isEmpty ? 'All' : _selectedLevel, 
-                        () => _showLevelFilter(levels),
-                        isActive: _selectedLevel.isNotEmpty,
-                      ),
-                      const SizedBox(width: 8),
-                      if (_selectedCategory.isNotEmpty || _selectedLevel.isNotEmpty)
-                        _buildClearFiltersButton(),
-                    ],
-                  ),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 8),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(
-                'Showing ${filteredPrograms.length} of ${programs.length} programs',
-                style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6),
-                ),
-              ),
-              if (_selectedCategory.isNotEmpty || _selectedLevel.isNotEmpty)
-                Text(
-                  'Filtered',
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: Theme.of(context).colorScheme.primary,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildFilterChip(String label, String value, VoidCallback onTap, {bool isActive = false}) {
+  Widget _buildSearchAndFilterSection(BuildContext context) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
-    
-    return GestureDetector(
-      onTap: onTap,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 200),
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-        decoration: BoxDecoration(
-          color: isActive 
-              ? colorScheme.primaryContainer 
-              : colorScheme.surfaceContainerHighest,
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(
-            color: isActive 
-                ? colorScheme.primary 
-                : colorScheme.outline.withOpacity(0.3),
-            width: isActive ? 1.5 : 1,
+
+    return Container(
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            colorScheme.primaryContainer.withOpacity(0.3),
+            colorScheme.secondaryContainer.withOpacity(0.2),
+          ],
+        ),
+        border: Border(
+          bottom: BorderSide(
+            color: colorScheme.outline.withOpacity(0.1),
+            width: 1,
           ),
         ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
           children: [
-            if (isActive)
-              Padding(
-                padding: const EdgeInsets.only(right: 4),
-                child: Icon(
-                  Icons.filter_alt,
-                  size: 14,
-                  color: colorScheme.primary,
-                ),
+            // Filter Tabs
+            Container(
+              decoration: BoxDecoration(
+                color: colorScheme.surface,
+                borderRadius: BorderRadius.circular(12),
+                boxShadow: [
+                  BoxShadow(
+                    color: colorScheme.shadow.withOpacity(0.04),
+                    blurRadius: 8,
+                    offset: const Offset(0, 2),
+                    spreadRadius: 0,
+                  ),
+                ],
               ),
-            Text(
-              '$label: $value',
-              style: theme.textTheme.bodySmall?.copyWith(
-                color: isActive 
-                    ? colorScheme.onPrimaryContainer 
-                    : colorScheme.onSurface,
-                fontWeight: isActive ? FontWeight.w600 : FontWeight.w500,
+              child: TabBar(
+                controller: _tabController,
+                labelColor: colorScheme.primary,
+                unselectedLabelColor: colorScheme.onSurface.withOpacity(0.6),
+                indicatorColor: colorScheme.primary,
+                indicatorWeight: 3,
+                indicatorSize: TabBarIndicatorSize.tab,
+                dividerColor: Colors.transparent,
+                tabs: const [
+                  Tab(text: 'Active'),
+                  Tab(text: 'Browse'),
+                  Tab(text: 'Completed'),
+                ],
               ),
             ),
-            const SizedBox(width: 4),
-            Icon(
-              Icons.keyboard_arrow_down, 
-              size: 16, 
-              color: isActive 
-                  ? colorScheme.onPrimaryContainer 
-                  : colorScheme.onSurface,
+            const SizedBox(height: 16),
+            
+            // Filter Chips
+            BlocBuilder<ProgramsBloc, ProgramsState>(
+              builder: (context, state) {
+                final categories = state.programs.map((p) => p.category).toSet().toList()..sort();
+                final levels = state.programs.map((p) => p.level).toSet().toList()..sort();
+                final filteredPrograms = _applyFilters(state.programs);
+                
+                return Column(
+                  children: [
+                    SingleChildScrollView(
+                      scrollDirection: Axis.horizontal,
+                      child: Row(
+                        children: [
+                          _buildEnhancedFilterChip('Category', _selectedCategory.isEmpty ? 'All' : _formatCategoryName(_selectedCategory), () => _showCategoryFilter(categories)),
+                          const SizedBox(width: 8),
+                          _buildEnhancedFilterChip('Level', _selectedLevel.isEmpty ? 'All' : _selectedLevel, () => _showLevelFilter(levels)),
+                          const SizedBox(width: 8),
+                          if (_selectedCategory.isNotEmpty || _selectedLevel.isNotEmpty)
+                            _buildClearFiltersButton(),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(
+                          'Showing ${filteredPrograms.length} of ${state.programs.length} programs',
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color: colorScheme.onSurface.withOpacity(0.6),
+                          ),
+                        ),
+                        if (_selectedCategory.isNotEmpty || _selectedLevel.isNotEmpty)
+                          Text(
+                            'Filtered',
+                            style: theme.textTheme.bodySmall?.copyWith(
+                              color: colorScheme.primary,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                      ],
+                    ),
+                  ],
+                );
+              },
             ),
           ],
         ),
       ),
     );
   }
+
+  Widget _buildEnhancedFilterChip(String label, String value, VoidCallback onTap) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final isActive = (label == 'Category' && _selectedCategory.isNotEmpty) ||
+                     (label == 'Level' && _selectedLevel.isNotEmpty);
+
+    return GestureDetector(
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+        decoration: BoxDecoration(
+          gradient: isActive
+              ? LinearGradient(
+                  colors: [
+                    colorScheme.primary.withOpacity(0.15),
+                    colorScheme.primary.withOpacity(0.05),
+                  ],
+                )
+              : null,
+          color: isActive ? null : colorScheme.surface,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(
+            color: isActive
+                ? colorScheme.primary.withOpacity(0.3)
+                : colorScheme.outline.withOpacity(0.2),
+            width: isActive ? 1.5 : 1,
+          ),
+          boxShadow: isActive ? [
+            BoxShadow(
+              color: colorScheme.primary.withOpacity(0.1),
+              blurRadius: 8,
+              offset: const Offset(0, 2),
+              spreadRadius: 0,
+            ),
+          ] : null,
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (isActive)
+              Padding(
+                padding: const EdgeInsets.only(right: 6),
+                child: Icon(
+                  Icons.filter_alt,
+                  size: 16,
+                  color: colorScheme.primary,
+                ),
+              ),
+            Text(
+              '$label: $value',
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: isActive
+                    ? colorScheme.primary
+                    : colorScheme.onSurface,
+                fontWeight: isActive ? FontWeight.w600 : FontWeight.w500,
+              ),
+            ),
+            const SizedBox(width: 4),
+            Icon(
+              Icons.keyboard_arrow_down,
+              size: 16,
+              color: isActive
+                  ? colorScheme.primary
+                  : colorScheme.onSurface.withOpacity(0.6),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   
   Widget _buildClearFiltersButton() {
     final theme = Theme.of(context);

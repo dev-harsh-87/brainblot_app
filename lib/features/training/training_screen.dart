@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:wakelock_plus/wakelock_plus.dart';
 import 'package:screen_brightness/screen_brightness.dart';
-import 'package:brainblot_app/core/di/injection.dart';
-import 'package:brainblot_app/features/drills/data/drill_repository.dart';
-import 'package:brainblot_app/features/drills/domain/drill.dart';
+import 'package:spark_app/core/di/injection.dart';
+import 'package:spark_app/features/drills/data/drill_repository.dart';
+import 'package:spark_app/features/drills/domain/drill.dart';
 import 'package:go_router/go_router.dart';
 
 class TrainingScreen extends StatefulWidget {

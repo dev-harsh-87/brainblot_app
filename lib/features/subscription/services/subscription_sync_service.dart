@@ -1,6 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:brainblot_app/features/subscription/domain/subscription_plan.dart';
-import 'package:brainblot_app/features/subscription/data/subscription_plan_repository.dart';
+import 'package:spark_app/features/subscription/domain/subscription_plan.dart';
+import 'package:spark_app/features/subscription/data/subscription_plan_repository.dart';
 import 'dart:async';
 
 /// Automatic subscription synchronization service

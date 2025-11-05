@@ -1,11 +1,11 @@
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:equatable/equatable.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:brainblot_app/features/auth/data/auth_repository.dart';
-import 'package:brainblot_app/features/auth/data/firebase_user_repository.dart';
-import 'package:brainblot_app/core/services/preferences_service.dart';
-import 'package:brainblot_app/core/auth/services/session_management_service.dart';
-import 'package:brainblot_app/core/di/injection.dart';
+import 'package:spark_app/features/auth/data/auth_repository.dart';
+import 'package:spark_app/features/auth/data/firebase_user_repository.dart';
+import 'package:spark_app/core/services/preferences_service.dart';
+import 'package:spark_app/core/auth/services/session_management_service.dart';
+import 'package:spark_app/core/di/injection.dart';
 import 'dart:async';
 
 part 'auth_event.dart';

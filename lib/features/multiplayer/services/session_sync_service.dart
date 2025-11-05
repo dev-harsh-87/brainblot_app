@@ -3,11 +3,11 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
-import 'package:brainblot_app/features/drills/domain/drill.dart';
-import 'package:brainblot_app/features/drills/domain/session_result.dart';
-import 'package:brainblot_app/features/multiplayer/domain/connection_session.dart';
-import 'package:brainblot_app/features/multiplayer/domain/sync_message.dart';
-import 'package:brainblot_app/features/multiplayer/services/bluetooth_connection_service.dart';
+import 'package:spark_app/features/drills/domain/drill.dart';
+import 'package:spark_app/features/drills/domain/session_result.dart';
+import 'package:spark_app/features/multiplayer/domain/connection_session.dart';
+import 'package:spark_app/features/multiplayer/domain/sync_message.dart';
+import 'package:spark_app/features/multiplayer/services/bluetooth_connection_service.dart';
 
 /// Service for synchronizing drill sessions across connected devices
 class SessionSyncService {

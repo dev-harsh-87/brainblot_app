@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
-import 'package:brainblot_app/features/subscription/domain/subscription_request.dart';
-import 'package:brainblot_app/features/subscription/services/subscription_request_service.dart';
+import 'package:spark_app/features/subscription/domain/subscription_request.dart';
+import 'package:spark_app/features/subscription/services/subscription_request_service.dart';
 
 /// Screen to view all user subscription requests with tab-based status filtering
 class UserRequestsScreen extends StatefulWidget {

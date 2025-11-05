@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:brainblot_app/core/auth/services/permission_service.dart';
-import 'package:brainblot_app/core/auth/models/user_role.dart';
-import 'package:brainblot_app/core/auth/models/permission.dart';
+import 'package:spark_app/core/auth/services/permission_service.dart';
+import 'package:spark_app/core/auth/models/user_role.dart';
+import 'package:spark_app/core/auth/models/permission.dart';
 
 /// Guard widget for admin-only routes
 class AdminGuard extends StatelessWidget {

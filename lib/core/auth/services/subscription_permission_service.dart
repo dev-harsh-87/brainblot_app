@@ -1,7 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:brainblot_app/features/subscription/domain/subscription_plan.dart';
-import 'package:brainblot_app/core/auth/models/user_role.dart';
+import 'package:spark_app/features/subscription/domain/subscription_plan.dart';
+import 'package:spark_app/core/auth/models/user_role.dart';
 import 'dart:async';
 
 /// Centralized service for subscription-based permission checking

@@ -1,6 +1,6 @@
 import 'dart:async';
-import 'package:brainblot_app/features/drills/data/drill_repository.dart';
-import 'package:brainblot_app/features/drills/domain/drill.dart';
+import 'package:spark_app/features/drills/data/drill_repository.dart';
+import 'package:spark_app/features/drills/domain/drill.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:hive_flutter/hive_flutter.dart';

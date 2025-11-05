@@ -1,7 +1,7 @@
 import "package:flutter/material.dart";
-import "package:brainblot_app/core/auth/services/session_management_service.dart";
-import "package:brainblot_app/core/auth/models/app_user.dart";
-import "package:brainblot_app/core/di/injection.dart";
+import "package:spark_app/core/auth/services/session_management_service.dart";
+import "package:spark_app/core/auth/models/app_user.dart";
+import "package:spark_app/core/di/injection.dart";
 
 /// Widget that guards content based on session permissions
 /// Automatically updates when session changes (login/logout/role changes)

@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
-import 'package:brainblot_app/core/theme/app_theme.dart';
+import 'package:spark_app/core/theme/app_theme.dart';
 
 Widget buildEnhancedAdminSection(BuildContext context) {
   final theme = Theme.of(context);

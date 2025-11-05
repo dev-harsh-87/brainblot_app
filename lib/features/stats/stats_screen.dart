@@ -5,9 +5,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:intl/intl.dart';
 
-import 'package:brainblot_app/core/services/auto_refresh_service.dart';
-import 'package:brainblot_app/features/drills/domain/session_result.dart';
-import 'package:brainblot_app/features/stats/bloc/stats_bloc.dart';
+import 'package:spark_app/core/services/auto_refresh_service.dart';
+import 'package:spark_app/features/drills/domain/session_result.dart';
+import 'package:spark_app/features/stats/bloc/stats_bloc.dart';
 
 class StatsScreen extends StatefulWidget {
   const StatsScreen({super.key});

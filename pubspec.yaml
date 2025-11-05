@@ -1,5 +1,5 @@
-name: brainblot_app
-description: "BrainBlot - Advanced Cognitive Training App for Athletes and Fitness Enthusiasts"
+name: spark_app
+description: "Spark - Advanced Cognitive Training App for Athletes and Fitness Enthusiasts"
 publish_to: 'none'
 
 # The following defines the version and build number for your application.

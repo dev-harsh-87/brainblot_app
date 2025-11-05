@@ -1,7 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:brainblot_app/core/auth/models/app_user.dart';
-import 'package:brainblot_app/core/auth/models/user_role.dart';
+import 'package:spark_app/core/auth/models/app_user.dart';
+import 'package:spark_app/core/auth/models/user_role.dart';
 import 'package:firebase_core/firebase_core.dart';
 
 /// Service for comprehensive user management including Firebase Auth and Firestore

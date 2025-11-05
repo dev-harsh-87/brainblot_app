@@ -1,6 +1,6 @@
 import 'dart:async';
 import 'dart:collection';
-import 'package:brainblot_app/features/programs/domain/program.dart';
+import 'package:spark_app/features/programs/domain/program.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:uuid/uuid.dart';
 

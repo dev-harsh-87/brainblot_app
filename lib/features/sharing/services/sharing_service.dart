@@ -1,7 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:brainblot_app/features/sharing/domain/user_profile.dart';
-import 'package:brainblot_app/core/services/auto_refresh_service.dart';
+import 'package:spark_app/features/sharing/domain/user_profile.dart';
+import 'package:spark_app/core/services/auto_refresh_service.dart';
 import 'package:uuid/uuid.dart';
 import 'package:url_launcher/url_launcher.dart';
 
@@ -482,7 +482,7 @@ class SharingService {
       try {
         await _launchEmail(
           email: email,
-          subject: '$senderName shared a ${itemType} with you on BrainBlot',
+          subject: '$senderName shared a ${itemType} with you on Spark',
           body: emailContent,
         );
       } catch (emailError) {
@@ -533,13 +533,13 @@ Or visit our website: https://brainblot.app/shared/$itemType/$itemId
     return '''
 Hi there! 👋
 
-$senderName has shared an amazing $actionText with you on BrainBlot!
+$senderName has shared an amazing $actionText with you on Spark!
 
 $itemEmoji $itemName
 
 ${personalMessage != null ? '\n💬 Personal message:\n"$personalMessage"\n' : ''}
 
-🚀 BrainBlot is the ultimate brain training app that helps improve your reaction time, focus, and cognitive performance through fun, interactive drills and structured training programs.
+🚀 Spark is the ultimate brain training app that helps improve your reaction time, focus, and cognitive performance through fun, interactive drills and structured training programs.
 
 ✨ What you'll get:
 • Personalized training programs
@@ -548,14 +548,14 @@ ${personalMessage != null ? '\n💬 Personal message:\n"$personalMessage"\n' : '
 • Social features to train with friends
 • Hundreds of cognitive training drills
 
-📱 Download BrainBlot now to access this shared content:
+📱 Download Spark now to access this shared content:
 
 $downloadLink
 
 Start your brain training journey today! 🧠💪
 
 ---
-The BrainBlot Team
+The Spark Team
 Making minds sharper, one drill at a time.
 ''';
   }

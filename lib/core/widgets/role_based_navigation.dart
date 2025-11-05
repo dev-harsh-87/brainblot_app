@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
-import 'package:brainblot_app/core/theme/app_theme.dart';
-import 'package:brainblot_app/core/auth/models/app_user.dart';
-import 'package:brainblot_app/core/auth/models/user_role.dart';
+import 'package:spark_app/core/theme/app_theme.dart';
+import 'package:spark_app/core/auth/models/app_user.dart';
+import 'package:spark_app/core/auth/models/user_role.dart';
 
 /// Role-based navigation widget that adapts based on user permissions
 class RoleBasedNavigation extends StatelessWidget {

@@ -1,10 +1,10 @@
 import 'dart:async';
 import 'package:equatable/equatable.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:brainblot_app/features/drills/data/drill_repository.dart';
-import 'package:brainblot_app/features/drills/data/firebase_drill_repository.dart';
-import 'package:brainblot_app/features/drills/domain/drill.dart';
-import 'package:brainblot_app/core/bloc/bloc_utils.dart';
+import 'package:spark_app/features/drills/data/drill_repository.dart';
+import 'package:spark_app/features/drills/data/firebase_drill_repository.dart';
+import 'package:spark_app/features/drills/domain/drill.dart';
+import 'package:spark_app/core/bloc/bloc_utils.dart';
 
 part 'drill_library_event.dart';
 part 'drill_library_state.dart';

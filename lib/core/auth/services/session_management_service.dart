@@ -1,10 +1,10 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:brainblot_app/core/auth/models/app_user.dart';
-import 'package:brainblot_app/core/auth/models/user_role.dart';
-import 'package:brainblot_app/core/services/preferences_service.dart';
-import 'package:brainblot_app/core/auth/services/permission_service.dart';
-import 'package:brainblot_app/features/subscription/services/subscription_sync_service.dart';
+import 'package:spark_app/core/auth/models/app_user.dart';
+import 'package:spark_app/core/auth/models/user_role.dart';
+import 'package:spark_app/core/services/preferences_service.dart';
+import 'package:spark_app/core/auth/services/permission_service.dart';
+import 'package:spark_app/features/subscription/services/subscription_sync_service.dart';
 import 'dart:async';
 
 /// Centralized session management service
@@ -410,12 +410,9 @@ class SessionManagementService {
     if (email == null) return 'user';
     
     const adminEmails = [
-      'admin@brainblot.com',
+      'admin@spark.com',
       'admin@brianblot.com',  // Fixed spelling - user's actual admin email
-      'support@brainblot.com',
-      'support@brianblot.com',
-      'root@brainblot.com',
-      'root@brianblot.com',
+      
     ];
     
     if (adminEmails.contains(email.toLowerCase())) {

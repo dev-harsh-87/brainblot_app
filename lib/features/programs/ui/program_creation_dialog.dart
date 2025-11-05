@@ -3,12 +3,12 @@ import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:uuid/uuid.dart';
 
-import 'package:brainblot_app/core/di/injection.dart';
-import 'package:brainblot_app/features/drills/data/drill_repository.dart';
-import 'package:brainblot_app/features/drills/domain/drill.dart';
-import 'package:brainblot_app/features/programs/bloc/programs_bloc.dart';
-import 'package:brainblot_app/features/programs/domain/program.dart';
-import 'package:brainblot_app/features/programs/services/program_creation_service.dart';
+import 'package:spark_app/core/di/injection.dart';
+import 'package:spark_app/features/drills/data/drill_repository.dart';
+import 'package:spark_app/features/drills/domain/drill.dart';
+import 'package:spark_app/features/programs/bloc/programs_bloc.dart';
+import 'package:spark_app/features/programs/domain/program.dart';
+import 'package:spark_app/features/programs/services/program_creation_service.dart';
 
 class ProgramCreationScreen extends StatefulWidget {
   const ProgramCreationScreen({super.key});
@@ -100,6 +100,53 @@ class _ProgramCreationScreenState extends State<ProgramCreationScreen>
     super.dispose();
   }
 
+  PreferredSizeWidget _buildAppBar(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+
+    return AppBar(
+      elevation: 0,
+      backgroundColor: colorScheme.primary,
+      foregroundColor: colorScheme.onPrimary,
+      title: Text(
+        'Create Program',
+        style: theme.textTheme.headlineSmall?.copyWith(
+          color: colorScheme.onPrimary,
+          fontWeight: FontWeight.w700,
+          letterSpacing: 0.5,
+        ),
+      ),
+      centerTitle: true,
+      flexibleSpace: Container(
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [
+              colorScheme.primary,
+              colorScheme.primary.withOpacity(0.9),
+              colorScheme.secondary.withOpacity(0.8),
+            ],
+          ),
+        ),
+      ),
+      actions: [
+        if (_currentStep > 0)
+          TextButton(
+            onPressed: _previousStep,
+            child: Text(
+              'Back',
+              style: TextStyle(
+                color: colorScheme.onPrimary,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+        const SizedBox(width: 8),
+      ],
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -107,19 +154,7 @@ class _ProgramCreationScreenState extends State<ProgramCreationScreen>
 
     return Scaffold(
         backgroundColor: colorScheme.surface,
-        appBar: AppBar(
-          title: const Text('Create Program'),
-          backgroundColor: colorScheme.primary,
-          foregroundColor: colorScheme.onPrimary,
-          elevation: 0,
-          actions: [
-            if (_currentStep > 0)
-              TextButton(
-                onPressed: _previousStep,
-                child: Text('Back', style: TextStyle(color: colorScheme.onPrimary)),
-              ),
-          ],
-        ),
+        appBar: _buildAppBar(context),
         body: Column(
           children: [
             _buildProgressIndicator(),
@@ -580,53 +615,39 @@ class _ProgramCreationScreenState extends State<ProgramCreationScreen>
     
     return Container(
       padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: [colorScheme.primary, colorScheme.secondary],
-        ),
-        borderRadius: const BorderRadius.only(
-          bottomLeft: Radius.circular(20),
-          bottomRight: Radius.circular(20),
-        ),
-      ),
       child: Column(
         children: [
           Row(
             children: List.generate(_totalSteps, (index) {
               final isActive = index <= _currentStep;
+              final isCurrent = index == _currentStep;
               
               return Expanded(
                 child: Container(
-                  margin: EdgeInsets.only(right: index < _totalSteps - 1 ? 8 : 0),
                   height: 4,
+                  margin: EdgeInsets.only(right: index < _totalSteps - 1 ? 8 : 0),
                   decoration: BoxDecoration(
-                    color: isActive 
-                        ? colorScheme.onPrimary 
-                        : colorScheme.onPrimary.withValues(alpha: 0.3),
+                    color: isActive
+                        ? colorScheme.primary
+                        : colorScheme.outline.withOpacity(0.3),
                     borderRadius: BorderRadius.circular(2),
                   ),
                 ),
               );
             }),
           ),
-          const SizedBox(height: 16),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(
-                'Step ${_currentStep + 1} of $_totalSteps',
-                style: theme.textTheme.bodyMedium?.copyWith(
-                  color: colorScheme.onPrimary.withValues(alpha: 0.8),
-                ),
-              ),
-              Text(
-                _getStepTitle(_currentStep),
-                style: theme.textTheme.titleMedium?.copyWith(
-                  color: colorScheme.onPrimary,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-            ],
+          const SizedBox(height: 12),
+          Text(
+            _getStepTitle(_currentStep),
+            style: theme.textTheme.titleMedium?.copyWith(
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          Text(
+            _getStepSubtitle(_currentStep),
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: colorScheme.onSurface.withOpacity(0.7),
+            ),
           ),
         ],
       ),
@@ -640,6 +661,16 @@ class _ProgramCreationScreenState extends State<ProgramCreationScreen>
       case 2: return 'Day Assignment';
       case 3: return 'Review & Create';
       default: return 'Step ${step + 1}';
+    }
+  }
+
+  String _getStepSubtitle(int step) {
+    switch (step) {
+      case 0: return 'Name, category, and program details';
+      case 1: return 'Choose drills for your program';
+      case 2: return 'Assign drills to specific days';
+      case 3: return 'Review your program settings';
+      default: return '';
     }
   }
 
@@ -1173,35 +1204,53 @@ class _ProgramCreationScreenState extends State<ProgramCreationScreen>
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
     final errors = _getValidationErrors();
-    
+
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
         color: colorScheme.surface,
-        border: Border(
-          top: BorderSide(
-            color: colorScheme.outline.withValues(alpha: 0.2),
+        boxShadow: [
+          BoxShadow(
+            color: colorScheme.shadow.withOpacity(0.1),
+            blurRadius: 8,
+            offset: const Offset(0, -2),
           ),
-        ),
+        ],
       ),
       child: Row(
         children: [
           if (_currentStep > 0)
             Expanded(
-              child: OutlinedButton(
+              child: OutlinedButton.icon(
                 onPressed: _previousStep,
-                child: const Text('Back'),
+                icon: const Icon(Icons.arrow_back),
+                label: const Text('Previous'),
+                style: OutlinedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(vertical: 16),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
               ),
             ),
-          if (_currentStep > 0) const SizedBox(width: 16),
+          if (_currentStep > 0) const SizedBox(width: 12),
           Expanded(
-            flex: 2,
-            child: FilledButton(
+            flex: _currentStep == 0 ? 1 : 1,
+            child: FilledButton.icon(
               onPressed: _currentStep == _totalSteps - 1
                   ? (errors.isEmpty ? _createProgram : null)
                   : _nextStep,
-              child: Text(
+              icon: Icon(_currentStep < _totalSteps - 1 ? Icons.arrow_forward : Icons.save),
+              label: Text(
                 _currentStep == _totalSteps - 1 ? 'Create Program' : 'Next',
+              ),
+              style: FilledButton.styleFrom(
+                backgroundColor: colorScheme.primary,
+                foregroundColor: colorScheme.onPrimary,
+                padding: const EdgeInsets.symmetric(vertical: 16),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
               ),
             ),
           ),

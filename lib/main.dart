@@ -1,16 +1,16 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:brainblot_app/core/di/injection.dart';
-import 'package:brainblot_app/core/router/app_router.dart';
-import 'package:brainblot_app/core/theme/app_theme.dart';
-import 'package:brainblot_app/core/ui/edge_to_edge.dart';
+import 'package:spark_app/core/di/injection.dart';
+import 'package:spark_app/core/router/app_router.dart';
+import 'package:spark_app/core/theme/app_theme.dart';
+import 'package:spark_app/core/ui/edge_to_edge.dart';
 import 'package:firebase_core/firebase_core.dart';
-import 'package:brainblot_app/firebase_options.dart';
-import 'package:brainblot_app/core/storage/app_storage.dart';
-import 'package:brainblot_app/features/auth/bloc/auth_bloc.dart';
-import 'package:brainblot_app/core/auth/auth_wrapper.dart';
+import 'package:spark_app/firebase_options.dart';
+import 'package:spark_app/core/storage/app_storage.dart';
+import 'package:spark_app/features/auth/bloc/auth_bloc.dart';
+import 'package:spark_app/core/auth/auth_wrapper.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:brainblot_app/features/subscription/services/subscription_fix_service.dart';
+import 'package:spark_app/features/subscription/services/subscription_fix_service.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -68,7 +68,7 @@ class CogniTrainApp extends StatelessWidget {
           final appRouter = AppRouter(context.read<AuthBloc>());
           return MaterialApp.router(
             debugShowCheckedModeBanner: false,
-            title: 'BrainBlot - Cognitive Training',
+            title: 'Spark - Cognitive Training',
             theme: AppTheme.light(),
             darkTheme: AppTheme.dark(),
             themeMode: ThemeMode.system,

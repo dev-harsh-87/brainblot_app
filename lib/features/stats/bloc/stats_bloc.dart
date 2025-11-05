@@ -1,8 +1,8 @@
 import 'dart:async';
 import 'package:equatable/equatable.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:brainblot_app/features/drills/data/session_repository.dart';
-import 'package:brainblot_app/features/drills/domain/session_result.dart';
+import 'package:spark_app/features/drills/data/session_repository.dart';
+import 'package:spark_app/features/drills/domain/session_result.dart';
 
 part 'stats_event.dart';
 part 'stats_state.dart';

@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:brainblot_app/features/sharing/domain/user_profile.dart';
-import 'package:brainblot_app/features/sharing/services/sharing_service.dart';
-import 'package:brainblot_app/core/di/injection.dart';
-import 'package:brainblot_app/core/widgets/confirmation_dialog.dart';
+import 'package:spark_app/features/sharing/domain/user_profile.dart';
+import 'package:spark_app/features/sharing/services/sharing_service.dart';
+import 'package:spark_app/core/di/injection.dart';
+import 'package:spark_app/core/widgets/confirmation_dialog.dart';
 
 class SharingScreen extends StatefulWidget {
   final String itemType; // 'drill' or 'program'
@@ -861,7 +861,7 @@ class _SharingScreenState extends State<SharingScreen> with SingleTickerProvider
         _buildInfoCard(
           icon: Icons.public,
           title: 'Public',
-          description: 'Anyone in the BrainBlot community can discover and use this ${widget.itemType}. Help others train better!',
+          description: 'Anyone in the Spark community can discover and use this ${widget.itemType}. Help others train better!',
           color: Colors.green,
         ),
       ],

@@ -90,12 +90,12 @@ BEGIN
         BLOCK "040904e4"
         BEGIN
             VALUE "CompanyName", "com.tbg" "\0"
-            VALUE "FileDescription", "brainblot_app" "\0"
+            VALUE "FileDescription", "spark_app" "\0"
             VALUE "FileVersion", VERSION_AS_STRING "\0"
-            VALUE "InternalName", "brainblot_app" "\0"
+            VALUE "InternalName", "spark_app" "\0"
             VALUE "LegalCopyright", "Copyright (C) 2025 com.tbg. All rights reserved." "\0"
-            VALUE "OriginalFilename", "brainblot_app.exe" "\0"
-            VALUE "ProductName", "brainblot_app" "\0"
+            VALUE "OriginalFilename", "spark_app.exe" "\0"
+            VALUE "ProductName", "spark_app" "\0"
             VALUE "ProductVersion", VERSION_AS_STRING "\0"
         END
     END

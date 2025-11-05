@@ -7,8 +7,8 @@
 // import 'package:nearby_connections/nearby_connections.dart';
 // import 'package:permission_handler/permission_handler.dart';
 //
-// import 'package:brainblot_app/features/multiplayer/domain/connection_session.dart';
-// import 'package:brainblot_app/features/multiplayer/domain/sync_message.dart';
+// import 'package:spark_app/features/multiplayer/domain/connection_session.dart';
+// import 'package:spark_app/features/multiplayer/domain/sync_message.dart';
 //
 // /// Service for managing Bluetooth connections and P2P communication
 // class BluetoothConnectionService {
@@ -645,7 +645,7 @@
 //
 //       return '$adjective $noun $number';
 //     } catch (e) {
-//       return 'BrainBlot User';
+//       return 'Spark User';
 //     }
 //   }
 //
@@ -671,10 +671,10 @@ import 'package:flutter/services.dart';
 import 'package:nearby_connections/nearby_connections.dart';
 import 'package:permission_handler/permission_handler.dart';
 
-import 'package:brainblot_app/features/multiplayer/domain/connection_session.dart';
-import 'package:brainblot_app/features/multiplayer/domain/sync_message.dart';
+import 'package:spark_app/features/multiplayer/domain/connection_session.dart';
+import 'package:spark_app/features/multiplayer/domain/sync_message.dart';
 
-/// Robust, null-safe and more predictable Bluetooth P2P manager for BrainBlot.
+/// Robust, null-safe and more predictable Bluetooth P2P manager for Spark.
 ///
 /// Changes and improvements made:
 /// * Better permission handling and clearer status messages.
@@ -1291,7 +1291,7 @@ class BluetoothConnectionService {
 
       return '$adjective $noun $number';
     } catch (e) {
-      return 'BrainBlot User';
+      return 'Spark User';
     }
   }
 

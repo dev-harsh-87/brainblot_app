@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:brainblot_app/core/theme/app_theme.dart';
-import 'package:brainblot_app/features/subscription/domain/subscription_plan.dart';
+import 'package:spark_app/core/theme/app_theme.dart';
+import 'package:spark_app/features/subscription/domain/subscription_plan.dart';
 
 /// Widget to display subscription plan information with upgrade prompts
 class SubscriptionPlanCard extends StatelessWidget {

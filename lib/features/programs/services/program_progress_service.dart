@@ -1,6 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:brainblot_app/features/programs/domain/program.dart';
+import 'package:spark_app/features/programs/domain/program.dart';
 
 class ProgramProgressService {
   final FirebaseFirestore _firestore;

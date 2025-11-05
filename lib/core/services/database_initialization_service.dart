@@ -1,8 +1,8 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:brainblot_app/core/auth/models/user_role.dart';
-import 'package:brainblot_app/core/auth/models/app_user.dart';
-import 'package:brainblot_app/features/subscription/data/subscription_plan_repository.dart';
+import 'package:spark_app/core/auth/models/user_role.dart';
+import 'package:spark_app/core/auth/models/app_user.dart';
+import 'package:spark_app/features/subscription/data/subscription_plan_repository.dart';
 
 /// Service for initializing database with default data
 class DatabaseInitializationService {

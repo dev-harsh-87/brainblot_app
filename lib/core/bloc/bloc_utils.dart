@@ -1,5 +1,5 @@
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:brainblot_app/core/error/app_error.dart';
+import 'package:spark_app/core/error/app_error.dart';
 
 /// Utility functions for BLoC operations
 class BlocUtils {

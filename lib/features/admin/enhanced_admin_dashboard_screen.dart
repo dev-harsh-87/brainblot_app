@@ -1,12 +1,12 @@
 import "package:flutter/material.dart";
 import "package:cloud_firestore/cloud_firestore.dart";
-import "package:brainblot_app/core/auth/services/permission_service.dart";
-import "package:brainblot_app/core/auth/guards/admin_guard.dart";
-import "package:brainblot_app/core/auth/models/user_role.dart";
-import "package:brainblot_app/features/admin/ui/user_management_screen.dart";
-import "package:brainblot_app/features/admin/ui/subscription_management_screen.dart";
-import "package:brainblot_app/features/admin/ui/analytics_screen.dart";
-import "package:brainblot_app/features/admin/ui/plan_requests_screen.dart";
+import "package:spark_app/core/auth/services/permission_service.dart";
+import "package:spark_app/core/auth/guards/admin_guard.dart";
+import "package:spark_app/core/auth/models/user_role.dart";
+import "package:spark_app/features/admin/ui/user_management_screen.dart";
+import "package:spark_app/features/admin/ui/subscription_management_screen.dart";
+import "package:spark_app/features/admin/ui/analytics_screen.dart";
+import "package:spark_app/features/admin/ui/plan_requests_screen.dart";
 
 
 class EnhancedAdminDashboardScreen extends StatelessWidget {

@@ -1,8 +1,8 @@
-import 'package:brainblot_app/core/di/injection.dart';
-import 'package:brainblot_app/core/services/auto_refresh_service.dart';
-import 'package:brainblot_app/features/drills/data/drill_repository.dart';
-import 'package:brainblot_app/features/drills/domain/drill.dart';
-import 'package:brainblot_app/features/drills/services/drill_validation_helper.dart';
+import 'package:spark_app/core/di/injection.dart';
+import 'package:spark_app/core/services/auto_refresh_service.dart';
+import 'package:spark_app/features/drills/data/drill_repository.dart';
+import 'package:spark_app/features/drills/domain/drill.dart';
+import 'package:spark_app/features/drills/services/drill_validation_helper.dart';
 
 /// Service to handle drill creation with auto-refresh integration
 class DrillCreationService {

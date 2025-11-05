@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:brainblot_app/core/error/app_error.dart';
+import 'package:spark_app/core/error/app_error.dart';
 
 /// Global error handler for the application
 class ErrorHandler {

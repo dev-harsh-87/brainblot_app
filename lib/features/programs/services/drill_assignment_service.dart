@@ -1,8 +1,8 @@
 import 'dart:async';
 
-import 'package:brainblot_app/features/drills/data/drill_repository.dart';
-import 'package:brainblot_app/features/drills/domain/drill.dart';
-import 'package:brainblot_app/features/programs/domain/program.dart';
+import 'package:spark_app/features/drills/data/drill_repository.dart';
+import 'package:spark_app/features/drills/domain/drill.dart';
+import 'package:spark_app/features/programs/domain/program.dart';
 
 class DrillAssignmentService {
   final DrillRepository _drillRepository;
