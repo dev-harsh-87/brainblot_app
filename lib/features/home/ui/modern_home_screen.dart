@@ -169,26 +169,22 @@ class _ModernHomeScreenState extends State<ModernHomeScreen>
             position: _slideAnimation,
             child: Column(
               children: [
-                const SizedBox(height: 24),
+                                // Admin Section (if admin)
+                if (user.role.isAdmin()) _buildAdminSection(context),
+        
 
                 // User Subscription Requests (if not admin)
                 if (!user.role.isAdmin())
                   _buildUserRequestsSection(context, user),
 
-                // Quick Actions Section
-                _buildQuickActionsSection(context, user),
-
                 // Features Grid
                 _buildFeaturesSection(context, user),
-
-                // Admin Section (if admin)
-                if (user.role.isAdmin()) _buildAdminSection(context),
 
                 // Subscription Section (if not admin)
                 if (!user.role.isAdmin())
                   _buildSubscriptionSection(context, user),
 
-                const SizedBox(height: 32),
+
               ],
             ),
           ),
@@ -533,133 +529,7 @@ class _ModernHomeScreenState extends State<ModernHomeScreen>
     }
   }
 
-  Widget _buildQuickActionsSection(BuildContext context, AppUser user) {
-    final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
 
-    final actions = [
-      _QuickAction(
-        title: 'Start Training',
-        subtitle: 'Begin your session',
-        icon: Icons.play_arrow_rounded,
-        route: "/training",
-        color: colorScheme.primary,
-      ),
-      _QuickAction(
-        title: 'View Progress',
-        subtitle: 'Check your stats',
-        icon: Icons.analytics_rounded,
-        route: "/stats",
-        color: Colors.blue,
-      ),
-    ];
-
-    return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 24),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            'Quick Actions',
-            style: theme.textTheme.titleLarge?.copyWith(
-              fontWeight: FontWeight.bold,
-              color: colorScheme.onSurface,
-            ),
-          ),
-          const SizedBox(height: 16),
-          Row(
-            children: actions.map((action) {
-              final index = actions.indexOf(action);
-              return Expanded(
-                child: Padding(
-                  padding: EdgeInsets.only(
-                    right: index == actions.length - 1 ? 0 : 12,
-                  ),
-                  child: TweenAnimationBuilder<double>(
-                    duration: Duration(milliseconds: 600 + (index * 200)),
-                    tween: Tween(begin: 0.0, end: 1.0),
-                    curve: Curves.easeOutBack,
-                    builder: (context, value, child) {
-                      return Transform.scale(
-                        scale: value,
-                        child: _buildQuickActionCard(context, action),
-                      );
-                    },
-                  ),
-                ),
-              );
-            }).toList(),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildQuickActionCard(BuildContext context, _QuickAction action) {
-    final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
-
-    return InkWell(
-      onTap: () => context.push(action.route),
-      borderRadius: BorderRadius.circular(16),
-      child: Container(
-        padding: const EdgeInsets.all(20),
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            colors: [
-              action.color.withOpacity(0.1),
-              action.color.withOpacity(0.05),
-            ],
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-          ),
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(
-            color: action.color.withOpacity(0.2),
-          ),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: action.color,
-                borderRadius: BorderRadius.circular(12),
-                boxShadow: [
-                  BoxShadow(
-                    color: action.color.withOpacity(0.3),
-                    blurRadius: 8,
-                    offset: const Offset(0, 2),
-                  ),
-                ],
-              ),
-              child: Icon(
-                action.icon,
-                color: Colors.white,
-                size: 24,
-              ),
-            ),
-            const SizedBox(height: 16),
-            Text(
-              action.title,
-              style: theme.textTheme.titleMedium?.copyWith(
-                fontWeight: FontWeight.bold,
-                color: colorScheme.onSurface,
-              ),
-            ),
-            const SizedBox(height: 4),
-            Text(
-              action.subtitle,
-              style: theme.textTheme.bodySmall?.copyWith(
-                color: colorScheme.onSurface.withOpacity(0.6),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
 
   Widget _buildFeaturesSection(BuildContext context, AppUser user) {
     final theme = Theme.of(context);
@@ -869,7 +739,7 @@ class _ModernHomeScreenState extends State<ModernHomeScreen>
     final colorScheme = theme.colorScheme;
 
     return Container(
-      margin: const EdgeInsets.all(24),
+            margin: const EdgeInsets.all(24),
       child: InkWell(
         onTap: () => context.push("/admin"),
         borderRadius: BorderRadius.circular(20),

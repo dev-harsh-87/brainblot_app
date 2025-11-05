@@ -8,6 +8,8 @@ import 'package:spark_app/features/sharing/services/sharing_service.dart';
 import 'package:spark_app/core/services/auto_refresh_service.dart';
 import 'package:spark_app/core/widgets/confirmation_dialog.dart';
 import 'package:spark_app/core/ui/edge_to_edge.dart';
+import 'package:spark_app/core/auth/services/session_management_service.dart';
+import 'package:spark_app/core/auth/services/subscription_permission_service.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -20,7 +22,7 @@ class DrillLibraryScreen extends StatefulWidget {
   State<DrillLibraryScreen> createState() => _DrillLibraryScreenState();
 }
 
-class _DrillLibraryScreenState extends State<DrillLibraryScreen> 
+class _DrillLibraryScreenState extends State<DrillLibraryScreen>
     with TickerProviderStateMixin, AutoRefreshMixin {
   late TabController _tabController;
   late AnimationController _fabAnimationController;
@@ -33,13 +35,19 @@ class _DrillLibraryScreenState extends State<DrillLibraryScreen>
   final ScrollController _scrollController = ScrollController();
   bool _showFab = true;
   final Map<String, bool> _ownershipCache = {};
+  bool _isAdmin = false;
+  bool _isLoading = true;
+  bool _hasDrillAccess = false;
 
   @override
   void initState() {
     super.initState();
     _sharingService = getIt<SharingService>();
     _drillRepository = getIt<DrillRepository>();
-    _tabController = TabController(length: 4, vsync: this);
+    
+    // Initialize with default length, will be updated after role check
+    _tabController = TabController(length: 2, vsync: this);
+    
     _fabAnimationController = AnimationController(
       duration: const Duration(milliseconds: 300),
       vsync: this,
@@ -58,6 +66,59 @@ class _DrillLibraryScreenState extends State<DrillLibraryScreen>
       AutoRefreshService.sharing: _refreshDrills,
     });
     _tabController.addListener(_onTabChanged);
+    
+    // Check user role and update tab configuration
+    _checkUserRoleAndUpdateTabs();
+  }
+  
+  Future<void> _checkUserRoleAndUpdateTabs() async {
+    try {
+      final sessionService = getIt<SessionManagementService>();
+      final subscriptionService = getIt<SubscriptionPermissionService>();
+      
+      final isAdmin = sessionService.isAdmin();
+      final hasDrillAccess = await subscriptionService.hasModuleAccess('admin_drills');
+      
+      setState(() {
+        _isAdmin = isAdmin;
+        _hasDrillAccess = hasDrillAccess;
+        _isLoading = false;
+      });
+      
+      // Update tab controller length based on role and access
+      _tabController.removeListener(_onTabChanged);
+      _tabController.dispose();
+      
+      // Tab configuration:
+      // Admin: 2 tabs (My Drills, Favorites)
+      // User with drill access: 3 tabs (My Drills, Admin Drills, Favorites)
+      // User without drill access: 2 tabs (My Drills, Favorites)
+      int tabLength;
+      if (isAdmin) {
+        tabLength = 2; // My Drills, Favorites
+      } else if (hasDrillAccess) {
+        tabLength = 3; // My Drills, Admin Drills, Favorites
+      } else {
+        tabLength = 2; // My Drills, Favorites (no Admin Drills)
+      }
+      
+      _tabController = TabController(
+        length: tabLength,
+        vsync: this,
+      );
+      _tabController.addListener(_onTabChanged);
+      
+      if (mounted) {
+        setState(() {});
+      }
+    } catch (e) {
+      print('Error checking user role and access: $e');
+      setState(() {
+        _isAdmin = false;
+        _hasDrillAccess = false;
+        _isLoading = false;
+      });
+    }
   }
 
   void _refreshDrills() {
@@ -69,12 +130,35 @@ class _DrillLibraryScreenState extends State<DrillLibraryScreen>
   void _onTabChanged() {
     if (!_tabController.indexIsChanging) return;
 
-    final view = switch (_tabController.index) {
-      0 => DrillLibraryView.all,
-      1 => DrillLibraryView.favorites,
-      2 => DrillLibraryView.custom,
-      _ => DrillLibraryView.all,
-    };
+    // Tab mapping based on role and access:
+    // Admin: 0=My Drills, 1=Favorites
+    // User with drill access: 0=My Drills, 1=Admin Drills, 2=Favorites
+    // User without drill access: 0=My Drills, 1=Favorites
+    DrillLibraryView view;
+    
+    if (_isAdmin) {
+      // Admin tabs: My Drills, Favorites
+      view = switch (_tabController.index) {
+        0 => DrillLibraryView.custom, // My Drills
+        1 => DrillLibraryView.favorites, // Favorites
+        _ => DrillLibraryView.custom,
+      };
+    } else if (_hasDrillAccess) {
+      // User with drill access: My Drills, Admin Drills, Favorites
+      view = switch (_tabController.index) {
+        0 => DrillLibraryView.custom, // My Drills
+        1 => DrillLibraryView.all, // Admin Drills
+        2 => DrillLibraryView.favorites, // Favorites
+        _ => DrillLibraryView.custom,
+      };
+    } else {
+      // User without drill access: My Drills, Favorites (no Admin Drills)
+      view = switch (_tabController.index) {
+        0 => DrillLibraryView.custom, // My Drills
+        1 => DrillLibraryView.favorites, // Favorites
+        _ => DrillLibraryView.custom,
+      };
+    }
 
     context.read<DrillLibraryBloc>().add(DrillLibraryViewChanged(view));
   }
@@ -95,6 +179,52 @@ class _DrillLibraryScreenState extends State<DrillLibraryScreen>
     } else if (_scrollController.offset <= 100 && !_showFab) {
       setState(() => _showFab = true);
       _fabAnimationController.forward();
+    }
+  }
+
+  List<Widget> _buildTabs() {
+    if (_isAdmin) {
+      // Admin: My Drills, Favorites
+      return const [
+        Tab(text: 'My Drills'),
+        Tab(text: 'Favorites'),
+      ];
+    } else if (_hasDrillAccess) {
+      // User with drill access: My Drills, Admin Drills, Favorites
+      return const [
+        Tab(text: 'My Drills'),
+        Tab(text: 'Admin Drills'),
+        Tab(text: 'Favorites'),
+      ];
+    } else {
+      // User without drill access: My Drills, Favorites (no Admin Drills)
+      return const [
+        Tab(text: 'My Drills'),
+        Tab(text: 'Favorites'),
+      ];
+    }
+  }
+
+  List<Widget> _buildTabViews(DrillLibraryState state) {
+    if (_isAdmin) {
+      // Admin: My Drills, Favorites
+      return [
+        _buildMyDrillsViewWithRefresh(state), // My drills only
+        _buildFavoriteDrillsViewWithRefresh(state), // Favorites
+      ];
+    } else if (_hasDrillAccess) {
+      // User with drill access: My Drills, Admin Drills, Favorites
+      return [
+        _buildMyDrillsViewWithRefresh(state), // My drills only
+        _buildAdminDrillsViewWithRefresh(state), // Admin drills only
+        _buildFavoriteDrillsViewWithRefresh(state), // Favorites
+      ];
+    } else {
+      // User without drill access: My Drills, Favorites (no Admin Drills)
+      return [
+        _buildMyDrillsViewWithRefresh(state), // My drills only
+        _buildFavoriteDrillsViewWithRefresh(state), // Favorites
+      ];
     }
   }
 
@@ -139,12 +269,7 @@ class _DrillLibraryScreenState extends State<DrillLibraryScreen>
                   children: [
                     TabBarView(
                       controller: _tabController,
-                      children: [
-                        _buildDrillViewWithRefresh(drills, state), // All drills
-                        _buildMyDrillsViewWithRefresh(state), // My drills only
-                        _buildPublicDrillsViewWithRefresh(state), // Public drills only
-                        _buildDrillViewWithRefresh(drills.where((d) => d.favorite).toList(), state), // Favorites
-                      ],
+                      children: _buildTabViews(state),
                     ),
                     // Show refreshing indicator
                     if (state.isRefreshing)
@@ -325,12 +450,7 @@ class _DrillLibraryScreenState extends State<DrillLibraryScreen>
                 indicatorWeight: 3,
                 indicatorSize: TabBarIndicatorSize.tab,
                 dividerColor: Colors.transparent,
-                tabs: const [
-                  Tab(text: 'All'),
-                  Tab(text: 'My Drills'),
-                  Tab(text: 'Public'),
-                  Tab(text: 'Favorites'),
-                ],
+                tabs: _buildTabs(),
               ),
             ),
             const SizedBox(height: 16),
@@ -427,69 +547,7 @@ class _DrillLibraryScreenState extends State<DrillLibraryScreen>
     );
   }
 
-  Widget _buildFilterChip(String label, String value, VoidCallback onTap) {
-    final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
-
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-        decoration: BoxDecoration(
-          color: colorScheme.surfaceContainerHighest,
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: colorScheme.outline.withOpacity(0.3)),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(
-              '$label: $value',
-              style: theme.textTheme.bodySmall?.copyWith(
-                color: colorScheme.onSurface,
-                fontWeight: FontWeight.w500,
-              ),
-            ),
-            const SizedBox(width: 4),
-            Icon(Icons.keyboard_arrow_down, size: 16, color: colorScheme.onSurface),
-          ],
-        ),
-      ),
-    );
-  }
-
-
-  Widget _buildStatItem(IconData icon, String label, String value, Color color) {
-    final theme = Theme.of(context);
-
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Container(
-          padding: const EdgeInsets.all(8),
-          decoration: BoxDecoration(
-            color: color.withOpacity(0.1),
-            borderRadius: BorderRadius.circular(8),
-          ),
-          child: Icon(icon, color: color, size: 20),
-        ),
-        const SizedBox(height: 4),
-        Text(
-          value,
-          style: theme.textTheme.titleMedium?.copyWith(
-            fontWeight: FontWeight.bold,
-            color: color,
-          ),
-        ),
-        Text(
-          label,
-          style: theme.textTheme.bodySmall?.copyWith(
-            color: theme.colorScheme.onSurface.withOpacity(0.7),
-          ),
-        ),
-      ],
-    );
-  }
+ 
 
   Widget _buildLoadingState() {
     final theme = Theme.of(context);
@@ -589,29 +647,7 @@ class _DrillLibraryScreenState extends State<DrillLibraryScreen>
   }
 
 
-  Widget _buildDrillViewWithRefresh(List<Drill> drills, DrillLibraryState state) {
-    if (drills.isEmpty) {
-      return RefreshIndicator(
-        onRefresh: () async {
-          context.read<DrillLibraryBloc>().add(const DrillLibraryRefreshRequested());
-        },
-        child: SingleChildScrollView(
-          physics: const AlwaysScrollableScrollPhysics(),
-          child: SizedBox(
-            height: MediaQuery.of(context).size.height * 0.6,
-            child: _buildEmptyStateForTab(),
-          ),
-        ),
-      );
-    }
-
-    return RefreshIndicator(
-      onRefresh: () async {
-        context.read<DrillLibraryBloc>().add(const DrillLibraryRefreshRequested());
-      },
-      child: _buildListView(drills),
-    );
-  }
+  
 
   Widget _buildMyDrillsViewWithRefresh(DrillLibraryState state) {
     return RefreshIndicator(
@@ -622,12 +658,22 @@ class _DrillLibraryScreenState extends State<DrillLibraryScreen>
     );
   }
 
-  Widget _buildPublicDrillsViewWithRefresh(DrillLibraryState state) {
+  
+  Widget _buildAdminDrillsViewWithRefresh(DrillLibraryState state) {
     return RefreshIndicator(
       onRefresh: () async {
         context.read<DrillLibraryBloc>().add(const DrillLibraryRefreshRequested());
       },
-      child: _buildPublicDrillsView(),
+      child: _buildAdminDrillsView(),
+    );
+  }
+
+  Widget _buildFavoriteDrillsViewWithRefresh(DrillLibraryState state) {
+    return RefreshIndicator(
+      onRefresh: () async {
+        context.read<DrillLibraryBloc>().add(const DrillLibraryRefreshRequested());
+      },
+      child: _buildFavoriteDrillsView(),
     );
   }
 
@@ -655,38 +701,7 @@ class _DrillLibraryScreenState extends State<DrillLibraryScreen>
 
 
 
-  Widget _buildTag({
-    IconData? icon,
-    required String text,
-    required Color color,
-    required ThemeData theme,
-    double fontSize = 10,
-  }) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-      decoration: BoxDecoration(
-        color: color.withOpacity(0.1),
-        borderRadius: BorderRadius.circular(4),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          if (icon != null) ...[
-            Icon(icon, color: color, size: fontSize + 2),
-            const SizedBox(width: 2),
-          ],
-          Text(
-            text,
-            style: theme.textTheme.bodySmall?.copyWith(
-              color: color,
-              fontSize: fontSize,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
+  
 Widget _buildCompactStatChip(IconData icon, String text, Color color) {
     final theme = Theme.of(context);
     
@@ -958,32 +973,7 @@ Widget _buildCompactStatChip(IconData icon, String text, Color color) {
     );
   }
 
-  Widget _buildInfoChip(IconData icon, String text) {
-    final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
-
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-      decoration: BoxDecoration(
-        color: colorScheme.surfaceContainerHighest,
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, size: 12, color: colorScheme.onSurface.withOpacity(0.7)),
-          const SizedBox(width: 4),
-          Text(
-            text,
-            style: theme.textTheme.bodySmall?.copyWith(
-              color: colorScheme.onSurface.withOpacity(0.7),
-              fontSize: 10,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
+ 
 
   Widget _buildEmptyState() {
     final theme = Theme.of(context);
@@ -1367,45 +1357,102 @@ Widget _buildCompactStatChip(IconData icon, String text, Color color) {
     );
   }
 
-  Widget _buildPublicDrillsView() {
+  Widget _buildAdminDrillsView() {
+    return FutureBuilder<bool>(
+      future: getIt<SubscriptionPermissionService>().hasModuleAccess('drills'),
+      builder: (context, moduleAccessSnapshot) {
+        if (moduleAccessSnapshot.connectionState == ConnectionState.waiting) {
+          return const Center(child: CircularProgressIndicator());
+        }
+
+        final hasAccess = moduleAccessSnapshot.data ?? false;
+        
+        if (!hasAccess) {
+          return _buildNoAccessState();
+        }
+
+        return BlocBuilder<DrillLibraryBloc, DrillLibraryState>(
+          builder: (context, state) {
+            return FutureBuilder<List<Drill>>(
+              key: ValueKey('admin-${state.query}-${state.category}-${state.difficulty}'),
+              future: getIt<DrillRepository>().fetchAdminDrills(
+                query: state.query?.isEmpty == true ? null : state.query,
+                category: state.category?.isEmpty == true ? null : state.category,
+                difficulty: state.difficulty,
+              ),
+            builder: (context, snapshot) {
+              if (snapshot.connectionState == ConnectionState.waiting) {
+                return const Center(child: CircularProgressIndicator());
+              }
+
+              if (snapshot.hasError) {
+                return Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(Icons.error_outline, size: 64, color: Colors.red),
+                      const SizedBox(height: 16),
+                      Text('Error loading admin drills: ${snapshot.error}'),
+                    ],
+                  ),
+                );
+              }
+
+              final adminDrills = snapshot.data ?? [];
+              if (adminDrills.isEmpty) {
+                return _buildEmptyAdminDrillsState();
+              }
+
+              return _buildDrillView(adminDrills);
+              },
+            );
+          },
+        );
+      },
+    );
+  }
+
+  Widget _buildFavoriteDrillsView() {
     return BlocBuilder<DrillLibraryBloc, DrillLibraryState>(
       builder: (context, state) {
         return FutureBuilder<List<Drill>>(
-          key: ValueKey('public-${state.query}-${state.category}-${state.difficulty}'),
-          future: getIt<DrillRepository>().fetchPublicDrills(
+          key: ValueKey('favorites-${state.query}-${state.category}-${state.difficulty}'),
+          future: getIt<DrillRepository>().fetchFavoriteDrills(
             query: state.query?.isEmpty == true ? null : state.query,
             category: state.category?.isEmpty == true ? null : state.category,
             difficulty: state.difficulty,
           ),
-      builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting) {
-          return const Center(child: CircularProgressIndicator());
-        }
+        builder: (context, snapshot) {
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return const Center(child: CircularProgressIndicator());
+          }
 
-        if (snapshot.hasError) {
-          return Center(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(Icons.error_outline, size: 64, color: Colors.red),
-                const SizedBox(height: 16),
-                Text('Error loading public drills: ${snapshot.error}'),
-              ],
-            ),
-          );
-        }
+          if (snapshot.hasError) {
+            return Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.error_outline, size: 64, color: Colors.red),
+                  const SizedBox(height: 16),
+                  Text('Error loading favorite drills: ${snapshot.error}'),
+                ],
+              ),
+            );
+          }
 
-        final publicDrills = snapshot.data ?? [];
-        if (publicDrills.isEmpty) {
-          return _buildEmptyPublicDrillsState();
-        }
+          final favoriteDrills = snapshot.data ?? [];
+          if (favoriteDrills.isEmpty) {
+            return _buildEmptyFavoriteDrillsState();
+          }
 
-        return _buildDrillView(publicDrills);
-        },
-      );
+          return _buildDrillView(favoriteDrills);
+          },
+        );
       },
     );
   }
+
+  
 
   Widget _buildEmptyMyDrillsState() {
     final theme = Theme.of(context);
@@ -1448,7 +1495,7 @@ Widget _buildCompactStatChip(IconData icon, String text, Color color) {
     );
   }
 
-  Widget _buildEmptyPublicDrillsState() {
+  Widget _buildNoAccessState() {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
 
@@ -1457,20 +1504,20 @@ Widget _buildCompactStatChip(IconData icon, String text, Color color) {
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
           Icon(
-            Icons.public_outlined,
+            Icons.lock_outlined,
             size: 80,
-            color: colorScheme.primary.withOpacity(0.5),
+            color: colorScheme.error.withOpacity(0.5),
           ),
           const SizedBox(height: 24),
           Text(
-            'No Public Drills Available',
+            'Access Required',
             style: theme.textTheme.headlineSmall?.copyWith(
               color: colorScheme.onSurface.withOpacity(0.7),
             ),
           ),
           const SizedBox(height: 12),
           Text(
-            'Be the first to share a drill with the community!\nMake your drills public to help others train.',
+            'You need module access to view admin drills.\nPlease contact an administrator to request access.',
             textAlign: TextAlign.center,
             style: theme.textTheme.bodyMedium?.copyWith(
               color: colorScheme.onSurface.withOpacity(0.6),
@@ -1481,33 +1528,75 @@ Widget _buildCompactStatChip(IconData icon, String text, Color color) {
     );
   }
 
-  Widget _buildPrivacyIndicator(Drill drill) {
-    return FutureBuilder<bool>(
-      future: _isOwner(drill),
-      builder: (context, snapshot) {
-        final isOwner = snapshot.data ?? false;
-        final isLoading = snapshot.connectionState == ConnectionState.waiting;
+  Widget _buildEmptyFavoriteDrillsState() {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
 
-        // Privacy toggle removed - all drills are private by default
-        return const SizedBox.shrink();
-      },
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(
+            Icons.favorite_outline,
+            size: 80,
+            color: colorScheme.primary.withOpacity(0.5),
+          ),
+          const SizedBox(height: 24),
+          Text(
+            'No Favorite Drills Yet',
+            style: theme.textTheme.headlineSmall?.copyWith(
+              color: colorScheme.onSurface.withOpacity(0.7),
+            ),
+          ),
+          const SizedBox(height: 12),
+          Text(
+            'Mark drills as favorites to see them here.\nTap the heart icon on any drill to add it to favorites.',
+            textAlign: TextAlign.center,
+            style: theme.textTheme.bodyMedium?.copyWith(
+              color: colorScheme.onSurface.withOpacity(0.6),
+            ),
+          ),
+        ],
+      ),
     );
   }
 
-  Future<bool> _isOwner(Drill drill) async {
-    if (_ownershipCache.containsKey(drill.id)) {
-      return _ownershipCache[drill.id]!;
-    }
+  Widget _buildEmptyAdminDrillsState() {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
 
-    try {
-      final isOwner = await _sharingService.isOwner('drill', drill.id);
-      _ownershipCache[drill.id] = isOwner;
-      return isOwner;
-    } catch (e) {
-      return false;
-    }
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(
+            Icons.admin_panel_settings_outlined,
+            size: 80,
+            color: colorScheme.primary.withOpacity(0.5),
+          ),
+          const SizedBox(height: 24),
+          Text(
+            'No Admin Drills Available',
+            style: theme.textTheme.headlineSmall?.copyWith(
+              color: colorScheme.onSurface.withOpacity(0.7),
+            ),
+          ),
+          const SizedBox(height: 12),
+          Text(
+            'No drills have been created by admins yet.\nCheck back later for admin-created drills.',
+            textAlign: TextAlign.center,
+            style: theme.textTheme.bodyMedium?.copyWith(
+              color: colorScheme.onSurface.withOpacity(0.6),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 
+  
+
+ 
   Future<void> _toggleFavorite(Drill drill) async {
     try {
       await _drillRepository.toggleFavorite(drill.id);
@@ -1576,24 +1665,5 @@ Widget _buildCompactStatChip(IconData icon, String text, Color color) {
     }
   }
 
-  Future<void> _toggleDrillPrivacy(Drill drill) async {
-    // Privacy toggle functionality removed - all drills are now private by default
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Row(
-          children: [
-            Icon(
-              Icons.lock,
-              color: Colors.white,
-              size: 20,
-            ),
-            SizedBox(width: 8),
-            Text('All drills are private by default 🔒'),
-          ],
-        ),
-        backgroundColor: Colors.grey,
-        behavior: SnackBarBehavior.floating,
-      ),
-    );
-  }
+
 }

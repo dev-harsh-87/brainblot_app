@@ -5,8 +5,9 @@ import "package:spark_app/core/auth/guards/admin_guard.dart";
 import "package:spark_app/core/auth/models/user_role.dart";
 import "package:spark_app/features/admin/ui/user_management_screen.dart";
 import "package:spark_app/features/admin/ui/subscription_management_screen.dart";
-import "package:spark_app/features/admin/ui/analytics_screen.dart";
+import "package:spark_app/features/admin/ui/screens/comprehensive_analytics_screen.dart";
 import "package:spark_app/features/admin/ui/plan_requests_screen.dart";
+import "package:spark_app/features/admin/ui/screens/comprehensive_activity_screen.dart";
 
 
 class EnhancedAdminDashboardScreen extends StatelessWidget {
@@ -37,13 +38,11 @@ class EnhancedAdminDashboardScreen extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 _buildHeader(context),
-                const SizedBox(height: 24),
+                const SizedBox(height: 20),
                 _buildRealTimeStats(context),
-                const SizedBox(height: 24),
-                _buildQuickActions(context),
-                const SizedBox(height: 24),
+                const SizedBox(height: 20),
                 _buildManagementGrid(context),
-                const SizedBox(height: 24),
+                const SizedBox(height: 20),
                 _buildRecentActivity(context),
               ],
             ),
@@ -235,121 +234,6 @@ Widget _buildStatCard(
   );
 }
 
-  Widget _buildQuickActions(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          "Quick Actions",
-          style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                fontWeight: FontWeight.bold,
-              ),
-        ),
-        const SizedBox(height: 16),
-        SingleChildScrollView(
-          scrollDirection: Axis.horizontal,
-          child: Row(
-            children: [
-              _buildQuickActionChip(
-                context,
-                "Add User",
-                Icons.person_add,
-                Colors.blue,
-                () => Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => const UserManagementScreen(),
-                  ),
-                ),
-              ),
-              const SizedBox(width: 12),
-              _buildQuickActionChip(
-                context,
-                "Manage Plans",
-                Icons.add_card,
-                Colors.green,
-                () => Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => const SubscriptionManagementScreen(),
-                  ),
-                ),
-              ),
-              const SizedBox(width: 12),
-              _buildQuickActionChip(
-                context,
-                "View Analytics",
-                Icons.analytics,
-                Colors.purple,
-                () => Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => const AnalyticsScreen(),
-                  ),
-                ),
-              ),
-              const SizedBox(width: 12),
-              _buildQuickActionChip(
-                context,
-                "Plan Requests",
-                Icons.receipt_long,
-                Colors.orange,
-                () => Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => const PlanRequestsScreen(),
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildQuickActionChip(
-    BuildContext context,
-    String label,
-    IconData icon,
-    Color color,
-    VoidCallback onTap,
-  ) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(12),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: color.withOpacity(0.3)),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.05),
-              blurRadius: 4,
-              offset: const Offset(0, 2),
-            ),
-          ],
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(icon, color: color, size: 20),
-            const SizedBox(width: 8),
-            Text(
-              label,
-              style: TextStyle(
-                color: color,
-                fontWeight: FontWeight.w600,
-                fontSize: 14,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
 
   Widget _buildManagementGrid(BuildContext context) {
     return Column(
@@ -418,7 +302,7 @@ Widget _buildStatCard(
               onTap: () => Navigator.push(
                 context,
                 MaterialPageRoute(
-                  builder: (context) => const AnalyticsScreen(),
+                  builder: (context) => const ComprehensiveAnalyticsScreen(),
                 ),
               ),
             ),
@@ -510,20 +394,36 @@ Widget _buildManagementCard(
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            Text(
-              "Recent Activity",
-              style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                    fontWeight: FontWeight.bold,
+            Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: Colors.blue.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(8),
                   ),
+                  child: const Icon(Icons.timeline, color: Colors.blue, size: 20),
+                ),
+                const SizedBox(width: 12),
+                Text(
+                  "Recent Activity",
+                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                        fontWeight: FontWeight.bold,
+                      ),
+                ),
+              ],
             ),
-            TextButton(
+            TextButton.icon(
               onPressed: () {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                      content: Text("Full activity log coming soon")),
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => const ComprehensiveActivityScreen(),
+                  ),
                 );
               },
-              child: const Text("View All"),
+              icon: const Icon(Icons.arrow_forward, size: 16),
+              label: const Text("View All"),
             ),
           ],
         ),
@@ -532,20 +432,37 @@ Widget _buildManagementCard(
           stream: FirebaseFirestore.instance
               .collection("users")
               .orderBy("createdAt", descending: true)
-              .limit(5)
+              .limit(3)
               .snapshots(),
           builder: (context, snapshot) {
             if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
               return Container(
-                padding: const EdgeInsets.all(24),
+                padding: const EdgeInsets.all(32),
                 decoration: BoxDecoration(
                   color: Colors.white,
-                  borderRadius: BorderRadius.circular(12),
+                  borderRadius: BorderRadius.circular(16),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.05),
+                      blurRadius: 10,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
                 ),
                 child: Center(
-                  child: Text(
-                    "No recent activity",
-                    style: TextStyle(color: Colors.grey[600]),
+                  child: Column(
+                    children: [
+                      Icon(Icons.inbox_outlined, size: 48, color: Colors.grey[400]),
+                      const SizedBox(height: 12),
+                      Text(
+                        "No recent activity",
+                        style: TextStyle(
+                          color: Colors.grey[600],
+                          fontSize: 16,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ],
                   ),
                 ),
               );
@@ -554,7 +471,7 @@ Widget _buildManagementCard(
             return Container(
               decoration: BoxDecoration(
                 color: Colors.white,
-                borderRadius: BorderRadius.circular(12),
+                borderRadius: BorderRadius.circular(16),
                 boxShadow: [
                   BoxShadow(
                     color: Colors.black.withOpacity(0.05),
@@ -566,34 +483,121 @@ Widget _buildManagementCard(
               child: ListView.separated(
                 shrinkWrap: true,
                 physics: const NeverScrollableScrollPhysics(),
+                padding: const EdgeInsets.all(4),
                 itemCount: snapshot.data!.docs.length,
-                separatorBuilder: (_, __) =>
-                    Divider(height: 1, color: Colors.grey[200]),
+                separatorBuilder: (_, __) => const SizedBox(height: 2),
                 itemBuilder: (context, index) {
                   final doc = snapshot.data!.docs[index];
                   final data = doc.data() as Map<String, dynamic>;
-                  final displayName =
-                      data["displayName"] as String? ?? "Unknown";
+                  final displayName = data["displayName"] as String? ?? "Unknown";
+                  final email = data["email"] as String? ?? "";
                   final createdAt = _parseTimestamp(data["createdAt"]);
 
-                  return ListTile(
-                    leading: CircleAvatar(
-                      backgroundColor: Colors.blue.withOpacity(0.1),
-                      child:
-                          const Icon(Icons.person_add, color: Colors.blue, size: 20),
+                  return Container(
+                    margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: Colors.grey[50],
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: Colors.blue.withOpacity(0.1)),
                     ),
-                    title: const Text(
-                      "New user registered",
-                      style: TextStyle(fontWeight: FontWeight.w600),
-                    ),
-                    subtitle: Text(displayName),
-                    trailing: createdAt != null
-                        ? Text(
-                            _formatTimeAgo(createdAt.toDate()),
+                    child: ListTile(
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                      leading: Container(
+                        width: 48,
+                        height: 48,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          gradient: LinearGradient(
+                            colors: [
+                              Colors.blue.withOpacity(0.8),
+                              Colors.blue,
+                            ],
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                          ),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.blue.withOpacity(0.3),
+                              blurRadius: 8,
+                              offset: const Offset(0, 4),
+                            ),
+                          ],
+                        ),
+                        child: const Icon(Icons.person_add, color: Colors.white, size: 24),
+                      ),
+                      title: Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              displayName,
+                              style: const TextStyle(
+                                fontWeight: FontWeight.bold,
+                                fontSize: 15,
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                            decoration: BoxDecoration(
+                              color: Colors.green.withOpacity(0.1),
+                              borderRadius: BorderRadius.circular(6),
+                              border: Border.all(color: Colors.green.withOpacity(0.3)),
+                            ),
+                            child: const Text(
+                              "NEW",
+                              style: TextStyle(
+                                color: Colors.green,
+                                fontSize: 10,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      subtitle: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const SizedBox(height: 4),
+                          Text(
+                            "New user registration",
                             style: TextStyle(
-                                fontSize: 12, color: Colors.grey[600]),
-                          )
-                        : null,
+                              fontSize: 13,
+                              color: Colors.grey[600],
+                            ),
+                          ),
+                          if (email.isNotEmpty) ...[
+                            const SizedBox(height: 2),
+                            Text(
+                              email,
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: Colors.grey[500],
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ],
+                          const SizedBox(height: 6),
+                          Row(
+                            children: [
+                              Icon(Icons.access_time, size: 12, color: Colors.grey[500]),
+                              const SizedBox(width: 4),
+                              Text(
+                                createdAt != null
+                                    ? _formatTimeAgo(createdAt.toDate())
+                                    : "Recently",
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  color: Colors.grey[500],
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
                   );
                 },
               ),

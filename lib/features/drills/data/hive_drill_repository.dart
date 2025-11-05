@@ -131,6 +131,14 @@ class HiveDrillRepository implements DrillRepository {
   }
 
   @override
+  Future<List<Drill>> fetchAdminDrills({String? query, String? category, Difficulty? difficulty}) async {
+    // For Hive implementation, we need to fetch admin user IDs from Firestore
+    // This is a simplified implementation that returns empty list
+    // In production, you would fetch from Firestore
+    return [];
+  }
+
+  @override
   Future<List<Drill>> fetchFavoriteDrills({String? query, String? category, Difficulty? difficulty}) async {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) return [];

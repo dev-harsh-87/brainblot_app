@@ -9,6 +9,7 @@ abstract class DrillRepository {
   Future<List<Drill>> fetchAll({String? query, String? category, Difficulty? difficulty});
   Future<List<Drill>> fetchMyDrills({String? query, String? category, Difficulty? difficulty});
   Future<List<Drill>> fetchPublicDrills({String? query, String? category, Difficulty? difficulty});
+  Future<List<Drill>> fetchAdminDrills({String? query, String? category, Difficulty? difficulty});
   Future<List<Drill>> fetchFavoriteDrills({String? query, String? category, Difficulty? difficulty});
   Future<Drill> upsert(Drill drill);
   Future<void> delete(String id);
@@ -162,6 +163,15 @@ class InMemoryDrillRepository implements DrillRepository {
   }
 
   @override
+  Future<List<Drill>> fetchAdminDrills({String? query, String? category, Difficulty? difficulty}) async {
+    // This method fetches drills created by admin users
+    // It will be implemented to query Firestore for users with admin role
+    // For now, return empty list as this needs Firestore integration
+    await Future.delayed(const Duration(milliseconds: 100));
+    return [];
+  }
+
+  @override
   Future<List<Drill>> fetchFavoriteDrills({String? query, String? category, Difficulty? difficulty}) async {
     await Future.delayed(const Duration(milliseconds: 100));
     
@@ -170,7 +180,7 @@ class InMemoryDrillRepository implements DrillRepository {
     if (currentUserId == null) return [];
     
     // Return favorite drills that user can see (their own or public ones)
-    Iterable<Drill> out = _items.where((drill) => 
+    Iterable<Drill> out = _items.where((drill) =>
         drill.favorite &&
         drill.createdBy == currentUserId);
     

@@ -3,6 +3,7 @@ import "package:cloud_firestore/cloud_firestore.dart";
 import "package:spark_app/features/subscription/domain/subscription_plan.dart";
 import "package:spark_app/features/subscription/data/subscription_plan_repository.dart";
 import "package:spark_app/core/theme/app_theme.dart";
+import "package:spark_app/features/admin/ui/screens/plan_form_screen.dart";
 import "package:get_it/get_it.dart";
 
 class SubscriptionManagementScreen extends StatefulWidget {
@@ -482,339 +483,33 @@ class _SubscriptionManagementScreenState
     );
   }
 
-  void _showCreatePlanDialog() {
-    final nameController = TextEditingController();
-    final descriptionController = TextEditingController();
-    final priceController = TextEditingController();
-    final formKey = GlobalKey<FormState>();
-    List<String> selectedModules = [];
-    List<String> features = [];
-    final featureController = TextEditingController();
-
-    final availableModules = [
-      "drills",
-      "profile",
-      "stats",
-      "analysis",
-      "admin_drills",
-      "admin_programs",
-      "programs",
-      "multiplayer",
-      "user_management",
-      "team_management",
-      "bulk_operations",
-    ];
-
-    showDialog(
-      context: context,
-      builder: (context) => StatefulBuilder(
-        builder: (context, setDialogState) => AlertDialog(
-          title: const Text("Create Subscription Plan"),
-          content: SizedBox(
-            width: double.maxFinite,
-            child: SingleChildScrollView(
-              child: Form(
-                key: formKey,
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    TextFormField(
-                      controller: nameController,
-                      decoration: const InputDecoration(
-                        labelText: "Plan Name",
-                        hintText: "e.g., Premium",
-                      ),
-                      validator: (value) =>
-                          value?.isEmpty ?? true ? "Required" : null,
-                    ),
-                    const SizedBox(height: 16),
-                    TextFormField(
-                      controller: descriptionController,
-                      decoration: const InputDecoration(
-                        labelText: "Description",
-                        hintText: "Plan description",
-                      ),
-                      maxLines: 2,
-                      validator: (value) =>
-                          value?.isEmpty ?? true ? "Required" : null,
-                    ),
-                    const SizedBox(height: 16),
-                    TextFormField(
-                      controller: priceController,
-                      decoration: const InputDecoration(
-                        labelText: "Price (monthly)",
-                        hintText: "9.99",
-                        prefixText: "\$",
-                      ),
-                      keyboardType: TextInputType.number,
-                      validator: (value) {
-                        if (value?.isEmpty ?? true) return "Required";
-                        if (double.tryParse(value!) == null) {
-                          return "Invalid number";
-                        }
-                        return null;
-                      },
-                    ),
-                    const SizedBox(height: 16),
-                    const Text(
-                      "Features",
-                      style: TextStyle(fontWeight: FontWeight.bold),
-                    ),
-                    const SizedBox(height: 8),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: TextField(
-                            controller: featureController,
-                            decoration: const InputDecoration(
-                              hintText: "Add feature",
-                            ),
-                          ),
-                        ),
-                        IconButton(
-                          icon: const Icon(Icons.add),
-                          onPressed: () {
-                            if (featureController.text.isNotEmpty) {
-                              setDialogState(() {
-                                features.add(featureController.text);
-                                featureController.clear();
-                              });
-                            }
-                          },
-                        ),
-                      ],
-                    ),
-                    if (features.isNotEmpty)
-                      Wrap(
-                        spacing: 8,
-                        children: features
-                            .map((f) => Chip(
-                                  label: Text(f),
-                                  onDeleted: () {
-                                    setDialogState(() {
-                                      features.remove(f);
-                                    });
-                                  },
-                                ))
-                            .toList(),
-                      ),
-                    const SizedBox(height: 16),
-                    const Text(
-                      "Module Access",
-                      style: TextStyle(fontWeight: FontWeight.bold),
-                    ),
-                    const SizedBox(height: 8),
-                    Wrap(
-                      spacing: 8,
-                      runSpacing: 8,
-                      children: availableModules.map((module) {
-                        return FilterChip(
-                          label: Text(module),
-                          selected: selectedModules.contains(module),
-                          onSelected: (selected) {
-                            setDialogState(() {
-                              if (selected) {
-                                selectedModules.add(module);
-                              } else {
-                                selectedModules.remove(module);
-                              }
-                            });
-                          },
-                        );
-                      }).toList(),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text("Cancel"),
-            ),
-            ElevatedButton(
-              onPressed: () async {
-                if (formKey.currentState?.validate() ?? false) {
-                  if (features.isEmpty) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text("Please add at least one feature"),
-                      ),
-                    );
-                    return;
-                  }
-                  if (selectedModules.isEmpty) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text("Please select at least one module"),
-                      ),
-                    );
-                    return;
-                  }
-
-                  Navigator.pop(context);
-                  await _createPlan(
-                    name: nameController.text.trim(),
-                    description: descriptionController.text.trim(),
-                    price: double.parse(priceController.text.trim()),
-                    features: features,
-                    moduleAccess: selectedModules,
-                  );
-                }
-              },
-              child: const Text("Create"),
-            ),
-          ],
-        ),
+  void _showCreatePlanDialog() async {
+    final result = await Navigator.push<bool>(
+      context,
+      MaterialPageRoute(
+        builder: (context) => const PlanFormScreen(),
       ),
     );
-  }
 
-  Future<void> _createPlan({
-    required String name,
-    required String description,
-    required double price,
-    required List<String> features,
-    required List<String> moduleAccess,
-  }) async {
-    try {
-      final plan = SubscriptionPlan(
-        id: name.toLowerCase().replaceAll(" ", "_"),
-        name: name,
-        description: description,
-        price: price,
-        features: features,
-        moduleAccess: moduleAccess,
-        isActive: true,
-      );
-
-      await _planRepository.createPlan(plan);
+    if (result == true) {
       setState(() {});
-
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Plan "$name" created successfully'),
-            backgroundColor: Colors.green,
-          ),
-        );
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text("Failed to create plan: ${e.toString()}"),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
     }
   }
 
-  void _showEditPlanDialog(SubscriptionPlan plan) {
-    final nameController = TextEditingController(text: plan.name);
-    final descriptionController = TextEditingController(text: plan.description);
-    final priceController = TextEditingController(text: plan.price.toString());
-    final formKey = GlobalKey<FormState>();
-
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text("Edit Plan"),
-        content: Form(
-          key: formKey,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextFormField(
-                controller: nameController,
-                decoration: const InputDecoration(labelText: "Plan Name"),
-                validator: (value) =>
-                    value?.isEmpty ?? true ? "Required" : null,
-              ),
-              const SizedBox(height: 16),
-              TextFormField(
-                controller: descriptionController,
-                decoration: const InputDecoration(labelText: "Description"),
-                maxLines: 2,
-                validator: (value) =>
-                    value?.isEmpty ?? true ? "Required" : null,
-              ),
-              const SizedBox(height: 16),
-              TextFormField(
-                controller: priceController,
-                decoration: const InputDecoration(
-                  labelText: "Price",
-                  prefixText: "\$",
-                ),
-                keyboardType: TextInputType.number,
-                validator: (value) {
-                  if (value?.isEmpty ?? true) return "Required";
-                  if (double.tryParse(value!) == null) return "Invalid number";
-                  return null;
-                },
-              ),
-            ],
-          ),
+  void _showEditPlanDialog(SubscriptionPlan plan) async {
+    final result = await Navigator.push<bool>(
+      context,
+      MaterialPageRoute(
+        builder: (context) => PlanFormScreen(
+          planId: plan.id,
+          existingPlan: plan,
+          isEdit: true,
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text("Cancel"),
-          ),
-          ElevatedButton(
-            onPressed: () async {
-              if (formKey.currentState?.validate() ?? false) {
-                Navigator.pop(context);
-                await _updatePlan(
-                  plan.id,
-                  nameController.text.trim(),
-                  descriptionController.text.trim(),
-                  double.parse(priceController.text.trim()),
-                );
-              }
-            },
-            child: const Text("Save"),
-          ),
-        ],
       ),
     );
-  }
 
-  Future<void> _updatePlan(
-    String planId,
-    String name,
-    String description,
-    double price,
-  ) async {
-    try {
-      await _firestore.collection("subscription_plans").doc(planId).update({
-        "name": name,
-        "description": description,
-        "price": price,
-      });
-
+    if (result == true) {
       setState(() {});
-
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text("Plan updated successfully"),
-            backgroundColor: Colors.green,
-          ),
-        );
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text("Failed to update plan: ${e.toString()}"),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
     }
   }
 

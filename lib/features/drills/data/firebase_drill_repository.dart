@@ -646,7 +646,7 @@ class FirebaseDrillRepository implements DrillRepository {
 
       if (query != null && query.isNotEmpty) {
         final queryLower = query.toLowerCase();
-        drills = drills.where((drill) => 
+        drills = drills.where((drill) =>
             drill.name.toLowerCase().contains(queryLower)).toList();
       }
 
@@ -657,6 +657,56 @@ class FirebaseDrillRepository implements DrillRepository {
     } catch (error) {
       print('Error fetching public drills: $error');
       throw Exception('Failed to fetch public drills: $error');
+    }
+  }
+
+  @override
+  Future<List<Drill>> fetchAdminDrills({String? query, String? category, Difficulty? difficulty}) async {
+    try {
+      // First, get all users with admin role
+      final usersSnapshot = await _firestore
+          .collection('users')
+          .where('role', isEqualTo: 'admin')
+          .get();
+      
+      final adminUserIds = usersSnapshot.docs.map((doc) => doc.id).toList();
+      
+      if (adminUserIds.isEmpty) {
+        return [];
+      }
+      
+      // Fetch drills created by admin users
+      final snapshot = await _firestore
+          .collection(_drillsCollection)
+          .get();
+      
+      List<Drill> drills = _mapSnapshotToDrills(snapshot);
+
+      // Filter to only include drills created by admin users
+      drills = drills.where((drill) => adminUserIds.contains(drill.createdBy)).toList();
+
+      // Apply filters in memory
+      if (category != null && category.isNotEmpty) {
+        drills = drills.where((drill) => drill.category == category).toList();
+      }
+
+      if (difficulty != null) {
+        drills = drills.where((drill) => drill.difficulty == difficulty).toList();
+      }
+
+      if (query != null && query.isNotEmpty) {
+        final queryLower = query.toLowerCase();
+        drills = drills.where((drill) =>
+            drill.name.toLowerCase().contains(queryLower)).toList();
+      }
+
+      // Sort by createdAt
+      drills.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+
+      return drills;
+    } catch (error) {
+      print('Error fetching admin drills: $error');
+      throw Exception('Failed to fetch admin drills: $error');
     }
   }
 
