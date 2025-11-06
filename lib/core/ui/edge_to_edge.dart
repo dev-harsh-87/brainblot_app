@@ -210,9 +210,10 @@ class EdgeToEdgeAppBar extends StatelessWidget implements PreferredSizeWidget {
   Widget build(BuildContext context) {
     final mediaQuery = MediaQuery.of(context);
     final statusBarHeight = mediaQuery.viewPadding.top;
+    final totalHeight = toolbarHeight + statusBarHeight;
     
     return Container(
-      height: preferredSize.height,
+      height: totalHeight,
       decoration: BoxDecoration(
         color: backgroundColor ?? Theme.of(context).colorScheme.primary,
       ),
@@ -242,6 +243,8 @@ class EdgeToEdgeAppBar extends StatelessWidget implements PreferredSizeWidget {
 
   @override
   Size get preferredSize {
-    return Size.fromHeight(toolbarHeight + 44); // 44 is typical status bar height
+    // Use a larger value to ensure it works on devices with notches/Dynamic Island
+    // The actual height is calculated in build() using the real MediaQuery values
+    return Size.fromHeight(toolbarHeight + 60);
   }
 }

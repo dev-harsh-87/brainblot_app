@@ -25,6 +25,7 @@ class _DrillBuilderScreenState extends State<DrillBuilderScreen>
   Difficulty _difficulty = Difficulty.beginner;
   int _duration = 60;
   int _rest = 30;
+  int _sets = 1;
   int _reps = 3;
   int _numberOfStimuli = 30;
   final Set<StimulusType> _stimuli = {StimulusType.color};
@@ -63,6 +64,7 @@ class _DrillBuilderScreenState extends State<DrillBuilderScreen>
       _difficulty = d.difficulty;
       _duration = d.durationSec < 60 ? 60 : d.durationSec; // Ensure minimum 60 seconds
       _rest = d.restSec;
+      _sets = d.sets;
       _reps = d.reps;
       _numberOfStimuli = d.numberOfStimuli;
       _stimuli
@@ -99,6 +101,7 @@ class _DrillBuilderScreenState extends State<DrillBuilderScreen>
       difficulty: _difficulty,
       durationSec: _duration,
       restSec: _rest,
+      sets: _sets,
       reps: _reps,
       stimulusTypes: _stimuli.toList(),
       numberOfStimuli: _numberOfStimuli,
@@ -614,7 +617,22 @@ class _DrillBuilderScreenState extends State<DrillBuilderScreen>
                   children: [
                     Expanded(
                       child: _buildSliderField(
-                        'Number of repetitions',
+                        'Number of sets',
+                        _sets.toDouble(),
+                        1.0,
+                        5.0,
+                        (value) => setState(() => _sets = value.round()),
+                        '$_sets sets',
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 16),
+                Row(
+                  children: [
+                    Expanded(
+                      child: _buildSliderField(
+                        'Repetitions per set',
                         _reps.toDouble(),
                         1.0,
                         10.0,

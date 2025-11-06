@@ -13,7 +13,8 @@ class Drill {
   final Difficulty difficulty;
   final int durationSec;
   final int restSec;
-  final int reps;
+  final int sets; // number of sets to perform
+  final int reps; // repetitions per set
   final List<StimulusType> stimulusTypes;
   final int numberOfStimuli; // per rep or per minute depending on design
   final List<ReactionZone> zones;
@@ -31,6 +32,7 @@ class Drill {
     required this.difficulty,
     required this.durationSec,
     required this.restSec,
+    this.sets = 1, // default to 1 set
     required this.reps,
     required this.stimulusTypes,
     required this.numberOfStimuli,
@@ -50,6 +52,7 @@ class Drill {
     Difficulty? difficulty,
     int? durationSec,
     int? restSec,
+    int? sets,
     int? reps,
     List<StimulusType>? stimulusTypes,
     int? numberOfStimuli,
@@ -67,6 +70,7 @@ class Drill {
         difficulty: difficulty ?? this.difficulty,
         durationSec: durationSec ?? this.durationSec,
         restSec: restSec ?? this.restSec,
+        sets: sets ?? this.sets,
         reps: reps ?? this.reps,
         stimulusTypes: stimulusTypes ?? this.stimulusTypes,
         numberOfStimuli: numberOfStimuli ?? this.numberOfStimuli,
@@ -86,6 +90,7 @@ class Drill {
         'difficulty': difficulty.name,
         'durationSec': durationSec,
         'restSec': restSec,
+        'sets': sets,
         'reps': reps,
         'stimulusTypes': stimulusTypes.map((e) => e.name).toList(),
         'numberOfStimuli': numberOfStimuli,
@@ -105,6 +110,7 @@ class Drill {
         difficulty: Difficulty.values.firstWhere((d) => d.name == map['difficulty']),
         durationSec: map['durationSec'] as int,
         restSec: map['restSec'] as int,
+        sets: (map['sets'] as int?) ?? 1, // default to 1 for backward compatibility
         reps: map['reps'] as int,
         stimulusTypes: (map['stimulusTypes'] as List).map((e) => StimulusType.values.firstWhere((s) => s.name == e)).toList(),
         numberOfStimuli: map['numberOfStimuli'] as int,

@@ -1041,7 +1041,7 @@ class _StatsScreenState extends State<StatsScreen> with SingleTickerProviderStat
     if (values.length < 2) return null;
     
     // Ensure we have enough values to compare
-    if (values.length < 6) {
+    if (values.length < 10) {
       // For small datasets, compare first half vs second half
       final midPoint = values.length ~/ 2;
       final older = values.sublist(0, midPoint);
@@ -1072,7 +1072,7 @@ class _StatsScreenState extends State<StatsScreen> with SingleTickerProviderStat
     
     List<SessionResult> recent, older;
     
-    if (sessions.length < 6) {
+    if (sessions.length < 10) {
       final midPoint = sessions.length ~/ 2;
       older = sessions.sublist(0, midPoint);
       recent = sessions.sublist(midPoint);
@@ -1099,7 +1099,7 @@ class _StatsScreenState extends State<StatsScreen> with SingleTickerProviderStat
     
     List<SessionResult> recent, older;
     
-    if (sessions.length < 6) {
+    if (sessions.length < 10) {
       final midPoint = sessions.length ~/ 2;
       older = sessions.sublist(0, midPoint);
       recent = sessions.sublist(midPoint);
@@ -1126,7 +1126,7 @@ class _StatsScreenState extends State<StatsScreen> with SingleTickerProviderStat
     
     List<SessionResult> recent, older;
     
-    if (sessions.length < 6) {
+    if (sessions.length < 10) {
       final midPoint = sessions.length ~/ 2;
       older = sessions.sublist(0, midPoint);
       recent = sessions.sublist(midPoint);

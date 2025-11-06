@@ -175,6 +175,10 @@ class _DrillResultsScreenState extends State<DrillResultsScreen>
                           _buildDetailedStats(),
                           const SizedBox(height: 20),
                           
+                          // Set-wise Performance
+                          _buildSetWisePerformance(),
+                          const SizedBox(height: 20),
+                          
                           // Performance Breakdown
                           _buildPerformanceBreakdown(),
                           const SizedBox(height: 32),
@@ -411,6 +415,306 @@ class _DrillResultsScreenState extends State<DrillResultsScreen>
         ],
       ),
     );
+  }
+
+  Widget _buildSetWisePerformance() {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final drill = widget.result.drill;
+    
+    // Calculate stimuli per set
+    final stimuliPerSet = drill.numberOfStimuli;
+    final totalSets = drill.sets;
+    final events = widget.result.events;
+    
+    // Group events into sets
+    List<List<ReactionEvent>> sets = [];
+    for (int setIndex = 0; setIndex < totalSets; setIndex++) {
+      final startIndex = setIndex * stimuliPerSet;
+      final endIndex = math.min(startIndex + stimuliPerSet, events.length);
+      if (startIndex < events.length) {
+        sets.add(events.sublist(startIndex, endIndex));
+      }
+    }
+    
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: colorScheme.surfaceContainerHighest,
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(
+                Icons.format_list_numbered,
+                color: colorScheme.primary,
+                size: 20,
+              ),
+              const SizedBox(width: 8),
+              Text(
+                'Set-wise Performance',
+                style: theme.textTheme.titleMedium?.copyWith(
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          
+          // Set performance cards
+          ...sets.asMap().entries.map((entry) {
+            final setIndex = entry.key;
+            final setEvents = entry.value;
+            final setHits = setEvents.where((e) => e.correct).length;
+            final setAccuracy = setEvents.isNotEmpty ? setHits / setEvents.length : 0.0;
+            final setReactionTimes = setEvents
+                .where((e) => e.correct && e.reactionTimeMs != null)
+                .map((e) => e.reactionTimeMs!)
+                .toList();
+            final avgSetReaction = setReactionTimes.isNotEmpty
+                ? setReactionTimes.reduce((a, b) => a + b) / setReactionTimes.length
+                : 0.0;
+            
+            return Container(
+              margin: const EdgeInsets.only(bottom: 12),
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: colorScheme.surface,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(
+                  color: _getPerformanceColor(setAccuracy).withOpacity(0.3),
+                  width: 1,
+                ),
+              ),
+              child: Row(
+                children: [
+                  // Set number indicator
+                  Container(
+                    width: 40,
+                    height: 40,
+                    decoration: BoxDecoration(
+                      color: _getPerformanceColor(setAccuracy),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Center(
+                      child: Text(
+                        '${setIndex + 1}',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 16,
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 16),
+                  
+                  // Set stats
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Text(
+                              'Set ${setIndex + 1}',
+                              style: theme.textTheme.titleSmall?.copyWith(
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                              decoration: BoxDecoration(
+                                color: _getPerformanceColor(setAccuracy).withOpacity(0.1),
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: Text(
+                                '${(setAccuracy * 100).toStringAsFixed(0)}%',
+                                style: theme.textTheme.labelSmall?.copyWith(
+                                  color: _getPerformanceColor(setAccuracy),
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 4),
+                        Row(
+                          children: [
+                            _buildSetStatItem(
+                              'Hits',
+                              '$setHits/${setEvents.length}',
+                              Icons.check_circle_outline,
+                              Colors.green,
+                            ),
+                            const SizedBox(width: 16),
+                            _buildSetStatItem(
+                              'Avg RT',
+                              '${avgSetReaction.toStringAsFixed(0)}ms',
+                              Icons.timer_outlined,
+                              Colors.blue,
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            );
+          }),
+          
+          // Summary row
+          if (sets.isNotEmpty) ...[
+            const SizedBox(height: 8),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [
+                    colorScheme.primary.withOpacity(0.1),
+                    colorScheme.primary.withOpacity(0.05),
+                  ],
+                ),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceAround,
+                children: [
+                  _buildSummaryItem(
+                    'Best Set',
+                    '${_getBestSetIndex(sets) + 1}',
+                    Icons.star,
+                    colorScheme.primary,
+                  ),
+                  _buildSummaryItem(
+                    'Consistency',
+                    _getConsistencyRating(sets),
+                    Icons.trending_up,
+                    _getConsistencyColor(sets),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+  
+  Widget _buildSetStatItem(String label, String value, IconData icon, Color color) {
+    final theme = Theme.of(context);
+    
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(icon, size: 12, color: color),
+        const SizedBox(width: 4),
+        Text(
+          '$label: ',
+          style: theme.textTheme.bodySmall?.copyWith(
+            color: theme.colorScheme.onSurface.withOpacity(0.6),
+          ),
+        ),
+        Text(
+          value,
+          style: theme.textTheme.bodySmall?.copyWith(
+            fontWeight: FontWeight.w600,
+            color: color,
+          ),
+        ),
+      ],
+    );
+  }
+  
+  Widget _buildSummaryItem(String label, String value, IconData icon, Color color) {
+    final theme = Theme.of(context);
+    
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Container(
+          padding: const EdgeInsets.all(4),
+          decoration: BoxDecoration(
+            color: color.withOpacity(0.1),
+            borderRadius: BorderRadius.circular(6),
+          ),
+          child: Icon(icon, size: 14, color: color),
+        ),
+        const SizedBox(width: 6),
+        Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              value,
+              style: theme.textTheme.labelLarge?.copyWith(
+                fontWeight: FontWeight.bold,
+                color: color,
+              ),
+            ),
+            Text(
+              label,
+              style: theme.textTheme.labelSmall?.copyWith(
+                color: theme.colorScheme.onSurface.withOpacity(0.6),
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+  
+  int _getBestSetIndex(List<List<ReactionEvent>> sets) {
+    double bestAccuracy = 0;
+    int bestIndex = 0;
+    
+    for (int i = 0; i < sets.length; i++) {
+      final setEvents = sets[i];
+      final setHits = setEvents.where((e) => e.correct).length;
+      final setAccuracy = setEvents.isNotEmpty ? setHits / setEvents.length : 0.0;
+      
+      if (setAccuracy > bestAccuracy) {
+        bestAccuracy = setAccuracy;
+        bestIndex = i;
+      }
+    }
+    
+    return bestIndex;
+  }
+  
+  String _getConsistencyRating(List<List<ReactionEvent>> sets) {
+    if (sets.length < 2) return 'N/A';
+    
+    List<double> setAccuracies = [];
+    for (final setEvents in sets) {
+      final setHits = setEvents.where((e) => e.correct).length;
+      final setAccuracy = setEvents.isNotEmpty ? setHits / setEvents.length : 0.0;
+      setAccuracies.add(setAccuracy);
+    }
+    
+    final mean = setAccuracies.reduce((a, b) => a + b) / setAccuracies.length;
+    final variance = setAccuracies.map((acc) => math.pow(acc - mean, 2)).reduce((a, b) => a + b) / setAccuracies.length;
+    final standardDeviation = math.sqrt(variance);
+    
+    if (standardDeviation < 0.1) return 'Excellent';
+    if (standardDeviation < 0.2) return 'Good';
+    if (standardDeviation < 0.3) return 'Fair';
+    return 'Variable';
+  }
+  
+  Color _getConsistencyColor(List<List<ReactionEvent>> sets) {
+    final rating = _getConsistencyRating(sets);
+    switch (rating) {
+      case 'Excellent': return Colors.green;
+      case 'Good': return Colors.blue;
+      case 'Fair': return Colors.orange;
+      case 'Variable': return Colors.red;
+      default: return Colors.grey;
+    }
   }
 
   Widget _buildPerformanceBreakdown() {

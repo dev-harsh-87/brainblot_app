@@ -1,0 +1,277 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
+import 'package:package_info_plus/package_info_plus.dart';
+import 'dart:io';
+import 'dart:async';
+
+/// Service to manage single device login sessions
+/// Ensures only one device can be logged in per user at a time
+class DeviceSessionService {
+  final FirebaseFirestore _firestore;
+  final FirebaseAuth _auth;
+  final FirebaseMessaging _messaging;
+  
+  static const String _deviceSessionsCollection = 'deviceSessions';
+  static const String _userSessionsCollection = 'userSessions';
+  
+  DeviceSessionService({
+    FirebaseFirestore? firestore,
+    FirebaseAuth? auth,
+    FirebaseMessaging? messaging,
+  })  : _firestore = firestore ?? FirebaseFirestore.instance,
+        _auth = auth ?? FirebaseAuth.instance,
+        _messaging = messaging ?? FirebaseMessaging.instance;
+ 
+  /// Register a new device session for the current user
+  /// If another device is already logged in, it will be force logged out (unless user is admin)
+  Future<void> registerDeviceSession(String userId, {bool isAdmin = false}) async {
+    try {
+      // Get device information
+      final deviceInfo = await _getDeviceInfo();
+      
+      // Try to get FCM token, but don't fail if it's not available
+      String? fcmToken;
+      try {
+        fcmToken = await _messaging.getToken();
+      } catch (e) {
+        print('⚠️ FCM token not available: $e');
+        fcmToken = null; // Continue without FCM token
+      }
+      
+      // Check if user has an existing active session on another device
+      // Skip for admins as they can have multiple concurrent sessions
+      if (!isAdmin) {
+        await _checkAndHandleExistingSession(userId, deviceInfo['deviceId'] as String);
+      }
+      
+      // Register new device session
+      await _createDeviceSession(userId, deviceInfo, fcmToken);
+      
+      print('✅ Device session registered successfully');
+    } catch (e) {
+      print('❌ Failed to register device session: $e');
+      rethrow;
+    }
+  }
+
+  /// Check for existing sessions and handle device conflicts
+  Future<void> _checkAndHandleExistingSession(String userId, String currentDeviceId) async {
+    try {
+      // Get current active session for this user
+      final existingSessionQuery = await _firestore
+          .collection(_userSessionsCollection)
+          .doc(userId)
+          .get();
+
+      if (existingSessionQuery.exists) {
+        final sessionData = existingSessionQuery.data()!;
+        final existingDeviceId = sessionData['deviceId'] as String?;
+        final existingFcmToken = sessionData['fcmToken'] as String?;
+        
+        // If same device, just update timestamp
+        if (existingDeviceId == currentDeviceId) {
+          await _updateSessionTimestamp(userId);
+          return;
+        }
+        
+        // Different device detected - force logout the previous device
+        print('🔄 Different device detected, logging out previous session...');
+        
+        if (existingFcmToken != null) {
+          await _sendLogoutNotification(existingFcmToken, sessionData);
+        }
+        
+        // Remove the previous device session
+        await _removeDeviceSession(userId, existingDeviceId);
+      }
+    } catch (e) {
+      print('⚠️ Error checking existing session: $e');
+      // Continue with registration even if check fails
+    }
+  }
+
+  /// Create a new device session
+  Future<void> _createDeviceSession(String userId, Map<String, dynamic> deviceInfo, String? fcmToken) async {
+    final sessionData = {
+      'userId': userId,
+      'deviceId': deviceInfo['deviceId'],
+      'deviceName': deviceInfo['deviceName'],
+      'deviceType': deviceInfo['deviceType'],
+      'platform': deviceInfo['platform'],
+      'appVersion': deviceInfo['appVersion'],
+      'fcmToken': fcmToken,
+      'loginTime': FieldValue.serverTimestamp(),
+      'lastActiveTime': FieldValue.serverTimestamp(),
+      'isActive': true,
+    };
+
+    // Create/update user session document
+    await _firestore.collection(_userSessionsCollection).doc(userId).set(sessionData);
+    
+    // Create device-specific session document
+    await _firestore
+        .collection(_deviceSessionsCollection)
+        .doc('${userId}_${deviceInfo['deviceId']}')
+        .set(sessionData);
+  }
+
+  /// Update session timestamp for activity tracking
+  Future<void> _updateSessionTimestamp(String userId) async {
+    try {
+      await _firestore.collection(_userSessionsCollection).doc(userId).update({
+        'lastActiveTime': FieldValue.serverTimestamp(),
+      });
+    } catch (e) {
+      print('⚠️ Failed to update session timestamp: $e');
+    }
+  }
+
+  /// Remove device session
+  Future<void> _removeDeviceSession(String userId, String? deviceId) async {
+    try {
+      // Remove user session
+      await _firestore.collection(_userSessionsCollection).doc(userId).delete();
+      
+      // Remove device-specific session if deviceId is available
+      if (deviceId != null) {
+        await _firestore
+            .collection(_deviceSessionsCollection)
+            .doc('${userId}_$deviceId')
+            .delete();
+      }
+    } catch (e) {
+      print('⚠️ Failed to remove device session: $e');
+    }
+  }
+
+  /// Send logout notification to the previous device
+  Future<void> _sendLogoutNotification(String fcmToken, Map<String, dynamic> sessionData) async {
+    try {
+      // In a real implementation, you would send this via your backend
+      // For now, we'll create a Firestore document that the other device can listen to
+      await _firestore.collection('logoutNotifications').add({
+        'fcmToken': fcmToken,
+        'userId': sessionData['userId'],
+        'deviceId': sessionData['deviceId'],
+        'message': 'You have been logged out because your account was accessed from another device.',
+        'timestamp': FieldValue.serverTimestamp(),
+        'processed': false,
+      });
+      
+      print('📱 Logout notification sent to previous device');
+    } catch (e) {
+      print('⚠️ Failed to send logout notification: $e');
+    }
+  }
+
+  /// Listen for logout notifications for current device
+  Stream<DocumentSnapshot> listenForLogoutNotifications() {
+    final userId = _auth.currentUser?.uid;
+    if (userId == null) {
+      return const Stream.empty();
+    }
+
+    return _firestore
+        .collection('logoutNotifications')
+        .where('userId', isEqualTo: userId)
+        .where('processed', isEqualTo: false)
+        .snapshots()
+        .map((snapshot) => snapshot.docs.isNotEmpty ? snapshot.docs.first : throw StateError('No notifications'));
+  }
+
+  /// Mark logout notification as processed
+  Future<void> markNotificationProcessed(String notificationId) async {
+    try {
+      await _firestore.collection('logoutNotifications').doc(notificationId).update({
+        'processed': true,
+        'processedAt': FieldValue.serverTimestamp(),
+      });
+    } catch (e) {
+      print('⚠️ Failed to mark notification as processed: $e');
+    }
+  }
+
+  /// Get device information
+  Future<Map<String, dynamic>> _getDeviceInfo() async {
+    final packageInfo = await PackageInfo.fromPlatform();
+    
+    // Generate a unique device ID (you might want to use a more sophisticated method)
+    String deviceId = '';
+    String deviceName = '';
+    String deviceType = '';
+    String platform = '';
+
+    if (Platform.isAndroid) {
+      platform = 'Android';
+      deviceType = 'Mobile';
+      deviceName = 'Android Device';
+      // In a real app, you'd use android_id or a similar unique identifier
+      deviceId = 'android_${DateTime.now().millisecondsSinceEpoch}';
+    } else if (Platform.isIOS) {
+      platform = 'iOS';
+      deviceType = 'Mobile';
+      deviceName = 'iPhone';
+      // In a real app, you'd use identifierForVendor or similar
+      deviceId = 'ios_${DateTime.now().millisecondsSinceEpoch}';
+    }
+
+    return {
+      'deviceId': deviceId,
+      'deviceName': deviceName,
+      'deviceType': deviceType,
+      'platform': platform,
+      'appVersion': packageInfo.version,
+      'buildNumber': packageInfo.buildNumber,
+    };
+  }
+
+  /// Cleanup session on logout
+  Future<void> cleanupSession(String userId) async {
+    try {
+      final deviceInfo = await _getDeviceInfo();
+      await _removeDeviceSession(userId, deviceInfo['deviceId'] as String?);
+      print('✅ Device session cleaned up');
+    } catch (e) {
+      print('⚠️ Failed to cleanup device session: $e');
+    }
+  }
+
+  /// Check if current device session is valid
+  Future<bool> isCurrentSessionValid() async {
+    try {
+      final userId = _auth.currentUser?.uid;
+      if (userId == null) return false;
+
+      final deviceInfo = await _getDeviceInfo();
+      final sessionDoc = await _firestore
+          .collection(_userSessionsCollection)
+          .doc(userId)
+          .get();
+
+      if (!sessionDoc.exists) return false;
+
+      final sessionData = sessionDoc.data()!;
+      final sessionDeviceId = sessionData['deviceId'] as String?;
+      
+      return sessionDeviceId == deviceInfo['deviceId'];
+    } catch (e) {
+      print('⚠️ Failed to validate session: $e');
+      return false;
+    }
+  }
+
+  /// Get all active sessions for debugging (admin only)
+  Future<List<Map<String, dynamic>>> getAllActiveSessions() async {
+    try {
+      final snapshot = await _firestore.collection(_userSessionsCollection).get();
+      return snapshot.docs.map((doc) => {
+        'id': doc.id,
+        ...doc.data(),
+      }).toList();
+    } catch (e) {
+      print('❌ Failed to get active sessions: $e');
+      return [];
+    }
+  }
+}

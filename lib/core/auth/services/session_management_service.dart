@@ -4,6 +4,7 @@ import 'package:spark_app/core/auth/models/app_user.dart';
 import 'package:spark_app/core/auth/models/user_role.dart';
 import 'package:spark_app/core/services/preferences_service.dart';
 import 'package:spark_app/core/auth/services/permission_service.dart';
+import 'package:spark_app/core/auth/services/device_session_service.dart';
 import 'package:spark_app/features/subscription/services/subscription_sync_service.dart';
 import 'dart:async';
 
@@ -14,11 +15,13 @@ class SessionManagementService {
   final FirebaseFirestore _firestore;
   final PermissionService? _permissionService;
   final SubscriptionSyncService _subscriptionSync;
+  final DeviceSessionService _deviceSessionService;
   
   // Session state
   AppUser? _currentSession;
   StreamSubscription<User?>? _authSubscription;
   StreamSubscription<DocumentSnapshot>? _userSubscription;
+  StreamSubscription<DocumentSnapshot>? _logoutSubscription;
   
   // Session callbacks
   final List<Function(AppUser?)> _sessionListeners = [];
@@ -28,10 +31,12 @@ class SessionManagementService {
     FirebaseFirestore? firestore,
     PermissionService? permissionService,
     SubscriptionSyncService? subscriptionSync,
+    DeviceSessionService? deviceSessionService,
   })  : _auth = auth ?? FirebaseAuth.instance,
         _firestore = firestore ?? FirebaseFirestore.instance,
         _permissionService = permissionService,
-        _subscriptionSync = subscriptionSync ?? SubscriptionSyncService() {
+        _subscriptionSync = subscriptionSync ?? SubscriptionSyncService(),
+        _deviceSessionService = deviceSessionService ?? DeviceSessionService() {
     _initializeSessionMonitoring();
   }
 
@@ -63,6 +68,28 @@ class SessionManagementService {
     try {
       // Cancel existing user subscription if any
       await _userSubscription?.cancel();
+      await _logoutSubscription?.cancel();
+      
+      // Register device session (handles single device login)
+      // Check if user is admin first
+      final userRole = _determineUserRole(firebaseUser.email);
+      final isAdmin = userRole == 'admin';
+      
+      print("🔄 Registering device session...");
+      await _deviceSessionService.registerDeviceSession(firebaseUser.uid, isAdmin: isAdmin);
+      print("✅ Device session registered (Admin: $isAdmin)");
+      
+      // Listen for logout notifications from other devices
+      _logoutSubscription = _deviceSessionService.listenForLogoutNotifications().listen(
+        (notification) async {
+          print("📱 Received logout notification from another device");
+          await _handleForceLogout();
+        },
+        onError: (error) {
+          // Silent fail - notification system is not critical
+          print("⚠️ Logout notification error: $error");
+        },
+      );
       
       // First ensure user profile exists
 // CRITICAL: Sync subscription BEFORE listening to snapshots
@@ -115,11 +142,29 @@ class SessionManagementService {
     }
   }
 
+  /// Handle force logout from another device
+  Future<void> _handleForceLogout() async {
+    print("🚪 Force logout initiated - another device logged in");
+    
+    // Sign out from Firebase Auth
+    await _auth.signOut();
+    
+    // Show user notification (you can customize this)
+    print("📱 You have been logged out because your account was accessed from another device");
+  }
+
   /// Clear user session
   Future<void> _clearSession() async {
     // Cancel subscriptions
     await _userSubscription?.cancel();
+    await _logoutSubscription?.cancel();
     _userSubscription = null;
+    _logoutSubscription = null;
+    
+    // Cleanup device session
+    if (_currentSession != null) {
+      await _deviceSessionService.cleanupSession(_currentSession!.id);
+    }
     
     // Clear session data
     _currentSession = null;
@@ -426,6 +471,7 @@ class SessionManagementService {
   Future<void> dispose() async {
     await _authSubscription?.cancel();
     await _userSubscription?.cancel();
+    await _logoutSubscription?.cancel();
     await _subscriptionSync.dispose();
     _sessionListeners.clear();
   }

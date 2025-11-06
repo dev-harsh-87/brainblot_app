@@ -272,11 +272,36 @@ class _DrillRunnerScreenState extends State<DrillRunnerScreen>
     });
     
     _startedAt = DateTime.now();
+    
+    // Initialize first set and rep
+    _initializeNewSet();
+    _initializeNewRep();
+    
     _stopwatch
       ..reset()
       ..start();
     _ticker = Timer.periodic(const Duration(milliseconds: 8), _onTick); // ~120 fps
     HapticFeedback.mediumImpact();
+  }
+
+  void _initializeNewSet() {
+    _currentSetStartTime = DateTime.now();
+    final newSet = SetResult(
+      setNumber: _currentSet,
+      repResults: [],
+      startTime: _currentSetStartTime!,
+    );
+    _setResults.add(newSet);
+  }
+
+  void _initializeNewRep() {
+    _currentRep++;
+    _currentRepStartTime = DateTime.now();
+    _currentRepEvents = [];
+    _events.clear(); // Clear events for new rep
+    _score = 0; // Reset score for new rep
+    _currentIndex = -1; // Reset stimulus index
+    _current = null; // Clear current stimulus
   }
 
   void _onTick(Timer timer) {
@@ -407,10 +432,10 @@ void _completeRep() {
           : validReactions.map((e) => e.reactionTimeMs!).reduce((a, b) => a + b) / validReactions.length;
       final accuracy = _currentRepEvents.isEmpty
           ? 0.0
-          : (_currentRepEvents.where((e) => e.correct).length / _currentRepEvents.length) * 100;
+          : (_currentRepEvents.where((e) => e.correct).length / _currentRepEvents.length);
       
       final repResult = RepResult(
-        repNumber: _currentRep + 1,
+        repNumber: _currentRep,
         events: List.from(_currentRepEvents),
         startTime: _currentRepStartTime!,
         endTime: DateTime.now(),
@@ -424,8 +449,6 @@ void _completeRep() {
         _setResults.last.repResults.add(repResult);
       }
     }
-    
-    _currentRep++;
     
     // Check if set is complete
     if (_currentRep >= widget.drill.reps) {
@@ -441,9 +464,11 @@ void _completeRep() {
   }
 
   void _completeSet() {
-    setState(() {
-      _state = DrillRunnerState.finished;
-    });
+    // Update current set's end time and stats
+    if (_setResults.isNotEmpty) {
+      _setResults.last.endTime = DateTime.now();
+      _setResults.last.updateStats();
+    }
     
     HapticFeedback.heavyImpact();
     SystemSound.play(SystemSoundType.click);
@@ -454,11 +479,14 @@ void _completeRep() {
     // Check if all sets are complete
     if (_currentSet >= widget.drill.reps) {
       // All sets complete - finish drill
+      setState(() {
+        _state = DrillRunnerState.finished;
+      });
       Future.delayed(const Duration(milliseconds: 1500), () {
         _finish();
       });
     } else {
-      // Start rest period between sets
+      // Start next set
       _currentSet++;
       _currentRep = 0;
       
@@ -466,6 +494,7 @@ void _completeRep() {
         if (widget.drill.restSec > 0) {
           _startRestPeriod();
         } else {
+          _initializeNewSet();
           _startNextRep();
         }
       });
@@ -500,12 +529,8 @@ void _completeRep() {
       _restCountdown = 0;
     });
     
-    // Reset for next rep
-    _currentIndex = -1;
-    _current = null;
-    _stopwatch.reset();
-    _events.clear();
-    _score = 0;
+    // Initialize new rep
+    _initializeNewRep();
     
     // Start countdown for next rep
     _startCountdown();
@@ -653,177 +678,13 @@ void _completeRep() {
           // Navigate back to program
           context.go('/programs');
         } else {
-          // Show detailed results screen
-          _showDetailedResults(detailedResult);
+          // Navigate to drill results screen
+          context.go('/drill-results', extra: result);
         }
       }
     });
   }
 
-  void _showDetailedResults(DetailedSessionResult detailedResult) {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (context) => DraggableScrollableSheet(
-        initialChildSize: 0.9,
-        maxChildSize: 0.95,
-        minChildSize: 0.5,
-        builder: (context, scrollController) => Container(
-          decoration: const BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.only(
-              topLeft: Radius.circular(20),
-              topRight: Radius.circular(20),
-            ),
-          ),
-          child: Column(
-            children: [
-              // Handle bar
-              Container(
-                margin: const EdgeInsets.only(top: 8),
-                height: 4,
-                width: 40,
-                decoration: BoxDecoration(
-                  color: Colors.grey[300],
-                  borderRadius: BorderRadius.circular(2),
-                ),
-              ),
-              
-              // Header
-              Padding(
-                padding: const EdgeInsets.all(20),
-                child: Column(
-                  children: [
-                    Text(
-                      'Drill Results',
-                      style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      widget.drill.name,
-                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                        color: Colors.grey[600],
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              
-              // Overall Stats
-              Container(
-                margin: const EdgeInsets.symmetric(horizontal: 20),
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: Colors.blue[50],
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceAround,
-                  children: [
-                    _buildStatColumn('Total Score', '${detailedResult.totalScore}', Colors.green),
-                    _buildStatColumn('Avg Reaction', '${detailedResult.overallAverageReactionTime.toStringAsFixed(0)}ms', Colors.blue),
-                    _buildStatColumn('Accuracy', '${detailedResult.overallAccuracy.toStringAsFixed(1)}%', Colors.orange),
-                  ],
-                ),
-              ),
-              
-              const SizedBox(height: 20),
-              
-              // Detailed Results
-              Expanded(
-                child: ListView.builder(
-                  controller: scrollController,
-                  padding: const EdgeInsets.symmetric(horizontal: 20),
-                  itemCount: detailedResult.setResults.length,
-                  itemBuilder: (context, setIndex) {
-                    final setResult = detailedResult.setResults[setIndex];
-                    return Card(
-                      margin: const EdgeInsets.only(bottom: 16),
-                      child: ExpansionTile(
-                        title: Text('Set ${setResult.setNumber}'),
-                        subtitle: Text(
-                          'Score: ${setResult.totalScore} | Avg: ${setResult.averageReactionTime.toStringAsFixed(0)}ms | ${setResult.accuracy.toStringAsFixed(1)}%',
-                        ),
-                        children: [
-                          ...setResult.repResults.asMap().entries.map((entry) {
-                            final repIndex = entry.key;
-                            final repResult = entry.value;
-                            return ListTile(
-                              contentPadding: const EdgeInsets.symmetric(horizontal: 32, vertical: 4),
-                              title: Text('Rep ${repIndex + 1}'),
-                              subtitle: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text('Score: ${repResult.score}/${repResult.events.length}'),
-                                  Text('Avg Reaction: ${repResult.averageReactionTime.toStringAsFixed(0)}ms'),
-                                  Text('Accuracy: ${repResult.accuracy.toStringAsFixed(1)}%'),
-                                ],
-                              ),
-                              trailing: Icon(
-                                repResult.accuracy >= 80 ? Icons.check_circle : Icons.warning,
-                                color: repResult.accuracy >= 80 ? Colors.green : Colors.orange,
-                              ),
-                            );
-                          }).toList(),
-                        ],
-                      ),
-                    );
-                  },
-                ),
-              ),
-              
-              // Close button
-              Padding(
-                padding: const EdgeInsets.all(20),
-                child: SizedBox(
-                  width: double.infinity,
-                  child: ElevatedButton(
-                    onPressed: () {
-                      Navigator.of(context).pop();
-                      context.go('/drills');
-                    },
-                    style: ElevatedButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(vertical: 16),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                    ),
-                    child: const Text('Back to Drills'),
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildStatColumn(String label, String value, Color color) {
-    return Column(
-      children: [
-        Text(
-          value,
-          style: TextStyle(
-            fontSize: 24,
-            fontWeight: FontWeight.bold,
-            color: color,
-          ),
-        ),
-        const SizedBox(height: 4),
-        Text(
-          label,
-          style: TextStyle(
-            fontSize: 12,
-            color: Colors.grey[600],
-          ),
-        ),
-      ],
-    );
-  }
 
   @override
   void dispose() {
@@ -974,7 +835,7 @@ void _completeRep() {
             children: [
               _buildStatItem(
                 'Set',
-                '$_currentSet/${widget.drill.reps}',
+                '$_currentSet/${widget.drill.sets}',
                 Icons.layers,
               ),
               _buildStatItem(

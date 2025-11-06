@@ -3,8 +3,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import 'package:spark_app/features/auth/bloc/auth_bloc.dart';
 import 'package:spark_app/core/services/preferences_service.dart';
-import 'package:google_sign_in/google_sign_in.dart';
-import 'package:firebase_auth/firebase_auth.dart';
+
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -86,26 +85,7 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
     }
   }
 
-  Future<void> _signInWithGoogle() async {
-    try {
-      final GoogleSignInAccount? googleUser = await GoogleSignIn().signIn();
-      if (googleUser == null) return;
-      
-      final GoogleSignInAuthentication googleAuth = await googleUser.authentication;
-      final credential = GoogleAuthProvider.credential(
-        accessToken: googleAuth.accessToken,
-        idToken: googleAuth.idToken,
-      );
-      
-      await FirebaseAuth.instance.signInWithCredential(credential);
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Google sign-in failed: ${e.toString()}')),
-        );
-      }
-    }
-  }
+
 
   @override
   Widget build(BuildContext context) {
@@ -322,54 +302,9 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
                                 ),
                                 const SizedBox(height: 24),
                                 
-                                // Divider
-                                Row(
-                                  children: [
-                                    Expanded(child: Divider(color: colorScheme.outline.withOpacity(0.3))),
-                                    Padding(
-                                      padding: const EdgeInsets.symmetric(horizontal: 16),
-                                      child: Text(
-                                        'or continue with',
-                                        style: theme.textTheme.bodySmall?.copyWith(
-                                          color: colorScheme.onSurface.withOpacity(0.6),
-                                        ),
-                                      ),
-                                    ),
-                                    Expanded(child: Divider(color: colorScheme.outline.withOpacity(0.3))),
-                                  ],
-                                ),
-                                const SizedBox(height: 24),
+                    
                                 
-                                // Google Sign In Button
-                                SizedBox(
-                                  width: double.infinity,
-                                  height: 56,
-                                  child: OutlinedButton.icon(
-                                    onPressed: loading ? null : _signInWithGoogle,
-                                    style: OutlinedButton.styleFrom(
-                                      side: BorderSide(color: colorScheme.outline.withOpacity(0.5)),
-                                      shape: RoundedRectangleBorder(
-                                        borderRadius: BorderRadius.circular(16),
-                                      ),
-                                    ),
-                                    icon: Container(
-                                      width: 24,
-                                      height: 24,
-                                      decoration: const BoxDecoration(
-                                        image: DecorationImage(
-                                          image: NetworkImage('https://developers.google.com/identity/images/g-logo.png'),
-                                        ),
-                                      ),
-                                    ),
-                                    label: Text(
-                                      'Continue with Google',
-                                      style: theme.textTheme.titleMedium?.copyWith(
-                                        color: colorScheme.onSurface,
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                                const SizedBox(height: 32),
+                             
                                 
                                 // Register Link
                                 Row(

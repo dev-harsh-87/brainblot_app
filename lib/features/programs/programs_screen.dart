@@ -10,6 +10,7 @@ import 'package:spark_app/features/programs/services/drill_assignment_service.da
 import 'package:spark_app/features/programs/services/program_progress_service.dart';
 import 'package:spark_app/features/programs/ui/program_creation_dialog.dart';
 import 'package:spark_app/features/programs/ui/program_day_screen.dart';
+import 'package:spark_app/features/programs/ui/program_details_screen.dart';
 import 'package:spark_app/features/sharing/services/sharing_service.dart';
 import 'package:spark_app/features/sharing/ui/privacy_control_widget.dart';
 import 'package:spark_app/features/sharing/ui/sharing_screen.dart';
@@ -24,7 +25,7 @@ class ProgramsScreen extends StatefulWidget {
   State<ProgramsScreen> createState() => _ProgramsScreenState();
 }
 
-class _ProgramsScreenState extends State<ProgramsScreen> 
+class _ProgramsScreenState extends State<ProgramsScreen>
     with TickerProviderStateMixin, AutoRefreshMixin {
   late TabController _tabController;
   late AnimationController _headerAnimationController;
@@ -48,13 +49,13 @@ class _ProgramsScreenState extends State<ProgramsScreen>
       curve: Curves.easeOutCubic,
     );
     _headerAnimationController.forward();
-    
+
     // Setup auto-refresh listeners
     listenToMultipleAutoRefresh({
       AutoRefreshService.programs: _refreshPrograms,
       AutoRefreshService.sharing: _refreshPrograms,
     });
-    
+
     // Programs are automatically loaded by the singleton BLoC
   }
 
@@ -91,7 +92,8 @@ class _ProgramsScreenState extends State<ProgramsScreen>
           Expanded(
             child: BlocListener<ProgramsBloc, ProgramsState>(
               listener: (context, state) {
-                if (state.status == ProgramsStatus.error && state.errorMessage != null) {
+                if (state.status == ProgramsStatus.error &&
+                    state.errorMessage != null) {
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(
                       content: Text(state.errorMessage!),
@@ -105,9 +107,10 @@ class _ProgramsScreenState extends State<ProgramsScreen>
                   if (state.status == ProgramsStatus.loading) {
                     return _buildLoadingState();
                   }
-                  
+
                   if (state.status == ProgramsStatus.error) {
-                    return _buildErrorState(state.errorMessage ?? 'Unknown error occurred');
+                    return _buildErrorState(
+                        state.errorMessage ?? 'Unknown error occurred');
                   }
 
                   return Stack(
@@ -193,7 +196,7 @@ class _ProgramsScreenState extends State<ProgramsScreen>
   Widget _buildLoadingState() {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
-    
+
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(64),
@@ -238,7 +241,7 @@ class _ProgramsScreenState extends State<ProgramsScreen>
   Widget _buildErrorState(String errorMessage) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
-    
+
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(32),
@@ -276,7 +279,9 @@ class _ProgramsScreenState extends State<ProgramsScreen>
             const SizedBox(height: 32),
             FilledButton.icon(
               onPressed: () {
-                context.read<ProgramsBloc>().add(const ProgramsRetryRequested());
+                context
+                    .read<ProgramsBloc>()
+                    .add(const ProgramsRetryRequested());
               },
               icon: const Icon(Icons.refresh),
               label: const Text('Retry'),
@@ -342,25 +347,39 @@ class _ProgramsScreenState extends State<ProgramsScreen>
               ),
             ),
             const SizedBox(height: 16),
-            
+
             // Filter Chips
             BlocBuilder<ProgramsBloc, ProgramsState>(
               builder: (context, state) {
-                final categories = state.programs.map((p) => p.category).toSet().toList()..sort();
-                final levels = state.programs.map((p) => p.level).toSet().toList()..sort();
+                final categories = state.programs
+                    .map((p) => p.category)
+                    .toSet()
+                    .toList()
+                  ..sort();
+                final levels =
+                    state.programs.map((p) => p.level).toSet().toList()..sort();
                 final filteredPrograms = _applyFilters(state.programs);
-                
+
                 return Column(
                   children: [
                     SingleChildScrollView(
                       scrollDirection: Axis.horizontal,
                       child: Row(
                         children: [
-                          _buildEnhancedFilterChip('Category', _selectedCategory.isEmpty ? 'All' : _formatCategoryName(_selectedCategory), () => _showCategoryFilter(categories)),
+                          _buildEnhancedFilterChip(
+                              'Category',
+                              _selectedCategory.isEmpty
+                                  ? 'All'
+                                  : _formatCategoryName(_selectedCategory),
+                              () => _showCategoryFilter(categories)),
                           const SizedBox(width: 8),
-                          _buildEnhancedFilterChip('Level', _selectedLevel.isEmpty ? 'All' : _selectedLevel, () => _showLevelFilter(levels)),
+                          _buildEnhancedFilterChip(
+                              'Level',
+                              _selectedLevel.isEmpty ? 'All' : _selectedLevel,
+                              () => _showLevelFilter(levels)),
                           const SizedBox(width: 8),
-                          if (_selectedCategory.isNotEmpty || _selectedLevel.isNotEmpty)
+                          if (_selectedCategory.isNotEmpty ||
+                              _selectedLevel.isNotEmpty)
                             _buildClearFiltersButton(),
                         ],
                       ),
@@ -375,7 +394,8 @@ class _ProgramsScreenState extends State<ProgramsScreen>
                             color: colorScheme.onSurface.withOpacity(0.6),
                           ),
                         ),
-                        if (_selectedCategory.isNotEmpty || _selectedLevel.isNotEmpty)
+                        if (_selectedCategory.isNotEmpty ||
+                            _selectedLevel.isNotEmpty)
                           Text(
                             'Filtered',
                             style: theme.textTheme.bodySmall?.copyWith(
@@ -395,11 +415,12 @@ class _ProgramsScreenState extends State<ProgramsScreen>
     );
   }
 
-  Widget _buildEnhancedFilterChip(String label, String value, VoidCallback onTap) {
+  Widget _buildEnhancedFilterChip(
+      String label, String value, VoidCallback onTap) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
     final isActive = (label == 'Category' && _selectedCategory.isNotEmpty) ||
-                     (label == 'Level' && _selectedLevel.isNotEmpty);
+        (label == 'Level' && _selectedLevel.isNotEmpty);
 
     return GestureDetector(
       onTap: onTap,
@@ -423,14 +444,16 @@ class _ProgramsScreenState extends State<ProgramsScreen>
                 : colorScheme.outline.withOpacity(0.2),
             width: isActive ? 1.5 : 1,
           ),
-          boxShadow: isActive ? [
-            BoxShadow(
-              color: colorScheme.primary.withOpacity(0.1),
-              blurRadius: 8,
-              offset: const Offset(0, 2),
-              spreadRadius: 0,
-            ),
-          ] : null,
+          boxShadow: isActive
+              ? [
+                  BoxShadow(
+                    color: colorScheme.primary.withOpacity(0.1),
+                    blurRadius: 8,
+                    offset: const Offset(0, 2),
+                    spreadRadius: 0,
+                  ),
+                ]
+              : null,
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
@@ -447,9 +470,7 @@ class _ProgramsScreenState extends State<ProgramsScreen>
             Text(
               '$label: $value',
               style: theme.textTheme.bodySmall?.copyWith(
-                color: isActive
-                    ? colorScheme.primary
-                    : colorScheme.onSurface,
+                color: isActive ? colorScheme.primary : colorScheme.onSurface,
                 fontWeight: isActive ? FontWeight.w600 : FontWeight.w500,
               ),
             ),
@@ -467,11 +488,10 @@ class _ProgramsScreenState extends State<ProgramsScreen>
     );
   }
 
-  
   Widget _buildClearFiltersButton() {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
-    
+
     return GestureDetector(
       onTap: _clearAllFilters,
       child: Container(
@@ -504,14 +524,14 @@ class _ProgramsScreenState extends State<ProgramsScreen>
       ),
     );
   }
-  
+
   void _clearAllFilters() {
     setState(() {
       _selectedCategory = '';
       _selectedLevel = '';
     });
   }
-  
+
   String _formatCategoryName(String category) {
     switch (category.toLowerCase()) {
       case 'fitness':
@@ -529,7 +549,8 @@ class _ProgramsScreenState extends State<ProgramsScreen>
       case 'general':
         return 'General';
       default:
-        return category.substring(0, 1).toUpperCase() + category.substring(1).toLowerCase();
+        return category.substring(0, 1).toUpperCase() +
+            category.substring(1).toLowerCase();
     }
   }
 
@@ -570,13 +591,14 @@ class _ProgramsScreenState extends State<ProgramsScreen>
         ),
       );
     }
-    
+
     // Find the active program
-    final matchingPrograms = state.programs.where((p) => p.id == state.active!.programId);
-    final Program? activeProgram = matchingPrograms.isNotEmpty 
-        ? matchingPrograms.first 
+    final matchingPrograms =
+        state.programs.where((p) => p.id == state.active!.programId);
+    final Program? activeProgram = matchingPrograms.isNotEmpty
+        ? matchingPrograms.first
         : (state.programs.isNotEmpty ? state.programs.first : null);
-    
+
     // If no active program found, show empty state
     if (activeProgram == null) {
       return RefreshIndicator(
@@ -592,7 +614,7 @@ class _ProgramsScreenState extends State<ProgramsScreen>
         ),
       );
     }
-    
+
     return SingleChildScrollView(
       physics: const AlwaysScrollableScrollPhysics(),
       padding: const EdgeInsets.all(16),
@@ -611,7 +633,7 @@ class _ProgramsScreenState extends State<ProgramsScreen>
 
   Widget _buildBrowseTab(ProgramsState state) {
     final filteredPrograms = _applyFilters(state.programs);
-    
+
     if (filteredPrograms.isEmpty) {
       return SingleChildScrollView(
         physics: const AlwaysScrollableScrollPhysics(),
@@ -621,7 +643,7 @@ class _ProgramsScreenState extends State<ProgramsScreen>
         ),
       );
     }
-    
+
     return ListView.separated(
       physics: const AlwaysScrollableScrollPhysics(),
       padding: const EdgeInsets.all(16),
@@ -647,7 +669,8 @@ class _ProgramsScreenState extends State<ProgramsScreen>
 
   List<Program> _applyFilters(List<Program> programs) {
     return programs.where((program) {
-      if (_selectedCategory.isNotEmpty && program.category != _selectedCategory) {
+      if (_selectedCategory.isNotEmpty &&
+          program.category != _selectedCategory) {
         return false;
       }
       if (_selectedLevel.isNotEmpty && program.level != _selectedLevel) {
@@ -660,7 +683,7 @@ class _ProgramsScreenState extends State<ProgramsScreen>
   Widget _buildEmptyActiveState() {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
-    
+
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(32),
@@ -713,7 +736,7 @@ class _ProgramsScreenState extends State<ProgramsScreen>
   Widget _buildEmptyBrowseState() {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
-    
+
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(32),
@@ -758,7 +781,7 @@ class _ProgramsScreenState extends State<ProgramsScreen>
   Widget _buildEmptyCompletedState() {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
-    
+
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(32),
@@ -804,7 +827,7 @@ class _ProgramsScreenState extends State<ProgramsScreen>
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
     final progress = active.currentDay / program.durationDays;
-    
+
     return Card(
       elevation: 4,
       child: Container(
@@ -853,7 +876,8 @@ class _ProgramsScreenState extends State<ProgramsScreen>
                         Text(
                           '${program.category} • ${program.level}',
                           style: theme.textTheme.bodyMedium?.copyWith(
-                            color: colorScheme.onPrimaryContainer.withOpacity(0.7),
+                            color:
+                                colorScheme.onPrimaryContainer.withOpacity(0.7),
                           ),
                         ),
                       ],
@@ -872,7 +896,8 @@ class _ProgramsScreenState extends State<ProgramsScreen>
               const SizedBox(height: 8),
               LinearProgressIndicator(
                 value: progress,
-                backgroundColor: colorScheme.onPrimaryContainer.withOpacity(0.2),
+                backgroundColor:
+                    colorScheme.onPrimaryContainer.withOpacity(0.2),
                 valueColor: AlwaysStoppedAnimation<Color>(colorScheme.primary),
               ),
               const SizedBox(height: 8),
@@ -887,7 +912,8 @@ class _ProgramsScreenState extends State<ProgramsScreen>
                 children: [
                   Expanded(
                     child: ElevatedButton.icon(
-                      onPressed: () => _navigateToProgramDay(program, active.currentDay),
+                      onPressed: () =>
+                          _navigateToProgramDay(program, active.currentDay),
                       icon: const Icon(Icons.play_arrow),
                       label: Text('Day ${active.currentDay}'),
                       style: ElevatedButton.styleFrom(
@@ -917,7 +943,7 @@ class _ProgramsScreenState extends State<ProgramsScreen>
   Widget _buildProgressSection(Program program, ActiveProgram active) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
-    
+
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(16),
@@ -961,12 +987,12 @@ class _ProgramsScreenState extends State<ProgramsScreen>
   Widget _buildTodaySection(Program program, ActiveProgram active) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
-    
+
     // Handle both old format (days list) and new format (dayWiseDrillIds)
     ProgramDay? todayDay;
     String? todayDrillId;
     int drillCount = 0;
-    
+
     if (program.days.isNotEmpty) {
       // Old format: use days list
       try {
@@ -990,8 +1016,8 @@ class _ProgramsScreenState extends State<ProgramsScreen>
         todayDay = ProgramDay(
           dayNumber: active.currentDay,
           title: 'Day ${active.currentDay}',
-          description: drillCount > 1 
-              ? '$drillCount drills assigned for today' 
+          description: drillCount > 1
+              ? '$drillCount drills assigned for today'
               : 'Training day',
           drillId: todayDrillId,
         );
@@ -1011,9 +1037,9 @@ class _ProgramsScreenState extends State<ProgramsScreen>
         description: 'No specific training scheduled for today',
       );
     }
-    
+
     final hasDrill = todayDay.drillId != null && todayDay.drillId!.isNotEmpty;
-    
+
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(16),
@@ -1031,15 +1057,15 @@ class _ProgramsScreenState extends State<ProgramsScreen>
               leading: Container(
                 padding: const EdgeInsets.all(8),
                 decoration: BoxDecoration(
-                  color: hasDrill 
-                      ? colorScheme.primaryContainer 
+                  color: hasDrill
+                      ? colorScheme.primaryContainer
                       : colorScheme.surfaceContainerHighest,
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: Icon(
                   hasDrill ? Icons.fitness_center : Icons.self_improvement,
-                  color: hasDrill 
-                      ? colorScheme.onPrimaryContainer 
+                  color: hasDrill
+                      ? colorScheme.onPrimaryContainer
                       : colorScheme.onSurface.withOpacity(0.6),
                 ),
               ),
@@ -1066,9 +1092,10 @@ class _ProgramsScreenState extends State<ProgramsScreen>
     );
   }
 
-  Widget _buildStatCard(String label, String value, IconData icon, Color color) {
+  Widget _buildStatCard(
+      String label, String value, IconData icon, Color color) {
     final theme = Theme.of(context);
-    
+
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
@@ -1098,299 +1125,356 @@ class _ProgramsScreenState extends State<ProgramsScreen>
     );
   }
 
-  Widget _buildProgramCard(Program program, {required bool isActive, required ProgramsState state}) {
+  Widget _buildProgramCard(Program program,
+      {required bool isActive, required ProgramsState state}) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
     final categoryColor = _getCategoryColor(program.category);
-    
+
     return Container(
-      margin: const EdgeInsets.only(bottom: 4),
+      margin: const EdgeInsets.only(bottom: 12),
       decoration: BoxDecoration(
-        color: colorScheme.surface,
-        borderRadius: BorderRadius.circular(16),
-        border: isActive 
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        border: isActive
             ? Border.all(color: colorScheme.primary, width: 2)
-            : Border.all(color: colorScheme.outline.withOpacity(0.1), width: 1),
+            : null,
         boxShadow: [
           BoxShadow(
-            color: isActive 
-                ? colorScheme.primary.withOpacity(0.1)
-                : colorScheme.shadow.withOpacity(0.05),
-            blurRadius: isActive ? 12 : 8,
-            offset: const Offset(0, 2),
+            color: isActive
+                ? colorScheme.primary.withOpacity(0.15)
+                : Colors.grey.withOpacity(0.08),
+            blurRadius: isActive ? 20 : 12,
+            offset: const Offset(0, 4),
+            spreadRadius: isActive ? 1 : 0,
           ),
         ],
       ),
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          onTap: () => _showProgramDetails(program),
-          borderRadius: BorderRadius.circular(16),
-          child: Padding(
-            padding: const EdgeInsets.all(20),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(20),
+        child: Material(
+          color: Colors.transparent,
+          child: InkWell(
+            onTap: () {
+              Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (context) => ProgramDetailsScreen(program: program),
+                ),
+              );
+            },
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Header with icon, title, and active badge
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    // Category icon with gradient background
-                    Container(
-                      width: 56,
-                      height: 56,
-                      decoration: BoxDecoration(
-                        gradient: LinearGradient(
-                          colors: [
-                            categoryColor.withOpacity(0.8),
-                            categoryColor.withOpacity(0.6),
+                // Header section with gradient background
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(20),
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: [
+                        categoryColor.withOpacity(0.1),
+                        categoryColor.withOpacity(0.05),
+                      ],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    ),
+                  ),
+                  child: Row(
+                    children: [
+                      // Modern category icon
+                      Container(
+                        width: 60,
+                        height: 60,
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            colors: [
+                              categoryColor,
+                              categoryColor.withOpacity(0.8),
+                            ],
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                          ),
+                          borderRadius: BorderRadius.circular(18),
+                          boxShadow: [
+                            BoxShadow(
+                              color: categoryColor.withOpacity(0.4),
+                              blurRadius: 10,
+                              offset: const Offset(0, 4),
+                            ),
                           ],
-                          begin: Alignment.topLeft,
-                          end: Alignment.bottomRight,
                         ),
-                        borderRadius: BorderRadius.circular(16),
-                        boxShadow: [
-                          BoxShadow(
-                            color: categoryColor.withOpacity(0.3),
-                            blurRadius: 8,
-                            offset: const Offset(0, 2),
-                          ),
-                        ],
+                        child: Icon(
+                          _getCategoryIcon(program.category),
+                          color: Colors.white,
+                          size: 30,
+                        ),
                       ),
-                      child: Icon(
-                        _getCategoryIcon(program.category),
-                        color: Colors.white,
-                        size: 28,
-                      ),
-                    ),
-                    const SizedBox(width: 16),
-                    // Title and metadata
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            children: [
-                              Expanded(
-                                child: Text(
-                                  program.name,
-                                  style: theme.textTheme.titleLarge?.copyWith(
-                                    fontWeight: FontWeight.w700,
-                                    color: colorScheme.onSurface,
-                                  ),
-                                  maxLines: 2,
-                                  overflow: TextOverflow.ellipsis,
-                                ),
-                              ),
-                              if (isActive) ...[
-                                const SizedBox(width: 8),
-                                Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                                  decoration: BoxDecoration(
-                                    gradient: LinearGradient(
-                                      colors: [colorScheme.primary, colorScheme.primary.withOpacity(0.8)],
+                      const SizedBox(width: 16),
+                      // Title and category
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: Text(
+                                    program.name,
+                                    style: theme.textTheme.titleLarge?.copyWith(
+                                      fontWeight: FontWeight.w800,
+                                      color: const Color(0xFF1A1A1A),
+                                      letterSpacing: -0.5,
                                     ),
-                                    borderRadius: BorderRadius.circular(20),
-                                    boxShadow: [
-                                      BoxShadow(
-                                        color: colorScheme.primary.withOpacity(0.3),
-                                        blurRadius: 6,
-                                        offset: const Offset(0, 2),
-                                      ),
-                                    ],
+                                    maxLines: 2,
+                                    overflow: TextOverflow.ellipsis,
                                   ),
-                                  child: Row(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      Icon(
-                                        Icons.play_circle_fill,
-                                        color: colorScheme.onPrimary,
-                                        size: 14,
-                                      ),
-                                      const SizedBox(width: 4),
-                                      Text(
-                                        'ACTIVE',
-                                        style: theme.textTheme.labelSmall?.copyWith(
-                                          color: colorScheme.onPrimary,
-                                          fontWeight: FontWeight.w700,
-                                          letterSpacing: 0.5,
+                                ),
+                                if (isActive)
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(
+                                        horizontal: 8, vertical: 4),
+                                    decoration: BoxDecoration(
+                                      color: colorScheme.primary,
+                                      borderRadius: BorderRadius.circular(12),
+                                    ),
+                                    child: Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Icon(
+                                          Icons.play_circle_fill,
+                                          color: Colors.white,
+                                          size: 12,
                                         ),
-                                      ),
-                                    ],
+                                        const SizedBox(width: 4),
+                                        Text(
+                                          'ACTIVE',
+                                          style: TextStyle(
+                                            color: Colors.white,
+                                            fontSize: 10,
+                                            fontWeight: FontWeight.w700,
+                                            letterSpacing: 0.5,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
                                   ),
-                                ),
                               ],
-                            ],
-                          ),
-                          const SizedBox(height: 6),
-                          // Program stats
-                          Wrap(
-                            spacing: 8,
-                            runSpacing: 4,
-                            children: [
-                              _buildStatChip(
-                                Icons.calendar_today,
-                                '${program.durationDays} days',
-                                Colors.blue,
+                            ),
+                            const SizedBox(height: 4),
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 10, vertical: 4),
+                              decoration: BoxDecoration(
+                                color: categoryColor.withOpacity(0.15),
+                                borderRadius: BorderRadius.circular(12),
                               ),
-                              _buildStatChip(
-                                Icons.trending_up,
-                                program.level,
-                                Colors.orange,
+                              child: Text(
+                                program.category.toUpperCase(),
+                                style: theme.textTheme.labelSmall?.copyWith(
+                                  color: categoryColor,
+                                  fontWeight: FontWeight.w700,
+                                  letterSpacing: 0.8,
+                                ),
                               ),
-                              if (program.dayWiseDrillIds.isNotEmpty)
-                                _buildStatChip(
-                                  Icons.fitness_center,
-                                  '${program.dayWiseDrillIds.length} days with drills',
-                                  Colors.green,
-                                ),
-                              if (program.selectedDrillIds.isNotEmpty)
-                                _buildStatChip(
-                                  Icons.list_alt,
-                                  '${program.selectedDrillIds.length} drills',
-                                  Colors.purple,
-                                ),
-                            ],
-                          ),
-                        ],
-                      ),
-                    ),
-                    IconButton(
-                      onPressed: () => _shareProgram(program),
-                      icon: const Icon(Icons.share_outlined),
-                      tooltip: 'Share Program',
-                      style: IconButton.styleFrom(
-                        backgroundColor: colorScheme.surfaceContainerHighest,
-                        foregroundColor: colorScheme.primary,
-                        padding: const EdgeInsets.all(12),
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 16),
-                
-                // Category badge
-                Row(
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                      decoration: BoxDecoration(
-                        color: categoryColor.withOpacity(0.1),
-                        borderRadius: BorderRadius.circular(20),
-                        border: Border.all(
-                          color: categoryColor.withOpacity(0.3),
-                          width: 1,
+                            ),
+                          ],
                         ),
                       ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
+                    ],
+                  ),
+                ),
+                
+                // Content section
+                Padding(
+                  padding: const EdgeInsets.all(20),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // Stats row
+                      Row(
                         children: [
-                          Icon(
-                            _getCategoryIcon(program.category),
-                            color: categoryColor,
-                            size: 14,
+                          _buildModernStatItem(
+                            Icons.calendar_today_outlined,
+                            '${program.durationDays}',
+                            'Days',
+                            Colors.blue,
                           ),
-                          const SizedBox(width: 6),
-                          Text(
-                            program.category.toUpperCase(),
-                            style: theme.textTheme.labelSmall?.copyWith(
-                              color: categoryColor,
-                              fontWeight: FontWeight.w600,
-                              letterSpacing: 0.5,
+                          const SizedBox(width: 20),
+                          _buildModernStatItem(
+                            Icons.trending_up,
+                            program.level,
+                            'Level',
+                            Colors.orange,
+                          ),
+                          const SizedBox(width: 20),
+                          if (program.selectedDrillIds.isNotEmpty)
+                            _buildModernStatItem(
+                              Icons.fitness_center_outlined,
+                              '${program.selectedDrillIds.length}',
+                              'Drills',
+                              Colors.green,
+                            ),
+                        ],
+                      ),
+                      
+                      // Description
+                      if (program.description != null &&
+                          program.description!.isNotEmpty) ...[
+                        const SizedBox(height: 16),
+                        Text(
+                          program.description!,
+                          style: theme.textTheme.bodyMedium?.copyWith(
+                            color: Colors.grey[600],
+                            height: 1.4,
+                          ),
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ],
+                      
+                      const SizedBox(height: 20),
+                      
+                      // Action buttons
+                      Row(
+                        children: [
+                          // Details button
+                          Expanded(
+                            child: OutlinedButton(
+                              onPressed: () {
+                                Navigator.of(context).push(
+                                  MaterialPageRoute(
+                                    builder: (context) => ProgramDetailsScreen(program: program),
+                                  ),
+                                );
+                              },
+                              style: OutlinedButton.styleFrom(
+                                padding: const EdgeInsets.symmetric(vertical: 14),
+                                side: BorderSide(color: Colors.grey[300]!),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                              ),
+                              child: Text(
+                                'View Details',
+                                style: TextStyle(
+                                  color: Colors.grey[700],
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ),
+                          ),
+                          
+                          const SizedBox(width: 12),
+                          
+                          // Activate button (if not active)
+                          if (!isActive)
+                            Expanded(
+                              child: ElevatedButton(
+                                onPressed: () async {
+                                  final confirmed = await ConfirmationDialog
+                                      .showProgramActivationConfirmation(
+                                    context,
+                                    programName: program.name,
+                                    durationDays: program.durationDays,
+                                    category: program.category,
+                                    level: program.level,
+                                    hasCurrentProgram: state.active != null,
+                                  );
+
+                                  if (confirmed == true) {
+                                    HapticFeedback.mediumImpact();
+                                    context
+                                        .read<ProgramsBloc>()
+                                        .add(ProgramsActivateRequested(program));
+                                  }
+                                },
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: categoryColor,
+                                  foregroundColor: Colors.white,
+                                  padding: const EdgeInsets.symmetric(vertical: 14),
+                                  elevation: 0,
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
+                                ),
+                                child: Text(
+                                  'Activate',
+                                  style: TextStyle(
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          
+                          // Share button
+                          const SizedBox(width: 8),
+                          Container(
+                            decoration: BoxDecoration(
+                              color: Colors.grey[100],
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: IconButton(
+                              onPressed: () => _shareProgram(program),
+                              icon: Icon(
+                                Icons.share_outlined,
+                                color: Colors.grey[600],
+                                size: 20,
+                              ),
+                              tooltip: 'Share Program',
                             ),
                           ),
                         ],
                       ),
-                    ),
-                    const SizedBox(width: 10),
-                    _buildPrivacyIndicator(program),
-                  ],
-                ),
-                // Privacy indicator
-
-
-                const SizedBox(height: 12),
-                
-                // Program description (if available)
-                if (program.description != null && program.description!.isNotEmpty) ...[
-                  Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: colorScheme.surfaceContainerHighest.withOpacity(0.5),
-                      borderRadius: BorderRadius.circular(8),
-                      border: Border.all(
-                        color: colorScheme.outline.withOpacity(0.2),
-                      ),
-                    ),
-                    child: Text(
-                      program.description!,
-                      style: theme.textTheme.bodySmall?.copyWith(
-                        color: colorScheme.onSurface.withOpacity(0.8),
-                        height: 1.3,
-                      ),
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                    ),
+                    ],
                   ),
-                  const SizedBox(height: 12),
-                ],
-                
-                // Action buttons
-                Row(
-                  children: [
-                    // Details button
-                    Expanded(
-                      child: OutlinedButton.icon(
-                        onPressed: () => _showProgramDetails(program),
-                        icon: Icon(Icons.info_outline, size: 18),
-                        label: const Text('Details'),
-                        style: OutlinedButton.styleFrom(
-                          padding: const EdgeInsets.symmetric(vertical: 12),
-                          side: BorderSide(color: colorScheme.outline.withOpacity(0.5)),
-                        ),
-                      ),
-                    ),
-                    
-                    const SizedBox(width: 12),
-                    
-
-                    
-                    // Activate button (if not active)
-                    if (!isActive)
-                      Expanded(
-                        child: FilledButton.icon(
-                          onPressed: () async {
-                            final confirmed = await ConfirmationDialog.showProgramActivationConfirmation(
-                              context,
-                              programName: program.name,
-                              durationDays: program.durationDays,
-                              category: program.category,
-                              level: program.level,
-                              hasCurrentProgram: state.active != null,
-                            );
-                            
-                            if (confirmed == true) {
-                              HapticFeedback.mediumImpact();
-                              context.read<ProgramsBloc>().add(ProgramsActivateRequested(program));
-                            }
-                          },
-                          icon: const Icon(Icons.play_arrow, size: 18),
-                          label: const Text('Activate'),
-                          style: FilledButton.styleFrom(
-                            backgroundColor: categoryColor,
-                            foregroundColor: Colors.white,
-                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                          ),
-                        ),
-                      ),
-                  ],
                 ),
               ],
             ),
           ),
         ),
       ),
+    );
+  }
+
+  Widget _buildModernStatItem(IconData icon, String value, String label, Color color) {
+    final theme = Theme.of(context);
+    
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Container(
+          padding: const EdgeInsets.all(6),
+          decoration: BoxDecoration(
+            color: color.withOpacity(0.1),
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Icon(
+            icon,
+            color: color,
+            size: 16,
+          ),
+        ),
+        const SizedBox(width: 8),
+        Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              value,
+              style: theme.textTheme.labelLarge?.copyWith(
+                fontWeight: FontWeight.w700,
+                color: const Color(0xFF1A1A1A),
+              ),
+            ),
+            Text(
+              label,
+              style: theme.textTheme.labelSmall?.copyWith(
+                color: Colors.grey[600],
+                fontSize: 10,
+              ),
+            ),
+          ],
+        ),
+      ],
     );
   }
 
@@ -1516,7 +1600,7 @@ class _ProgramsScreenState extends State<ProgramsScreen>
     try {
       final progressService = getIt<ProgramProgressService>();
       final progress = await progressService.getProgramProgress(program.id);
-      
+
       if (mounted) {
         Navigator.of(context).push(
           MaterialPageRoute<void>(
@@ -1540,61 +1624,64 @@ class _ProgramsScreenState extends State<ProgramsScreen>
     }
   }
 
-  void _showProgramDaysOverview(Program program, ActiveProgram active) {
-    showModalBottomSheet<void>(
-      context: context,
-      isScrollControlled: true,
-      builder: (context) => DraggableScrollableSheet(
-        initialChildSize: 0.7,
-        maxChildSize: 0.9,
-        minChildSize: 0.5,
-        builder: (context, scrollController) => Container(
+void _showProgramDaysOverview(Program program, ActiveProgram active) {
+  showModalBottomSheet<void>(
+    context: context,
+    isScrollControlled: true,
+    backgroundColor: Colors.transparent,
+    builder: (context) {
+      return FractionallySizedBox(
+        heightFactor: 0.7, // 70% of screen height
+        child: Container(
           decoration: const BoxDecoration(
+            color: Colors.white,
             borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
           ),
           child: Column(
             children: [
-              Container(
-                padding: const EdgeInsets.all(16),
-                child: Column(
-                  children: [
-                    Container(
-                      width: 40,
-                      height: 4,
-                      decoration: BoxDecoration(
-                        color: Colors.grey[300],
-                        borderRadius: BorderRadius.circular(2),
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-                    Text(
-                      '${program.name} - Program Days',
-                      style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ],
+              // --- Top drag handle and title ---
+              Padding(
+                padding: const EdgeInsets.only(top: 12, bottom: 8),
+                child: Container(
+                  width: 40,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: Colors.grey[300],
+                    borderRadius: BorderRadius.circular(2),
+                  ),
                 ),
               ),
+              Text(
+                '${program.name} - Program Days',
+                style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                      fontWeight: FontWeight.bold,
+                    ),
+              ),
+              const SizedBox(height: 12),
+              const Divider(height: 1),
+
+              // --- Scrollable content ---
               Expanded(
                 child: FutureBuilder<ProgramProgress?>(
-                  future: getIt<ProgramProgressService>().getProgramProgress(program.id),
+                  future: getIt<ProgramProgressService>()
+                      .getProgramProgress(program.id),
                   builder: (context, snapshot) {
                     final progress = snapshot.data;
-                    
-                    // Handle both old format (days list) and new format (dayWiseDrillIds)
+
                     if (program.days.isNotEmpty) {
-                      // Old format: use days list
+                      // Old format
                       return ListView.builder(
-                        controller: scrollController,
-                        padding: const EdgeInsets.symmetric(horizontal: 16),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 16, vertical: 8),
                         itemCount: program.days.length,
                         itemBuilder: (context, index) {
                           final day = program.days[index];
-                          final isCompleted = progress?.isDayCompleted(day.dayNumber) ?? false;
+                          final isCompleted =
+                              progress?.isDayCompleted(day.dayNumber) ?? false;
                           final isCurrent = active.currentDay == day.dayNumber;
-                          final isAccessible = day.dayNumber <= active.currentDay;
-                          
+                          final isAccessible =
+                              day.dayNumber <= active.currentDay;
+
                           return _buildDayOverviewCard(
                             context,
                             program,
@@ -1608,28 +1695,34 @@ class _ProgramsScreenState extends State<ProgramsScreen>
                         },
                       );
                     } else if (program.dayWiseDrillIds.isNotEmpty) {
-                      // New enhanced format: use dayWiseDrillIds
-                      final sortedDays = program.dayWiseDrillIds.keys.toList()..sort();
+                      // New format
+                      final sortedDays = program.dayWiseDrillIds.keys.toList()
+                        ..sort();
+
                       return ListView.builder(
-                        controller: scrollController,
-                        padding: const EdgeInsets.symmetric(horizontal: 16),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 16, vertical: 8),
                         itemCount: sortedDays.length,
                         itemBuilder: (context, index) {
                           final dayNumber = sortedDays[index];
-                          final drillIds = program.dayWiseDrillIds[dayNumber] ?? [];
-                          final isCompleted = progress?.isDayCompleted(dayNumber) ?? false;
+                          final drillIds =
+                              program.dayWiseDrillIds[dayNumber] ?? [];
+                          final isCompleted =
+                              progress?.isDayCompleted(dayNumber) ?? false;
                           final isCurrent = active.currentDay == dayNumber;
                           final isAccessible = dayNumber <= active.currentDay;
                           final drillCount = drillIds.length;
-                          
+
                           return _buildDayOverviewCard(
                             context,
                             program,
                             dayNumber: dayNumber,
                             title: 'Day $dayNumber',
-                            description: drillCount > 1 
-                                ? '$drillCount drills assigned' 
-                                : (drillCount == 1 ? 'Training day' : 'Rest day'),
+                            description: drillCount > 1
+                                ? '$drillCount drills assigned'
+                                : (drillCount == 1
+                                    ? 'Training day'
+                                    : 'Rest day'),
                             isCompleted: isCompleted,
                             isCurrent: isCurrent,
                             isAccessible: isAccessible,
@@ -1643,9 +1736,10 @@ class _ProgramsScreenState extends State<ProgramsScreen>
                           padding: const EdgeInsets.all(32),
                           child: Text(
                             'No program schedule available',
-                            style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                              color: Colors.grey,
-                            ),
+                            style:
+                                Theme.of(context).textTheme.bodyLarge?.copyWith(
+                                      color: Colors.grey,
+                                    ),
                           ),
                         ),
                       );
@@ -1656,14 +1750,16 @@ class _ProgramsScreenState extends State<ProgramsScreen>
             ],
           ),
         ),
-      ),
-    );
-  }
+      );
+    },
+  );
+}
+
 
   void _showCreateProgramScreen() {
     // Get the bloc from the parent context before navigating
     final programsBloc = context.read<ProgramsBloc>();
-    
+
     Navigator.of(context).push(
       MaterialPageRoute<void>(
         builder: (context) => BlocProvider.value(
@@ -1671,14 +1767,6 @@ class _ProgramsScreenState extends State<ProgramsScreen>
           child: const ProgramCreationScreen(),
         ),
       ),
-    );
-  }
-
-  void _showProgramDetails(Program program) {
-    showModalBottomSheet<void>(
-      context: context,
-      isScrollControlled: true,
-      builder: (context) => _ProgramDetailsSheet(program: program),
     );
   }
 
@@ -1699,9 +1787,9 @@ class _ProgramsScreenState extends State<ProgramsScreen>
           width: 40,
           height: 40,
           decoration: BoxDecoration(
-            color: isCompleted 
-                ? Colors.green 
-                : isCurrent 
+            color: isCompleted
+                ? Colors.green
+                : isCurrent
                     ? Theme.of(context).primaryColor
                     : isAccessible
                         ? Colors.grey[400]
@@ -1729,17 +1817,17 @@ class _ProgramsScreenState extends State<ProgramsScreen>
           ),
         ),
         subtitle: Text(
-          description.length > 60 
+          description.length > 60
               ? '${description.substring(0, 60)}...'
               : description,
           style: TextStyle(
             color: isAccessible ? null : Colors.grey,
           ),
         ),
-        trailing: isAccessible 
+        trailing: isAccessible
             ? const Icon(Icons.arrow_forward_ios, size: 16)
             : Icon(Icons.lock, color: Colors.grey[400], size: 16),
-        onTap: isAccessible 
+        onTap: isAccessible
             ? () {
                 Navigator.pop(context);
                 _navigateToProgramDay(program, dayNumber);
@@ -1755,12 +1843,13 @@ class _ProgramsScreenState extends State<ProgramsScreen>
         // Get the drill from the drill assignment service
         final drillService = getIt<DrillAssignmentService>();
         final drill = await drillService.getDrillById(day.drillId!);
-        
+
         if (drill != null && mounted) {
           // Navigate to drill runner with program context
           final programs = context.read<ProgramsBloc>().state.programs;
-          final program = programs.where((p) => p.days.contains(day)).firstOrNull;
-          
+          final program =
+              programs.where((p) => p.days.contains(day)).firstOrNull;
+
           if (program == null) {
             ScaffoldMessenger.of(context).showSnackBar(
               const SnackBar(content: Text('Program not found')),
@@ -1796,7 +1885,7 @@ class _ProgramsScreenState extends State<ProgramsScreen>
       // No drill assigned, navigate to program day screen
       final programs = context.read<ProgramsBloc>().state.programs;
       final program = programs.where((p) => p.days.contains(day)).firstOrNull;
-      
+
       if (program != null) {
         _navigateToProgramDay(
           program,
@@ -1813,7 +1902,7 @@ class _ProgramsScreenState extends State<ProgramsScreen>
   void _shareProgram(Program program) {
     try {
       HapticFeedback.lightImpact();
-      
+
       // Navigate to sharing screen
       Navigator.of(context).push(
         MaterialPageRoute<void>(
@@ -1840,7 +1929,7 @@ class _ProgramsScreenState extends State<ProgramsScreen>
       builder: (context, snapshot) {
         final isOwner = snapshot.data ?? false;
         final isLoading = snapshot.connectionState == ConnectionState.waiting;
-        
+
         // Privacy toggle removed - all programs are private by default
         return const SizedBox.shrink();
       },
@@ -1851,7 +1940,7 @@ class _ProgramsScreenState extends State<ProgramsScreen>
     if (_ownershipCache.containsKey(program.id)) {
       return _ownershipCache[program.id]!;
     }
-    
+
     try {
       final isOwner = await _sharingService.isOwner('program', program.id);
       _ownershipCache[program.id] = isOwner;
@@ -1859,27 +1948,6 @@ class _ProgramsScreenState extends State<ProgramsScreen>
     } catch (e) {
       return false;
     }
-  }
-
-  Future<void> _toggleProgramPrivacy(Program program) async {
-    // Privacy toggle functionality removed - all programs are now private by default
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Row(
-          children: [
-            Icon(
-              Icons.lock,
-              color: Colors.white,
-              size: 20,
-            ),
-            SizedBox(width: 8),
-            Text('All programs are private by default 🔒'),
-          ],
-        ),
-        backgroundColor: Colors.grey,
-        behavior: SnackBarBehavior.floating,
-      ),
-    );
   }
 }
 
@@ -1921,15 +1989,15 @@ class _FilterBottomSheet extends StatelessWidget {
             final icon = icons?[option];
             final color = colors?[option] ?? theme.colorScheme.primary;
             final isSelected = option == selectedValue;
-            
+
             return Container(
               margin: const EdgeInsets.only(bottom: 8),
               decoration: BoxDecoration(
-                color: isSelected 
+                color: isSelected
                     ? theme.colorScheme.primaryContainer.withOpacity(0.3)
                     : null,
                 borderRadius: BorderRadius.circular(12),
-                border: isSelected 
+                border: isSelected
                     ? Border.all(color: theme.colorScheme.primary, width: 1.5)
                     : null,
               ),
@@ -1967,7 +2035,8 @@ class _FilterBottomSheet extends StatelessWidget {
                 title: Text(
                   option,
                   style: theme.textTheme.bodyLarge?.copyWith(
-                    fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
+                    fontWeight:
+                        isSelected ? FontWeight.w600 : FontWeight.normal,
                     color: isSelected ? theme.colorScheme.primary : null,
                   ),
                 ),
@@ -2005,25 +2074,25 @@ class _ProgramDetailsSheetState extends State<_ProgramDetailsSheet> {
 
   Future<void> _loadDrillNames() async {
     setState(() => _isLoadingDrills = true);
-    
+
     try {
       final drillService = getIt<DrillAssignmentService>();
-      
+
       // Get unique drill IDs from both program days and dayWiseDrillIds
       final Set<String> drillIds = {};
-      
+
       // From program days (old format)
       for (final day in widget.program.days) {
         if (day.drillId != null && day.drillId!.isNotEmpty) {
           drillIds.add(day.drillId!);
         }
       }
-      
+
       // From dayWiseDrillIds (new enhanced format)
       for (final drillIdsList in widget.program.dayWiseDrillIds.values) {
         drillIds.addAll(drillIdsList);
       }
-      
+
       // Load drill names
       for (final drillId in drillIds) {
         try {
@@ -2101,7 +2170,8 @@ class _ProgramDetailsSheetState extends State<_ProgramDetailsSheet> {
             ),
           ),
           const SizedBox(height: 8),
-          if (widget.program.days.isEmpty && widget.program.dayWiseDrillIds.isEmpty)
+          if (widget.program.days.isEmpty &&
+              widget.program.dayWiseDrillIds.isEmpty)
             Padding(
               padding: const EdgeInsets.all(16),
               child: Text(
@@ -2130,7 +2200,7 @@ class _ProgramDetailsSheetState extends State<_ProgramDetailsSheet> {
         final day = widget.program.days[index];
         final hasDrill = day.drillId != null && day.drillId!.isNotEmpty;
         final drillName = hasDrill ? _drillNames[day.drillId] : null;
-        
+
         return _buildDayListTile(
           theme,
           colorScheme,
@@ -2144,10 +2214,11 @@ class _ProgramDetailsSheetState extends State<_ProgramDetailsSheet> {
     );
   }
 
-  Widget _buildEnhancedFormatDaysList(ThemeData theme, ColorScheme colorScheme) {
+  Widget _buildEnhancedFormatDaysList(
+      ThemeData theme, ColorScheme colorScheme) {
     // Build list from dayWiseDrillIds
     final sortedDays = widget.program.dayWiseDrillIds.keys.toList()..sort();
-    
+
     return ListView.separated(
       itemCount: sortedDays.length,
       separatorBuilder: (context, index) => const Divider(height: 1),
@@ -2158,14 +2229,14 @@ class _ProgramDetailsSheetState extends State<_ProgramDetailsSheet> {
         final drillId = hasDrill ? drillIds.first : null;
         final drillName = drillId != null ? _drillNames[drillId] : null;
         final drillCount = drillIds.length;
-        
+
         return _buildDayListTile(
           theme,
           colorScheme,
           dayNumber: dayNumber,
           title: 'Day $dayNumber',
-          description: drillCount > 1 
-              ? '$drillCount drills assigned' 
+          description: drillCount > 1
+              ? '$drillCount drills assigned'
               : (hasDrill ? 'Training day' : 'Rest day'),
           drillId: drillId,
           drillName: drillName,
@@ -2186,18 +2257,16 @@ class _ProgramDetailsSheetState extends State<_ProgramDetailsSheet> {
     int drillCount = 1,
   }) {
     final hasDrill = drillId != null && drillId.isNotEmpty;
-    
+
     return ListTile(
       leading: CircleAvatar(
-        backgroundColor: hasDrill 
-            ? colorScheme.primary 
+        backgroundColor: hasDrill
+            ? colorScheme.primary
             : colorScheme.surfaceContainerHighest,
         child: Text(
           '$dayNumber',
           style: TextStyle(
-            color: hasDrill 
-                ? colorScheme.onPrimary 
-                : colorScheme.onSurface,
+            color: hasDrill ? colorScheme.onPrimary : colorScheme.onSurface,
             fontWeight: FontWeight.bold,
           ),
         ),
@@ -2229,7 +2298,10 @@ class _ProgramDetailsSheetState extends State<_ProgramDetailsSheet> {
                 const SizedBox(width: 4),
                 Expanded(
                   child: Text(
-                    drillName ?? (_isLoadingDrills ? 'Loading drill...' : 'Drill assigned'),
+                    drillName ??
+                        (_isLoadingDrills
+                            ? 'Loading drill...'
+                            : 'Drill assigned'),
                     style: theme.textTheme.bodySmall?.copyWith(
                       color: colorScheme.primary,
                       fontWeight: FontWeight.w500,
