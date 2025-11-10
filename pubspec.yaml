@@ -69,6 +69,7 @@ dependencies:
 
   # Audio & Device
   audioplayers: ^6.1.0
+  flutter_tts: ^4.0.2
   wakelock_plus: ^1.2.6
   screen_brightness: ^0.2.2
   vibration: ^3.1.4

@@ -1239,8 +1239,48 @@ class _HostSessionScreenState extends State<HostSessionScreen>
                     );
                   }
                 } else {
-                  // For Android, try to request or open settings
-                  await openAppSettings();
+                  // For Android, first try to request permissions
+                  try {
+                    final bluetoothService = _syncService.getBluetoothService();
+                    final granted = await bluetoothService.requestPermissions();
+                    
+                    if (granted) {
+                      // Permissions granted, show success message
+                      if (mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text('Permissions granted! You can now host sessions.'),
+                            backgroundColor: Colors.green,
+                            duration: Duration(seconds: 3),
+                          ),
+                        );
+                      }
+                    } else {
+                      // Some permissions denied, open settings
+                      await openAppSettings();
+                      
+                      if (mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: const Text(
+                              'Please enable all permissions in Settings and return to Spark',
+                            ),
+                            duration: const Duration(seconds: 5),
+                            action: SnackBarAction(
+                              label: 'Refresh',
+                              onPressed: () async {
+                                await _checkPermissions();
+                                setState(() {});
+                              },
+                            ),
+                          ),
+                        );
+                      }
+                    }
+                  } catch (e) {
+                    // If permission request fails, open settings
+                    await openAppSettings();
+                  }
                 }
 
                 // Refresh permissions after delay

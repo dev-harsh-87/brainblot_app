@@ -343,13 +343,69 @@ class _MultiplayerSelectionScreenState extends State<MultiplayerSelectionScreen>
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
 
+    return Column(
+      children: [
+        Container(
+          padding: const EdgeInsets.all(20),
+          decoration: BoxDecoration(
+            color: colorScheme.surfaceVariant.withOpacity(0.3),
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(
+              color: colorScheme.outline.withOpacity(0.1),
+            ),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Icon(
+                    Icons.info_outline_rounded,
+                    color: colorScheme.primary,
+                    size: 20,
+                  ),
+                  const SizedBox(width: 8),
+                  Text(
+                    'How it works',
+                    style: theme.textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.bold,
+                      color: colorScheme.onSurface,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              Text(
+                '• Host creates a session and shares the 6-digit code\n'
+                '• Participants join using the session code\n'
+                '• Host controls drill timing for all connected devices\n'
+                '• Everyone trains simultaneously with synchronized drills\n'
+                '• Real-time synchronization with pause/resume controls',
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  color: colorScheme.onSurface.withOpacity(0.7),
+                  height: 1.5,
+                ),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 16),
+        _buildRequirementsSection(context),
+      ],
+    );
+  }
+
+  Widget _buildRequirementsSection(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: colorScheme.surfaceVariant.withOpacity(0.3),
+        color: Colors.blue.withOpacity(0.05),
         borderRadius: BorderRadius.circular(16),
         border: Border.all(
-          color: colorScheme.outline.withOpacity(0.1),
+          color: Colors.blue.withOpacity(0.2),
         ),
       ),
       child: Column(
@@ -358,33 +414,49 @@ class _MultiplayerSelectionScreenState extends State<MultiplayerSelectionScreen>
           Row(
             children: [
               Icon(
-                Icons.info_outline_rounded,
-                color: colorScheme.primary,
+                Icons.checklist_rounded,
+                color: Colors.blue,
                 size: 20,
               ),
               const SizedBox(width: 8),
               Text(
-                'How it works',
+                'Requirements',
                 style: theme.textTheme.titleMedium?.copyWith(
                   fontWeight: FontWeight.bold,
-                  color: colorScheme.onSurface,
+                  color: Colors.blue,
                 ),
               ),
             ],
           ),
           const SizedBox(height: 12),
+          _buildRequirementItem('📱 Bluetooth enabled on both devices'),
+          _buildRequirementItem('📍 Location permission granted'),
+          _buildRequirementItem('🔄 Devices within Bluetooth range (~10m)'),
+          _buildRequirementItem('⚡ Stable connection for best experience'),
+          const SizedBox(height: 8),
           Text(
-            '• Host creates a session and shares the 6-digit code\n'
-            '• Participants join using the session code\n'
-            '• Host controls drill timing for all connected devices\n'
-            '• Everyone trains simultaneously with synchronized drills\n'
-            '• Chat and communicate during training sessions',
-            style: theme.textTheme.bodyMedium?.copyWith(
-              color: colorScheme.onSurface.withOpacity(0.7),
-              height: 1.5,
+            'Note: Permissions will be requested when you start hosting or joining.',
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: Colors.blue.withOpacity(0.8),
+              fontStyle: FontStyle.italic,
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildRequirementItem(String text) {
+    final theme = Theme.of(context);
+    
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 4),
+      child: Text(
+        text,
+        style: theme.textTheme.bodyMedium?.copyWith(
+          color: Colors.blue.withOpacity(0.9),
+          height: 1.3,
+        ),
       ),
     );
   }

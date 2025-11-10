@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:spark_app/core/di/injection.dart';
 import 'package:spark_app/core/router/app_router.dart';
@@ -58,11 +59,20 @@ class CogniTrainApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return BlocProvider(
-      create: (context) => AuthBloc(
-        getIt(),
-        userRepo: getIt(),
-        sessionService: getIt(),
-      )..add(const AuthCheckRequested()),
+      create: (context) {
+        final authBloc = AuthBloc(
+          getIt(),
+          userRepo: getIt(),
+          sessionService: getIt(),
+        );
+        
+        // Delay auth check slightly to allow Firebase Auth to initialize
+        Future.delayed(const Duration(milliseconds: 100), () {
+          authBloc.add(const AuthCheckRequested());
+        });
+        
+        return authBloc;
+      },
       child: Builder(
         builder: (context) {
           final appRouter = AppRouter(context.read<AuthBloc>());
@@ -74,11 +84,54 @@ class CogniTrainApp extends StatelessWidget {
             themeMode: ThemeMode.system,
             routerConfig: appRouter.router,
             builder: (context, child) {
-              return AuthWrapper(child: child ?? const SizedBox.shrink());
+              return NavigationStateTracker(
+                child: AuthWrapper(child: child ?? const SizedBox.shrink()),
+              );
             },
           );
         },
       ),
     );
+  }
+}
+
+/// Widget to track navigation state for hot reload preservation (debug mode only)
+class NavigationStateTracker extends StatefulWidget {
+  final Widget child;
+  
+  const NavigationStateTracker({super.key, required this.child});
+
+  @override
+  State<NavigationStateTracker> createState() => _NavigationStateTrackerState();
+}
+
+class _NavigationStateTrackerState extends State<NavigationStateTracker> {
+  @override
+  void initState() {
+    super.initState();
+    
+    // Clear navigation state on fresh app start (not hot reload)
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (kDebugMode) {
+        try {
+          // Only clear if this is a fresh start, not a hot reload
+          final lastLocation = AppStorage.getString('last_navigation_location');
+          if (lastLocation != null) {
+            print('[NAVIGATION] Found preserved location: $lastLocation');
+            // Clear it after a delay to prevent infinite loops
+            Future.delayed(const Duration(seconds: 5), () {
+              AppStorage.remove('last_navigation_location');
+            });
+          }
+        } catch (e) {
+          print('[NAVIGATION] State tracking error: $e');
+        }
+      }
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return widget.child;
   }
 }

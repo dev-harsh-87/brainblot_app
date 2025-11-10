@@ -89,11 +89,44 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
   }
   
   Future<void> _onAuthCheck(AuthCheckRequested event, Emitter<AuthState> emit) async {
+    // Emit loading state while checking authentication
+    emit(state.copyWith(status: AuthStatus.loading));
+    
     final currentUser = FirebaseAuth.instance.currentUser;
     if (currentUser != null) {
-      emit(state.copyWith(status: AuthStatus.authenticated, user: currentUser));
+      // User exists in Firebase Auth, wait for session to be established
+      try {
+        // Wait a moment for SessionManagementService to establish session
+        await Future.delayed(const Duration(milliseconds: 500));
+        
+        // Check if session service has established the session
+        final sessionEstablished = _sessionService?.isLoggedIn() ?? false;
+        
+        if (sessionEstablished) {
+          emit(state.copyWith(status: AuthStatus.authenticated, user: currentUser));
+          print("✅ Auth check: User authenticated and session established");
+        } else {
+          // Session not yet established, wait a bit more and try again
+          await Future.delayed(const Duration(milliseconds: 1000));
+          final sessionRecheck = _sessionService?.isLoggedIn() ?? false;
+          
+          if (sessionRecheck) {
+            emit(state.copyWith(status: AuthStatus.authenticated, user: currentUser));
+            print("✅ Auth check: User authenticated after session restoration");
+          } else {
+            // Session failed to establish, sign out to clear inconsistent state
+            print("⚠️ Auth check: Session failed to establish, clearing auth state");
+            await FirebaseAuth.instance.signOut();
+            emit(const AuthState.initial());
+          }
+        }
+      } catch (e) {
+        print("❌ Auth check error: $e");
+        emit(const AuthState.initial());
+      }
     } else {
       emit(const AuthState.initial());
+      print("ℹ️ Auth check: No user found in Firebase Auth");
     }
   }
 

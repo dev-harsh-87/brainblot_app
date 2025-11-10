@@ -904,7 +904,7 @@ class _JoinSessionScreenState extends State<JoinSessionScreen>
     try {
       setState(() {
         _isLoading = true;
-        _statusMessage = 'Joining session...';
+        _statusMessage = 'Searching for session...';
       });
 
       final session = await _syncService.joinSession(code);
@@ -923,20 +923,49 @@ class _JoinSessionScreenState extends State<JoinSessionScreen>
           SnackBar(
             content: Text('Joined session: ${session.sessionId}'),
             backgroundColor: Colors.green,
+            duration: const Duration(seconds: 2),
           ),
         );
       }
     } catch (e) {
       setState(() {
         _isLoading = false;
-        _statusMessage = 'Failed to join: $e';
+      });
+      
+      // Provide more specific error messages
+      String errorMessage = 'Failed to join session';
+      String statusMessage = 'Connection failed';
+      
+      final errorString = e.toString().toLowerCase();
+      if (errorString.contains('timeout') || errorString.contains('timed out')) {
+        errorMessage = 'Session not found - check the code and try again';
+        statusMessage = 'Session not found';
+      } else if (errorString.contains('permission')) {
+        errorMessage = 'Bluetooth permissions required';
+        statusMessage = 'Permissions needed';
+      } else if (errorString.contains('bluetooth')) {
+        errorMessage = 'Bluetooth connection failed - ensure it\'s enabled';
+        statusMessage = 'Bluetooth issue';
+      } else if (errorString.contains('full')) {
+        errorMessage = 'Session is full - cannot join';
+        statusMessage = 'Session full';
+      }
+      
+      setState(() {
+        _statusMessage = statusMessage;
       });
       
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Failed to join session: $e'),
+            content: Text(errorMessage),
             backgroundColor: Colors.red,
+            duration: const Duration(seconds: 4),
+            action: SnackBarAction(
+              label: 'Retry',
+              textColor: Colors.white,
+              onPressed: () => _joinSession(),
+            ),
           ),
         );
       }

@@ -543,6 +543,7 @@ class FirebaseDrillRepository implements DrillRepository {
       ),
       durationSec: data['durationSec'] as int,
       restSec: data['restSec'] as int,
+      sets: (data['sets'] as int?) ?? 1, // Add missing sets field with fallback
       reps: data['reps'] as int,
       stimulusTypes: (data['stimulusTypes'] as List)
           .map((e) => StimulusType.values.firstWhere(
@@ -563,6 +564,12 @@ class FirebaseDrillRepository implements DrillRepository {
                 radix: 16,
               )))
           .toList(),
+      presentationMode: data['presentationMode'] != null
+          ? PresentationMode.values.firstWhere(
+              (p) => p.name == data['presentationMode'],
+              orElse: () => PresentationMode.visual,
+            )
+          : PresentationMode.visual,
       favorite: data['favorite'] as bool? ?? false,
       isPreset: data['isPreset'] as bool? ?? false,
       createdBy: data['createdBy'] as String?,

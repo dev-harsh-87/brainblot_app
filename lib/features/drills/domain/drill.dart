@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 
 enum Difficulty { beginner, intermediate, advanced }
 
-enum StimulusType { color, shape, arrow, number, audio }
+enum StimulusType { color, shape, arrow, number }
+
+enum PresentationMode { visual, audio }
 
 enum ReactionZone { center, top, bottom, left, right, quadrants }
 
@@ -19,6 +21,7 @@ class Drill {
   final int numberOfStimuli; // per rep or per minute depending on design
   final List<ReactionZone> zones;
   final List<Color> colors; // used for color stimulus
+  final PresentationMode presentationMode; // visual or audio presentation
   final bool favorite;
   final bool isPreset; // preset vs user-created
   final String? createdBy; // user ID who created the drill
@@ -38,6 +41,7 @@ class Drill {
     required this.numberOfStimuli,
     required this.zones,
     required this.colors,
+    this.presentationMode = PresentationMode.visual, // default to visual
     this.favorite = false,
     this.isPreset = false,
     this.createdBy,
@@ -58,6 +62,7 @@ class Drill {
     int? numberOfStimuli,
     List<ReactionZone>? zones,
     List<Color>? colors,
+    PresentationMode? presentationMode,
     bool? favorite,
     bool? isPreset,
     String? createdBy,
@@ -76,6 +81,7 @@ class Drill {
         numberOfStimuli: numberOfStimuli ?? this.numberOfStimuli,
         zones: zones ?? this.zones,
         colors: colors ?? this.colors,
+        presentationMode: presentationMode ?? this.presentationMode,
         favorite: favorite ?? this.favorite,
         isPreset: isPreset ?? this.isPreset,
         createdBy: createdBy ?? this.createdBy,
@@ -96,6 +102,7 @@ class Drill {
         'numberOfStimuli': numberOfStimuli,
         'zones': zones.map((e) => e.name).toList(),
         'colors': colors.map((c) => '#${c.value.toRadixString(16).padLeft(8, '0')}').toList(),
+        'presentationMode': presentationMode.name,
         'favorite': favorite,
         'isPreset': isPreset,
         'createdBy': createdBy,
@@ -116,6 +123,9 @@ class Drill {
         numberOfStimuli: map['numberOfStimuli'] as int,
         zones: (map['zones'] as List).map((e) => ReactionZone.values.firstWhere((z) => z.name == e)).toList(),
         colors: (map['colors'] as List).map((hex) => Color(int.parse((hex as String).replaceFirst('#', ''), radix: 16))).toList(),
+        presentationMode: map['presentationMode'] != null
+            ? PresentationMode.values.firstWhere((p) => p.name == map['presentationMode'], orElse: () => PresentationMode.visual)
+            : PresentationMode.visual, // default to visual for backward compatibility
         favorite: (map['favorite'] as bool?) ?? false,
         isPreset: (map['isPreset'] as bool?) ?? false,
         createdBy: map['createdBy'] as String?,

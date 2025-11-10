@@ -318,7 +318,7 @@ class _RegisterScreenState extends State<RegisterScreen> with TickerProviderStat
                                           ),
                                   ),
                                 ),
-              
+                                const SizedBox(height: 24),
                                 
                                 // Login Link
                                 Row(

@@ -276,6 +276,16 @@ class SessionSyncService {
     return await _bluetoothService.arePermissionsAvailable();
   }
 
+  /// Get the underlying bluetooth service for direct access
+  BluetoothConnectionService getBluetoothService() {
+    return _bluetoothService;
+  }
+
+  /// Request permissions through the bluetooth service
+  Future<bool> requestPermissions() async {
+    return await _bluetoothService.requestPermissions();
+  }
+
   // Private methods
 
   void _setupMessageListener() {

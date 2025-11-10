@@ -151,12 +151,22 @@ class _MultiplayerTrainingScreenState extends State<MultiplayerTrainingScreen>
     // Navigate to drill runner with multiplayer context
     Navigator.of(context).push(
       MaterialPageRoute(
+        settings: const RouteSettings(name: '/drill-runner-multiplayer'),
         builder: (context) => DrillRunnerScreen(
           drill: drill,
           isMultiplayerMode: true,
           onDrillComplete: (result) {
             // Handle drill completion in multiplayer context
-            Navigator.of(context).pop();
+            if (mounted) {
+              Navigator.of(context).pop();
+              // Show completion feedback
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text('Drill completed: ${drill.name}'),
+                  backgroundColor: Colors.green,
+                ),
+              );
+            }
           },
         ),
       ),

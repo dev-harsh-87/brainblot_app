@@ -31,6 +31,7 @@ class _DrillBuilderScreenState extends State<DrillBuilderScreen>
   final Set<StimulusType> _stimuli = {StimulusType.color};
   final Set<ReactionZone> _zones = {ReactionZone.center};
   final List<Color> _selectedColors = [Colors.red, Colors.green, Colors.blue, Colors.yellow];
+  PresentationMode _presentationMode = PresentationMode.visual;
   
   int _currentStep = 0;
   final int _totalSteps = 4;
@@ -67,6 +68,7 @@ class _DrillBuilderScreenState extends State<DrillBuilderScreen>
       _sets = d.sets;
       _reps = d.reps;
       _numberOfStimuli = d.numberOfStimuli;
+      _presentationMode = d.presentationMode;
       _stimuli
         ..clear()
         ..addAll(d.stimulusTypes);
@@ -107,6 +109,7 @@ class _DrillBuilderScreenState extends State<DrillBuilderScreen>
       numberOfStimuli: _numberOfStimuli,
       zones: _zones.toList(),
       colors: _selectedColors,
+      presentationMode: _presentationMode,
       favorite: initial?.favorite ?? false,
       isPreset: initial?.isPreset ?? false,
       createdBy: initial?.createdBy,
@@ -532,11 +535,7 @@ class _DrillBuilderScreenState extends State<DrillBuilderScreen>
     }
   }
 
-  void _saveDrillOld() {
-    if (_formKey.currentState?.validate() ?? false) {
-      Navigator.of(context).pop(_build());
-    }
-  }
+
 
   Widget _buildConfigurationStep() {
     final theme = Theme.of(context);
@@ -713,31 +712,163 @@ class _DrillBuilderScreenState extends State<DrillBuilderScreen>
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Stimulus Types Section
+          // Presentation Mode Section
           Text(
-            'Stimulus Types',
+            'Presentation Mode',
             style: theme.textTheme.titleMedium?.copyWith(
               fontWeight: FontWeight.w600,
             ),
           ),
           const SizedBox(height: 8),
           Text(
-            'Select the types of stimuli that will appear during the drill',
+            'Choose how stimuli will be presented during the drill',
             style: theme.textTheme.bodySmall?.copyWith(
               color: colorScheme.onSurface.withOpacity(0.7),
             ),
           ),
           const SizedBox(height: 16),
-          Wrap(
-            spacing: 12,
-            runSpacing: 12,
-            children: StimulusType.values.map((type) => _buildStimulusTypeChip(type)).toList(),
+          Row(
+            children: [
+              Expanded(
+                child: _buildPresentationModeCard(PresentationMode.visual),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: _buildPresentationModeCard(PresentationMode.audio),
+              ),
+            ],
           ),
           const SizedBox(height: 32),
 
-          // Reaction Zones Section
+          // Stimulus Types Section with improved UI
           Text(
-            'Reaction Zones',
+            'Stimulus Selection',
+            style: theme.textTheme.titleMedium?.copyWith(
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'Select individual stimulus types and configure each one',
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: colorScheme.onSurface.withOpacity(0.7),
+            ),
+          ),
+          const SizedBox(height: 16),
+          
+          // Color Stimulus Card
+          _buildStimulusCard(
+            'Colors',
+            Icons.palette,
+            StimulusType.color,
+            _presentationMode == PresentationMode.audio
+                ? 'Speaks color names (Red, Blue, Green, etc.)'
+                : 'Displays colors visually',
+            colorScheme.primary,
+          ),
+          const SizedBox(height: 12),
+          
+          // Arrow Stimulus Card
+          _buildStimulusCard(
+            'Arrows',
+            Icons.arrow_forward,
+            StimulusType.arrow,
+            _presentationMode == PresentationMode.audio
+                ? 'Speaks directions (Up arrow, Down arrow, etc.)'
+                : 'Displays directional arrows',
+            colorScheme.secondary,
+          ),
+          const SizedBox(height: 12),
+          
+          // Shape Stimulus Card
+          _buildStimulusCard(
+            'Shapes',
+            Icons.category,
+            StimulusType.shape,
+            _presentationMode == PresentationMode.audio
+                ? 'Speaks shape names (Circle, Square, Triangle)'
+                : 'Displays geometric shapes',
+            colorScheme.tertiary,
+          ),
+          const SizedBox(height: 12),
+          
+          // Number Stimulus Card
+          _buildStimulusCard(
+            'Numbers',
+            Icons.numbers,
+            StimulusType.number,
+            _presentationMode == PresentationMode.audio
+                ? 'Speaks numbers (One, Two, Three, etc.)'
+                : 'Displays numbers 1-9',
+            Colors.orange,
+          ),
+          const SizedBox(height: 32),
+
+          // Color Selection Section (only show if color stimulus is selected)
+          if (_stimuli.contains(StimulusType.color)) ...[
+            Text(
+              'Color Selection',
+              style: theme.textTheme.titleMedium?.copyWith(
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Select colors for your stimuli (minimum 2 colors)',
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: colorScheme.onSurface.withOpacity(0.7),
+              ),
+            ),
+            const SizedBox(height: 16),
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: colorScheme.surfaceContainerHighest,
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Column(
+                children: [
+                  Wrap(
+                    spacing: 12,
+                    runSpacing: 12,
+                    children: [
+                      Colors.red, Colors.green, Colors.blue, Colors.yellow,
+                      Colors.orange, Colors.purple, Colors.pink, Colors.cyan,
+                      Colors.brown, Colors.grey, Colors.black, Colors.white,
+                    ].map((color) => _buildColorChip(color)).toList(),
+                  ),
+                  if (_selectedColors.length < 2) ...[
+                    const SizedBox(height: 12),
+                    Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: Colors.orange.withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: Colors.orange.withOpacity(0.3)),
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(Icons.warning_amber, color: Colors.orange, size: 16),
+                          const SizedBox(width: 8),
+                          Text(
+                            'Please select at least 2 colors',
+                            style: theme.textTheme.bodySmall?.copyWith(
+                              color: Colors.orange.shade700,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+            const SizedBox(height: 32),
+          ],
+
+          // Reaction Zones Section - Simplified with fullscreen option
+          Text(
+            'Screen Coverage',
             style: theme.textTheme.titleMedium?.copyWith(
               fontWeight: FontWeight.w600,
             ),
@@ -750,70 +881,26 @@ class _DrillBuilderScreenState extends State<DrillBuilderScreen>
             ),
           ),
           const SizedBox(height: 16),
-          Wrap(
-            spacing: 12,
-            runSpacing: 12,
-            children: ReactionZone.values.map((zone) => _buildReactionZoneChip(zone)).toList(),
-          ),
-          const SizedBox(height: 32),
-
-          // Color Selection Section
-          Text(
-            'Stimulus Colors',
-            style: theme.textTheme.titleMedium?.copyWith(
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            'Select colors for your stimuli (minimum 2 colors)',
-            style: theme.textTheme.bodySmall?.copyWith(
-              color: colorScheme.onSurface.withOpacity(0.7),
-            ),
-          ),
-          const SizedBox(height: 16),
-          Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: colorScheme.surfaceContainerHighest,
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Column(
-              children: [
-                Wrap(
-                  spacing: 12,
-                  runSpacing: 12,
-                  children: [
-                    Colors.red, Colors.green, Colors.blue, Colors.yellow,
-                    Colors.orange, Colors.purple, Colors.pink, Colors.cyan,
-                    Colors.brown, Colors.grey, Colors.black, Colors.white,
-                  ].map((color) => _buildColorChip(color)).toList(),
+          Row(
+            children: [
+              Expanded(
+                child: _buildReactionZoneCard(
+                  'Fullscreen',
+                  Icons.fullscreen,
+                  'Stimuli appear anywhere on the full screen',
+                  ReactionZone.quadrants,
                 ),
-                if (_selectedColors.length < 2) ...[
-                  const SizedBox(height: 12),
-                  Container(
-                    padding: const EdgeInsets.all(8),
-                    decoration: BoxDecoration(
-                      color: Colors.orange.withOpacity(0.1),
-                      borderRadius: BorderRadius.circular(8),
-                      border: Border.all(color: Colors.orange.withOpacity(0.3)),
-                    ),
-                    child: Row(
-                      children: [
-                        Icon(Icons.warning_amber, color: Colors.orange, size: 16),
-                        const SizedBox(width: 8),
-                        Text(
-                          'Please select at least 2 colors',
-                          style: theme.textTheme.bodySmall?.copyWith(
-                            color: Colors.orange.shade700,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ],
-            ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: _buildReactionZoneCard(
+                  'Center',
+                  Icons.center_focus_strong,
+                  'Stimuli appear in the center area',
+                  ReactionZone.center,
+                ),
+              ),
+            ],
           ),
         ],
       ),
@@ -909,6 +996,7 @@ class _DrillBuilderScreenState extends State<DrillBuilderScreen>
             'Stimulus & Zones',
             Icons.psychology,
             [
+              _buildReviewItem('Presentation mode', _presentationMode.name.toUpperCase()),
               _buildReviewItem('Stimulus types', _stimuli.isEmpty ? 'None selected' : _stimuli.map((s) => s.name).join(', ')),
               _buildReviewItem('Reaction zones', _zones.isEmpty ? 'None selected' : _zones.map((z) => z.name).join(', ')),
               _buildReviewItem('Colors', '${_selectedColors.length} colors selected'),
@@ -1111,6 +1199,90 @@ class _DrillBuilderScreenState extends State<DrillBuilderScreen>
     );
   }
 
+  Widget _buildPresentationModeCard(PresentationMode mode) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final isSelected = _presentationMode == mode;
+    
+    String getLabel() {
+      switch (mode) {
+        case PresentationMode.visual:
+          return 'Visual';
+        case PresentationMode.audio:
+          return 'Audio';
+      }
+    }
+    
+    String getDescription() {
+      switch (mode) {
+        case PresentationMode.visual:
+          return 'Show stimuli visually';
+        case PresentationMode.audio:
+          return 'Speak stimuli aloud';
+      }
+    }
+    
+    IconData getIcon() {
+      switch (mode) {
+        case PresentationMode.visual:
+          return Icons.visibility;
+        case PresentationMode.audio:
+          return Icons.volume_up;
+      }
+    }
+
+    return GestureDetector(
+      onTap: () {
+        setState(() {
+          _presentationMode = mode;
+        });
+        HapticFeedback.lightImpact();
+      },
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: isSelected
+              ? colorScheme.primaryContainer
+              : colorScheme.surfaceContainerHighest,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: isSelected
+                ? colorScheme.primary
+                : colorScheme.outline.withOpacity(0.3),
+            width: isSelected ? 2 : 1,
+          ),
+        ),
+        child: Column(
+          children: [
+            Icon(
+              getIcon(),
+              color: isSelected ? colorScheme.primary : colorScheme.onSurface.withOpacity(0.7),
+              size: 32,
+            ),
+            const SizedBox(height: 8),
+            Text(
+              getLabel(),
+              style: theme.textTheme.titleSmall?.copyWith(
+                fontWeight: FontWeight.w600,
+                color: isSelected ? colorScheme.primary : colorScheme.onSurface,
+              ),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              getDescription(),
+              textAlign: TextAlign.center,
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: isSelected
+                    ? colorScheme.onPrimaryContainer
+                    : colorScheme.onSurface.withOpacity(0.6),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   Widget _buildColorChip(Color color) {
     final isSelected = _selectedColors.contains(color);
     final colorScheme = Theme.of(context).colorScheme;
@@ -1304,7 +1476,6 @@ class _DrillBuilderScreenState extends State<DrillBuilderScreen>
       case StimulusType.shape: return 'Shape';
       case StimulusType.arrow: return 'Arrow';
       case StimulusType.number: return 'Number';
-      case StimulusType.audio: return 'Audio';
     }
   }
 
@@ -1314,7 +1485,7 @@ class _DrillBuilderScreenState extends State<DrillBuilderScreen>
       case StimulusType.shape: return Icons.category;
       case StimulusType.arrow: return Icons.arrow_forward;
       case StimulusType.number: return Icons.numbers;
-      case StimulusType.audio: return Icons.volume_up;
+    
     }
   }
 
@@ -1338,6 +1509,166 @@ class _DrillBuilderScreenState extends State<DrillBuilderScreen>
       case ReactionZone.right: return Icons.keyboard_arrow_right;
       case ReactionZone.quadrants: return Icons.grid_view;
     }
+  }
+
+  Widget _buildStimulusCard(String title, IconData icon, StimulusType type, String description, Color accentColor) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final isSelected = _stimuli.contains(type);
+
+    return GestureDetector(
+      onTap: () {
+        setState(() {
+          if (isSelected) {
+            _stimuli.remove(type);
+          } else {
+            _stimuli.add(type);
+          }
+        });
+        HapticFeedback.lightImpact();
+      },
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: isSelected 
+              ? accentColor.withOpacity(0.1) 
+              : colorScheme.surfaceContainerHighest,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: isSelected 
+                ? accentColor 
+                : colorScheme.outline.withOpacity(0.3),
+            width: isSelected ? 2 : 1,
+          ),
+        ),
+        child: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: isSelected 
+                    ? accentColor 
+                    : colorScheme.surfaceContainerHigh,
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Icon(
+                icon,
+                color: isSelected 
+                    ? Colors.white 
+                    : colorScheme.onSurface.withOpacity(0.7),
+                size: 24,
+              ),
+            ),
+            const SizedBox(width: 16),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Text(
+                        title,
+                        style: theme.textTheme.titleSmall?.copyWith(
+                          fontWeight: FontWeight.w600,
+                          color: isSelected ? accentColor : colorScheme.onSurface,
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      if (_presentationMode == PresentationMode.audio)
+                        Icon(
+                          Icons.volume_up,
+                          size: 16,
+                          color: isSelected ? accentColor : colorScheme.onSurface.withOpacity(0.5),
+                        ),
+                      if (_presentationMode == PresentationMode.visual)
+                        Icon(
+                          Icons.visibility,
+                          size: 16,
+                          color: isSelected ? accentColor : colorScheme.onSurface.withOpacity(0.5),
+                        ),
+                    ],
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    description,
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: isSelected 
+                          ? colorScheme.onSurface 
+                          : colorScheme.onSurface.withOpacity(0.6),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            if (isSelected)
+              Icon(
+                Icons.check_circle,
+                color: accentColor,
+                size: 24,
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildReactionZoneCard(String title, IconData icon, String description, ReactionZone zone) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final isSelected = _zones.contains(zone);
+
+    return GestureDetector(
+      onTap: () {
+        setState(() {
+          // Clear all zones and add the selected one (single selection)
+          _zones.clear();
+          _zones.add(zone);
+        });
+        HapticFeedback.lightImpact();
+      },
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: isSelected 
+              ? colorScheme.primaryContainer 
+              : colorScheme.surfaceContainerHighest,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: isSelected 
+                ? colorScheme.primary 
+                : colorScheme.outline.withOpacity(0.3),
+            width: isSelected ? 2 : 1,
+          ),
+        ),
+        child: Column(
+          children: [
+            Icon(
+              icon,
+              color: isSelected ? colorScheme.primary : colorScheme.onSurface.withOpacity(0.7),
+              size: 32,
+            ),
+            const SizedBox(height: 8),
+            Text(
+              title,
+              style: theme.textTheme.titleSmall?.copyWith(
+                fontWeight: FontWeight.w600,
+                color: isSelected ? colorScheme.primary : colorScheme.onSurface,
+              ),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              description,
+              textAlign: TextAlign.center,
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: isSelected 
+                    ? colorScheme.onPrimaryContainer 
+                    : colorScheme.onSurface.withOpacity(0.6),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   Color _getContrastColor(Color color) {

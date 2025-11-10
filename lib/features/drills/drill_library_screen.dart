@@ -689,7 +689,6 @@ class _DrillLibraryScreenState extends State<DrillLibraryScreen>
 
   Widget _buildListView(List<Drill> drills) {
     return ListView.separated(
-      controller: _scrollController,
       padding: const EdgeInsets.all(16),
       itemCount: drills.length,
       separatorBuilder: (context, index) => const SizedBox(height: 12),

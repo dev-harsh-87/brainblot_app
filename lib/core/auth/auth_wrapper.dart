@@ -21,6 +21,11 @@ class AuthWrapper extends StatelessWidget {
           return;
         }
         
+        // Don't redirect during loading state to allow session restoration
+        if (state.status == AuthStatus.loading) {
+          return;
+        }
+        
         if (state.status == AuthStatus.authenticated) {
           // If user is authenticated and on auth screens, redirect to home
           if (currentLocation == '/login' || currentLocation == '/register') {
@@ -28,7 +33,9 @@ class AuthWrapper extends StatelessWidget {
           }
         } else if (state.status == AuthStatus.initial) {
           // If user is not authenticated and not on auth screens, redirect to login
-          if (currentLocation != '/login' && currentLocation != '/register') {
+          if (currentLocation != '/login' &&
+              currentLocation != '/register' &&
+              currentLocation != '/forgot-password') {
             context.go('/login');
           }
         }

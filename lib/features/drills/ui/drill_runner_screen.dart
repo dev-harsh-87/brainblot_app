@@ -5,10 +5,12 @@ import 'package:spark_app/features/drills/data/session_repository.dart';
 import 'package:spark_app/features/drills/domain/drill.dart';
 import 'package:spark_app/features/drills/domain/session_result.dart';
 import 'package:spark_app/features/programs/services/program_progress_service.dart';
+import 'package:spark_app/features/multiplayer/services/session_sync_service.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 import 'package:uuid/uuid.dart';
+import 'package:flutter_tts/flutter_tts.dart';
 
 // Data structures for detailed results tracking
 class RepResult {
@@ -100,6 +102,10 @@ class _DrillRunnerScreenState extends State<DrillRunnerScreen>
   final _uuid = const Uuid();
   final _stopwatch = Stopwatch();
   Timer? _ticker;
+  
+  // Text-to-Speech
+  final FlutterTts _flutterTts = FlutterTts();
+  bool _isTtsInitialized = false;
 
   late DateTime _startedAt;
   DateTime? _endedAt;
@@ -142,7 +148,7 @@ class _DrillRunnerScreenState extends State<DrillRunnerScreen>
   
   // Set and rep tracking
   int _currentSet = 1;
-  int _currentRep = 0;
+  int _currentRep = 1;
   bool _isInRestPeriod = false;
   Timer? _restTimer;
   int _restCountdown = 0;
@@ -153,13 +159,43 @@ class _DrillRunnerScreenState extends State<DrillRunnerScreen>
   DateTime? _currentRepStartTime;
   DateTime? _currentSetStartTime;
 
+  // Multiplayer sync
+  SessionSyncService? _syncService;
+  StreamSubscription? _drillEventSubscription;
+  bool _isMultiplayerPaused = false;
+
   @override
   void initState() {
     super.initState();
+    
+    // Initialize multiplayer sync if in multiplayer mode
+    if (widget.isMultiplayerMode) {
+      _initializeMultiplayerSync();
+    }
+    
+    // Debug: Print drill configuration to verify sets value
+    print('🏃‍♂️ Drill Runner - Drill Configuration:');
+    print('  Name: ${widget.drill.name}');
+    print('  Sets: ${widget.drill.sets}');
+    print('  Reps: ${widget.drill.reps}');
+    print('  Duration: ${widget.drill.durationSec}s');
+    print('  Rest: ${widget.drill.restSec}s');
+    print('  Presentation Mode: ${widget.drill.presentationMode.name}');
+    print('  Created At: ${widget.drill.createdAt}');
+    
+    // Additional safety check for invalid sets value
+    if (widget.drill.sets < 1) {
+      print('⚠️ WARNING: Invalid sets value (${widget.drill.sets}), defaulting to 1');
+    }
+    
     _schedule = _generateSchedule(widget.drill);
     _initializeAnimations();
+    _initializeTts();
   }
   
+  // Helper method to get safe sets value (minimum 1)
+  int get _safeSetCount => widget.drill.sets < 1 ? 1 : widget.drill.sets;
+
   void _initializeAnimations() {
     _stimulusAnimationController = AnimationController(
       duration: const Duration(milliseconds: 300),
@@ -203,6 +239,218 @@ class _DrillRunnerScreenState extends State<DrillRunnerScreen>
     _pulseAnimationController.repeat(reverse: true);
   }
 
+  Future<void> _initializeTts() async {
+    try {
+      print('🔧 Initializing TTS...');
+      
+      // Set completion handler to track speech completion
+      _flutterTts.setCompletionHandler(() {
+        print('✅ TTS speech completed');
+      });
+      
+      // Set error handler
+      _flutterTts.setErrorHandler((msg) {
+        print('❌ TTS error handler: $msg');
+      });
+      
+      // Set start handler
+      _flutterTts.setStartHandler(() {
+        print('▶️ TTS speech started');
+      });
+      
+      // Configure TTS settings
+      await _flutterTts.setLanguage("en-US");
+      await _flutterTts.setSpeechRate(0.5); // Slightly slower for clarity
+      await _flutterTts.setVolume(1.0);
+      await _flutterTts.setPitch(1.0);
+      
+      // Set iOS-specific settings if needed
+      if (Theme.of(context).platform == TargetPlatform.iOS) {
+        await _flutterTts.setSharedInstance(true);
+        await _flutterTts.setIosAudioCategory(
+          IosTextToSpeechAudioCategory.playback,
+          [
+            IosTextToSpeechAudioCategoryOptions.allowBluetooth,
+            IosTextToSpeechAudioCategoryOptions.allowBluetoothA2DP,
+            IosTextToSpeechAudioCategoryOptions.mixWithOthers,
+          ],
+          IosTextToSpeechAudioMode.voicePrompt,
+        );
+      }
+      
+      // Test TTS with a silent test
+      print('🔍 Testing TTS...');
+      final testResult = await _flutterTts.speak("");
+      print('🔍 TTS test result: $testResult');
+      await _flutterTts.stop();
+      
+      _isTtsInitialized = true;
+      print('✅ TTS initialized successfully with handlers');
+    } catch (e, stackTrace) {
+      print('❌ TTS initialization error: $e');
+      print('Stack trace: $stackTrace');
+      _isTtsInitialized = false;
+    }
+  }
+
+  void _initializeMultiplayerSync() {
+    try {
+      _syncService = getIt<SessionSyncService>();
+      
+      // Listen for drill synchronization events
+      _drillEventSubscription = _syncService!.drillEventStream.listen((event) {
+        _handleMultiplayerDrillEvent(event);
+      });
+      
+      print('🔗 Multiplayer sync initialized for drill runner');
+    } catch (e) {
+      print('❌ Failed to initialize multiplayer sync: $e');
+    }
+  }
+
+  void _handleMultiplayerDrillEvent(dynamic event) {
+    if (!widget.isMultiplayerMode || !mounted) return;
+    
+    print('🎮 Multiplayer drill event received: ${event.runtimeType}');
+    
+    if (event is DrillStartedEvent) {
+      // Host started the drill - start locally if not already running
+      if (_state == DrillRunnerState.ready || _state == DrillRunnerState.paused) {
+        print('🎮 Starting drill from multiplayer sync');
+        _startDrill();
+      }
+    } else if (event is DrillStoppedEvent) {
+      // Host stopped the drill - stop locally
+      if (_state == DrillRunnerState.running || _state == DrillRunnerState.paused) {
+        print('🎮 Stopping drill from multiplayer sync');
+        _finish();
+      }
+    } else if (event is DrillPausedEvent) {
+      // Host paused the drill - pause locally
+      if (_state == DrillRunnerState.running) {
+        print('🎮 Pausing drill from multiplayer sync');
+        _pauseDrillFromSync();
+      }
+    } else if (event is DrillResumedEvent) {
+      // Host resumed the drill - resume locally
+      if (_state == DrillRunnerState.paused || _isMultiplayerPaused) {
+        print('🎮 Resuming drill from multiplayer sync');
+        _resumeDrillFromSync();
+      }
+    }
+  }
+
+  void _pauseDrillFromSync() {
+    if (_state != DrillRunnerState.running) return;
+    
+    _ticker?.cancel();
+    _stopwatch.stop();
+    _isMultiplayerPaused = true;
+    
+    setState(() {
+      _state = DrillRunnerState.paused;
+      _feedbackText = 'Paused by Host';
+      _feedbackColor = Colors.orange;
+    });
+    
+    _showFeedback('Paused by Host', Colors.orange);
+    HapticFeedback.mediumImpact();
+  }
+
+  void _resumeDrillFromSync() {
+    if (_state != DrillRunnerState.paused && !_isMultiplayerPaused) return;
+    
+    _isMultiplayerPaused = false;
+    _stopwatch.start();
+    _ticker = Timer.periodic(const Duration(milliseconds: 8), _onTick);
+    
+    setState(() {
+      _state = DrillRunnerState.running;
+    });
+    
+    _showFeedback('Resumed by Host', Colors.green);
+    HapticFeedback.mediumImpact();
+  }
+
+  Future<void> _speakStimulus(String text) async {
+    if (!_isTtsInitialized) {
+      print('⚠️ TTS not initialized, skipping speech');
+      return;
+    }
+    
+    // Only speak in audio mode
+    if (widget.drill.presentationMode != PresentationMode.audio) {
+      return;
+    }
+    
+    try {
+      // Stop any ongoing speech
+      await _flutterTts.stop();
+      
+      // Add a small delay to ensure stop completes
+      await Future.delayed(const Duration(milliseconds: 50));
+      
+      // Speak the stimulus
+      final result = await _flutterTts.speak(text);
+      print('🔊 Speaking: $text (result: $result)');
+      
+      if (result == 0) {
+        print('❌ TTS speak failed with result 0');
+      }
+    } catch (e) {
+      print('❌ TTS speak error: $e');
+      print('Stack trace: ${StackTrace.current}');
+    }
+  }
+
+  String _getStimulusTextForTts(_Stimulus stimulus) {
+    switch (stimulus.type) {
+      case StimulusType.color:
+        // For colors, speak the color name
+        final colorName = _getColorName(_displayColor);
+        return colorName;
+      case StimulusType.arrow:
+        // For arrows, speak just the direction
+        switch (stimulus.label) {
+          case '↑': return 'Up';
+          case '→': return 'Right';
+          case '↓': return 'Down';
+          case '←': return 'Left';
+          default: return stimulus.label;
+        }
+      case StimulusType.number:
+        return stimulus.label;
+      case StimulusType.shape:
+        // For shapes, speak the shape name
+        switch (stimulus.label) {
+          case '●': return 'Circle';
+          case '■': return 'Square';
+          case '▲': return 'Triangle';
+          default: return 'Shape';
+        }
+    }
+  }
+
+  String _getColorName(Color color) {
+    // Compare color values instead of objects since deserialized colors
+    // from Firebase won't match Flutter constant colors using ==
+    final colorValue = color.value;
+    
+    if (colorValue == Colors.red.value) return 'Red';
+    if (colorValue == Colors.green.value) return 'Green';
+    if (colorValue == Colors.blue.value) return 'Blue';
+    if (colorValue == Colors.yellow.value) return 'Yellow';
+    if (colorValue == Colors.orange.value) return 'Orange';
+    if (colorValue == Colors.purple.value) return 'Purple';
+    if (colorValue == Colors.pink.value) return 'Pink';
+    if (colorValue == Colors.cyan.value) return 'Cyan';
+    if (colorValue == Colors.brown.value) return 'Brown';
+    if (colorValue == Colors.grey.value) return 'Grey';
+    if (colorValue == Colors.black.value) return 'Black';
+    if (colorValue == Colors.white.value) return 'White';
+    return 'Color';
+  }
+
   List<_Stimulus> _generateSchedule(Drill drill) {
     final totalMs = drill.durationSec * 1000;
     final rnd = Random();
@@ -229,8 +477,6 @@ class _DrillRunnerScreenState extends State<DrillRunnerScreen>
       case StimulusType.shape:
         const shapes = ['●', '■', '▲'];
         return shapes[Random().nextInt(shapes.length)];
-      case StimulusType.audio:
-        return '♪';
       case StimulusType.color:
       default:
         final colors = drill.colors.isEmpty
@@ -273,9 +519,14 @@ class _DrillRunnerScreenState extends State<DrillRunnerScreen>
     
     _startedAt = DateTime.now();
     
-    // Initialize first set and rep
-    _initializeNewSet();
-    _initializeNewRep();
+    // Initialize first set and rep ONLY if this is the initial start (no sets exist yet)
+    if (_setResults.isEmpty) {
+      _initializeNewSet();
+      _initializeNewRep();
+    } else {
+      // For subsequent sets, just initialize the rep (set was already initialized in _completeSet)
+      _initializeNewRep();
+    }
     
     _stopwatch
       ..reset()
@@ -285,6 +536,8 @@ class _DrillRunnerScreenState extends State<DrillRunnerScreen>
   }
 
   void _initializeNewSet() {
+    print('🔧 _initializeNewSet called: _currentSet=$_currentSet, existing sets=${_setResults.length}');
+    print('   Stack trace: ${StackTrace.current}');
     _currentSetStartTime = DateTime.now();
     final newSet = SetResult(
       setNumber: _currentSet,
@@ -292,10 +545,10 @@ class _DrillRunnerScreenState extends State<DrillRunnerScreen>
       startTime: _currentSetStartTime!,
     );
     _setResults.add(newSet);
+    print('✅ Set initialized: setNumber=${newSet.setNumber}, total sets now=${_setResults.length}');
   }
 
   void _initializeNewRep() {
-    _currentRep++;
     _currentRepStartTime = DateTime.now();
     _currentRepEvents = [];
     _events.clear(); // Clear events for new rep
@@ -331,12 +584,19 @@ class _DrillRunnerScreenState extends State<DrillRunnerScreen>
         }
       });
       
+      print('🎬 Stimulus shown: type=${_current!.type}, mode=${widget.drill.presentationMode.name}');
+      
+      // Speak the stimulus if in audio mode
+      if (widget.drill.presentationMode == PresentationMode.audio) {
+        final textToSpeak = _getStimulusTextForTts(_current!);
+        print('🎯 Attempting to speak: "$textToSpeak" for stimulus type: ${_current!.type}');
+        _speakStimulus(textToSpeak);
+      } else {
+        print('👁️ Visual mode - showing stimulus visually');
+      }
+      
       // Enhanced feedback based on stimulus type
       switch (_current!.type) {
-        case StimulusType.audio:
-          SystemSound.play(SystemSoundType.click);
-          HapticFeedback.mediumImpact();
-          break;
         case StimulusType.color:
           HapticFeedback.lightImpact();
           break;
@@ -420,6 +680,7 @@ class _DrillRunnerScreenState extends State<DrillRunnerScreen>
     return colors[Random().nextInt(colors.length)];
   }
 void _completeRep() {
+    print('🔄 _completeRep called: Set $_currentSet, Rep $_currentRep');
     _ticker?.cancel();
     _stopwatch.stop();
     
@@ -444,16 +705,26 @@ void _completeRep() {
         accuracy: accuracy,
       );
       
+      print('   Rep result: score=$repScore, events=${_currentRepEvents.length}');
+      
       // Add to current set's rep results
       if (_setResults.isNotEmpty) {
         _setResults.last.repResults.add(repResult);
+        print('   Added to set ${_setResults.last.setNumber}, total reps now: ${_setResults.last.repResults.length}');
       }
     }
     
     // Check if set is complete
+    print('   Checking: _currentRep=$_currentRep >= widget.drill.reps=${widget.drill.reps}?');
     if (_currentRep >= widget.drill.reps) {
+      print('   ✅ Set complete! Calling _completeSet()');
       _completeSet();
     } else {
+      print('   ⏭️ More reps needed');
+      // Increment rep counter for next rep
+      _currentRep++;
+      print('   Incremented _currentRep to $_currentRep');
+      
       // Start rest period between reps if rest time is configured
       if (widget.drill.restSec > 0) {
         _startRestPeriod();
@@ -464,10 +735,13 @@ void _completeRep() {
   }
 
   void _completeSet() {
+    print('🏁 _completeSet called: _currentSet=$_currentSet, _safeSetCount=$_safeSetCount');
+    
     // Update current set's end time and stats
     if (_setResults.isNotEmpty) {
       _setResults.last.endTime = DateTime.now();
       _setResults.last.updateStats();
+      print('   Updated set ${_setResults.last.setNumber}: ${_setResults.last.repResults.length} reps');
     }
     
     HapticFeedback.heavyImpact();
@@ -477,7 +751,8 @@ void _completeRep() {
     _showFeedback('Set ${_currentSet} Complete!', Colors.green);
     
     // Check if all sets are complete
-    if (_currentSet >= widget.drill.reps) {
+    if (_currentSet >= _safeSetCount) {
+      print('✅ All sets complete! Finishing drill...');
       // All sets complete - finish drill
       setState(() {
         _state = DrillRunnerState.finished;
@@ -486,16 +761,19 @@ void _completeRep() {
         _finish();
       });
     } else {
-      // Start next set
+      print('➡️ Moving to next set...');
+      // Move to next set
       _currentSet++;
-      _currentRep = 0;
+      _currentRep = 1; // Initialize rep counter for new set
+      print('   New values: _currentSet=$_currentSet, _currentRep=$_currentRep');
       
       Future.delayed(const Duration(milliseconds: 1500), () {
+        _initializeNewSet();
         if (widget.drill.restSec > 0) {
           _startRestPeriod();
         } else {
-          _initializeNewSet();
-          _startNextRep();
+          _initializeNewRep(); // Start first rep of new set
+          _startCountdown();
         }
       });
     }
@@ -529,7 +807,7 @@ void _completeRep() {
       _restCountdown = 0;
     });
     
-    // Initialize new rep
+    // Initialize new rep (within current set)
     _initializeNewRep();
     
     // Start countdown for next rep
@@ -678,8 +956,30 @@ void _completeRep() {
           // Navigate back to program
           context.go('/programs');
         } else {
-          // Navigate to drill results screen
-          context.go('/drill-results', extra: result);
+          // Navigate to drill results screen with detailed set results
+          final detailedSetResults = _setResults.map((setResult) {
+            print('📊 Set ${setResult.setNumber}: ${setResult.repResults.length} reps');
+            return {
+              'setNumber': setResult.setNumber,
+              'reps': setResult.repResults.map((repResult) {
+                print('  Rep ${repResult.repNumber}: ${repResult.score} hits, ${repResult.events.length} stimuli');
+                return {
+                  'repNumber': repResult.repNumber,
+                  'hits': repResult.score,
+                  'totalStimuli': repResult.events.length,
+                  'accuracy': repResult.accuracy,
+                  'avgReactionTime': repResult.averageReactionTime,
+                };
+              }).toList(),
+            };
+          }).toList();
+          
+          print('📦 Total sets being passed: ${detailedSetResults.length}');
+          
+          context.go('/drill-results', extra: {
+            'result': result,
+            'detailedSetResults': detailedSetResults,
+          });
         }
       }
     });
@@ -695,6 +995,11 @@ void _completeRep() {
     _stimulusAnimationController.dispose();
     _pulseAnimationController.dispose();
     _feedbackAnimationController.dispose();
+    // Stop and cleanup TTS synchronously
+    _flutterTts.stop();
+    print('🛑 TTS stopped on dispose');
+    // Clean up multiplayer subscription
+    _drillEventSubscription?.cancel();
     super.dispose();
   }
 
@@ -835,7 +1140,7 @@ void _completeRep() {
             children: [
               _buildStatItem(
                 'Set',
-                '$_currentSet/${widget.drill.sets}',
+                '$_currentSet/$_safeSetCount',
                 Icons.layers,
               ),
               _buildStatItem(
@@ -845,7 +1150,7 @@ void _completeRep() {
               ),
               _buildStatItem(
                 'Score',
-                '$_score',
+                '$_score/${widget.drill.numberOfStimuli}',
                 Icons.star,
               ),
               _buildStatItem(
@@ -919,29 +1224,40 @@ void _completeRep() {
   }
   
   Widget _buildStimulusArea() {
-    return Container(
-      width: double.infinity,
-      height: 400,
-      child: Stack(
-        children: [
-          // Zone indicators
-          ..._buildZoneIndicators(),
-          
-          // Active stimulus
-          if (_current != null) _buildActiveStimulus(),
-        ],
-      ),
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        // Use full available space for better visibility
+        return Container(
+          width: constraints.maxWidth,
+          height: constraints.maxHeight,
+          child: Stack(
+            children: [
+              // Zone indicators
+              ..._buildZoneIndicators(constraints),
+              
+              // Active stimulus
+              if (_current != null) _buildActiveStimulus(),
+            ],
+          ),
+        );
+      },
     );
   }
 
-  List<Widget> _buildZoneIndicators() {
+  List<Widget> _buildZoneIndicators(BoxConstraints constraints) {
     final zones = widget.drill.zones.isEmpty ? [ReactionZone.center] : widget.drill.zones;
-    return zones.map((zone) => _buildZoneIndicator(zone)).toList();
+    return zones.map((zone) => _buildZoneIndicator(zone, constraints)).toList();
   }
 
-  Widget _buildZoneIndicator(ReactionZone zone) {
-    final position = _getZonePosition(zone);
+  Widget _buildZoneIndicator(ReactionZone zone, BoxConstraints constraints) {
+    final position = _getZonePosition(zone, constraints);
     final isActive = _current != null && _getCurrentZone() == zone;
+    
+    // Calculate size based on available space - much larger for better visibility
+    final availableSize = constraints.maxHeight.clamp(200.0, 600.0);
+    final stimulusSize = availableSize * 0.6; // 60% of available height
+    final fontSize = stimulusSize * 0.4; // 40% of stimulus size
+    final iconSize = stimulusSize * 0.25; // 25% of stimulus size
     
     return Positioned(
       left: position.dx,
@@ -959,27 +1275,27 @@ void _completeRep() {
                   return Transform.scale(
                     scale: isActive ? _pulseAnimation.value : 1.0,
                     child: Container(
-                      width: 120,
-                      height: 120,
+                      width: stimulusSize,
+                      height: stimulusSize,
                       alignment: Alignment.center,
                       decoration: BoxDecoration(
                         color: isActive
                             ? (_current?.type == StimulusType.color ? _displayColor : Colors.white.withOpacity(0.9))
                             : Colors.white.withOpacity(0.1),
-                        borderRadius: BorderRadius.circular(60),
+                        borderRadius: BorderRadius.circular(stimulusSize / 2),
                         border: Border.all(
                           color: isActive
                               ? Colors.white.withOpacity(0.9)
                               : Colors.white.withOpacity(0.3),
-                          width: isActive ? 4 : 2,
+                          width: isActive ? 6 : 3,
                         ),
                         boxShadow: isActive ? [
                           BoxShadow(
                             color: (_current?.type == StimulusType.color
                                 ? _displayColor
-                                : Colors.white).withOpacity(0.4),
-                            blurRadius: 25,
-                            spreadRadius: 8,
+                                : Colors.white).withOpacity(0.5),
+                            blurRadius: 40,
+                            spreadRadius: 15,
                           ),
                         ] : null,
                       ),
@@ -989,19 +1305,19 @@ void _completeRep() {
                           color: _current?.type == StimulusType.color
                               ? Colors.white
                               : Colors.black,
-                          fontSize: 48,
+                          fontSize: fontSize,
                           fontWeight: FontWeight.bold,
                           shadows: [
                             Shadow(
-                              color: Colors.black.withOpacity(0.5),
-                              blurRadius: 8,
+                              color: Colors.black.withOpacity(0.7),
+                              blurRadius: 15,
                             ),
                           ],
                         ),
                       ) : Icon(
                         _getZoneIcon(zone),
                         color: Colors.white.withOpacity(0.5),
-                        size: 32,
+                        size: iconSize,
                       ),
                     ),
                   );
@@ -1019,25 +1335,30 @@ void _completeRep() {
     return const SizedBox.shrink();
   }
 
-  Offset _getZonePosition(ReactionZone zone) {
-    const centerX = 200.0; // Approximate center for 400px width
-    const centerY = 200.0; // Approximate center for 400px height
-    const offset = 120.0;  // Distance from center
+  Offset _getZonePosition(ReactionZone zone, BoxConstraints constraints) {
+    final centerX = constraints.maxWidth / 2;
+    final centerY = constraints.maxHeight / 2;
+    
+    // Calculate size based on available space
+    final availableSize = constraints.maxHeight.clamp(200.0, 600.0);
+    final stimulusSize = availableSize * 0.6;
+    final halfSize = stimulusSize / 2;
+    final offset = stimulusSize * 0.8; // Distance from center
     
     switch (zone) {
       case ReactionZone.center:
-        return Offset(centerX - 60, centerY - 60);
+        return Offset(centerX - halfSize, centerY - halfSize);
       case ReactionZone.top:
-        return Offset(centerX - 60, centerY - offset - 60);
+        return Offset(centerX - halfSize, centerY - offset - halfSize);
       case ReactionZone.bottom:
-        return Offset(centerX - 60, centerY + offset - 60);
+        return Offset(centerX - halfSize, centerY + offset - halfSize);
       case ReactionZone.left:
-        return Offset(centerX - offset - 60, centerY - 60);
+        return Offset(centerX - offset - halfSize, centerY - halfSize);
       case ReactionZone.right:
-        return Offset(centerX + offset - 60, centerY - 60);
+        return Offset(centerX + offset - halfSize, centerY - halfSize);
       case ReactionZone.quadrants:
         // For quadrants, we'll show multiple zones
-        return Offset(centerX - 60, centerY - 60);
+        return Offset(centerX - halfSize, centerY - halfSize);
     }
   }
 
@@ -1261,6 +1582,7 @@ enum DrillRunnerState {
   ready,
   countdown,
   running,
+  paused,
   rest,
   finished,
 }

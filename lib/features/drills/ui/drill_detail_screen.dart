@@ -708,8 +708,6 @@ class _DrillDetailScreenState extends State<DrillDetailScreen> {
         return Icons.arrow_forward;
       case StimulusType.number:
         return Icons.numbers;
-      case StimulusType.audio:
-        return Icons.volume_up;
     }
   }
 }
