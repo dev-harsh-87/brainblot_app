@@ -25,6 +25,15 @@ class DrillLibraryFilterChanged extends DrillLibraryEvent {
   List<Object?> get props => [category, difficulty];
 }
 
+class DrillLibraryFiltersChanged extends DrillLibraryEvent {
+  final String? category;
+  final Difficulty? difficulty;
+  final String? searchQuery;
+  const DrillLibraryFiltersChanged({this.category, this.difficulty, this.searchQuery});
+  @override
+  List<Object?> get props => [category, difficulty, searchQuery];
+}
+
 class DrillLibraryRefreshRequested extends DrillLibraryEvent {
   const DrillLibraryRefreshRequested();
 }

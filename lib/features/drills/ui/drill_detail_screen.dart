@@ -12,6 +12,8 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:uuid/uuid.dart';
+import 'package:youtube_player_flutter/youtube_player_flutter.dart';
+import 'dart:convert';
 
 class DrillDetailScreen extends StatefulWidget {
   final Drill drill;
@@ -27,7 +29,6 @@ class _DrillDetailScreenState extends State<DrillDetailScreen> {
   late Drill _currentDrill;
   bool _isLoading = false;
   bool _isOwner = false;
-  final bool _privacyLoading = false;
 
   @override
   void initState() {
@@ -40,314 +41,272 @@ class _DrillDetailScreenState extends State<DrillDetailScreen> {
 
   Future<void> _loadOwnershipInfo() async {
     try {
-      print('🔍 Checking ownership for drill: ${_currentDrill.id}');
       final isOwner = await _sharingService.isOwner('drill', _currentDrill.id);
-      print('👤 Ownership result: $isOwner');
       if (mounted) {
         setState(() => _isOwner = isOwner);
       }
     } catch (e) {
-      // Ownership check failure shouldn't block the UI
-      print('❌ Failed to check ownership: $e');
-      // For custom drills, assume ownership if check fails
       if (!_currentDrill.isPreset && mounted) {
         setState(() => _isOwner = true);
       }
     }
   }
 
-  // Privacy toggle functionality removed - all drills are now private by default
-
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
+    final hasMedia = _currentDrill.videoUrl != null || _currentDrill.stepImageUrl != null;
 
     return Scaffold(
       backgroundColor: colorScheme.surface,
-      body: Stack(
-        children: [
-          CustomScrollView(
-        slivers: [
-          // Hero Header
-          SliverAppBar(
-            expandedHeight: 300,
-            pinned: true,
-            backgroundColor: colorScheme.surface,
-            foregroundColor: colorScheme.onSurface,
-            flexibleSpace: FlexibleSpaceBar(
-              title: Text(
-                _currentDrill.name,
-                style: theme.textTheme.headlineSmall?.copyWith(
-                  fontWeight: FontWeight.bold,
-                  color: colorScheme.onSurface,
-                ),
-              ),
-              background: Container(
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    colors: [
-                      _getDifficultyColor(_currentDrill.difficulty).withOpacity(0.8),
-                      _getDifficultyColor(_currentDrill.difficulty).withOpacity(0.4),
+      appBar: AppBar(
+        backgroundColor: colorScheme.surface,
+        elevation: 0,
+        title: Text(
+          _currentDrill.name,
+          style: theme.textTheme.titleLarge?.copyWith(
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        actions: [
+          IconButton(
+            onPressed: _isLoading ? null : _toggleFavorite,
+            icon: Icon(
+              _currentDrill.favorite ? Icons.favorite : Icons.favorite_border,
+              color: _currentDrill.favorite ? colorScheme.error : null,
+            ),
+          ),
+          PopupMenuButton<String>(
+            onSelected: _isLoading ? null : (value) {
+              switch (value) {
+                case 'edit':
+                  _editDrill();
+                  break;
+                case 'duplicate':
+                  _duplicateDrill();
+                  break;
+                case 'share':
+                  _shareDrill();
+                  break;
+              }
+            },
+            itemBuilder: (context) => [
+              if (!_currentDrill.isPreset)
+                const PopupMenuItem(
+                  value: 'edit',
+                  child: Row(
+                    children: [
+                      Icon(Icons.edit),
+                      SizedBox(width: 8),
+                      Text('Edit'),
                     ],
-                    begin: Alignment.topCenter,
-                    end: Alignment.bottomCenter,
                   ),
                 ),
-                child: Stack(
+              const PopupMenuItem(
+                value: 'duplicate',
+                child: Row(
                   children: [
-                    Center(
-                      child: Container(
-                        width: 120,
-                        height: 120,
-                        decoration: BoxDecoration(
-                          color: Colors.white.withOpacity(0.2),
-                          shape: BoxShape.circle,
-                        ),
-                        child: Icon(
-                          _getCategoryIcon(_currentDrill.category),
-                          size: 60,
-                          color: Colors.white,
-                        ),
-                      ),
-                    ),
-
+                    Icon(Icons.copy),
+                    SizedBox(width: 8),
+                    Text('Duplicate'),
                   ],
                 ),
               ),
-            ),
-            actions: [
-              IconButton(
-                onPressed: _isLoading ? null : _toggleFavorite,
-                icon: Icon(
-                  _currentDrill.favorite ? Icons.favorite : Icons.favorite_border,
-                  color: _currentDrill.favorite ? colorScheme.error : null,
+              const PopupMenuItem(
+                value: 'share',
+                child: Row(
+                  children: [
+                    Icon(Icons.share),
+                    SizedBox(width: 8),
+                    Text('Share'),
+                  ],
                 ),
-              ),
-              // Privacy toggle removed - all drills are private by default
-              PopupMenuButton<String>(
-                onSelected: _isLoading ? null : (value) {
-                  switch (value) {
-                    case 'edit':
-                      _editDrill();
-                      break;
-                    case 'duplicate':
-                      _duplicateDrill();
-                      break;
-                    case 'share':
-                      _shareDrill();
-                      break;
-                  }
-                },
-                itemBuilder: (context) => [
-                  if (!_currentDrill.isPreset)
-                    const PopupMenuItem(
-                      value: 'edit',
-                      child: Row(
-                        children: [
-                          Icon(Icons.edit),
-                          SizedBox(width: 8),
-                          Text('Edit'),
-                        ],
-                      ),
-                    ),
-                  const PopupMenuItem(
-                    value: 'duplicate',
-                    child: Row(
-                      children: [
-                        Icon(Icons.copy),
-                        SizedBox(width: 8),
-                        Text('Duplicate'),
-                      ],
-                    ),
-                  ),
-                  const PopupMenuItem(
-                    value: 'share',
-                    child: Row(
-                      children: [
-                        Icon(Icons.share),
-                        SizedBox(width: 8),
-                        Text('Share'),
-                      ],
-                    ),
-                  ),
-                ],
               ),
             ],
           ),
-          // Content
-          SliverToBoxAdapter(
-            child: Padding(
-              padding: const EdgeInsets.all(20),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // Category and Tags
-                  Wrap(
-                    spacing: 8,
-                    runSpacing: 8,
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                        decoration: BoxDecoration(
-                          color: colorScheme.primaryContainer,
-                          borderRadius: BorderRadius.circular(16),
-                        ),
-                        child: Text(
-                          _currentDrill.category.toUpperCase(),
-                          style: theme.textTheme.bodySmall?.copyWith(
-                            color: colorScheme.onPrimaryContainer,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                      ),
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                        decoration: BoxDecoration(
-                          color: _getDifficultyColor(_currentDrill.difficulty).withOpacity(0.1),
-                          borderRadius: BorderRadius.circular(16),
-                          border: Border.all(
-                            color: _getDifficultyColor(_currentDrill.difficulty).withOpacity(0.3),
-                          ),
-                        ),
-                        child: Text(
-                          _currentDrill.difficulty.name.toUpperCase(),
-                          style: theme.textTheme.bodySmall?.copyWith(
-                            color: _getDifficultyColor(_currentDrill.difficulty),
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ),
-                      if (_currentDrill.isPreset)
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                          decoration: BoxDecoration(
-                            color: colorScheme.secondaryContainer,
-                            borderRadius: BorderRadius.circular(16),
-                          ),
-                          child: Text(
-                            'PRESET',
-                            style: theme.textTheme.bodySmall?.copyWith(
-                              color: colorScheme.onSecondaryContainer,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                        ),
-                    ],
-                  ),
-                  const SizedBox(height: 24),
-                  
-                  // Quick Stats Cards
-                  Row(
-                    children: [
-                      Expanded(
-                        child: _buildStatCard(
-                          context,
-                          Icons.timer,
-                          'Duration',
-                          '${_currentDrill.durationSec}s',
-                          colorScheme.primary,
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: _buildStatCard(
-                          context,
-                          Icons.repeat,
-                          'Repetitions',
-                          '${_currentDrill.reps}x',
-                          colorScheme.secondary,
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: _buildStatCard(
-                          context,
-                          Icons.pause,
-                          'Rest',
-                          '${_currentDrill.restSec}s',
-                          colorScheme.tertiary,
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 24),
-                  
-                  // Stimulus Types Section
-                  Text(
-                    'Stimulus Types',
-                    style: theme.textTheme.titleLarge?.copyWith(
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  Wrap(
-                    spacing: 8,
-                    runSpacing: 8,
-                    children: _currentDrill.stimulusTypes.map((type) => _buildStimulusChip(context, type)).toList(),
-                  ),
-                  const SizedBox(height: 24),
-                  
-                  // Reaction Zones Section
-                  Text(
-                    'Reaction Zones',
-                    style: theme.textTheme.titleLarge?.copyWith(
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  Container(
-                    width: double.infinity,
-                    height: 200,
-                    decoration: BoxDecoration(
-                      color: colorScheme.surfaceContainerHighest,
-                      borderRadius: BorderRadius.circular(16),
-                      border: Border.all(color: colorScheme.outline.withOpacity(0.3)),
-                    ),
-                    child: _buildZoneVisualization(_currentDrill.zones),
-                  ),
-                  const SizedBox(height: 24),
-                  
-                  // Configuration Details
-                  Text(
-                    'Configuration',
-                    style: theme.textTheme.titleLarge?.copyWith(
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  _buildConfigurationCard(context),
-                  const SizedBox(height: 32),
-                  
-                  // Action Buttons
-                  Row(
-                    children: [
-                      Expanded(
-                        flex: 2,
-                        child: FilledButton.icon(
-                          onPressed: () => context.push('/drill-runner', extra: _currentDrill),
-                          icon: const Icon(Icons.play_arrow),
-                          label: const Text('Start Drill'),
-                          style: FilledButton.styleFrom(
-                            backgroundColor: colorScheme.primary,
-                            foregroundColor: colorScheme.onPrimary,
-                            padding: const EdgeInsets.symmetric(vertical: 16),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                          ),
-                        ),
-                      ),
-
-                    ],
-                  ),
-                  const SizedBox(height: 20),
-                ],
-              ),
-            ),
-          ),
         ],
       ),
+      body: Stack(
+        children: [
+          SingleChildScrollView(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Media Section (Full Width)
+                if (hasMedia) _buildFullWidthMediaSection(),
+                
+                // Content Section
+                Padding(
+                  padding: const EdgeInsets.all(20),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // Category and Tags
+                      Wrap(
+                        spacing: 8,
+                        runSpacing: 8,
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                            decoration: BoxDecoration(
+                              color: colorScheme.primaryContainer,
+                              borderRadius: BorderRadius.circular(16),
+                            ),
+                            child: Text(
+                              _currentDrill.category.toUpperCase(),
+                              style: theme.textTheme.bodySmall?.copyWith(
+                                color: colorScheme.onPrimaryContainer,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                            decoration: BoxDecoration(
+                              color: _getDifficultyColor(_currentDrill.difficulty).withOpacity(0.1),
+                              borderRadius: BorderRadius.circular(16),
+                              border: Border.all(
+                                color: _getDifficultyColor(_currentDrill.difficulty).withOpacity(0.3),
+                              ),
+                            ),
+                            child: Text(
+                              _currentDrill.difficulty.name.toUpperCase(),
+                              style: theme.textTheme.bodySmall?.copyWith(
+                                color: _getDifficultyColor(_currentDrill.difficulty),
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ),
+                          if (_currentDrill.isPreset)
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                              decoration: BoxDecoration(
+                                color: colorScheme.secondaryContainer,
+                                borderRadius: BorderRadius.circular(16),
+                              ),
+                              child: Text(
+                                'PRESET',
+                                style: theme.textTheme.bodySmall?.copyWith(
+                                  color: colorScheme.onSecondaryContainer,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ),
+                        ],
+                      ),
+                      const SizedBox(height: 24),
+                      
+                      // Quick Stats Cards
+                      Row(
+                        children: [
+                          Expanded(
+                            child: _buildStatCard(
+                              context,
+                              Icons.timer,
+                              'Duration',
+                              '${_currentDrill.durationSec}s',
+                              colorScheme.primary,
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: _buildStatCard(
+                              context,
+                              Icons.repeat,
+                              'Repetitions',
+                              '${_currentDrill.reps}x',
+                              colorScheme.secondary,
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: _buildStatCard(
+                              context,
+                              Icons.pause,
+                              'Rest',
+                              '${_currentDrill.restSec}s',
+                              colorScheme.tertiary,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 24),
+                      
+                      // Stimulus Types Section
+                      Text(
+                        'Stimulus Types',
+                        style: theme.textTheme.titleLarge?.copyWith(
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      Wrap(
+                        spacing: 8,
+                        runSpacing: 8,
+                        children: _currentDrill.stimulusTypes.map((type) => _buildStimulusChip(context, type)).toList(),
+                      ),
+                      const SizedBox(height: 24),
+                      
+                      // Reaction Zones Section
+                      Text(
+                        'Reaction Zones',
+                        style: theme.textTheme.titleLarge?.copyWith(
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      Container(
+                        width: double.infinity,
+                        height: 200,
+                        decoration: BoxDecoration(
+                          color: colorScheme.surfaceContainerHighest,
+                          borderRadius: BorderRadius.circular(16),
+                          border: Border.all(color: colorScheme.outline.withOpacity(0.3)),
+                        ),
+                        child: _buildZoneVisualization(_currentDrill.zones),
+                      ),
+                      const SizedBox(height: 24),
+                      
+                      // Configuration Details
+                      Text(
+                        'Configuration',
+                        style: theme.textTheme.titleLarge?.copyWith(
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      _buildConfigurationCard(context),
+                      const SizedBox(height: 32),
+                      
+                      // Action Buttons
+                      Row(
+                        children: [
+                          Expanded(
+                            flex: 2,
+                            child: FilledButton.icon(
+                              onPressed: () => context.push('/drill-runner', extra: _currentDrill),
+                              icon: const Icon(Icons.play_arrow),
+                              label: const Text('Start Drill'),
+                              style: FilledButton.styleFrom(
+                                backgroundColor: colorScheme.primary,
+                                foregroundColor: colorScheme.onPrimary,
+                                padding: const EdgeInsets.symmetric(vertical: 16),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 20),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
           // Loading overlay
           if (_isLoading)
             Container(
@@ -371,6 +330,253 @@ class _DrillDetailScreenState extends State<DrillDetailScreen> {
         ],
       ),
     );
+  }
+
+  Widget _buildFullWidthMediaSection() {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    
+    final hasVideo = _currentDrill.videoUrl != null;
+    final hasImage = _currentDrill.stepImageUrl != null;
+    
+    if (!hasVideo && !hasImage) {
+      return const SizedBox.shrink();
+    }
+
+    // If only one media type exists, show it directly
+    if (hasVideo && !hasImage) {
+      return SizedBox(
+        height: 300,
+        width: double.infinity,
+        child: _buildVideoPlayer(),
+      );
+    }
+    
+    if (!hasVideo && hasImage) {
+      return SizedBox(
+        height: 300,
+        width: double.infinity,
+        child: _buildImageDisplay(),
+      );
+    }
+
+    // If both exist, show tabbed interface
+    return DefaultTabController(
+      length: 2,
+      child: Column(
+        children: [
+          // Tab selector
+          Container(
+            margin: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+            height: 48,
+            decoration: BoxDecoration(
+              color: colorScheme.surfaceContainerHighest,
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: TabBar(
+              indicator: BoxDecoration(
+                color: colorScheme.primaryContainer,
+                borderRadius: BorderRadius.circular(10),
+              ),
+              indicatorSize: TabBarIndicatorSize.tab,
+              dividerColor: Colors.transparent,
+              labelColor: colorScheme.primary,
+              unselectedLabelColor: colorScheme.onSurface.withOpacity(0.6),
+              labelStyle: theme.textTheme.bodyMedium?.copyWith(
+                fontWeight: FontWeight.w600,
+                fontSize: 13,
+              ),
+              padding: const EdgeInsets.all(4),
+              tabs: const [
+                Tab(
+                  height: 40,
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(Icons.play_circle_outline, size: 18),
+                      SizedBox(width: 6),
+                      Text('Video'),
+                    ],
+                  ),
+                ),
+                Tab(
+                  height: 40,
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(Icons.image_outlined, size: 18),
+                      SizedBox(width: 6),
+                      Text('Image'),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+          // Content
+          SizedBox(
+            height: 300,
+            width: double.infinity,
+            child: Padding(
+              padding: const EdgeInsets.all(16.0),
+              child: TabBarView(
+                children: [
+                  _buildVideoPlayer(),
+                  _buildImageDisplay(),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildVideoPlayer() {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final videoId = YoutubePlayer.convertUrlToId(_currentDrill.videoUrl ?? '');
+    
+    if (videoId == null) {
+      return Container(
+        color: colorScheme.surfaceContainerHighest,
+        child: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(
+                Icons.error_outline,
+                size: 48,
+                color: colorScheme.error,
+              ),
+              const SizedBox(height: 16),
+              Text(
+                'Invalid YouTube URL',
+                style: theme.textTheme.titleMedium?.copyWith(
+                  color: colorScheme.error,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    final controller = YoutubePlayerController(
+      initialVideoId: videoId,
+      flags: const YoutubePlayerFlags(
+        autoPlay: false,
+        mute: false,
+        enableCaption: true,
+      ),
+    );
+
+    return YoutubePlayer(
+      controller: controller,
+      showVideoProgressIndicator: true,
+      progressIndicatorColor: colorScheme.primary,
+      progressColors: ProgressBarColors(
+        playedColor: colorScheme.primary,
+        handleColor: colorScheme.primaryContainer,
+        bufferedColor: colorScheme.primaryContainer.withOpacity(0.3),
+        backgroundColor: colorScheme.surfaceContainerHighest,
+      ),
+      bottomActions: [
+        CurrentPosition(),
+        ProgressBar(isExpanded: true),
+        RemainingDuration(),
+        const PlaybackSpeedButton(),
+      ],
+    );
+  }
+
+  Widget _buildImageDisplay() {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final imageUrl = _currentDrill.stepImageUrl;
+    
+    if (imageUrl == null || imageUrl.isEmpty) {
+      return Container(
+        color: colorScheme.surfaceContainerHighest,
+        child: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(
+                Icons.image_not_supported,
+                size: 48,
+                color: colorScheme.onSurfaceVariant,
+              ),
+              const SizedBox(height: 16),
+              Text(
+                'No image available',
+                style: theme.textTheme.titleMedium?.copyWith(
+                  color: colorScheme.onSurfaceVariant,
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    return _buildImageFromBase64(imageUrl);
+  }
+
+  Widget _buildImageFromBase64(String base64String) {
+    try {
+      String cleanBase64 = base64String;
+      if (base64String.contains('base64,')) {
+        cleanBase64 = base64String.split('base64,')[1];
+      }
+      
+      final imageBytes = base64Decode(cleanBase64);
+      
+      return Image.memory(
+        imageBytes,
+        fit: BoxFit.cover,
+        width: double.infinity,
+        height: double.infinity,
+        errorBuilder: (context, error, stackTrace) => Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              Icons.broken_image,
+              size: 48,
+              color: Theme.of(context).colorScheme.error,
+            ),
+            const SizedBox(height: 16),
+            Text(
+              'Failed to load image',
+              style: TextStyle(
+                color: Theme.of(context).colorScheme.onSurface.withOpacity(0.7),
+                fontSize: 16,
+              ),
+            ),
+          ],
+        ),
+      );
+    } catch (e) {
+      return Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(
+            Icons.broken_image,
+            size: 48,
+            color: Theme.of(context).colorScheme.error,
+          ),
+          const SizedBox(height: 16),
+          Text(
+            'Failed to decode image',
+            style: TextStyle(
+              color: Theme.of(context).colorScheme.onSurface.withOpacity(0.7),
+              fontSize: 16,
+            ),
+          ),
+        ],
+      );
+    }
   }
 
   Widget _buildStatCard(BuildContext context, IconData icon, String label, String value, Color color) {
@@ -436,7 +642,6 @@ class _DrillDetailScreenState extends State<DrillDetailScreen> {
   Widget _buildZoneVisualization(List<ReactionZone> zones) {
     return Stack(
       children: [
-        // Background grid
         Container(
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(16),
@@ -498,11 +703,9 @@ class _DrillDetailScreenState extends State<DrillDetailScreen> {
     );
   }
 
-  // Functionality Methods
   Future<void> _toggleFavorite() async {
     if (_isLoading) return;
     
-    print('🔄 Toggling favorite for drill: ${_currentDrill.id}, current: ${_currentDrill.favorite}');
     setState(() => _isLoading = true);
     
     try {
@@ -510,18 +713,14 @@ class _DrillDetailScreenState extends State<DrillDetailScreen> {
       setState(() {
         _currentDrill = _currentDrill.copyWith(favorite: !_currentDrill.favorite);
       });
-      print('✅ Favorite toggled successfully, new state: ${_currentDrill.favorite}');
       
-      // Refresh the drill library to update the UI
       try {
         final drillLibraryBloc = getIt<DrillLibraryBloc>();
         drillLibraryBloc.add(const DrillLibraryRefreshRequested());
       } catch (e) {
-        // DrillLibraryBloc might not be available, that's okay
-        print('DrillLibraryBloc not available for refresh: $e');
+        // Bloc might not be available
       }
       
-      // Show feedback
       if (mounted) {
         HapticFeedback.lightImpact();
         ScaffoldMessenger.of(context).showSnackBar(
@@ -554,23 +753,18 @@ class _DrillDetailScreenState extends State<DrillDetailScreen> {
   }
 
   Future<void> _editDrill() async {
-    print('✏️ Editing drill: ${_currentDrill.id}, isPreset: ${_currentDrill.isPreset}, isOwner: $_isOwner');
     HapticFeedback.lightImpact();
     
     final editedDrill = await context.push<Drill>('/drill-builder', extra: _currentDrill);
-    print('📝 Edit result: ${editedDrill != null ? "Success" : "Cancelled"}');
     
     if (editedDrill != null && mounted) {
-      // Update the drill in the repository
       try {
         await _drillRepository.upsert(editedDrill);
         
-        // Update the current drill state
         setState(() {
           _currentDrill = editedDrill;
         });
         
-        // Show success message
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('Drill updated successfully!'),
@@ -578,7 +772,6 @@ class _DrillDetailScreenState extends State<DrillDetailScreen> {
           ),
         );
       } catch (e) {
-        // Show error message
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Failed to update drill: $e'),
@@ -598,7 +791,6 @@ class _DrillDetailScreenState extends State<DrillDetailScreen> {
     try {
       HapticFeedback.lightImpact();
       
-      // Create a copy with new ID and modified name
       final duplicatedDrill = _currentDrill.copyWith(
         id: const Uuid().v4(),
         name: '${_currentDrill.name} (Copy)',
@@ -643,7 +835,6 @@ class _DrillDetailScreenState extends State<DrillDetailScreen> {
     try {
       HapticFeedback.lightImpact();
       
-      // Navigate to sharing screen
       await Navigator.of(context).push(
         MaterialPageRoute(
           builder: (context) => SharingScreen(
@@ -760,7 +951,6 @@ class _ZoneVisualizationPainter extends CustomPainter {
           canvas.drawRect(rect, borderPaint);
           break;
         case ReactionZone.quadrants:
-          // Draw four quadrants
           final quadrants = [
             Rect.fromLTWH(0, 0, size.width / 2, size.height / 2),
             Rect.fromLTWH(size.width / 2, 0, size.width / 2, size.height / 2),

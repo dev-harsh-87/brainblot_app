@@ -575,6 +575,8 @@ class FirebaseDrillRepository implements DrillRepository {
       createdBy: data['createdBy'] as String?,
       sharedWith: List<String>.from((data['sharedWith'] as List<dynamic>?)?.cast<String>() ?? <String>[]),
       createdAt: createdAt,
+      videoUrl: data['videoUrl'] as String?,
+      stepImageUrl: data['stepImageUrl'] as String?,
     );
   }
 

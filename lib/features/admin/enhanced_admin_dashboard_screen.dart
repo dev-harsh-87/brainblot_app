@@ -8,6 +8,7 @@ import 'package:spark_app/features/admin/ui/subscription_management_screen.dart'
 import 'package:spark_app/features/admin/ui/screens/comprehensive_analytics_screen.dart';
 import 'package:spark_app/features/admin/ui/plan_requests_screen.dart';
 import 'package:spark_app/features/admin/ui/screens/comprehensive_activity_screen.dart';
+import 'package:spark_app/features/admin/ui/category_management_screen.dart';
 
 
 class EnhancedAdminDashboardScreen extends StatelessWidget {
@@ -277,6 +278,19 @@ Widget _buildStatCard(
                 context,
                 MaterialPageRoute(
                   builder: (context) => const SubscriptionManagementScreen(),
+                ),
+              ),
+            ),
+            _buildManagementCard(
+              context,
+              title: 'Drill Categories',
+              description: 'Manage drill categories',
+              icon: Icons.category_outlined,
+              color: Colors.teal,
+              onTap: () => Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => const CategoryManagementScreen(),
                 ),
               ),
             ),

@@ -3,7 +3,12 @@ import 'package:flutter/services.dart';
 import 'package:uuid/uuid.dart';
 import 'package:spark_app/core/di/injection.dart';
 import 'package:spark_app/features/drills/domain/drill.dart';
+import 'package:spark_app/features/drills/domain/drill_category.dart';
+import 'package:spark_app/features/drills/data/drill_category_repository.dart';
 import 'package:spark_app/features/drills/services/drill_creation_service.dart';
+import 'package:spark_app/features/drills/services/image_upload_service.dart';
+import 'package:image_picker/image_picker.dart';
+import 'dart:io';
 
 class DrillBuilderScreen extends StatefulWidget {
   final Drill? initial;
@@ -21,7 +26,13 @@ class _DrillBuilderScreenState extends State<DrillBuilderScreen>
 
   late TextEditingController _name;
   late TextEditingController _description;
-  String _category = 'fitness';
+  late TextEditingController _videoUrl;
+  String _category = '';
+  List<DrillCategory> _availableCategories = [];
+  bool _loadingCategories = true;
+  String? _stepImageUrl;
+  File? _selectedImageFile;
+  bool _isUploadingImage = false;
   Difficulty _difficulty = Difficulty.beginner;
   int _duration = 60;
   int _rest = 30;
@@ -59,6 +70,8 @@ class _DrillBuilderScreenState extends State<DrillBuilderScreen>
     final d = widget.initial;
     _name = TextEditingController(text: d?.name ?? 'Custom Drill');
     _description = TextEditingController(text: '');
+    _videoUrl = TextEditingController(text: d?.videoUrl ?? '');
+    _stepImageUrl = d?.stepImageUrl;
     
     if (d != null) {
       _category = d.category;
@@ -82,13 +95,56 @@ class _DrillBuilderScreenState extends State<DrillBuilderScreen>
       }
     }
     
+    _loadCategories();
     _animationController.forward();
+  }
+
+  Future<void> _loadCategories() async {
+    try {
+      print('🔄 Loading categories...');
+      final repository = DrillCategoryRepository();
+      final categories = await repository.getActiveCategories();
+      print('✅ Loaded ${categories.length} categories');
+      
+      if (categories.isNotEmpty) {
+        print('📋 Categories: ${categories.map((c) => c.displayName).join(", ")}');
+      }
+      
+      setState(() {
+        _availableCategories = categories;
+        _loadingCategories = false;
+        // Set default category if not already set
+        if (_category.isEmpty && categories.isNotEmpty) {
+          _category = categories.first.name;
+          print('✅ Set default category: ${categories.first.displayName}');
+        }
+      });
+    } catch (e, stackTrace) {
+      print('❌ Error loading categories: $e');
+      print('Stack trace: $stackTrace');
+      setState(() {
+        _loadingCategories = false;
+      });
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error loading categories: $e'),
+            duration: const Duration(seconds: 5),
+            action: SnackBarAction(
+              label: 'Retry',
+              onPressed: _loadCategories,
+            ),
+          ),
+        );
+      }
+    }
   }
 
   @override
   void dispose() {
     _name.dispose();
     _description.dispose();
+    _videoUrl.dispose();
     _pageController.dispose();
     _animationController.dispose();
     super.dispose();
@@ -114,6 +170,8 @@ class _DrillBuilderScreenState extends State<DrillBuilderScreen>
       isPreset: initial?.isPreset ?? false,
       createdBy: initial?.createdBy,
       sharedWith: initial?.sharedWith ?? [],
+      videoUrl: _videoUrl.text.trim().isEmpty ? null : _videoUrl.text.trim(),
+      stepImageUrl: _stepImageUrl,
     );
   }
 
@@ -306,6 +364,176 @@ class _DrillBuilderScreenState extends State<DrillBuilderScreen>
             ),
             const SizedBox(height: 20),
 
+            // YouTube Video URL
+            TextFormField(
+              controller: _videoUrl,
+              decoration: InputDecoration(
+                labelText: 'YouTube Video URL (Optional)',
+                hintText: 'https://www.youtube.com/watch?v=...',
+                prefixIcon: const Icon(Icons.video_library),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                helperText: 'Add a YouTube video to demonstrate this drill',
+              ),
+              keyboardType: TextInputType.url,
+              validator: (v) {
+                if (v != null && v.isNotEmpty) {
+                  // Basic YouTube URL validation
+                  final youtubeRegex = RegExp(
+                    r'^(https?://)?(www\.)?(youtube\.com|youtu\.be)/.+$',
+                    caseSensitive: false,
+                  );
+                  if (!youtubeRegex.hasMatch(v)) {
+                    return 'Please enter a valid YouTube URL';
+                  }
+                }
+                return null;
+              },
+            ),
+            const SizedBox(height: 20),
+
+            // Drill Step Image Upload
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: colorScheme.surfaceContainerHighest,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: colorScheme.outline.withOpacity(0.3)),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Icon(Icons.image, color: colorScheme.primary, size: 20),
+                      const SizedBox(width: 8),
+                      Text(
+                        'Drill Step Image (Optional)',
+                        style: theme.textTheme.titleSmall?.copyWith(
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    'Upload an image showing the drill steps or visualization',
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: colorScheme.onSurface.withOpacity(0.7),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  if (_stepImageUrl != null) ...[
+                    Stack(
+                      children: [
+                        ClipRRect(
+                          borderRadius: BorderRadius.circular(8),
+                          child: Image.network(
+                            _stepImageUrl!,
+                            height: 120,
+                            width: double.infinity,
+                            fit: BoxFit.cover,
+                            errorBuilder: (context, error, stackTrace) =>
+                              Container(
+                                height: 120,
+                                color: colorScheme.errorContainer,
+                                child: const Center(
+                                  child: Icon(Icons.broken_image),
+                                ),
+                              ),
+                          ),
+                        ),
+                        Positioned(
+                          top: 8,
+                          right: 8,
+                          child: IconButton(
+                            onPressed: () {
+                              setState(() {
+                                _stepImageUrl = null;
+                              });
+                            },
+                            icon: const Icon(Icons.close),
+                            style: IconButton.styleFrom(
+                              backgroundColor: Colors.black54,
+                              foregroundColor: Colors.white,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ] else if (_selectedImageFile != null) ...[
+                    Stack(
+                      children: [
+                        ClipRRect(
+                          borderRadius: BorderRadius.circular(8),
+                          child: Image.file(
+                            _selectedImageFile!,
+                            height: 120,
+                            width: double.infinity,
+                            fit: BoxFit.cover,
+                          ),
+                        ),
+                        Positioned(
+                          top: 8,
+                          right: 8,
+                          child: IconButton(
+                            onPressed: () {
+                              setState(() {
+                                _selectedImageFile = null;
+                              });
+                            },
+                            icon: const Icon(Icons.close),
+                            style: IconButton.styleFrom(
+                              backgroundColor: Colors.black54,
+                              foregroundColor: Colors.white,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ] else ...[
+                    Row(
+                      children: [
+                        Expanded(
+                          child: OutlinedButton.icon(
+                            onPressed: _isUploadingImage ? null : () => _pickImage(ImageSource.gallery),
+                            icon: const Icon(Icons.photo_library),
+                            label: const Text('Gallery'),
+                            style: OutlinedButton.styleFrom(
+                              minimumSize: const Size(double.infinity, 48),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: OutlinedButton.icon(
+                            onPressed: _isUploadingImage ? null : () => _pickImage(ImageSource.camera),
+                            icon: const Icon(Icons.camera_alt),
+                            label: const Text('Camera'),
+                            style: OutlinedButton.styleFrom(
+                              minimumSize: const Size(double.infinity, 48),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                  if (_isUploadingImage) ...[
+                    const SizedBox(height: 12),
+                    const LinearProgressIndicator(),
+                  ],
+                ],
+              ),
+            ),
+            const SizedBox(height: 20),
+
             // Category Selection
             Text(
               'Category',
@@ -314,14 +542,48 @@ class _DrillBuilderScreenState extends State<DrillBuilderScreen>
               ),
             ),
             const SizedBox(height: 12),
-            Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              children: [
-                'fitness', 'soccer', 'basketball', 'hockey', 'tennis', 
-                'volleyball', 'football', 'lacrosse', 'physiotherapy', 'agility',
-              ].map((cat) => _buildCategoryChip(cat)).toList(),
-            ),
+            _loadingCategories
+                ? const Center(
+                    child: Padding(
+                      padding: EdgeInsets.all(16.0),
+                      child: CircularProgressIndicator(),
+                    ),
+                  )
+                : _availableCategories.isEmpty
+                    ? Container(
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          color: colorScheme.errorContainer.withOpacity(0.5),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(
+                            color: colorScheme.error.withOpacity(0.3),
+                          ),
+                        ),
+                        child: Row(
+                          children: [
+                            Icon(
+                              Icons.warning_amber_rounded,
+                              color: colorScheme.error,
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Text(
+                                'No categories available. Please contact admin to add categories.',
+                                style: TextStyle(
+                                  color: colorScheme.onErrorContainer,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      )
+                    : Wrap(
+                        spacing: 8,
+                        runSpacing: 8,
+                        children: _availableCategories
+                            .map((cat) => _buildCategoryChip(cat))
+                            .toList(),
+                      ),
             const SizedBox(height: 20),
 
             // Difficulty Selection
@@ -348,14 +610,14 @@ class _DrillBuilderScreenState extends State<DrillBuilderScreen>
     );
   }
 
-  Widget _buildCategoryChip(String category) {
+  Widget _buildCategoryChip(DrillCategory category) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
-    final isSelected = _category == category;
+    final isSelected = _category == category.name;
 
     return FilterChip(
       label: Text(
-        category.toUpperCase(),
+        category.displayName.toUpperCase(),
         style: TextStyle(
           fontWeight: FontWeight.w600,
           color: isSelected ? colorScheme.onPrimary : colorScheme.onSurface,
@@ -364,7 +626,7 @@ class _DrillBuilderScreenState extends State<DrillBuilderScreen>
       selected: isSelected,
       onSelected: (selected) {
         setState(() {
-          _category = category;
+          _category = category.name;
         });
         HapticFeedback.lightImpact();
       },
@@ -1718,6 +1980,55 @@ class _DrillBuilderScreenState extends State<DrillBuilderScreen>
         ),
       );
       HapticFeedback.heavyImpact();
+    }
+  }
+
+  Future<void> _pickImage(ImageSource source) async {
+    try {
+      final imageUploadService = ImageUploadService();
+      File? imageFile;
+      
+      if (source == ImageSource.gallery) {
+        imageFile = await imageUploadService.pickImageFromGallery();
+      } else {
+        imageFile = await imageUploadService.pickImageFromCamera();
+      }
+      
+      if (imageFile != null) {
+        setState(() {
+          _selectedImageFile = imageFile;
+          _isUploadingImage = true;
+        });
+        
+        // Convert image to base64
+        final base64Image = await imageUploadService.convertImageToBase64(imageFile);
+        
+        setState(() {
+          _stepImageUrl = base64Image;
+          _isUploadingImage = false;
+        });
+        
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Image uploaded successfully!'),
+            backgroundColor: Colors.green,
+            duration: Duration(seconds: 2),
+          ),
+        );
+      }
+    } catch (e) {
+      setState(() {
+        _isUploadingImage = false;
+        _selectedImageFile = null;
+      });
+      
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Failed to upload image: ${e.toString().replaceAll('Exception: ', '')}'),
+          backgroundColor: Colors.red,
+          duration: const Duration(seconds: 3),
+        ),
+      );
     }
   }
 }

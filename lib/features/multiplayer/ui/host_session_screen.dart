@@ -810,6 +810,7 @@ class _HostSessionScreenState extends State<HostSessionScreen>
         builder: (context) => DrillRunnerScreen(
           drill: drill,
           isMultiplayerMode: true,
+          isHost: true, // Host has full control
           onDrillComplete: (result) {
             // Handle drill completion for host
             if (mounted) {

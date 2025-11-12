@@ -446,6 +446,25 @@ class BluetoothConnectionService {
     }
   }
 
+  Future<void> broadcastStimulus(Map<String, dynamic> stimulusData) async {
+    if (!_isHost) {
+      return; // Only host can broadcast stimuli
+    }
+
+    try {
+      final message = SyncMessage.drillStimulus(
+        senderId: _deviceId!,
+        senderName: _deviceName!,
+        stimulusData: stimulusData,
+      );
+
+      await sendMessage(message);
+      debugPrint('✅ Stimulus broadcasted to all participants');
+    } catch (e) {
+      debugPrint('❌ Failed to broadcast stimulus: $e');
+    }
+  }
+
   Future<void> sendChatMessage(String message) async {
     final chatMessage = SyncMessage.chat(
       senderId: _deviceId!,

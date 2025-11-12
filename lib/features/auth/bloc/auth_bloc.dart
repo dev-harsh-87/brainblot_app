@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:equatable/equatable.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -44,12 +45,14 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
   }
 
   /// Determines initial state based on current Firebase Auth state
-  /// This helps with hot reload scenarios
+  /// This helps with hot reload scenarios and app restarts
   static AuthState _getInitialState() {
     final currentUser = FirebaseAuth.instance.currentUser;
     if (currentUser != null) {
-      // User is logged in, start with loading to prevent premature redirects
-      return const AuthState(status: AuthStatus.loading);
+      // User is logged in, start with authenticated state immediately
+      // The session will be established asynchronously via SessionManagementService
+      debugPrint('🔄 Initial state: User exists in Firebase Auth, starting as authenticated');
+      return AuthState(status: AuthStatus.authenticated, user: currentUser);
     }
     return const AuthState.initial();
   }
@@ -119,44 +122,16 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
   }
   
   Future<void> _onAuthCheck(AuthCheckRequested event, Emitter<AuthState> emit) async {
-    // Emit loading state while checking authentication
-    emit(state.copyWith(status: AuthStatus.loading));
-    
     final currentUser = FirebaseAuth.instance.currentUser;
     if (currentUser != null) {
-      // User exists in Firebase Auth, wait for session to be established
-      try {
-        // Wait a moment for SessionManagementService to establish session
-        await Future.delayed(const Duration(milliseconds: 500));
-        
-        // Check if session service has established the session
-        final sessionEstablished = _sessionService?.isLoggedIn() ?? false;
-        
-        if (sessionEstablished) {
-          emit(state.copyWith(status: AuthStatus.authenticated, user: currentUser));
-          print('✅ Auth check: User authenticated and session established');
-        } else {
-          // Session not yet established, wait a bit more and try again
-          await Future.delayed(const Duration(milliseconds: 1000));
-          final sessionRecheck = _sessionService?.isLoggedIn() ?? false;
-          
-          if (sessionRecheck) {
-            emit(state.copyWith(status: AuthStatus.authenticated, user: currentUser));
-            print('✅ Auth check: User authenticated after session restoration');
-          } else {
-            // Session failed to establish, sign out to clear inconsistent state
-            print('⚠️ Auth check: Session failed to establish, clearing auth state');
-            await FirebaseAuth.instance.signOut();
-            emit(const AuthState.initial());
-          }
-        }
-      } catch (e) {
-        print('❌ Auth check error: $e');
-        emit(const AuthState.initial());
-      }
+      // User exists in Firebase Auth, mark as authenticated immediately
+      // Session establishment happens asynchronously via SessionManagementService
+      print('🔍 Auth check: Found Firebase user, marking as authenticated');
+      emit(state.copyWith(status: AuthStatus.authenticated, user: currentUser));
     } else {
+      // No user found
+      print('🔍 Auth check: No Firebase user found');
       emit(const AuthState.initial());
-      print('ℹ️ Auth check: No user found in Firebase Auth');
     }
   }
 

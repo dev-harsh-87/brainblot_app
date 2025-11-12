@@ -27,6 +27,8 @@ class Drill {
   final String? createdBy; // user ID who created the drill
   final List<String> sharedWith; // user IDs who have access to this drill
   final DateTime createdAt; // when the drill was created
+  final String? videoUrl; // YouTube video URL for drill demonstration
+  final String? stepImageUrl; // Image URL for drill step visualization
 
   Drill({
     required this.id,
@@ -47,6 +49,8 @@ class Drill {
     this.createdBy,
     this.sharedWith = const [],
     DateTime? createdAt,
+    this.videoUrl,
+    this.stepImageUrl,
   }) : createdAt = createdAt ?? DateTime.now();
 
   Drill copyWith({
@@ -68,6 +72,8 @@ class Drill {
     String? createdBy,
     List<String>? sharedWith,
     DateTime? createdAt,
+    String? videoUrl,
+    String? stepImageUrl,
   }) => Drill(
         id: id ?? this.id,
         name: name ?? this.name,
@@ -87,6 +93,8 @@ class Drill {
         createdBy: createdBy ?? this.createdBy,
         sharedWith: sharedWith ?? this.sharedWith,
         createdAt: createdAt ?? this.createdAt,
+        videoUrl: videoUrl ?? this.videoUrl,
+        stepImageUrl: stepImageUrl ?? this.stepImageUrl,
       );
 
   Map<String, dynamic> toMap() => {
@@ -108,6 +116,8 @@ class Drill {
         'createdBy': createdBy,
         'sharedWith': sharedWith,
         'createdAt': createdAt.toIso8601String(),
+        'videoUrl': videoUrl,
+        'stepImageUrl': stepImageUrl,
       };
 
   static Drill fromMap(Map<String, dynamic> map) => Drill(
@@ -131,5 +141,7 @@ class Drill {
         createdBy: map['createdBy'] as String?,
         sharedWith: List<String>.from((map['sharedWith'] as List?) ?? []),
         createdAt: map['createdAt'] != null ? DateTime.parse(map['createdAt'] as String) : DateTime.now(),
+        videoUrl: map['videoUrl'] as String?,
+        stepImageUrl: map['stepImageUrl'] as String?,
       );
 }

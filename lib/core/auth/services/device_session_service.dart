@@ -2,6 +2,8 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:package_info_plus/package_info_plus.dart';
+import 'package:spark_app/core/storage/app_storage.dart';
+import 'package:device_info_plus/device_info_plus.dart';
 import 'dart:io';
 import 'dart:async';
 
@@ -250,28 +252,74 @@ class DeviceSessionService {
     }
   }
 
-  /// Get device information
+  /// Get device information with persistent device ID
   Future<Map<String, dynamic>> getDeviceInfo() async {
     final packageInfo = await PackageInfo.fromPlatform();
+    final deviceInfoPlugin = DeviceInfoPlugin();
     
-    // Generate a unique device ID (you might want to use a more sophisticated method)
     String deviceId = '';
     String deviceName = '';
     String deviceType = '';
     String platform = '';
 
+    // Try to get stored device ID first
+    const deviceIdKey = 'persistent_device_id';
+    String? storedDeviceId = AppStorage.getString(deviceIdKey);
+
     if (Platform.isAndroid) {
       platform = 'Android';
       deviceType = 'Mobile';
-      deviceName = 'Android Device';
-      // In a real app, you'd use android_id or a similar unique identifier
-      deviceId = 'android_${DateTime.now().millisecondsSinceEpoch}';
+      
+      try {
+        final androidInfo = await deviceInfoPlugin.androidInfo;
+        deviceName = '${androidInfo.brand} ${androidInfo.model}';
+        
+        // Use Android ID as device identifier
+        if (storedDeviceId != null) {
+          deviceId = storedDeviceId;
+        } else {
+          // Generate a persistent device ID based on Android ID
+          deviceId = 'android_${androidInfo.id}';
+          await AppStorage.setString(deviceIdKey, deviceId);
+        }
+      } catch (e) {
+        print('⚠️ Failed to get Android device info: $e');
+        deviceName = 'Android Device';
+        // Fallback to stored ID or generate new one
+        if (storedDeviceId != null) {
+          deviceId = storedDeviceId;
+        } else {
+          deviceId = 'android_${DateTime.now().millisecondsSinceEpoch}';
+          await AppStorage.setString(deviceIdKey, deviceId);
+        }
+      }
     } else if (Platform.isIOS) {
       platform = 'iOS';
       deviceType = 'Mobile';
-      deviceName = 'iPhone';
-      // In a real app, you'd use identifierForVendor or similar
-      deviceId = 'ios_${DateTime.now().millisecondsSinceEpoch}';
+      
+      try {
+        final iosInfo = await deviceInfoPlugin.iosInfo;
+        deviceName = '${iosInfo.name} (${iosInfo.model})';
+        
+        // Use identifierForVendor as device identifier
+        if (storedDeviceId != null) {
+          deviceId = storedDeviceId;
+        } else {
+          // Use iOS identifierForVendor
+          deviceId = 'ios_${iosInfo.identifierForVendor ?? DateTime.now().millisecondsSinceEpoch}';
+          await AppStorage.setString(deviceIdKey, deviceId);
+        }
+      } catch (e) {
+        print('⚠️ Failed to get iOS device info: $e');
+        deviceName = 'iPhone';
+        // Fallback to stored ID or generate new one
+        if (storedDeviceId != null) {
+          deviceId = storedDeviceId;
+        } else {
+          deviceId = 'ios_${DateTime.now().millisecondsSinceEpoch}';
+          await AppStorage.setString(deviceIdKey, deviceId);
+        }
+      }
     }
 
     return {

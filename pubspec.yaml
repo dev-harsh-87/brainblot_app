@@ -86,6 +86,11 @@ dependencies:
   share_plus: ^10.1.2
   url_launcher: ^6.3.0
   package_info_plus: ^8.0.2
+  device_info_plus: ^10.1.0
+  
+  # Media & Video
+  youtube_player_flutter: ^9.0.3
+  image_picker: ^1.1.2
 
   # Monetization (optional)
   in_app_purchase: ^3.2.0

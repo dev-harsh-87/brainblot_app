@@ -17,6 +17,7 @@ class DrillLibraryBloc extends Bloc<DrillLibraryEvent, DrillLibraryState> {
     on<DrillLibraryStarted>(_onStarted);
     on<DrillLibraryQueryChanged>(_onQueryChanged);
     on<DrillLibraryFilterChanged>(_onFilterChanged);
+    on<DrillLibraryFiltersChanged>(_onFiltersChanged);
     on<DrillLibraryViewChanged>(_onViewChanged);
     on<DrillLibraryRefreshRequested>(_onRefreshRequested);
     on<DrillLibraryFiltersCleared>(_onFiltersCleared);
@@ -87,6 +88,30 @@ class DrillLibraryBloc extends Bloc<DrillLibraryEvent, DrillLibraryState> {
     
     // Apply filters with the updated state
     final filtered = _applyFilters(newState.all, 
+      query: newState.query,
+      category: newState.category,
+      difficulty: newState.difficulty,
+    );
+    
+    emit(newState.copyWith(
+      status: DrillLibraryStatus.loaded,
+      items: filtered,
+      lastUpdated: DateTime.now(),
+    ),);
+  }
+
+  Future<void> _onFiltersChanged(DrillLibraryFiltersChanged event, Emitter<DrillLibraryState> emit) async {
+    // Update the state with new filters and search query
+    final newState = state.copyWith(
+      status: DrillLibraryStatus.filtering,
+      category: event.category,
+      difficulty: event.difficulty,
+      query: event.searchQuery,
+    );
+    emit(newState);
+    
+    // Apply filters with the updated state
+    final filtered = _applyFilters(newState.all,
       query: newState.query,
       category: newState.category,
       difficulty: newState.difficulty,

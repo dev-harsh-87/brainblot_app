@@ -1,8 +1,10 @@
 import 'package:spark_app/core/di/injection.dart';
 import 'package:spark_app/features/drills/bloc/drill_library_bloc.dart';
 import 'package:spark_app/features/drills/data/drill_repository.dart';
+import 'package:spark_app/features/drills/data/drill_category_repository.dart';
 import 'package:spark_app/features/drills/data/firebase_drill_repository.dart';
 import 'package:spark_app/features/drills/domain/drill.dart';
+import 'package:spark_app/features/drills/domain/drill_category.dart';
 import 'package:spark_app/features/sharing/ui/privacy_control_widget.dart';
 import 'package:spark_app/features/sharing/services/sharing_service.dart';
 import 'package:spark_app/core/services/auto_refresh_service.dart';
@@ -31,6 +33,7 @@ class _DrillLibraryScreenState extends State<DrillLibraryScreen>
   late DrillRepository _drillRepository;
   String _selectedCategory = '';
   Difficulty? _selectedDifficulty;
+  List<DrillCategory> _availableCategories = [];
   final TextEditingController _searchController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
   bool _showFab = true;
@@ -69,6 +72,23 @@ class _DrillLibraryScreenState extends State<DrillLibraryScreen>
     
     // Check user role and update tab configuration
     _checkUserRoleAndUpdateTabs();
+    
+    // Load categories
+    _loadCategories();
+  }
+
+  Future<void> _loadCategories() async {
+    try {
+      final categoryRepository = getIt<DrillCategoryRepository>();
+      final categories = await categoryRepository.getActiveCategories();
+      if (mounted) {
+        setState(() {
+          _availableCategories = categories;
+        });
+      }
+    } catch (e) {
+      print('❌ Error loading categories: $e');
+    }
   }
   
   Future<void> _checkUserRoleAndUpdateTabs() async {
@@ -354,6 +374,7 @@ class _DrillLibraryScreenState extends State<DrillLibraryScreen>
         ),
       ),
       actions: [
+        _buildFilterButton(colorScheme),
         const SizedBox(width: 8),
       ],
     );
@@ -450,92 +471,8 @@ class _DrillLibraryScreenState extends State<DrillLibraryScreen>
               ),
             ),
             const SizedBox(height: 16),
-            
-            // Filter Chips
-            SingleChildScrollView(
-              scrollDirection: Axis.horizontal,
-              child: Row(
-                children: [
-                  _buildEnhancedFilterChip('Category', _selectedCategory.isEmpty ? 'All' : _selectedCategory, () => _showCategoryFilter()),
-                  const SizedBox(width: 8),
-                  _buildEnhancedFilterChip('Difficulty', _selectedDifficulty?.name ?? 'All', () => _showDifficultyFilter()),
-                  const SizedBox(width: 8),
-                  _buildEnhancedFilterChip('Sport', _selectedCategory.isEmpty ? 'All Sports' : _selectedCategory.toUpperCase(), () => _showSportFilter()),
-                ],
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
 
-  Widget _buildEnhancedFilterChip(String label, String value, VoidCallback onTap) {
-    final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
-    final isActive = (label == 'Category' && _selectedCategory.isNotEmpty) ||
-                     (label == 'Difficulty' && _selectedDifficulty != null) ||
-                     (label == 'Sport' && _selectedCategory.isNotEmpty);
 
-    return GestureDetector(
-      onTap: onTap,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 200),
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-        decoration: BoxDecoration(
-          gradient: isActive
-              ? LinearGradient(
-                  colors: [
-                    colorScheme.primary.withOpacity(0.15),
-                    colorScheme.primary.withOpacity(0.05),
-                  ],
-                )
-              : null,
-          color: isActive ? null : colorScheme.surface,
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(
-            color: isActive
-                ? colorScheme.primary.withOpacity(0.3)
-                : colorScheme.outline.withOpacity(0.2),
-            width: isActive ? 1.5 : 1,
-          ),
-          boxShadow: isActive ? [
-            BoxShadow(
-              color: colorScheme.primary.withOpacity(0.1),
-              blurRadius: 8,
-              offset: const Offset(0, 2),
-            ),
-          ] : null,
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            if (isActive)
-              Padding(
-                padding: const EdgeInsets.only(right: 6),
-                child: Icon(
-                  Icons.filter_alt,
-                  size: 16,
-                  color: colorScheme.primary,
-                ),
-              ),
-            Text(
-              '$label: $value',
-              style: theme.textTheme.bodySmall?.copyWith(
-                color: isActive
-                    ? colorScheme.primary
-                    : colorScheme.onSurface,
-                fontWeight: isActive ? FontWeight.w600 : FontWeight.w500,
-              ),
-            ),
-            const SizedBox(width: 4),
-            Icon(
-              Icons.keyboard_arrow_down,
-              size: 16,
-              color: isActive
-                  ? colorScheme.primary
-                  : colorScheme.onSurface.withOpacity(0.6),
-            ),
           ],
         ),
       ),
@@ -773,31 +710,7 @@ Widget _buildCompactStatChip(IconData icon, String text, Color color) {
           child: Padding(
             padding: const EdgeInsets.all(16),
             child: Row(
-              children: [
-                // Leading icon
-                Container(
-                  padding: const EdgeInsets.all(14),
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      colors: [
-                        _getDifficultyColor(drill.difficulty).withOpacity(0.15),
-                        _getDifficultyColor(drill.difficulty).withOpacity(0.05),
-                      ],
-                    ),
-                    borderRadius: BorderRadius.circular(14),
-                    border: Border.all(
-                      color: _getDifficultyColor(drill.difficulty).withOpacity(0.2),
-                    ),
-                  ),
-                  child: Icon(
-                    _getCategoryIcon(drill.category),
-                    color: _getDifficultyColor(drill.difficulty),
-                    size: 24,
-                  ),
-                ),
-                
-                const SizedBox(width: 16),
-                
+              children: [    
                 // Content
                 Expanded(
                   child: Column(
@@ -1064,283 +977,23 @@ Widget _buildCompactStatChip(IconData icon, String text, Color color) {
     }
   }
 
-  IconData _getCategoryIcon(String category) {
-    switch (category.toLowerCase()) {
-      case 'soccer':
-        return Icons.sports_soccer;
-      case 'basketball':
-        return Icons.sports_basketball;
-      case 'tennis':
-        return Icons.sports_tennis;
-      case 'fitness':
-        return Icons.fitness_center;
-      case 'hockey':
-        return Icons.sports_hockey;
-      case 'volleyball':
-        return Icons.sports_volleyball;
-      case 'football':
-        return Icons.sports_football;
-      default:
-        return Icons.psychology;
-    }
-  }
 
-  void _showSportFilter() {
-    final sports = ['Soccer', 'Basketball', 'Tennis', 'Fitness', 'Hockey', 'Volleyball', 'Football'];
 
-    showModalBottomSheet<void>(
-      context: context,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (context) {
-        final theme = Theme.of(context);
-        final colorScheme = theme.colorScheme;
-        
-        return Container(
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  Icon(Icons.sports, color: colorScheme.primary),
-                  const SizedBox(width: 8),
-                  Text(
-                    'Filter by Sport',
-                    style: theme.textTheme.titleLarge?.copyWith(
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 20),
-              Wrap(
-                spacing: 8,
-                runSpacing: 8,
-                children: [
-                  _buildSportChip('All Sports', _selectedCategory.isEmpty),
-                  ...sports.map((sport) => _buildSportChip(sport, _selectedCategory == sport.toLowerCase())),
-                ],
-              ),
-              const SizedBox(height: 24),
-            ],
-          ),
-        );
-      },
-    );
-  }
 
-  void _showCategoryFilter() {
-    final categories = ['Soccer', 'Basketball', 'Tennis', 'Fitness', 'Hockey', 'Volleyball', 'Football'];
 
-    showModalBottomSheet<void>(
-      context: context,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (context) {
-        return Container(
-          width: double.infinity,
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'Filter by Category',
-                style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-              const SizedBox(height: 16),
-              Wrap(
-                spacing: 8,
-                runSpacing: 8,
-                children: [
-                  _buildCategoryChip('All', _selectedCategory.isEmpty),
-                  ...categories.map((category) => _buildCategoryChip(category, _selectedCategory == category)),
-                ],
-              ),
-              const SizedBox(height: 24),
-            ],
-          ),
-        );
-      },
-    );
-  }
-
-  Widget _buildSportChip(String sport, bool isSelected) {
-    final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
-
-    return FilterChip(
-      label: Text(sport),
-      selected: isSelected,
-      onSelected: (selected) {
-        setState(() {
-          _selectedCategory = selected ? (sport == 'All Sports' ? '' : sport.toLowerCase()) : '';
-        });
-        print('🏃 Sport filter changed: "$sport" -> category: "$_selectedCategory"');
-        context.read<DrillLibraryBloc>().add(DrillLibraryFilterChanged(
-          category: _selectedCategory.isEmpty ? null : _selectedCategory,
-          difficulty: _selectedDifficulty,
-        ),);
-        Navigator.pop(context);
-      },
-      selectedColor: colorScheme.primary.withOpacity(0.2),
-      checkmarkColor: colorScheme.primary,
-      labelStyle: TextStyle(
-        color: isSelected ? colorScheme.primary : colorScheme.onSurface,
-        fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
-      ),
-    );
-  }
-
-  Widget _buildCategoryChip(String category, bool isSelected) {
-    final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
-
-    return FilterChip(
-      label: Text(category),
-      selected: isSelected,
-      onSelected: (selected) {
-        setState(() {
-          _selectedCategory = selected ? (category == 'All' ? '' : category.toLowerCase()) : '';
-        });
-        context.read<DrillLibraryBloc>().add(DrillLibraryFilterChanged(
-          category: _selectedCategory.isEmpty ? null : _selectedCategory,
-          difficulty: _selectedDifficulty,
-        ),);
-        Navigator.pop(context);
-      },
-      selectedColor: colorScheme.primary.withOpacity(0.2),
-      checkmarkColor: colorScheme.primary,
-      labelStyle: TextStyle(
-        color: isSelected ? colorScheme.primary : colorScheme.onSurface,
-        fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
-      ),
-    );
-  }
-
-  void _showDifficultyFilter() {
-    showModalBottomSheet<void>(
-      context: context,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (context) {
-        return Container(
-          width: double.infinity,
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'Filter by Difficulty',
-                style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-              const SizedBox(height: 16),
-              Wrap(
-                spacing: 8,
-                runSpacing: 8,
-                children: [
-                  _buildDifficultyChip('All', _selectedDifficulty == null),
-                  ...Difficulty.values.map((difficulty) => _buildDifficultyChip(
-                    difficulty.name.toUpperCase(),
-                    _selectedDifficulty == difficulty,
-                  ),),
-                ],
-              ),
-              const SizedBox(height: 24),
-            ],
-          ),
-        );
-      },
-    );
-  }
-
-  Widget _buildDifficultyChip(String label, bool isSelected) {
-    final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
-
-    Color chipColor = colorScheme.primary;
-    if (label != 'All') {
-      final difficulty = Difficulty.values.firstWhere(
-        (d) => d.name.toUpperCase() == label,
-        orElse: () => Difficulty.beginner,
-      );
-      chipColor = _getDifficultyColor(difficulty);
-    }
-
-    return FilterChip(
-      label: Text(label),
-      selected: isSelected,
-      onSelected: (selected) {
-        setState(() {
-          if (label == 'All') {
-            _selectedDifficulty = null;
-          } else {
-            _selectedDifficulty = selected
-                ? Difficulty.values.firstWhere((d) => d.name.toUpperCase() == label)
-                : null;
-          }
-        });
-        context.read<DrillLibraryBloc>().add(DrillLibraryFilterChanged(
-          category: _selectedCategory.isEmpty ? null : _selectedCategory,
-          difficulty: _selectedDifficulty,
-        ),);
-        Navigator.pop(context);
-      },
-      selectedColor: chipColor.withOpacity(0.2),
-      checkmarkColor: chipColor,
-      labelStyle: TextStyle(
-        color: isSelected ? chipColor : colorScheme.onSurface,
-        fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
-      ),
-    );
-  }
+  
 
   Widget _buildMyDrillsView() {
     return BlocBuilder<DrillLibraryBloc, DrillLibraryState>(
       builder: (context, state) {
-        return FutureBuilder<List<Drill>>(
-          key: ValueKey('${state.query}-${state.category}-${state.difficulty}'),
-          future: getIt<DrillRepository>().fetchMyDrills(
-            query: state.query?.isEmpty == true ? null : state.query,
-            category: state.category?.isEmpty == true ? null : state.category,
-            difficulty: state.difficulty,
-          ),
-      builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting) {
-          return const Center(child: CircularProgressIndicator());
-        }
-
-        if (snapshot.hasError) {
-          return Center(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(Icons.error_outline, size: 64, color: Colors.red),
-                const SizedBox(height: 16),
-                Text('Error loading your drills: ${snapshot.error}'),
-              ],
-            ),
-          );
-        }
-
-        final myDrills = snapshot.data ?? [];
+        // Filter drills based on current view and filters
+        final myDrills = state.items.where((drill) => !drill.isPreset).toList();
+        
         if (myDrills.isEmpty) {
           return _buildEmptyMyDrillsState();
         }
 
         return _buildDrillView(myDrills);
-        },
-      );
       },
     );
   }
@@ -1361,39 +1014,14 @@ Widget _buildCompactStatChip(IconData icon, String text, Color color) {
 
         return BlocBuilder<DrillLibraryBloc, DrillLibraryState>(
           builder: (context, state) {
-            return FutureBuilder<List<Drill>>(
-              key: ValueKey('admin-${state.query}-${state.category}-${state.difficulty}'),
-              future: getIt<DrillRepository>().fetchAdminDrills(
-                query: state.query?.isEmpty == true ? null : state.query,
-                category: state.category?.isEmpty == true ? null : state.category,
-                difficulty: state.difficulty,
-              ),
-            builder: (context, snapshot) {
-              if (snapshot.connectionState == ConnectionState.waiting) {
-                return const Center(child: CircularProgressIndicator());
-              }
+            // Filter drills based on current view and filters - admin drills only
+            final adminDrills = state.items.where((drill) => drill.isPreset).toList();
+            
+            if (adminDrills.isEmpty) {
+              return _buildEmptyAdminDrillsState();
+            }
 
-              if (snapshot.hasError) {
-                return Center(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(Icons.error_outline, size: 64, color: Colors.red),
-                      const SizedBox(height: 16),
-                      Text('Error loading admin drills: ${snapshot.error}'),
-                    ],
-                  ),
-                );
-              }
-
-              final adminDrills = snapshot.data ?? [];
-              if (adminDrills.isEmpty) {
-                return _buildEmptyAdminDrillsState();
-              }
-
-              return _buildDrillView(adminDrills);
-              },
-            );
+            return _buildDrillView(adminDrills);
           },
         );
       },
@@ -1403,39 +1031,15 @@ Widget _buildCompactStatChip(IconData icon, String text, Color color) {
   Widget _buildFavoriteDrillsView() {
     return BlocBuilder<DrillLibraryBloc, DrillLibraryState>(
       builder: (context, state) {
-        return FutureBuilder<List<Drill>>(
-          key: ValueKey('favorites-${state.query}-${state.category}-${state.difficulty}'),
-          future: getIt<DrillRepository>().fetchFavoriteDrills(
-            query: state.query?.isEmpty == true ? null : state.query,
-            category: state.category?.isEmpty == true ? null : state.category,
-            difficulty: state.difficulty,
-          ),
-        builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator());
-          }
+        // The BLoC already filters for favorites when currentView is DrillLibraryView.favorites
+        // state.items already contains only favorites due to the view filter
+        final favoriteDrills = state.items;
+        
+        if (favoriteDrills.isEmpty) {
+          return _buildEmptyFavoriteDrillsState();
+        }
 
-          if (snapshot.hasError) {
-            return Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(Icons.error_outline, size: 64, color: Colors.red),
-                  const SizedBox(height: 16),
-                  Text('Error loading favorite drills: ${snapshot.error}'),
-                ],
-              ),
-            );
-          }
-
-          final favoriteDrills = snapshot.data ?? [];
-          if (favoriteDrills.isEmpty) {
-            return _buildEmptyFavoriteDrillsState();
-          }
-
-          return _buildDrillView(favoriteDrills);
-          },
-        );
+        return _buildDrillView(favoriteDrills);
       },
     );
   }
@@ -1622,6 +1226,328 @@ Widget _buildCompactStatChip(IconData icon, String text, Color color) {
       );
     }
   }
+int _getActiveFilterCount() {
+    int count = 0;
+    if (_selectedCategory.isNotEmpty) count++;
+    if (_selectedDifficulty != null) count++;
+    return count;
+  }
+
+  String _getDifficultyDisplayName(Difficulty difficulty) {
+    switch (difficulty) {
+      case Difficulty.beginner:
+        return 'Beginner';
+      case Difficulty.intermediate:
+        return 'Intermediate';
+      case Difficulty.advanced:
+        return 'Advanced';
+    }
+  }
+
+  Widget _buildFilterButton(ColorScheme colorScheme) {
+    final filterCount = _getActiveFilterCount();
+    
+    return Stack(
+      children: [
+        IconButton(
+          icon: const Icon(Icons.filter_list),
+          onPressed: () => _showComprehensiveFilterBottomSheet(),
+          tooltip: 'Filter drills',
+        ),
+        if (filterCount > 0)
+          Positioned(
+            right: 8,
+            top: 8,
+            child: Container(
+              padding: const EdgeInsets.all(4),
+              decoration: BoxDecoration(
+                color: colorScheme.error,
+                shape: BoxShape.circle,
+              ),
+              constraints: const BoxConstraints(
+                minWidth: 16,
+                minHeight: 16,
+              ),
+              child: Text(
+                '$filterCount',
+                style: TextStyle(
+                  color: colorScheme.onError,
+                  fontSize: 10,
+                  fontWeight: FontWeight.bold,
+                ),
+                textAlign: TextAlign.center,
+              ),
+            ),
+          ),
+      ],
+    );
+  }
+
+  void _showComprehensiveFilterBottomSheet() {
+    HapticFeedback.lightImpact();
+    
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setModalState) {
+          final theme = Theme.of(context);
+          final colorScheme = theme.colorScheme;
+          
+          return Container(
+            decoration: BoxDecoration(
+              color: colorScheme.surface,
+              borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+            ),
+            padding: EdgeInsets.only(
+              bottom: MediaQuery.of(context).viewInsets.bottom,
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                // Header
+                Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Row(
+                    children: [
+                      Icon(
+                        Icons.filter_list,
+                        color: colorScheme.primary,
+                      ),
+                      const SizedBox(width: 12),
+                      Text(
+                        'Filter Drills',
+                        style: theme.textTheme.titleLarge?.copyWith(
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      const Spacer(),
+                      TextButton(
+                        onPressed: () {
+                          setState(() {
+                            _selectedCategory = '';
+                            _selectedDifficulty = null;
+                          });
+                          setModalState(() {});
+                          context.read<DrillLibraryBloc>().add(
+                            const DrillLibraryFiltersChanged(
+                              category: '',
+                              difficulty: null,
+                              searchQuery: '',
+                            ),
+                          );
+                        },
+                        child: const Text('Clear All'),
+                      ),
+                    ],
+                  ),
+                ),
+                const Divider(height: 1),
+                
+                // Category Filter Section
+                Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Category',
+                        style: theme.textTheme.titleMedium?.copyWith(
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      Wrap(
+                        spacing: 8,
+                        runSpacing: 8,
+                        children: [
+                          // All Categories chip
+                          FilterChip(
+                            label: const Text('All Categories'),
+                            selected: _selectedCategory.isEmpty,
+                            onSelected: (selected) {
+                              setState(() {
+                                _selectedCategory = '';
+                              });
+                              setModalState(() {});
+                              context.read<DrillLibraryBloc>().add(
+                                DrillLibraryFiltersChanged(
+                                  category: '',
+                                  difficulty: _selectedDifficulty,
+                                  searchQuery: _searchController.text,
+                                ),
+                              );
+                            },
+                            selectedColor: colorScheme.primaryContainer,
+                            checkmarkColor: colorScheme.onPrimaryContainer,
+                          ),
+                          // Dynamic category chips
+                          ..._availableCategories.map((category) {
+                            final isSelected = _selectedCategory == category.name;
+                            return FilterChip(
+                              label: Text(category.displayName),
+                              selected: isSelected,
+                              onSelected: (selected) {
+                                setState(() {
+                                  _selectedCategory = selected ? category.name : '';
+                                });
+                                setModalState(() {});
+                                context.read<DrillLibraryBloc>().add(
+                                  DrillLibraryFiltersChanged(
+                                    category: selected ? category.name : '',
+                                    difficulty: _selectedDifficulty,
+                                    searchQuery: _searchController.text,
+                                  ),
+                                );
+                              },
+                              avatar: isSelected ? null : Icon(
+                                _getCategoryIcon(category.name),
+                                size: 18,
+                              ),
+                              selectedColor: colorScheme.primaryContainer,
+                              checkmarkColor: colorScheme.onPrimaryContainer,
+                            );
+                          }).toList(),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+                
+                const Divider(height: 1),
+                
+                // Difficulty Filter Section
+                Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Difficulty Level',
+                        style: theme.textTheme.titleMedium?.copyWith(
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      Wrap(
+                        spacing: 8,
+                        runSpacing: 8,
+                        children: [
+                          // All Difficulties chip
+                          FilterChip(
+                            label: const Text('All Levels'),
+                            selected: _selectedDifficulty == null,
+                            onSelected: (selected) {
+                              setState(() {
+                                _selectedDifficulty = null;
+                              });
+                              setModalState(() {});
+                              context.read<DrillLibraryBloc>().add(
+                                DrillLibraryFiltersChanged(
+                                  category: _selectedCategory,
+                                  difficulty: null,
+                                  searchQuery: _searchController.text,
+                                ),
+                              );
+                            },
+                            selectedColor: colorScheme.primaryContainer,
+                            checkmarkColor: colorScheme.onPrimaryContainer,
+                          ),
+                          // Difficulty level chips
+                          ...Difficulty.values.map((difficulty) {
+                            final isSelected = _selectedDifficulty == difficulty;
+                            return FilterChip(
+                              label: Text(_getDifficultyDisplayName(difficulty)),
+                              selected: isSelected,
+                              onSelected: (selected) {
+                                setState(() {
+                                  _selectedDifficulty = selected ? difficulty : null;
+                                });
+                                setModalState(() {});
+                                context.read<DrillLibraryBloc>().add(
+                                  DrillLibraryFiltersChanged(
+                                    category: _selectedCategory,
+                                    difficulty: selected ? difficulty : null,
+                                    searchQuery: _searchController.text,
+                                  ),
+                                );
+                              },
+                              avatar: isSelected ? null : Icon(
+                                _getDifficultyIcon(difficulty),
+                                size: 18,
+                              ),
+                              selectedColor: _getDifficultyColor(difficulty).withOpacity(0.2),
+                              checkmarkColor: _getDifficultyColor(difficulty),
+                            );
+                          }).toList(),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+                
+                const SizedBox(height: 16),
+                
+                // Apply Button
+                Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: ElevatedButton(
+                    onPressed: () {
+                      Navigator.pop(context);
+                    },
+                    style: ElevatedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(vertical: 16),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                    child: Text(
+                      'Apply Filters',
+                      style: theme.textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  IconData _getCategoryIcon(String category) {
+    switch (category.toLowerCase()) {
+      case 'fitness':
+        return Icons.fitness_center;
+      case 'shooting':
+        return Icons.sports_basketball;
+      case 'passing':
+        return Icons.swap_horiz;
+      case 'dribbling':
+        return Icons.sports_soccer;
+      case 'defense':
+        return Icons.shield;
+      case 'agility':
+        return Icons.directions_run;
+      default:
+        return Icons.sports;
+    }
+  }
+
+  IconData _getDifficultyIcon(Difficulty difficulty) {
+    switch (difficulty) {
+      case Difficulty.beginner:
+        return Icons.person;
+      case Difficulty.intermediate:
+        return Icons.trending_up;
+      case Difficulty.advanced:
+        return Icons.workspace_premium;
+    }
+  }
 
   Future<void> _editDrill(Drill drill) async {
     HapticFeedback.lightImpact();
@@ -1652,6 +1578,4 @@ Widget _buildCompactStatChip(IconData icon, String text, Color color) {
       }
     }
   }
-
-
 }

@@ -218,6 +218,7 @@ class _JoinSessionScreenState extends State<JoinSessionScreen>
         builder: (context) => DrillRunnerScreen(
           drill: drill,
           isMultiplayerMode: true,
+          isHost: false, // Participant has no control
           onDrillComplete: (result) {
             // Handle drill completion in multiplayer context
             if (mounted) {
@@ -997,6 +998,40 @@ class _JoinSessionScreenState extends State<JoinSessionScreen>
                     ],
                   ),
                 ),
+                
+                // Show info message for participants
+                if (isActive && !isPaused) ...[
+                  const SizedBox(height: 12),
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: Colors.blue.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(
+                        color: Colors.blue.withOpacity(0.3),
+                      ),
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(
+                          Icons.info_rounded,
+                          color: Colors.blue[700],
+                          size: 16,
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            'Drill is running! You should be in the drill screen.',
+                            style: theme.textTheme.bodySmall?.copyWith(
+                              color: Colors.blue[700],
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
               ],
             ),
         ],
@@ -1007,6 +1042,8 @@ class _JoinSessionScreenState extends State<JoinSessionScreen>
   Widget _buildParticipantInstructions(BuildContext context) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
+    final isActive = _syncService.isDrillActive;
+    final isPaused = _syncService.isDrillPaused;
 
     return Container(
       padding: const EdgeInsets.all(20),
@@ -1038,6 +1075,71 @@ class _JoinSessionScreenState extends State<JoinSessionScreen>
             ],
           ),
           const SizedBox(height: 12),
+          
+          // Show dynamic status message based on drill state
+          if (isActive && !isPaused)
+            Container(
+              padding: const EdgeInsets.all(12),
+              margin: const EdgeInsets.only(bottom: 12),
+              decoration: BoxDecoration(
+                color: Colors.green.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(
+                  color: Colors.green.withOpacity(0.3),
+                ),
+              ),
+              child: Row(
+                children: [
+                  Icon(
+                    Icons.play_circle_rounded,
+                    color: Colors.green[700],
+                    size: 20,
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      'Drill is running! Your drill should have started automatically.',
+                      style: theme.textTheme.bodyMedium?.copyWith(
+                        color: Colors.green[700],
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            )
+          else if (isActive && isPaused)
+            Container(
+              padding: const EdgeInsets.all(12),
+              margin: const EdgeInsets.only(bottom: 12),
+              decoration: BoxDecoration(
+                color: Colors.orange.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(
+                  color: Colors.orange.withOpacity(0.3),
+                ),
+              ),
+              child: Row(
+                children: [
+                  Icon(
+                    Icons.pause_circle_rounded,
+                    color: Colors.orange[700],
+                    size: 20,
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      'Drill paused by host. Wait for the host to resume.',
+                      style: theme.textTheme.bodyMedium?.copyWith(
+                        color: Colors.orange[700],
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          
           _buildInstructionItem(
             '🎯 Wait for host to select and start drill',
             'The host will choose which drill to run for everyone',

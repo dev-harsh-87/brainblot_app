@@ -847,14 +847,19 @@ class _DrillResultsScreenState extends State<DrillResultsScreen>
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
     
-    // Calculate insights
-    final avgAccuracy = allReps.map((r) => r.accuracy).reduce((a, b) => a + b) / allReps.length;
+    // Calculate insights - normalize accuracy values (handle both decimal 0-1 and percentage 0-100)
+    final normalizedAccuracies = allReps.map((r) => r.accuracy > 1 ? r.accuracy / 100 : r.accuracy).toList();
+    final avgAccuracy = normalizedAccuracies.reduce((a, b) => a + b) / normalizedAccuracies.length;
     final avgReactionTime = allReps
         .where((r) => r.avgReactionTime > 0)
         .map((r) => r.avgReactionTime)
         .fold(0.0, (a, b) => a + b) /
         allReps.where((r) => r.avgReactionTime > 0).length;
-    final bestRep = allReps.reduce((a, b) => a.accuracy > b.accuracy ? a : b);
+    final bestRep = allReps.reduce((a, b) {
+      final aAcc = a.accuracy > 1 ? a.accuracy / 100 : a.accuracy;
+      final bAcc = b.accuracy > 1 ? b.accuracy / 100 : b.accuracy;
+      return aAcc > bAcc ? a : b;
+    });
     final totalHits = allReps.map((r) => r.hits).reduce((a, b) => a + b);
     
     return Container(
@@ -980,7 +985,7 @@ class _DrillResultsScreenState extends State<DrillResultsScreen>
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
     final setAvgAccuracy = reps.isNotEmpty
-        ? reps.map((r) => r.accuracy).reduce((a, b) => a + b) / reps.length
+        ? reps.map((r) => r.accuracy > 1 ? r.accuracy / 100 : r.accuracy).reduce((a, b) => a + b) / reps.length
         : 0.0;
     
     return Container(
@@ -1099,7 +1104,8 @@ class _DrillResultsScreenState extends State<DrillResultsScreen>
   Widget _buildRepCard(RepPerformanceData rep) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
-    final accuracyColor = _getPerformanceColor(rep.accuracy);
+    final normalizedAccuracy = rep.accuracy > 1 ? rep.accuracy / 100 : rep.accuracy;
+    final accuracyColor = _getPerformanceColor(normalizedAccuracy);
     
     return AnimatedBuilder(
       animation: _chartAnimation,
@@ -1154,7 +1160,7 @@ class _DrillResultsScreenState extends State<DrillResultsScreen>
                         borderRadius: BorderRadius.circular(6),
                       ),
                       child: Text(
-                        '${(rep.accuracy * 100).toStringAsFixed(0)}%',
+                        '${(normalizedAccuracy * 100).toStringAsFixed(0)}%',
                         style: theme.textTheme.labelSmall?.copyWith(
                           color: accuracyColor,
                           fontWeight: FontWeight.w700,
@@ -1294,22 +1300,6 @@ class _DrillResultsScreenState extends State<DrillResultsScreen>
                 ),
               ),
             ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: OutlinedButton.icon(
-                onPressed: _shareResults,
-                icon: const Icon(Icons.share_rounded),
-                label: const Text('Share'),
-                style: OutlinedButton.styleFrom(
-                  foregroundColor: colorScheme.primary,
-                  side: BorderSide(color: colorScheme.primary),
-                  padding: const EdgeInsets.symmetric(vertical: 16),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(16),
-                  ),
-                ),
-              ),
-            ),
           ],
         ),
         const SizedBox(height: 12),
@@ -1397,31 +1387,6 @@ class _DrillResultsScreenState extends State<DrillResultsScreen>
   void _retryDrill() {
     HapticFeedback.mediumImpact();
     context.go('/drill-runner', extra: widget.result.drill);
-  }
-
-  void _shareResults() {
-    HapticFeedback.mediumImpact();
-    final drill = widget.result.drill;
-    final accuracy = (widget.result.accuracy * 100).toStringAsFixed(1);
-    final avgReaction = widget.result.avgReactionMs.toStringAsFixed(0);
-    
-    final shareText = '''
-🧠 Cognitive Training Results
-
-Drill: ${drill.name}
-Category: ${drill.category}
-Difficulty: ${drill.difficulty.name}
-
-📊 Performance:
-• Accuracy: $accuracy%
-• Avg Reaction Time: ${avgReaction}ms
-• Hits: ${widget.result.hits}/${drill.numberOfStimuli}
-• Sets: ${drill.sets} × ${drill.reps} reps
-
-Keep training to improve your cognitive abilities! 🚀
-''';
-    
-    Share.share(shareText, subject: 'My Cognitive Training Results');
   }
 
   void _backToHome() {

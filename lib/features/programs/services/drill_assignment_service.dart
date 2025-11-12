@@ -16,9 +16,8 @@ class DrillAssignmentService {
     final levelDrills = _filterDrillsByLevel(categoryDrills, program.level);
     
     if (levelDrills.isEmpty) {
-      // Fallback to general fitness drills if no category-specific drills found
-      final fallbackDrills = _filterDrillsByCategory(allDrills, 'fitness');
-      return _assignDrillsToDays(program.days, fallbackDrills, program.level);
+      // Fallback to all available drills if no category-specific drills found
+      return _assignDrillsToDays(program.days, allDrills, program.level);
     }
     
     return _assignDrillsToDays(program.days, levelDrills, program.level);
@@ -42,30 +41,16 @@ class DrillAssignmentService {
       }
     }
     
-    // Final fallback to general fitness
-    return drills.where((drill) => drill.category.toLowerCase() == 'fitness').toList();
+    // Final fallback to all drills if no related category drills found
+    return drills;
   }
 
   /// Gets related categories for better drill matching
+  /// This provides common fallback categories but is no longer hardcoded to specific sports
   List<String> _getRelatedCategories(String category) {
-    switch (category.toLowerCase()) {
-      case 'soccer':
-        return ['football', 'agility', 'fitness'];
-      case 'basketball':
-        return ['agility', 'fitness'];
-      case 'tennis':
-        return ['agility', 'fitness'];
-      case 'football':
-        return ['soccer', 'agility', 'fitness'];
-      case 'hockey':
-        return ['agility', 'fitness'];
-      case 'agility':
-        return ['fitness'];
-      case 'general':
-        return ['fitness', 'agility'];
-      default:
-        return ['fitness', 'agility'];
-    }
+    // Use a more generic approach - return empty list to use all drills as fallback
+    // This allows the system to work with any dynamically added categories
+    return [];
   }
 
   /// Filters drills by difficulty level with progressive difficulty

@@ -5,7 +5,9 @@ import 'package:uuid/uuid.dart';
 
 import 'package:spark_app/core/di/injection.dart';
 import 'package:spark_app/features/drills/data/drill_repository.dart';
+import 'package:spark_app/features/drills/data/drill_category_repository.dart';
 import 'package:spark_app/features/drills/domain/drill.dart';
+import 'package:spark_app/features/drills/domain/drill_category.dart';
 import 'package:spark_app/features/programs/bloc/programs_bloc.dart';
 import 'package:spark_app/features/programs/domain/program.dart';
 import 'package:spark_app/features/programs/services/program_creation_service.dart';
@@ -24,12 +26,13 @@ class _ProgramCreationScreenState extends State<ProgramCreationScreen>
   final _descriptionController = TextEditingController();
   final _pageController = PageController();
 
-  String _selectedCategory = 'fitness';
+  String _selectedCategory = '';
   final String _selectedLevel = 'Beginner';
   int _programDuration = 30; // days instead of text field
   
   // Drill selection and assignment
   List<Drill> _availableDrills = [];
+  List<DrillCategory> _availableCategories = [];
   final Map<int, List<Drill>> _dayWiseDrills = {}; // day -> drills
   final Set<String> _selectedDrillIds = {};
   
@@ -40,14 +43,6 @@ class _ProgramCreationScreenState extends State<ProgramCreationScreen>
   
   late AnimationController _animationController;
   late Animation<double> _fadeAnimation;
-
-  final List<String> _categories = [
-    'fitness',
-    'soccer',
-    'basketball',
-    'tennis',
-    'hockey',
-  ];
 
   final List<String> _levels = [
     'Beginner',
@@ -66,26 +61,34 @@ class _ProgramCreationScreenState extends State<ProgramCreationScreen>
     _fadeAnimation = Tween<double>(begin: 0.0, end: 1.0)
         .animate(CurvedAnimation(parent: _animationController, curve: Curves.easeInOut));
     
-    _loadAvailableDrills();
+    _loadInitialData();
     _animationController.forward();
   }
 
-  Future<void> _loadAvailableDrills() async {
+  Future<void> _loadInitialData() async {
     setState(() => _isLoading = true);
     
     try {
       final drillRepository = getIt<DrillRepository>();
+      final categoryRepository = getIt<DrillCategoryRepository>();
+      
       final drills = await drillRepository.fetchAll();
+      final categories = await categoryRepository.getActiveCategories();
       
       setState(() {
         _availableDrills = drills;
+        _availableCategories = categories;
+        // Set default category if available
+        if (categories.isNotEmpty && _selectedCategory.isEmpty) {
+          _selectedCategory = categories.first.name;
+        }
         _isLoading = false;
       });
     } catch (e) {
       setState(() => _isLoading = false);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error loading drills: $e')),
+          SnackBar(content: Text('Error loading data: $e')),
         );
       }
     }
@@ -293,25 +296,25 @@ class _ProgramCreationScreenState extends State<ProgramCreationScreen>
         filled: true,
         fillColor: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
       ),
-      items: _categories.map((category) {
+      items: _availableCategories.map((category) {
         return DropdownMenuItem(
-          value: category,
+          value: category.name,
           child: Row(
             children: [
               Container(
                 padding: const EdgeInsets.all(6),
                 decoration: BoxDecoration(
-                  color: _getCategoryColor(category).withValues(alpha: 0.1),
+                  color: _getCategoryColor(category.name).withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(6),
                 ),
                 child: Icon(
-                  _getCategoryIcon(category),
+                  _getCategoryIcon(category.name),
                   size: 18,
-                  color: _getCategoryColor(category),
+                  color: _getCategoryColor(category.name),
                 ),
               ),
               const SizedBox(width: 10),
-              Text(_formatCategoryName(category)),
+              Text(category.displayName),
             ],
           ),
         );

@@ -47,6 +47,15 @@ class SessionManagementService {
       print('⚠️ Failed to initialize subscription sync: $e');
     });
     
+    // Check if there's an existing Firebase Auth user on init
+    final currentUser = _auth.currentUser;
+    if (currentUser != null) {
+      print('🔄 Session init: Found existing Firebase user, establishing session...');
+      _establishSession(currentUser).catchError((e) {
+        print('❌ Failed to establish initial session: $e');
+      });
+    }
+    
     // Listen to Firebase Auth state changes
     _authSubscription = _auth.authStateChanges().listen(_handleAuthStateChange);
   }
@@ -230,7 +239,19 @@ class SessionManagementService {
   AppUser? getCurrentSession() => _currentSession;
 
   /// Check if user is logged in
-  bool isLoggedIn() => _currentSession != null && _auth.currentUser != null;
+  /// Returns true if either session is established OR Firebase user exists
+  /// This allows for graceful session restoration
+  bool isLoggedIn() {
+    final hasSession = _currentSession != null;
+    final hasFirebaseUser = _auth.currentUser != null;
+    
+    // If we have Firebase user but no session yet, session is being established
+    if (hasFirebaseUser && !hasSession) {
+      print('ℹ️ isLoggedIn: Firebase user exists, session establishing...');
+    }
+    
+    return hasSession || hasFirebaseUser;
+  }
 
   /// Check if current user is admin
   bool isAdmin() {

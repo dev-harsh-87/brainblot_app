@@ -227,6 +227,35 @@ class SessionSyncService {
     }
   }
 
+  /// Broadcast stimulus data to all participants (host only)
+  Future<void> broadcastStimulus({
+    required String stimulusType,
+    required String label,
+    required int colorValue,
+    required int timeMs,
+    required int index,
+  }) async {
+    if (!_bluetoothService.isHost) {
+      return; // Only host can broadcast stimuli
+    }
+
+    try {
+      final stimulusData = {
+        'type': stimulusType,
+        'label': label,
+        'colorValue': colorValue,
+        'timeMs': timeMs,
+        'index': index,
+        'timestamp': DateTime.now().millisecondsSinceEpoch,
+      };
+
+      await _bluetoothService.broadcastStimulus(stimulusData);
+      debugPrint('Broadcasted stimulus: $stimulusType at $timeMs ms');
+    } catch (e) {
+      debugPrint('Failed to broadcast stimulus: $e');
+    }
+  }
+
   /// Send a chat message to all participants
   Future<void> sendChatMessage(String message) async {
     try {
@@ -312,6 +341,9 @@ class SessionSyncService {
         break;
       case SyncMessageType.drillResume:
         _handleDrillResume(message);
+        break;
+      case SyncMessageType.drillStimulus:
+        _handleDrillStimulus(message);
         break;
       case SyncMessageType.chat:
         _handleChatMessage(message);
@@ -415,6 +447,20 @@ class SessionSyncService {
     }
   }
 
+  void _handleDrillStimulus(SyncMessage message) {
+    try {
+      final stimulusData = message.data['stimulusData'] as Map<String, dynamic>?;
+      if (stimulusData == null) return;
+
+      // Emit event for drill runner to display the stimulus
+      _drillEventController.add(DrillSyncEvent.stimulus(stimulusData));
+      
+      debugPrint('Received stimulus: ${stimulusData['type']} at ${stimulusData['timeMs']}ms');
+    } catch (e) {
+      debugPrint('Error handling drill stimulus: $e');
+    }
+  }
+
   void _handleChatMessage(SyncMessage message) {
     final chatText = message.chatMessage;
     if (chatText != null) {
@@ -480,6 +526,7 @@ abstract class DrillSyncEvent {
   factory DrillSyncEvent.paused(Drill? drill) = DrillPausedEvent;
   factory DrillSyncEvent.resumed(Drill? drill) = DrillResumedEvent;
   factory DrillSyncEvent.chatReceived(String sender, String message) = ChatReceivedEvent;
+  factory DrillSyncEvent.stimulus(Map<String, dynamic> data) = StimulusEvent;
 }
 
 class DrillStartedEvent extends DrillSyncEvent {
@@ -501,6 +548,11 @@ class DrillPausedEvent extends DrillSyncEvent {
 class DrillResumedEvent extends DrillSyncEvent {
   final Drill? drill;
   const DrillResumedEvent(this.drill);
+}
+
+class StimulusEvent extends DrillSyncEvent {
+  final Map<String, dynamic> data;
+  const StimulusEvent(this.data);
 }
 
 class ChatReceivedEvent extends DrillSyncEvent {

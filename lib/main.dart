@@ -70,17 +70,9 @@ class CogniTrainApp extends StatelessWidget {
           sessionService: getIt(),
         );
         
-        // For hot reload: Check Firebase Auth state immediately if user exists
-        final currentUser = FirebaseAuth.instance.currentUser;
-        if (currentUser != null) {
-          // User is logged in, trigger auth check immediately to prevent login redirect
-          authBloc.add(const AuthCheckRequested());
-        } else {
-          // No user, delay auth check slightly to allow Firebase Auth to initialize
-          Future.delayed(const Duration(milliseconds: 100), () {
-            authBloc.add(const AuthCheckRequested());
-          });
-        }
+        // AuthBloc now initializes with correct state based on Firebase Auth
+        // No need for explicit auth check - SessionManagementService handles it
+        print('🔄 App initialization: AuthBloc created with initial state');
         
         return authBloc;
       },

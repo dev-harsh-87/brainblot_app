@@ -100,6 +100,7 @@ class AppRouter {
     final currentLocation = state.uri.toString();
     final authState = _authBloc.state;
     final isAuthRoute = _authRoutes.contains(currentLocation);
+    final currentUser = FirebaseAuth.instance.currentUser;
     
     // Save location for hot reload (debug mode)
     _saveLocationForHotReload(currentLocation);
@@ -114,18 +115,14 @@ class AppRouter {
       return '/';
     }
     
-    // For hot reload: Check if Firebase Auth has a user before redirecting to login
+    // Check if Firebase Auth has a user (handles app restart and hot reload)
     if (authState.status == AuthStatus.initial && !isAuthRoute) {
-      // In debug mode, check if Firebase Auth still has a user (hot reload case)
-      if (kDebugMode) {
-        final currentUser = FirebaseAuth.instance.currentUser;
-        if (currentUser != null) {
-          // User is still logged in Firebase Auth, don't redirect to login
-          // Let AuthBloc handle the state restoration
-          debugPrint('[Router] Hot reload detected: User still in Firebase Auth, allowing navigation');
-          return null;
-        }
+      if (currentUser != null) {
+        // User exists in Firebase Auth, allow navigation while session establishes
+        debugPrint('[Router] Firebase user exists, allowing navigation during session restoration');
+        return null;
       }
+      // No Firebase user, redirect to login
       return '/login';
     }
     

@@ -4,6 +4,8 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 
 import 'package:spark_app/core/di/injection.dart';
+import 'package:spark_app/features/drills/data/drill_category_repository.dart';
+import 'package:spark_app/features/drills/domain/drill_category.dart';
 import 'package:spark_app/features/programs/bloc/programs_bloc.dart';
 import 'package:spark_app/features/programs/domain/program.dart';
 import 'package:spark_app/features/programs/services/drill_assignment_service.dart';
@@ -33,6 +35,7 @@ class _ProgramsScreenState extends State<ProgramsScreen>
   late SharingService _sharingService;
   String _selectedCategory = '';
   String _selectedLevel = '';
+  List<DrillCategory> _availableCategories = [];
   final Map<String, bool> _ownershipCache = {};
 
   @override
@@ -56,7 +59,24 @@ class _ProgramsScreenState extends State<ProgramsScreen>
       AutoRefreshService.sharing: _refreshPrograms,
     });
 
+    // Load categories
+    _loadCategories();
+
     // Programs are automatically loaded by the singleton BLoC
+  }
+
+  Future<void> _loadCategories() async {
+    try {
+      final categoryRepository = getIt<DrillCategoryRepository>();
+      final categories = await categoryRepository.getActiveCategories();
+      if (mounted) {
+        setState(() {
+          _availableCategories = categories;
+        });
+      }
+    } catch (e) {
+      print('❌ Error loading categories: $e');
+    }
   }
 
   void _refreshPrograms() {
@@ -349,11 +369,6 @@ class _ProgramsScreenState extends State<ProgramsScreen>
             // Filter Chips
             BlocBuilder<ProgramsBloc, ProgramsState>(
               builder: (context, state) {
-                final categories = state.programs
-                    .map((p) => p.category)
-                    .toSet()
-                    .toList()
-                  ..sort();
                 final levels =
                     state.programs.map((p) => p.level).toSet().toList()..sort();
                 final filteredPrograms = _applyFilters(state.programs);
@@ -369,7 +384,7 @@ class _ProgramsScreenState extends State<ProgramsScreen>
                               _selectedCategory.isEmpty
                                   ? 'All'
                                   : _formatCategoryName(_selectedCategory),
-                              () => _showCategoryFilter(categories),),
+                              () => _showCategoryFilter(),),
                           const SizedBox(width: 8),
                           _buildEnhancedFilterChip(
                               'Level',
@@ -1531,7 +1546,13 @@ class _ProgramsScreenState extends State<ProgramsScreen>
     }
   }
 
-  void _showCategoryFilter(List<String> categories) {
+  void _showCategoryFilter() {
+    final categoryNames = _availableCategories.map((c) => c.name).toList();
+    final icons = <String, IconData>{
+      'All': Icons.apps,
+      ..._buildCategoryIconMap(),
+    };
+    
     showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
@@ -1540,25 +1561,24 @@ class _ProgramsScreenState extends State<ProgramsScreen>
       ),
       builder: (context) => _FilterBottomSheet(
         title: 'Select Category',
-        options: ['All', ...categories],
+        options: ['All', ...categoryNames],
         selectedValue: _selectedCategory.isEmpty ? 'All' : _selectedCategory,
         onSelected: (value) {
           setState(() {
             _selectedCategory = value == 'All' ? '' : value;
           });
         },
-        icons: {
-          'All': Icons.apps,
-          'fitness': Icons.fitness_center,
-          'soccer': Icons.sports_soccer,
-          'basketball': Icons.sports_basketball,
-          'tennis': Icons.sports_tennis,
-          'hockey': Icons.sports_hockey,
-          'agility': Icons.speed,
-          'general': Icons.psychology,
-        },
+        icons: icons,
       ),
     );
+  }
+
+  Map<String, IconData> _buildCategoryIconMap() {
+    final iconMap = <String, IconData>{};
+    for (final category in _availableCategories) {
+      iconMap[category.name] = _getCategoryIcon(category.name);
+    }
+    return iconMap;
   }
 
   void _showLevelFilter(List<String> levels) {

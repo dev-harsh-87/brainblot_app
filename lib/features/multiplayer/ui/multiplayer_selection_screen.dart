@@ -68,10 +68,7 @@ class _MultiplayerSelectionScreenState extends State<MultiplayerSelectionScreen>
         backgroundColor: colorScheme.surface,
         foregroundColor: colorScheme.onSurface,
         elevation: 0,
-        leading: IconButton(
-          onPressed: () => context.pop(),
-          icon: const Icon(Icons.arrow_back_ios_rounded),
-        ),
+      
       ),
       body: AnimatedBuilder(
         animation: _animationController,

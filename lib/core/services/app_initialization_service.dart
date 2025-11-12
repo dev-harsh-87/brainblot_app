@@ -1,6 +1,7 @@
 import 'package:spark_app/core/services/database_initialization_service.dart';
 import 'package:spark_app/core/services/enhanced_ios_permission_service.dart';
 import 'package:spark_app/core/services/fcm_token_service.dart';
+import 'package:spark_app/core/services/category_initialization_service.dart';
 
 /// Service to initialize the app with database setup
 class AppInitializationService {
@@ -45,6 +46,16 @@ class AppInitializationService {
         print('⚠️ Please change the admin password after first login!');
       } else {
         print('✅ Database already initialized');
+      }
+
+      // Initialize default categories if needed
+      final categoryService = CategoryInitializationService();
+      final needsCategoryInit = await categoryService.needsInitialization();
+      if (needsCategoryInit) {
+        print('🏷️ Initializing default drill categories...');
+        await categoryService.initializeDefaultCategories();
+      } else {
+        print('✅ Drill categories already initialized');
       }
 
       // Log permission status for debugging

@@ -82,14 +82,16 @@ class DrillRunnerScreen extends StatefulWidget {
   final String? programId;
   final int? programDayNumber;
   final bool isMultiplayerMode;
+  final bool isHost;
   final Function(SessionResult)? onDrillComplete;
   
   const DrillRunnerScreen({
-    super.key, 
+    super.key,
     required this.drill,
     this.programId,
     this.programDayNumber,
     this.isMultiplayerMode = false,
+    this.isHost = true,
     this.onDrillComplete,
   });
 
@@ -171,6 +173,9 @@ class _DrillRunnerScreenState extends State<DrillRunnerScreen>
     // Initialize multiplayer sync if in multiplayer mode
     if (widget.isMultiplayerMode) {
       _initializeMultiplayerSync();
+      
+      // Check if drill is already active in multiplayer session
+      _checkMultiplayerDrillState();
     }
     
     // Debug: Print drill configuration to verify sets value
@@ -329,6 +334,44 @@ class _DrillRunnerScreenState extends State<DrillRunnerScreen>
     }
   }
 
+  void _checkMultiplayerDrillState() {
+    if (_syncService == null) return;
+    
+    try {
+      // Check if the drill is already active in the multiplayer session
+      final isDrillActive = _syncService!.isDrillActive;
+      final isDrillPaused = _syncService!.isDrillPaused;
+      
+      print('🔍 Checking multiplayer drill state: active=$isDrillActive, paused=$isDrillPaused');
+      
+      if (isDrillActive && !isDrillPaused) {
+        // Drill is already running, start it immediately for this participant
+        print('🎮 Drill already active, auto-starting for participant');
+        
+        // Use a post-frame callback to ensure the widget is fully built
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted && _state == DrillRunnerState.ready) {
+            _startDrillFromSync();
+          }
+        });
+      } else if (isDrillActive && isDrillPaused) {
+        // Drill is paused, set the paused state
+        print('🎮 Drill is paused, setting paused state for participant');
+        
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted && _state == DrillRunnerState.ready) {
+            setState(() {
+              _state = DrillRunnerState.paused;
+              _isMultiplayerPaused = true;
+            });
+          }
+        });
+      }
+    } catch (e) {
+      print('❌ Error checking multiplayer drill state: $e');
+    }
+  }
+
   void _handleMultiplayerDrillEvent(dynamic event) {
     if (!widget.isMultiplayerMode || !mounted) return;
     
@@ -359,6 +402,11 @@ class _DrillRunnerScreenState extends State<DrillRunnerScreen>
           print('🎮 Resuming drill from multiplayer sync');
           _resumeDrillFromSync();
         }
+      } else if (event is StimulusEvent) {
+        // Participant receiving stimulus data from host
+        if (!widget.isHost && _state == DrillRunnerState.running) {
+          _handleStimulusFromHost(event.data);
+        }
       }
     } catch (e) {
       print('❌ Error handling multiplayer drill event: $e');
@@ -373,20 +421,58 @@ class _DrillRunnerScreenState extends State<DrillRunnerScreen>
     }
   }
 
+  void _handleStimulusFromHost(Map<String, dynamic> stimulusData) {
+    try {
+      // Extract stimulus data
+      final stimulusTypeStr = stimulusData['type'] as String;
+      final label = stimulusData['label'] as String;
+      final colorValue = stimulusData['colorValue'] as int;
+      final index = stimulusData['index'] as int;
+      
+      // Parse stimulus type
+      final stimulusType = StimulusType.values.firstWhere(
+        (e) => e.name == stimulusTypeStr,
+        orElse: () => StimulusType.color,
+      );
+      
+      // Update current stimulus
+      _currentIndex = index;
+      if (_currentIndex < _schedule.length) {
+        _current = _schedule[_currentIndex];
+      }
+      
+      // Display the stimulus with the exact color from host
+      final color = Color(colorValue);
+      _showStimulus(label, color, stimulusType);
+      
+      print('🎯 Participant received stimulus: type=$stimulusTypeStr, color=${color.value}, index=$index');
+    } catch (e) {
+      print('❌ Error handling stimulus from host: $e');
+    }
+  }
+
   void _startDrillFromSync() {
-    if (_state != DrillRunnerState.ready && _state != DrillRunnerState.paused) return;
+    // Allow starting from ready or paused states
+    if (_state != DrillRunnerState.ready && _state != DrillRunnerState.paused) {
+      print('⚠️ Cannot start drill from sync in state: $_state');
+      return;
+    }
     
     try {
+      print('🎮 Starting drill from sync in state: $_state');
+      
       // Start the drill without countdown for sync
       _startedAt = DateTime.now();
       _currentRepStartTime = _startedAt;
       _currentSetStartTime = _startedAt;
       
+      _stopwatch.reset();
       _stopwatch.start();
       _ticker = Timer.periodic(const Duration(milliseconds: 8), _onTick);
       
       setState(() {
         _state = DrillRunnerState.running;
+        _isMultiplayerPaused = false;
         _display = 'Ready';
         _displayColor = Colors.white;
       });
@@ -682,49 +768,30 @@ class _DrillRunnerScreenState extends State<DrillRunnerScreen>
     }
     
     // Advance stimulus when time passes
+    // In multiplayer mode, only the host generates and broadcasts stimuli
     if (_currentIndex + 1 < _schedule.length && ms >= _schedule[_currentIndex + 1].timeMs) {
       _currentIndex++;
       _current = _schedule[_currentIndex];
       
-      // Animate stimulus appearance
-      _stimulusAnimationController.reset();
-      _stimulusAnimationController.forward();
-      
-      setState(() {
-        _display = _current!.type == StimulusType.color ? '' : _current!.label;
-        if (_current!.type == StimulusType.color) {
-          _displayColor = _getRandomColor();
-        } else {
-          _displayColor = Colors.white;
-        }
-      });
-      
-      print('🎬 Stimulus shown: type=${_current!.type}, mode=${widget.drill.presentationMode.name}');
-      
-      // Speak the stimulus if in audio mode
-      if (widget.drill.presentationMode == PresentationMode.audio) {
-        final textToSpeak = _getStimulusTextForTts(_current!);
-        print('🎯 Attempting to speak: "$textToSpeak" for stimulus type: ${_current!.type}');
-        _speakStimulus(textToSpeak);
-      } else {
-        print('👁️ Visual mode - showing stimulus visually');
+      // Generate display color for color stimuli
+      Color stimulusColor = Colors.white;
+      if (_current!.type == StimulusType.color) {
+        stimulusColor = _getRandomColor();
       }
       
-      // Enhanced feedback based on stimulus type
-      switch (_current!.type) {
-        case StimulusType.color:
-          HapticFeedback.lightImpact();
-          break;
-        case StimulusType.shape:
-          HapticFeedback.selectionClick();
-          break;
-        case StimulusType.arrow:
-          HapticFeedback.mediumImpact();
-          break;
-        case StimulusType.number:
-          HapticFeedback.lightImpact();
-          break;
+      // If host in multiplayer mode, broadcast the stimulus to participants
+      if (widget.isMultiplayerMode && widget.isHost && _syncService != null) {
+        _syncService!.broadcastStimulus(
+          stimulusType: _current!.type.name,
+          label: _current!.label,
+          colorValue: stimulusColor.value,
+          timeMs: _current!.timeMs,
+          index: _current!.index,
+        );
       }
+      
+      // Show the stimulus locally
+      _showStimulus(_current!.label, stimulusColor, _current!.type);
     }
 
     // End of current rep
@@ -732,6 +799,49 @@ class _DrillRunnerScreenState extends State<DrillRunnerScreen>
       _completeRep();
     } else {
       setState(() {});
+    }
+  }
+
+  void _showStimulus(String label, Color color, StimulusType type) {
+    // Animate stimulus appearance
+    _stimulusAnimationController.reset();
+    _stimulusAnimationController.forward();
+    
+    setState(() {
+      _display = type == StimulusType.color ? '' : label;
+      _displayColor = color;
+    });
+    
+    print('🎬 Stimulus shown: type=$type, mode=${widget.drill.presentationMode.name}');
+    
+    // Speak the stimulus if in audio mode
+    if (widget.drill.presentationMode == PresentationMode.audio) {
+      final textToSpeak = _getStimulusTextForTts(_Stimulus(
+        index: _currentIndex,
+        timeMs: _stopwatch.elapsedMilliseconds,
+        type: type,
+        label: label,
+      ));
+      print('🎯 Attempting to speak: "$textToSpeak" for stimulus type: $type');
+      _speakStimulus(textToSpeak);
+    } else {
+      print('👁️ Visual mode - showing stimulus visually');
+    }
+    
+    // Enhanced feedback based on stimulus type
+    switch (type) {
+      case StimulusType.color:
+        HapticFeedback.lightImpact();
+        break;
+      case StimulusType.shape:
+        HapticFeedback.selectionClick();
+        break;
+      case StimulusType.arrow:
+        HapticFeedback.mediumImpact();
+        break;
+      case StimulusType.number:
+        HapticFeedback.lightImpact();
+        break;
     }
   }
 
@@ -1208,7 +1318,8 @@ void _completeRep() {
         ],
       ),
       actions: [
-        if (_state == DrillRunnerState.running)
+        // Only show pause button for host in multiplayer mode, or in non-multiplayer mode
+        if (_state == DrillRunnerState.running && (!widget.isMultiplayerMode || widget.isHost))
           IconButton(
             onPressed: _showPauseDialog,
             icon: const Icon(Icons.pause, color: Colors.white),
@@ -1525,6 +1636,46 @@ void _completeRep() {
   }
   
   Widget _buildControlButtons() {
+    // In multiplayer mode, only show controls for host
+    if (widget.isMultiplayerMode && !widget.isHost) {
+      return Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 32),
+        child: Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: Colors.blue.withOpacity(0.2),
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(
+              color: Colors.blue.withOpacity(0.4),
+            ),
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(
+                Icons.people_outline_rounded,
+                color: Colors.blue[300],
+                size: 20,
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  'Participant Mode - Host controls the drill',
+                  style: TextStyle(
+                    color: Colors.blue[300],
+                    fontWeight: FontWeight.w500,
+                    fontSize: 14,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+    
+    // Show normal controls for host or non-multiplayer mode
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 32),
       child: Row(

@@ -4,6 +4,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:spark_app/features/auth/data/auth_repository.dart';
 import 'package:spark_app/features/auth/data/firebase_user_repository.dart';
 import 'package:spark_app/features/drills/data/drill_repository.dart';
+import 'package:spark_app/features/drills/data/drill_category_repository.dart';
 import 'package:spark_app/features/drills/data/session_repository.dart';
 import 'package:spark_app/features/drills/data/firebase_drill_repository.dart';
 import 'package:spark_app/features/drills/data/firebase_session_repository.dart';
@@ -65,6 +66,14 @@ Future<void> configureDependencies() async {
   // Also register the concrete type for cases where it's needed specifically
   getIt.registerLazySingleton<FirebaseDrillRepository>(() {
     return getIt<DrillRepository>() as FirebaseDrillRepository;
+  });
+
+  getIt.registerLazySingleton<DrillCategoryRepository>(() {
+    final repo = DrillCategoryRepository(
+      firestore: firebaseFirestore,
+    );
+    print('🔧 DI: Created DrillCategoryRepository instance');
+    return repo;
   });
   
   getIt.registerLazySingleton<SessionRepository>(() {
