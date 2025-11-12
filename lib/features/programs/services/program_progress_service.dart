@@ -44,7 +44,7 @@ class ProgramProgressService {
       throw Exception('No active program found');
     }
 
-    final activeData = activeDoc.data()!;
+    final activeData = activeDoc.data();
     final currentDay = (activeData['currentDay'] as int?) ?? 1;
     final completedDays = List<int>.from((activeData['completedDays'] as List<dynamic>?) ?? <dynamic>[]);
 

@@ -77,10 +77,7 @@ class FCMTokenService {
       
       // Request permission first (for iOS)
       final settings = await FirebaseMessaging.instance.requestPermission(
-        alert: true,
         badge: true,
-        sound: true,
-        provisional: false,
       );
       
       debugPrint('$_tag Notification permission status: ${settings.authorizationStatus}');

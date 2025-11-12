@@ -421,7 +421,7 @@ class SessionSyncService {
       _drillEventController.add(DrillSyncEvent.chatReceived(
         message.senderName,
         chatText,
-      ));
+      ),);
       _statusController.add('${message.senderName}: $chatText');
     }
   }
@@ -448,9 +448,6 @@ class SessionSyncService {
       colors: (data['colors'] as List<dynamic>)
           .map((c) => Color(c as int))
           .toList(),
-      favorite: false,
-      isPreset: false,
-      createdBy: null,
       sharedWith: [],
       createdAt: DateTime.now(),
     );

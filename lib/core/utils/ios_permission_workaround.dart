@@ -30,7 +30,7 @@ class IOSPermissionWorkaround {
         return {
           'success': true,
           'needsSettings': false,
-          'message': 'All permissions already granted'
+          'message': 'All permissions already granted',
         };
       }
 
@@ -39,7 +39,7 @@ class IOSPermissionWorkaround {
         return {
           'success': false,
           'needsSettings': true,
-          'message': 'Permissions permanently denied - please enable in iOS Settings'
+          'message': 'Permissions permanently denied - please enable in iOS Settings',
         };
       }
 
@@ -92,13 +92,13 @@ class IOSPermissionWorkaround {
         return {
           'success': true,
           'needsSettings': false,
-          'message': 'All permissions granted successfully'
+          'message': 'All permissions granted successfully',
         };
       } else if (anyPermanentlyDenied) {
         return {
           'success': false,
           'needsSettings': true,
-          'message': 'Permissions permanently denied - please enable in iOS Settings'
+          'message': 'Permissions permanently denied - please enable in iOS Settings',
         };
       } else if (showedPermissionDialog && (!allGranted && (finalBluetoothStatus.isDenied || finalLocationStatus.isDenied))) {
         // On iOS, if we showed a permission dialog and permissions are still denied,
@@ -118,7 +118,7 @@ If Spark is not in the app list:
 • Go to Settings > Privacy & Security > Bluetooth
 • Enable for Spark
 • Go to Settings > Privacy & Security > Location Services
-• Enable for Spark'''
+• Enable for Spark''',
         };
       } else if (!showedPermissionDialog) {
         // If no permission dialog was shown, permissions might already be in a denied state
@@ -126,13 +126,13 @@ If Spark is not in the app list:
         return {
           'success': false,
           'needsSettings': true,
-          'message': 'Permissions need to be enabled in iOS Settings'
+          'message': 'Permissions need to be enabled in iOS Settings',
         };
       } else {
         return {
           'success': false,
           'needsSettings': false,
-          'message': 'Some permissions were not granted'
+          'message': 'Some permissions were not granted',
         };
       }
 
@@ -141,7 +141,7 @@ If Spark is not in the app list:
       return {
         'success': false,
         'needsSettings': true,
-        'message': 'Permission request failed. Please enable permissions in iOS Settings.'
+        'message': 'Permission request failed. Please enable permissions in iOS Settings.',
       };
     }
   }

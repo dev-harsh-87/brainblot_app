@@ -48,7 +48,7 @@ Future<void> configureDependencies() async {
   getIt.registerLazySingleton<FirebaseUserRepository>(() => FirebaseUserRepository(
     firestore: firebaseFirestore,
     auth: firebaseAuth,
-  ));
+  ),);
   
   // Professional Firebase Repositories
   print('🔧 DI: Registering professional Firebase repositories');
@@ -110,7 +110,7 @@ Future<void> configureDependencies() async {
   getIt.registerLazySingleton<ProfileService>(() => ProfileService(
     firestore: firebaseFirestore,
     auth: firebaseAuth,
-  ));
+  ),);
 
   // Auto Refresh Service
   getIt.registerLazySingleton<AutoRefreshService>(() => AutoRefreshService());
@@ -131,16 +131,16 @@ Future<void> configureDependencies() async {
   getIt.registerLazySingleton<PermissionService>(() => PermissionService(
     firestore: firebaseFirestore,
     auth: firebaseAuth,
-  ));
+  ),);
   getIt.registerLazySingleton<SubscriptionPlanRepository>(() => SubscriptionPlanRepository(
     firestore: firebaseFirestore,
-  ));
+  ),);
   
   // Register Subscription Sync Service
   getIt.registerLazySingleton<SubscriptionSyncService>(() => SubscriptionSyncService(
     firestore: firebaseFirestore,
     planRepository: getIt<SubscriptionPlanRepository>(),
-  ));
+  ),);
   
 // Register Session Management Service (singleton for app-wide session tracking)
   getIt.registerLazySingleton<SessionManagementService>(() => SessionManagementService(
@@ -148,24 +148,24 @@ Future<void> configureDependencies() async {
     firestore: firebaseFirestore,
     permissionService: getIt<PermissionService>(),
     subscriptionSync: getIt<SubscriptionSyncService>(),
-  ));
+  ),);
   
   // Register Multi-Device Session Service
   getIt.registerLazySingleton<MultiDeviceSessionService>(() => MultiDeviceSessionService(
     firestore: firebaseFirestore,
     auth: firebaseAuth,
-  ));
+  ),);
   
   // Register Subscription Permission Service
   getIt.registerLazySingleton<SubscriptionPermissionService>(() => SubscriptionPermissionService(
     auth: firebaseAuth,
     firestore: firebaseFirestore,
-  ));
+  ),);
 // Register User Management Service
   getIt.registerLazySingleton<UserManagementService>(() => UserManagementService());
   
   print('🔧 DI: Professional Firebase dependency injection configuration completed successfully');
   print('🔧 DI: Available repositories: Firebase (primary), Hive (local fallback)');
   print('🔧 DI: RBAC system initialized with PermissionService and SubscriptionPlanRepository');
-  print("🔧 DI: Session management service registered - centralized auth handling enabled");
+  print('🔧 DI: Session management service registered - centralized auth handling enabled');
 }

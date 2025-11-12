@@ -1,8 +1,8 @@
-import "package:cloud_firestore/cloud_firestore.dart";
-import "package:firebase_auth/firebase_auth.dart";
-import "package:spark_app/features/subscription/domain/subscription_request.dart";
-import "package:spark_app/core/di/injection.dart";
-import "package:spark_app/core/auth/services/session_management_service.dart";
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:spark_app/features/subscription/domain/subscription_request.dart';
+import 'package:spark_app/core/di/injection.dart';
+import 'package:spark_app/core/auth/services/session_management_service.dart';
 
 /// Service for managing subscription upgrade requests
 class SubscriptionRequestService {
@@ -17,39 +17,38 @@ class SubscriptionRequestService {
     try {
       final currentUser = _auth.currentUser;
       if (currentUser == null) {
-        throw Exception("No authenticated user found");
+        throw Exception('No authenticated user found');
       }
 
       // Get current user data
-      final userDoc = await _firestore.collection("users").doc(currentUser.uid).get();
+      final userDoc = await _firestore.collection('users').doc(currentUser.uid).get();
       if (!userDoc.exists) {
-        throw Exception("User document not found");
+        throw Exception('User document not found');
       }
 
       final userData = userDoc.data()!;
-      final String currentPlan = (userData["subscription"]?["plan"] as String?) ?? "free";
+      final String currentPlan = (userData['subscription']?['plan'] as String?) ?? 'free';
 
       // Create request
       final request = SubscriptionRequest(
-        id: "", // Will be set by Firestore
+        id: '', // Will be set by Firestore
         userId: currentUser.uid,
-        userEmail: currentUser.email ?? "",
-        userName: (userData["displayName"] as String?) ?? "Unknown",
+        userEmail: currentUser.email ?? '',
+        userName: (userData['displayName'] as String?) ?? 'Unknown',
         currentPlan: currentPlan,
         requestedPlan: requestedPlan,
         reason: reason,
-        status: "pending",
         createdAt: DateTime.now(),
       );
 
       final docRef = await _firestore
-          .collection("subscription_requests")
+          .collection('subscription_requests')
           .add(request.toFirestore());
 
-      print("✅ Subscription request created: ${docRef.id}");
+      print('✅ Subscription request created: ${docRef.id}');
       return docRef.id;
     } catch (e) {
-      print("❌ Failed to create subscription request: $e");
+      print('❌ Failed to create subscription request: $e');
       rethrow;
     }
   }
@@ -57,8 +56,8 @@ class SubscriptionRequestService {
   /// Get all pending requests (for admin)
   Stream<List<SubscriptionRequest>> getPendingRequests() {
     return _firestore
-        .collection("subscription_requests")
-        .where("status", isEqualTo: "pending")
+        .collection('subscription_requests')
+        .where('status', isEqualTo: 'pending')
         .snapshots()
         .map((snapshot) {
       final requests = snapshot.docs
@@ -74,7 +73,7 @@ class SubscriptionRequestService {
   /// Get all requests (for admin)
   Stream<List<SubscriptionRequest>> getAllRequests() {
     return _firestore
-        .collection("subscription_requests")
+        .collection('subscription_requests')
         .snapshots()
         .map((snapshot) {
       final requests = snapshot.docs
@@ -95,8 +94,8 @@ class SubscriptionRequestService {
     }
 
     return _firestore
-        .collection("subscription_requests")
-        .where("userId", isEqualTo: currentUser.uid)
+        .collection('subscription_requests')
+        .where('userId', isEqualTo: currentUser.uid)
         .snapshots()
         .map((snapshot) {
       final requests = snapshot.docs
@@ -114,28 +113,28 @@ class SubscriptionRequestService {
     try {
       final currentUser = _auth.currentUser;
       if (currentUser == null) {
-        throw Exception("No authenticated admin user found");
+        throw Exception('No authenticated admin user found');
       }
 
       // Get admin data
-      final adminDoc = await _firestore.collection("users").doc(currentUser.uid).get();
+      final adminDoc = await _firestore.collection('users').doc(currentUser.uid).get();
       final adminData = adminDoc.data();
 
       // Get request data
       final requestDoc = await _firestore
-          .collection("subscription_requests")
+          .collection('subscription_requests')
           .doc(requestId)
           .get();
 
       if (!requestDoc.exists) {
-        throw Exception("Request not found");
+        throw Exception('Request not found');
       }
 
       final request = SubscriptionRequest.fromFirestore(requestDoc);
 
       // Get the actual subscription plan from the repository to ensure consistency
       final planDoc = await _firestore
-          .collection("subscription_plans")
+          .collection('subscription_plans')
           .doc(request.requestedPlan)
           .get();
 
@@ -176,32 +175,32 @@ class SubscriptionRequestService {
       // Update user's subscription in Firestore
       // Use dot notation to update nested fields properly
       final updateData = {
-        "subscription.plan": request.requestedPlan,
-        "subscription.status": "active",
-        "subscription.moduleAccess": moduleAccess,
-        "updatedAt": FieldValue.serverTimestamp(),
+        'subscription.plan': request.requestedPlan,
+        'subscription.status': 'active',
+        'subscription.moduleAccess': moduleAccess,
+        'updatedAt': FieldValue.serverTimestamp(),
       };
 
       // Only set expiration if it's not null (lifetime plans don't expire)
       if (expiresAt != null) {
-        updateData["subscription.expiresAt"] = Timestamp.fromDate(expiresAt);
+        updateData['subscription.expiresAt'] = Timestamp.fromDate(expiresAt);
       } else {
         // Remove expiration for lifetime plans
-        updateData["subscription.expiresAt"] = FieldValue.delete();
+        updateData['subscription.expiresAt'] = FieldValue.delete();
       }
 
-      await _firestore.collection("users").doc(request.userId).update(updateData);
+      await _firestore.collection('users').doc(request.userId).update(updateData);
 
       // Update request status
-      await _firestore.collection("subscription_requests").doc(requestId).update({
-        "status": "approved",
-        "adminId": currentUser.uid,
-        "adminEmail": currentUser.email,
-        "adminName": adminData?["displayName"] ?? "Admin",
-        "processedAt": FieldValue.serverTimestamp(),
+      await _firestore.collection('subscription_requests').doc(requestId).update({
+        'status': 'approved',
+        'adminId': currentUser.uid,
+        'adminEmail': currentUser.email,
+        'adminName': adminData?['displayName'] ?? 'Admin',
+        'processedAt': FieldValue.serverTimestamp(),
       });
 
-      print("✅ Subscription request approved and user plan upgraded");
+      print('✅ Subscription request approved and user plan upgraded');
       print("📅 Plan expires at: ${expiresAt?.toString() ?? 'Never (lifetime)'}");
       
       // If the upgraded user is currently logged in, refresh their session
@@ -211,9 +210,9 @@ class SubscriptionRequestService {
       // The user document snapshot listener in SessionManagementService
       // at line 62-92 will automatically detect the change and update
       // the session, triggering permission cache clearing at line 74.
-      print("📡 User session will be automatically refreshed via Firestore listener");
+      print('📡 User session will be automatically refreshed via Firestore listener');
     } catch (e) {
-      print("❌ Failed to approve request: $e");
+      print('❌ Failed to approve request: $e');
       rethrow;
     }
   }
@@ -223,26 +222,26 @@ class SubscriptionRequestService {
     try {
       final currentUser = _auth.currentUser;
       if (currentUser == null) {
-        throw Exception("No authenticated admin user found");
+        throw Exception('No authenticated admin user found');
       }
 
       // Get admin data
-      final adminDoc = await _firestore.collection("users").doc(currentUser.uid).get();
+      final adminDoc = await _firestore.collection('users').doc(currentUser.uid).get();
       final adminData = adminDoc.data();
 
       // Update request status
-      await _firestore.collection("subscription_requests").doc(requestId).update({
-        "status": "rejected",
-        "rejectionReason": rejectionReason,
-        "adminId": currentUser.uid,
-        "adminEmail": currentUser.email,
-        "adminName": adminData?["displayName"] ?? "Admin",
-        "processedAt": FieldValue.serverTimestamp(),
+      await _firestore.collection('subscription_requests').doc(requestId).update({
+        'status': 'rejected',
+        'rejectionReason': rejectionReason,
+        'adminId': currentUser.uid,
+        'adminEmail': currentUser.email,
+        'adminName': adminData?['displayName'] ?? 'Admin',
+        'processedAt': FieldValue.serverTimestamp(),
       });
 
-      print("✅ Subscription request rejected");
+      print('✅ Subscription request rejected');
     } catch (e) {
-      print("❌ Failed to reject request: $e");
+      print('❌ Failed to reject request: $e');
       rethrow;
     }
   }
@@ -251,14 +250,14 @@ class SubscriptionRequestService {
   Future<int> getPendingRequestCount() async {
     try {
       final snapshot = await _firestore
-          .collection("subscription_requests")
-          .where("status", isEqualTo: "pending")
+          .collection('subscription_requests')
+          .where('status', isEqualTo: 'pending')
           .count()
           .get();
 
       return snapshot.count ?? 0;
     } catch (e) {
-      print("❌ Failed to get pending request count: $e");
+      print('❌ Failed to get pending request count: $e');
       return 0;
     }
   }
@@ -266,8 +265,8 @@ class SubscriptionRequestService {
   /// Stream of pending request count
   Stream<int> watchPendingRequestCount() {
     return _firestore
-        .collection("subscription_requests")
-        .where("status", isEqualTo: "pending")
+        .collection('subscription_requests')
+        .where('status', isEqualTo: 'pending')
         .snapshots()
         .map((snapshot) => snapshot.docs.length);
   }

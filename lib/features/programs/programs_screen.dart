@@ -110,7 +110,7 @@ class _ProgramsScreenState extends State<ProgramsScreen>
 
                   if (state.status == ProgramsStatus.error) {
                     return _buildErrorState(
-                        state.errorMessage ?? 'Unknown error occurred');
+                        state.errorMessage ?? 'Unknown error occurred',);
                   }
 
                   return Stack(
@@ -129,7 +129,7 @@ class _ProgramsScreenState extends State<ProgramsScreen>
                           top: 0,
                           left: 0,
                           right: 0,
-                          child: Container(
+                          child: SizedBox(
                             height: 4,
                             child: LinearProgressIndicator(
                               backgroundColor: Colors.transparent,
@@ -309,7 +309,6 @@ class _ProgramsScreenState extends State<ProgramsScreen>
         border: Border(
           bottom: BorderSide(
             color: colorScheme.outline.withOpacity(0.1),
-            width: 1,
           ),
         ),
       ),
@@ -327,7 +326,6 @@ class _ProgramsScreenState extends State<ProgramsScreen>
                     color: colorScheme.shadow.withOpacity(0.04),
                     blurRadius: 8,
                     offset: const Offset(0, 2),
-                    spreadRadius: 0,
                   ),
                 ],
               ),
@@ -371,12 +369,12 @@ class _ProgramsScreenState extends State<ProgramsScreen>
                               _selectedCategory.isEmpty
                                   ? 'All'
                                   : _formatCategoryName(_selectedCategory),
-                              () => _showCategoryFilter(categories)),
+                              () => _showCategoryFilter(categories),),
                           const SizedBox(width: 8),
                           _buildEnhancedFilterChip(
                               'Level',
                               _selectedLevel.isEmpty ? 'All' : _selectedLevel,
-                              () => _showLevelFilter(levels)),
+                              () => _showLevelFilter(levels),),
                           const SizedBox(width: 8),
                           if (_selectedCategory.isNotEmpty ||
                               _selectedLevel.isNotEmpty)
@@ -416,7 +414,7 @@ class _ProgramsScreenState extends State<ProgramsScreen>
   }
 
   Widget _buildEnhancedFilterChip(
-      String label, String value, VoidCallback onTap) {
+      String label, String value, VoidCallback onTap,) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
     final isActive = (label == 'Category' && _selectedCategory.isNotEmpty) ||
@@ -450,7 +448,6 @@ class _ProgramsScreenState extends State<ProgramsScreen>
                     color: colorScheme.primary.withOpacity(0.1),
                     blurRadius: 8,
                     offset: const Offset(0, 2),
-                    spreadRadius: 0,
                   ),
                 ]
               : null,
@@ -925,11 +922,11 @@ class _ProgramsScreenState extends State<ProgramsScreen>
                   const SizedBox(width: 12),
                   ElevatedButton(
                     onPressed: () => _showProgramDaysOverview(program, active),
-                    child: const Icon(Icons.calendar_view_day),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: colorScheme.secondary,
                       foregroundColor: colorScheme.onSecondary,
                     ),
+                    child: const Icon(Icons.calendar_view_day),
                   ),
                 ],
               ),
@@ -1093,7 +1090,7 @@ class _ProgramsScreenState extends State<ProgramsScreen>
   }
 
   Widget _buildStatCard(
-      String label, String value, IconData icon, Color color) {
+      String label, String value, IconData icon, Color color,) {
     final theme = Theme.of(context);
 
     return Container(
@@ -1126,7 +1123,7 @@ class _ProgramsScreenState extends State<ProgramsScreen>
   }
 
   Widget _buildProgramCard(Program program,
-      {required bool isActive, required ProgramsState state}) {
+      {required bool isActive, required ProgramsState state,}) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
     final categoryColor = _getCategoryColor(program.category);
@@ -1232,7 +1229,7 @@ class _ProgramsScreenState extends State<ProgramsScreen>
                                 if (isActive)
                                   Container(
                                     padding: const EdgeInsets.symmetric(
-                                        horizontal: 8, vertical: 4),
+                                        horizontal: 8, vertical: 4,),
                                     decoration: BoxDecoration(
                                       color: colorScheme.primary,
                                       borderRadius: BorderRadius.circular(12),
@@ -1263,7 +1260,7 @@ class _ProgramsScreenState extends State<ProgramsScreen>
                             const SizedBox(height: 4),
                             Container(
                               padding: const EdgeInsets.symmetric(
-                                  horizontal: 10, vertical: 4),
+                                  horizontal: 10, vertical: 4,),
                               decoration: BoxDecoration(
                                 color: categoryColor.withOpacity(0.15),
                                 borderRadius: BorderRadius.circular(12),
@@ -1672,7 +1669,7 @@ void _showProgramDaysOverview(Program program, ActiveProgram active) {
                       // Old format
                       return ListView.builder(
                         padding: const EdgeInsets.symmetric(
-                            horizontal: 16, vertical: 8),
+                            horizontal: 16, vertical: 8,),
                         itemCount: program.days.length,
                         itemBuilder: (context, index) {
                           final day = program.days[index];
@@ -1701,7 +1698,7 @@ void _showProgramDaysOverview(Program program, ActiveProgram active) {
 
                       return ListView.builder(
                         padding: const EdgeInsets.symmetric(
-                            horizontal: 16, vertical: 8),
+                            horizontal: 16, vertical: 8,),
                         itemCount: sortedDays.length,
                         itemBuilder: (context, index) {
                           final dayNumber = sortedDays[index];
@@ -1860,7 +1857,7 @@ void _showProgramDaysOverview(Program program, ActiveProgram active) {
             'drill': drill,
             'programId': program.id,
             'programDayNumber': day.dayNumber,
-          });
+          },);
         } else {
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
@@ -2215,7 +2212,7 @@ class _ProgramDetailsSheetState extends State<_ProgramDetailsSheet> {
   }
 
   Widget _buildEnhancedFormatDaysList(
-      ThemeData theme, ColorScheme colorScheme) {
+      ThemeData theme, ColorScheme colorScheme,) {
     // Build list from dayWiseDrillIds
     final sortedDays = widget.program.dayWiseDrillIds.keys.toList()..sort();
 

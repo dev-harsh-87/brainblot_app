@@ -10,7 +10,7 @@ class AppStorage {
   static Future<void> init() async {
     if (_inited) return;
     if (!kIsWeb) {
-      Directory dir = await getApplicationDocumentsDirectory();
+      final Directory dir = await getApplicationDocumentsDirectory();
       await Hive.initFlutter(dir.path);
     } else {
       await Hive.initFlutter();

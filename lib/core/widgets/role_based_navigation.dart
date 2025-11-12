@@ -63,45 +63,42 @@ class RoleBasedNavigation extends StatelessWidget {
         icon: Icons.home_outlined,
         selectedIcon: Icons.home,
         label: 'Home',
-        requiresSubscription: false,
       ),
       NavigationItem(
         route: '/drills',
         icon: Icons.fitness_center_outlined,
         selectedIcon: Icons.fitness_center,
         label: 'Drills',
-        requiresSubscription: false,
       ),
       NavigationItem(
         route: '/training',
         icon: Icons.play_circle_outline,
         selectedIcon: Icons.play_circle,
         label: 'Training',
-        requiresSubscription: false,
       ),
     ];
 
     // Add subscription-based features
     // Use actual user subscription data instead of hardcoded plans
     
-    if (user.subscription.moduleAccess.contains("programs")) {
+    if (user.subscription.moduleAccess.contains('programs')) {
       items.add(NavigationItem(
         route: '/programs',
         icon: Icons.schedule_outlined,
         selectedIcon: Icons.schedule,
         label: 'Programs',
         requiresSubscription: true,
-      ));
+      ),);
     }
 
-    if (user.subscription.moduleAccess.contains("multiplayer")) {
+    if (user.subscription.moduleAccess.contains('multiplayer')) {
       items.add(NavigationItem(
         route: '/multiplayer',
         icon: Icons.group_outlined,
         selectedIcon: Icons.group,
         label: 'Multiplayer',
         requiresSubscription: true,
-      ));
+      ),);
     }
 
     // Add stats for all users
@@ -110,8 +107,7 @@ class RoleBasedNavigation extends StatelessWidget {
       icon: Icons.analytics_outlined,
       selectedIcon: Icons.analytics,
       label: 'Stats',
-      requiresSubscription: false,
-    ));
+    ),);
 
     // Add admin navigation if user is admin
     if (user.role.isAdmin()) {
@@ -120,9 +116,8 @@ class RoleBasedNavigation extends StatelessWidget {
         icon: Icons.admin_panel_settings_outlined,
         selectedIcon: Icons.admin_panel_settings,
         label: 'Admin',
-        requiresSubscription: false,
         isAdminOnly: true,
-      ));
+      ),);
     }
 
     return items;

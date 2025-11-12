@@ -148,7 +148,7 @@ class InMemoryDrillRepository implements DrillRepository {
     
     // Only return public drills that are not created by current user
     Iterable<Drill> out = _items.where((drill) =>
-        drill.createdBy != currentUserId);
+        drill.createdBy != currentUserId,);
     
     if (query != null && query.isNotEmpty) {
       out = out.where((d) => d.name.toLowerCase().contains(query.toLowerCase()));
@@ -182,7 +182,7 @@ class InMemoryDrillRepository implements DrillRepository {
     // Return favorite drills that user can see (their own or public ones)
     Iterable<Drill> out = _items.where((drill) =>
         drill.favorite &&
-        drill.createdBy == currentUserId);
+        drill.createdBy == currentUserId,);
     
     if (query != null && query.isNotEmpty) {
       out = out.where((d) => d.name.toLowerCase().contains(query.toLowerCase()));

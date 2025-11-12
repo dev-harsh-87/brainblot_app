@@ -148,7 +148,7 @@ class MultiDeviceSessionService {
       // Get all active sessions except current device
       final sessions = await getActiveSessions();
       final otherSessions = sessions.where((session) => 
-          session.deviceId != currentDeviceId).toList();
+          session.deviceId != currentDeviceId,).toList();
 
       // Logout from each other device
       for (final session in otherSessions) {

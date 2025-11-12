@@ -557,7 +557,7 @@ class _DeviceSessionsScreenState extends State<DeviceSessionsScreen> with Ticker
                       ),
                       const SizedBox(height: 16),
                       ...otherSessions.map((session) => 
-                        _buildSessionCard(session, colorScheme)),
+                        _buildSessionCard(session, colorScheme),),
                     ],
                     
                     if (otherSessions.isEmpty && currentSession != null) ...[

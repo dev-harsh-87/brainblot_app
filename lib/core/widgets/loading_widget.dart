@@ -135,7 +135,6 @@ class LoadingOverlay extends StatelessWidget {
             color: Colors.black.withValues(alpha: 0.3),
             child: AppLoadingWidget(
               message: message,
-              size: LoadingSize.medium,
             ),
           ),
       ],

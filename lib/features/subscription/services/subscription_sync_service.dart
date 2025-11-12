@@ -62,7 +62,6 @@ class SubscriptionSyncService {
         name: 'Free Plan',
         description: 'Basic access to core features',
         price: 0.0,
-        currency: 'USD',
         billingPeriod: 'lifetime',
         features: [
           'Basic drills',
@@ -76,7 +75,6 @@ class SubscriptionSyncService {
         ],
         maxDrills: 10,
         maxPrograms: 3,
-        isActive: true,
         priority: 1,
         createdAt: DateTime.now(),
         updatedAt: DateTime.now(),
@@ -86,8 +84,6 @@ class SubscriptionSyncService {
         name: 'Institute Plan',
         description: 'Full access for educational institutions',
         price: 99.99,
-        currency: 'USD',
-        billingPeriod: 'monthly',
         features: [
           'All drills and programs',
           'Advanced analytics',
@@ -105,9 +101,6 @@ class SubscriptionSyncService {
           'analytics',
           'user_management',
         ],
-        maxDrills: -1, // unlimited
-        maxPrograms: -1, // unlimited
-        isActive: true,
         priority: 3,
         createdAt: DateTime.now(),
         updatedAt: DateTime.now(),
@@ -117,8 +110,6 @@ class SubscriptionSyncService {
         name: 'Premium Plan',
         description: 'Advanced features for serious trainers',
         price: 19.99,
-        currency: 'USD',
-        billingPeriod: 'monthly',
         features: [
           'All drills and programs',
           'Advanced analytics',
@@ -131,9 +122,6 @@ class SubscriptionSyncService {
           'advanced_stats',
           'multiplayer',
         ],
-        maxDrills: -1, // unlimited
-        maxPrograms: -1, // unlimited
-        isActive: true,
         priority: 2,
         createdAt: DateTime.now(),
         updatedAt: DateTime.now(),

@@ -44,7 +44,7 @@ class SessionManagementService {
   void _initializeSessionMonitoring() {
     // Initialize subscription sync service
     _subscriptionSync.initialize().catchError((e) {
-      print("⚠️ Failed to initialize subscription sync: $e");
+      print('⚠️ Failed to initialize subscription sync: $e');
     });
     
     // Listen to Firebase Auth state changes
@@ -75,24 +75,23 @@ class SessionManagementService {
       final userRole = _determineUserRole(firebaseUser.email);
       final isAdmin = userRole == 'admin';
       
-      print("🔄 Registering device session...");
+      print('🔄 Registering device session...');
       try {
         final existingSessions = await _deviceSessionService.registerDeviceSession(
           firebaseUser.uid,
           isAdmin: isAdmin,
-          forceLogoutOthers: false, // Don't automatically logout others
         );
         
         // If there are existing sessions and user is not admin, we should handle this
         // For now, we'll just log it - the UI will handle showing the conflict dialog
         if (existingSessions.isNotEmpty && !isAdmin) {
-          print("⚠️ Found ${existingSessions.length} existing sessions for user");
+          print('⚠️ Found ${existingSessions.length} existing sessions for user');
           // You could emit an event here to show device conflict dialog
         }
         
-        print("✅ Device session registered (Admin: $isAdmin)");
+        print('✅ Device session registered (Admin: $isAdmin)');
       } catch (e) {
-        print("⚠️ Device session registration failed: $e");
+        print('⚠️ Device session registration failed: $e');
         // Continue with session establishment - this is not critical
       }
       
@@ -100,16 +99,16 @@ class SessionManagementService {
       try {
         _logoutSubscription = _deviceSessionService.listenForLogoutNotifications().listen(
           (notification) async {
-            print("📱 Received logout notification from another device");
+            print('📱 Received logout notification from another device');
             await _handleForceLogout();
           },
           onError: (error) {
             // Silent fail - notification system is not critical
-            print("⚠️ Logout notification error: $error");
+            print('⚠️ Logout notification error: $error');
           },
         );
       } catch (e) {
-        print("⚠️ Failed to setup logout notifications: $e");
+        print('⚠️ Failed to setup logout notifications: $e');
         // Continue - this is not critical for session establishment
       }
       
@@ -118,12 +117,12 @@ class SessionManagementService {
       
       // CRITICAL: Sync subscription BEFORE listening to snapshots
       // This ensures the user gets the correct moduleAccess from their plan
-      print("🔄 Syncing subscription before establishing session...");
+      print('🔄 Syncing subscription before establishing session...');
       try {
         await _subscriptionSync.syncUserOnLogin(firebaseUser.uid);
-        print("✅ Subscription synced");
+        print('✅ Subscription synced');
       } catch (e) {
-        print("⚠️ Subscription sync failed: $e");
+        print('⚠️ Subscription sync failed: $e');
         // Continue - user can still use the app with default permissions
       }
       
@@ -165,7 +164,7 @@ class SessionManagementService {
         print('⚠️ Auth check: Session failed to establish, clearing auth state');
         _currentSession = null;
         _notifySessionListeners(null);
-      });
+      },);
     } catch (e) {
       print('❌ Failed to establish session: $e');
       print('⚠️ Auth check: Session failed to establish, clearing auth state');
@@ -176,13 +175,13 @@ class SessionManagementService {
 
   /// Handle force logout from another device
   Future<void> _handleForceLogout() async {
-    print("🚪 Force logout initiated - another device logged in");
+    print('🚪 Force logout initiated - another device logged in');
     
     // Sign out from Firebase Auth
     await _auth.signOut();
     
     // Show user notification (you can customize this)
-    print("📱 You have been logged out because your account was accessed from another device");
+    print('📱 You have been logged out because your account was accessed from another device');
   }
 
   /// Clear user session
@@ -349,9 +348,9 @@ class SessionManagementService {
         forceLogoutOthers: true, // This will logout other devices
       );
 
-      print("✅ Forced logout from other devices completed");
+      print('✅ Forced logout from other devices completed');
     } catch (e) {
-      print("❌ Failed to force logout other devices: $e");
+      print('❌ Failed to force logout other devices: $e');
       rethrow;
     }
   }
@@ -458,7 +457,6 @@ class SessionManagementService {
         subscription: isAdmin
             ? const UserSubscription(
                 plan: 'institute',
-                status: 'active',
                 moduleAccess: [
                   'drills',
                   'profile',
@@ -475,23 +473,13 @@ class SessionManagementService {
               )
             : const UserSubscription(
                 plan: 'free',
-                status: 'active',
                 moduleAccess: ['drills', 'profile', 'stats', 'analysis'],
               ),
         preferences: const UserPreferences(
-          theme: 'system',
           notifications: true,
-          soundEnabled: true,
-          language: 'en',
-          timezone: 'UTC',
         ),
         stats: const UserStats(
-          totalSessions: 0,
           totalDrillsCompleted: 0,
-          totalProgramsCompleted: 0,
-          averageAccuracy: 0.0,
-          averageReactionTime: 0.0,
-          streakDays: 0,
         ),
         createdAt: DateTime.now(),
         lastActiveAt: DateTime.now(),

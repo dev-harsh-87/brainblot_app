@@ -475,7 +475,7 @@ class _SharingScreenState extends State<SharingScreen> with SingleTickerProvider
 
             // Results section - Flexible
             if (_searchResults.isEmpty)
-              Container(
+              SizedBox(
                 height: 200,
                 child: _buildEmptySearchState(),
               )

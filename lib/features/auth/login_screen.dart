@@ -157,7 +157,7 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
         context.read<AuthBloc>().add(AuthLoginSubmitted(
               email: _emailCtrl.text.trim(),
               password: _passwordCtrl.text,
-            ));
+            ),);
       }
     }
   }
@@ -277,7 +277,6 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
             borderRadius: BorderRadius.circular(20),
             borderSide: BorderSide(
               color: colorScheme.outline.withOpacity(0.3),
-              width: 1,
             ),
           ),
           focusedBorder: OutlineInputBorder(
@@ -291,7 +290,6 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
             borderRadius: BorderRadius.circular(20),
             borderSide: BorderSide(
               color: colorScheme.error,
-              width: 1,
             ),
           ),
           filled: true,
@@ -324,8 +322,6 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
                         colorScheme.primary,
                         colorScheme.secondary,
                       ],
-                begin: Alignment.centerLeft,
-                end: Alignment.centerRight,
               ),
               boxShadow: [
                 BoxShadow(
@@ -415,7 +411,6 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
                     ? (sessionData['lastActiveTime'] as Timestamp).toDate()
                     : DateTime.now(),
                 isActive: (sessionData['isActive'] as bool?) ?? false,
-                isCurrentDevice: false,
               );
             }).toList();
             

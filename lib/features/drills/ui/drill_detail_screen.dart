@@ -27,7 +27,7 @@ class _DrillDetailScreenState extends State<DrillDetailScreen> {
   late Drill _currentDrill;
   bool _isLoading = false;
   bool _isOwner = false;
-  bool _privacyLoading = false;
+  final bool _privacyLoading = false;
 
   @override
   void initState() {

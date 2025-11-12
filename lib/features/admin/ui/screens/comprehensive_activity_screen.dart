@@ -78,7 +78,7 @@ class _ComprehensiveActivityScreenState extends State<ComprehensiveActivityScree
             subtitle: data['displayName'] as String? ?? 'Unknown',
             timestamp: createdAt.toDate(),
             data: data,
-          ));
+          ),);
         }
       }
 
@@ -98,7 +98,7 @@ class _ComprehensiveActivityScreenState extends State<ComprehensiveActivityScree
             subtitle: data['name'] as String? ?? 'Unknown',
             timestamp: createdAt.toDate(),
             data: data,
-          ));
+          ),);
         }
       }
 
@@ -125,7 +125,7 @@ class _ComprehensiveActivityScreenState extends State<ComprehensiveActivityScree
                 subtitle: data['name'] as String? ?? 'Unknown',
                 timestamp: createdAt.toDate(),
                 data: {...data, 'userId': userDoc.id},
-              ));
+              ),);
             }
           }
         }
@@ -156,7 +156,7 @@ class _ComprehensiveActivityScreenState extends State<ComprehensiveActivityScree
                 subtitle: data['name'] as String? ?? 'Unknown',
                 timestamp: createdAt.toDate(),
                 data: {...data, 'userId': userDoc.id},
-              ));
+              ),);
             }
           }
         }
@@ -183,7 +183,7 @@ class _ComprehensiveActivityScreenState extends State<ComprehensiveActivityScree
               subtitle: '${data['userName']} → ${data['requestedPlan']}',
               timestamp: createdAt.toDate(),
               data: data,
-            ));
+            ),);
           }
         }
       } catch (e) {
@@ -318,25 +318,25 @@ class _ComprehensiveActivityScreenState extends State<ComprehensiveActivityScree
       case 'users':
         return _activities.where((a) => 
           a.type == ActivityType.userRegistered || 
-          a.type == ActivityType.userUpdated
+          a.type == ActivityType.userUpdated,
         ).toList();
       case 'plans':
         return _activities.where((a) => 
           a.type == ActivityType.planCreated || 
           a.type == ActivityType.planUpdated ||
-          a.type == ActivityType.planDeleted
+          a.type == ActivityType.planDeleted,
         ).toList();
       case 'drills':
         return _activities.where((a) => 
           a.type == ActivityType.drillCreated || 
           a.type == ActivityType.drillUpdated ||
-          a.type == ActivityType.drillDeleted
+          a.type == ActivityType.drillDeleted,
         ).toList();
       case 'programs':
         return _activities.where((a) => 
           a.type == ActivityType.programCreated || 
           a.type == ActivityType.programUpdated ||
-          a.type == ActivityType.programDeleted
+          a.type == ActivityType.programDeleted,
         ).toList();
       case 'requests':
         return _activities.where((a) => a.type == ActivityType.planRequest).toList();

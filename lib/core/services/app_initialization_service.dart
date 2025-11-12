@@ -1,4 +1,3 @@
-import 'package:firebase_core/firebase_core.dart';
 import 'package:spark_app/core/services/database_initialization_service.dart';
 import 'package:spark_app/core/services/enhanced_ios_permission_service.dart';
 import 'package:spark_app/core/services/fcm_token_service.dart';

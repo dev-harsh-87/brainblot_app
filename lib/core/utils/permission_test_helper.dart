@@ -95,21 +95,21 @@ class PermissionTestHelper {
       debugPrint('$_tag   Has Permission Issues: ${report.hasPermissionIssues}');
       debugPrint('$_tag   Error: ${report.error ?? 'None'}');
       
-      debugPrint('$_tag');
+      debugPrint(_tag);
       debugPrint('$_tag Granted Permissions (${report.grantedPermissions.length}):');
       for (final permission in report.grantedPermissions) {
         final displayName = ProfessionalPermissionManager.getPermissionDisplayName(permission);
         debugPrint('$_tag   ✅ $displayName');
       }
       
-      debugPrint('$_tag');
+      debugPrint(_tag);
       debugPrint('$_tag Denied Permissions (${report.deniedPermissions.length}):');
       for (final permission in report.deniedPermissions) {
         final displayName = ProfessionalPermissionManager.getPermissionDisplayName(permission);
         debugPrint('$_tag   ❌ $displayName');
       }
       
-      debugPrint('$_tag');
+      debugPrint(_tag);
       debugPrint('$_tag Permanently Denied Permissions (${report.permanentlyDeniedPermissions.length}):');
       for (final permission in report.permanentlyDeniedPermissions) {
         final displayName = ProfessionalPermissionManager.getPermissionDisplayName(permission);

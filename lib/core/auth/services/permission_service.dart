@@ -238,7 +238,7 @@ class PermissionService {
     final role = await getCurrentUserRole();
     return {
       for (var permission in permissions)
-        permission: permission.isGrantedTo(role)
+        permission: permission.isGrantedTo(role),
     };
   }
 

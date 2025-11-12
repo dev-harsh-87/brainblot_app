@@ -44,13 +44,13 @@ void _fixSubscriptionOnStartup() {
   Future.delayed(const Duration(seconds: 2), () async {
     final currentUser = FirebaseAuth.instance.currentUser;
     if (currentUser != null) {
-      print("🔧 Running subscription fix for logged-in user...");
+      print('🔧 Running subscription fix for logged-in user...');
       try {
         final fixService = SubscriptionFixService();
         await fixService.fixCurrentUserSubscription();
-        print("✅ Subscription fix completed");
+        print('✅ Subscription fix completed');
       } catch (e) {
-        print("❌ Subscription fix failed: $e");
+        print('❌ Subscription fix failed: $e');
       }
     }
   });
@@ -92,7 +92,6 @@ class CogniTrainApp extends StatelessWidget {
             title: 'Spark - Cognitive Training',
             theme: AppTheme.light(),
             darkTheme: AppTheme.dark(),
-            themeMode: ThemeMode.system,
             routerConfig: appRouter.router,
             builder: (context, child) {
               return NavigationStateTracker(

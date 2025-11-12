@@ -1,7 +1,7 @@
-import "package:flutter/material.dart";
-import "package:spark_app/core/auth/services/session_management_service.dart";
-import "package:spark_app/core/auth/models/app_user.dart";
-import "package:spark_app/core/di/injection.dart";
+import 'package:flutter/material.dart';
+import 'package:spark_app/core/auth/services/session_management_service.dart';
+import 'package:spark_app/core/auth/models/app_user.dart';
+import 'package:spark_app/core/di/injection.dart';
 
 /// Widget that guards content based on session permissions
 /// Automatically updates when session changes (login/logout/role changes)
@@ -93,14 +93,14 @@ class _SessionGuardState extends State<SessionGuard> {
   }
 
   Widget _buildAccessDenied(BuildContext context) {
-    String message = widget.errorMessage ?? "Access denied";
+    String message = widget.errorMessage ?? 'Access denied';
     
     if (widget.requireAdmin) {
-      message = "Admin access required";
+      message = 'Admin access required';
     } else if (widget.requiredModules != null && widget.requiredModules!.isNotEmpty) {
-      message = "Subscription upgrade required";
+      message = 'Subscription upgrade required';
     } else if (widget.requireLogin) {
-      message = "Please log in to continue";
+      message = 'Please log in to continue';
     }
 
     return Center(

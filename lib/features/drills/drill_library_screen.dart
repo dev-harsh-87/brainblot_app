@@ -277,7 +277,7 @@ class _DrillLibraryScreenState extends State<DrillLibraryScreen>
                         top: 0,
                         left: 0,
                         right: 0,
-                        child: Container(
+                        child: SizedBox(
                           height: 4,
                           child: LinearProgressIndicator(
                             backgroundColor: Colors.transparent,
@@ -376,7 +376,6 @@ class _DrillLibraryScreenState extends State<DrillLibraryScreen>
         border: Border(
           bottom: BorderSide(
             color: colorScheme.outline.withOpacity(0.1),
-            width: 1,
           ),
         ),
       ),
@@ -394,12 +393,10 @@ class _DrillLibraryScreenState extends State<DrillLibraryScreen>
                     color: colorScheme.shadow.withOpacity(0.08),
                     blurRadius: 12,
                     offset: const Offset(0, 3),
-                    spreadRadius: 0,
                   ),
                 ],
                 border: Border.all(
                   color: colorScheme.outline.withOpacity(0.08),
-                  width: 1,
                 ),
               ),
               child: TextField(
@@ -438,7 +435,6 @@ class _DrillLibraryScreenState extends State<DrillLibraryScreen>
                     color: colorScheme.shadow.withOpacity(0.04),
                     blurRadius: 8,
                     offset: const Offset(0, 2),
-                    spreadRadius: 0,
                   ),
                 ],
               ),
@@ -508,7 +504,6 @@ class _DrillLibraryScreenState extends State<DrillLibraryScreen>
               color: colorScheme.primary.withOpacity(0.1),
               blurRadius: 8,
               offset: const Offset(0, 2),
-              spreadRadius: 0,
             ),
           ] : null,
         ),
@@ -711,7 +706,6 @@ Widget _buildCompactStatChip(IconData icon, String text, Color color) {
         borderRadius: BorderRadius.circular(8),
         border: Border.all(
           color: color.withOpacity(0.2),
-          width: 1,
         ),
       ),
       child: Row(
@@ -757,18 +751,15 @@ Widget _buildCompactStatChip(IconData icon, String text, Color color) {
             color: colorScheme.shadow.withOpacity(0.08),
             blurRadius: 16,
             offset: const Offset(0, 4),
-            spreadRadius: 0,
           ),
           BoxShadow(
             color: _getDifficultyColor(drill.difficulty).withOpacity(0.04),
             blurRadius: 8,
             offset: const Offset(0, 2),
-            spreadRadius: 0,
           ),
         ],
         border: Border.all(
           color: _getDifficultyColor(drill.difficulty).withOpacity(0.1),
-          width: 1,
         ),
       ),
       child: Material(
@@ -796,7 +787,6 @@ Widget _buildCompactStatChip(IconData icon, String text, Color color) {
                     borderRadius: BorderRadius.circular(14),
                     border: Border.all(
                       color: _getDifficultyColor(drill.difficulty).withOpacity(0.2),
-                      width: 1,
                     ),
                   ),
                   child: Icon(
@@ -877,7 +867,6 @@ Widget _buildCompactStatChip(IconData icon, String text, Color color) {
                               borderRadius: BorderRadius.circular(6),
                               border: Border.all(
                                 color: _getDifficultyColor(drill.difficulty).withOpacity(0.3),
-                                width: 1,
                               ),
                             ),
                             child: Row(
@@ -1197,7 +1186,7 @@ Widget _buildCompactStatChip(IconData icon, String text, Color color) {
         context.read<DrillLibraryBloc>().add(DrillLibraryFilterChanged(
           category: _selectedCategory.isEmpty ? null : _selectedCategory,
           difficulty: _selectedDifficulty,
-        ));
+        ),);
         Navigator.pop(context);
       },
       selectedColor: colorScheme.primary.withOpacity(0.2),
@@ -1223,7 +1212,7 @@ Widget _buildCompactStatChip(IconData icon, String text, Color color) {
         context.read<DrillLibraryBloc>().add(DrillLibraryFilterChanged(
           category: _selectedCategory.isEmpty ? null : _selectedCategory,
           difficulty: _selectedDifficulty,
-        ));
+        ),);
         Navigator.pop(context);
       },
       selectedColor: colorScheme.primary.withOpacity(0.2),
@@ -1263,8 +1252,8 @@ Widget _buildCompactStatChip(IconData icon, String text, Color color) {
                   _buildDifficultyChip('All', _selectedDifficulty == null),
                   ...Difficulty.values.map((difficulty) => _buildDifficultyChip(
                     difficulty.name.toUpperCase(),
-                    _selectedDifficulty == difficulty
-                  )),
+                    _selectedDifficulty == difficulty,
+                  ),),
                 ],
               ),
               const SizedBox(height: 24),
@@ -1304,7 +1293,7 @@ Widget _buildCompactStatChip(IconData icon, String text, Color color) {
         context.read<DrillLibraryBloc>().add(DrillLibraryFilterChanged(
           category: _selectedCategory.isEmpty ? null : _selectedCategory,
           difficulty: _selectedDifficulty,
-        ));
+        ),);
         Navigator.pop(context);
       },
       selectedColor: chipColor.withOpacity(0.2),
@@ -1613,7 +1602,7 @@ Widget _buildCompactStatChip(IconData icon, String text, Color color) {
               const SizedBox(width: 8),
               Text(drill.favorite 
                   ? 'Removed from favorites' 
-                  : 'Added to favorites'),
+                  : 'Added to favorites',),
             ],
           ),
           duration: const Duration(seconds: 2),

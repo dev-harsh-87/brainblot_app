@@ -1,5 +1,4 @@
 import 'package:spark_app/core/di/injection.dart';
-import 'package:spark_app/features/drills/domain/drill.dart';
 import 'package:spark_app/features/drills/data/drill_repository.dart';
 
 /// Service to handle data migration for drill configuration issues

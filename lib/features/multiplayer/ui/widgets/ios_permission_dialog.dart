@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:permission_handler/permission_handler.dart';
 import 'package:spark_app/core/services/ios_permission_service.dart';
 
 /// Enhanced permission dialog specifically designed for iOS permission flow

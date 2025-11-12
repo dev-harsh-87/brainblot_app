@@ -106,7 +106,7 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
           );
         }
 
-        var users = snapshot.data!.docs.where((doc) {
+        final users = snapshot.data!.docs.where((doc) {
           final data = doc.data() as Map<String, dynamic>;
           final displayName = (data['displayName'] as String? ?? '').toLowerCase();
           final email = (data['email'] as String? ?? '').toLowerCase();
@@ -369,7 +369,7 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
               _buildDetailRow('Email', user.email),
               _buildDetailRow('Role', user.role.displayName),
               _buildDetailRow('Subscription', user.subscription.plan.toUpperCase()),
-              _buildDetailRow('Created', user.createdAt != null ? _formatDate(user.createdAt!) : "N/A"),
+              _buildDetailRow('Created', user.createdAt != null ? _formatDate(user.createdAt!) : 'N/A'),
               if (data['createdBy'] != null)
                 _buildDetailRow(
                   'Created By',

@@ -243,7 +243,6 @@ class _IOSPermissionDialogState extends State<IOSPermissionDialog> {
     try {
       final result = await EnhancedIOSPermissionService.requestPermissions(
         forceNativeDialog: true,
-        showRationale: true,
       );
 
       setState(() {
@@ -461,7 +460,7 @@ class _PermissionStatusIndicatorState extends State<PermissionStatusIndicator> {
               const SizedBox(width: 4),
               Text('${entry.key}: Granted', style: const TextStyle(fontSize: 12)),
             ],
-          )),
+          ),),
           ...denied.entries.map((entry) => Row(
             mainAxisSize: MainAxisSize.min,
             children: [
@@ -469,7 +468,7 @@ class _PermissionStatusIndicatorState extends State<PermissionStatusIndicator> {
               const SizedBox(width: 4),
               Text('${entry.key}: Denied', style: const TextStyle(fontSize: 12)),
             ],
-          )),
+          ),),
         ],
       ],
     );

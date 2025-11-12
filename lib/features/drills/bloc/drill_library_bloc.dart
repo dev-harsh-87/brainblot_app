@@ -32,8 +32,7 @@ class DrillLibraryBloc extends Bloc<DrillLibraryEvent, DrillLibraryState> {
       () async {
         emit(state.copyWith(
           status: DrillLibraryStatus.loading,
-          errorMessage: null,
-        ));
+        ),);
         
         // Ensure default drills are seeded (only for Firebase repository)
         try {
@@ -63,7 +62,7 @@ class DrillLibraryBloc extends Bloc<DrillLibraryEvent, DrillLibraryState> {
     emit(state.copyWith(
       status: DrillLibraryStatus.filtering,
       query: event.query,
-    ));
+    ),);
     
     // Apply filters with debouncing effect
     await Future<void>.delayed(const Duration(milliseconds: 300));
@@ -73,7 +72,7 @@ class DrillLibraryBloc extends Bloc<DrillLibraryEvent, DrillLibraryState> {
         status: DrillLibraryStatus.loaded,
         items: filtered,
         lastUpdated: DateTime.now(),
-      ));
+      ),);
     }
   }
 
@@ -97,21 +96,21 @@ class DrillLibraryBloc extends Bloc<DrillLibraryEvent, DrillLibraryState> {
       status: DrillLibraryStatus.loaded,
       items: filtered,
       lastUpdated: DateTime.now(),
-    ));
+    ),);
   }
 
   Future<void> _onViewChanged(DrillLibraryViewChanged event, Emitter<DrillLibraryState> emit) async {
     emit(state.copyWith(
       status: DrillLibraryStatus.filtering,
       currentView: event.view,
-    ));
+    ),);
     
     final filtered = _applyFilters(state.all, view: event.view);
     emit(state.copyWith(
       status: DrillLibraryStatus.loaded,
       items: filtered,
       lastUpdated: DateTime.now(),
-    ));
+    ),);
   }
 
   Future<void> _onRefreshRequested(DrillLibraryRefreshRequested event, Emitter<DrillLibraryState> emit) async {
@@ -120,8 +119,7 @@ class DrillLibraryBloc extends Bloc<DrillLibraryEvent, DrillLibraryState> {
         emit(state.copyWith(
           status: DrillLibraryStatus.refreshing,
           isRefreshing: true,
-          errorMessage: null,
-        ));
+        ),);
         
         try {
           // Force refresh from repository with retry mechanism
@@ -136,7 +134,7 @@ class DrillLibraryBloc extends Bloc<DrillLibraryEvent, DrillLibraryState> {
             } catch (e) {
               retryCount++;
               if (retryCount >= maxRetries) {
-                throw e; // Re-throw after max retries
+                rethrow; // Re-throw after max retries
               }
               // Wait before retry with exponential backoff
               await Future.delayed(Duration(milliseconds: 500 * retryCount));
@@ -151,12 +149,12 @@ class DrillLibraryBloc extends Bloc<DrillLibraryEvent, DrillLibraryState> {
             all: items,
             isRefreshing: false,
             lastUpdated: DateTime.now(),
-          ));
+          ),);
           
           print('✅ Successfully refreshed ${items.length} drills');
         } catch (e) {
 
-          throw e;
+          rethrow;
         }
       },
       emit,
@@ -170,12 +168,10 @@ class DrillLibraryBloc extends Bloc<DrillLibraryEvent, DrillLibraryState> {
 
   Future<void> _onFiltersCleared(DrillLibraryFiltersCleared event, Emitter<DrillLibraryState> emit) async {
     emit(state.copyWith(
-      query: null,
       category: null,
-      difficulty: null,
       items: state.all,
       lastUpdated: DateTime.now(),
-    ));
+    ),);
   }
 
   void _onItemsUpdated(_DrillLibraryItemsUpdated event, Emitter<DrillLibraryState> emit) {
@@ -184,9 +180,8 @@ class DrillLibraryBloc extends Bloc<DrillLibraryEvent, DrillLibraryState> {
       status: DrillLibraryStatus.loaded,
       items: filtered,
       all: event.items,
-      errorMessage: null,
       lastUpdated: DateTime.now(),
-    ));
+    ),);
   }
 
   void _onErrorOccurred(_DrillLibraryErrorOccurred event, Emitter<DrillLibraryState> emit) {
@@ -194,7 +189,7 @@ class DrillLibraryBloc extends Bloc<DrillLibraryEvent, DrillLibraryState> {
       status: DrillLibraryStatus.error,
       errorMessage: event.error,
       isRefreshing: false,
-    ));
+    ),);
   }
 
   List<Drill> _applyFilters(List<Drill> items, {String? query, String? category, Difficulty? difficulty, DrillLibraryView? view}) {

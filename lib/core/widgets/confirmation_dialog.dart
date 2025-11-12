@@ -152,7 +152,6 @@ class ConfirmationDialog extends StatelessWidget {
                 ? 'This will replace your current active program and reset your progress.'
                 : 'This will start your training journey with this program.'}',
         confirmText: 'Activate Program',
-        cancelText: 'Cancel',
         icon: Icons.play_circle_filled,
         iconColor: Colors.green,
         confirmButtonColor: Colors.green,

@@ -142,9 +142,9 @@ class _DrillRunnerScreenState extends State<DrillRunnerScreen>
   Timer? _countdownTimer;
   
   // Audio and feedback settings
-  bool _soundEnabled = true;
-  bool _vibrationEnabled = true;
-  bool _voiceEnabled = true;
+  final bool _soundEnabled = true;
+  final bool _vibrationEnabled = true;
+  final bool _voiceEnabled = true;
   
   // Set and rep tracking
   int _currentSet = 1;
@@ -218,7 +218,7 @@ class _DrillRunnerScreenState extends State<DrillRunnerScreen>
     ).animate(CurvedAnimation(
       parent: _stimulusAnimationController,
       curve: Curves.elasticOut,
-    ));
+    ),);
     
     _pulseAnimation = Tween<double>(
       begin: 1.0,
@@ -226,7 +226,7 @@ class _DrillRunnerScreenState extends State<DrillRunnerScreen>
     ).animate(CurvedAnimation(
       parent: _pulseAnimationController,
       curve: Curves.easeInOut,
-    ));
+    ),);
     
     _feedbackOpacityAnimation = Tween<double>(
       begin: 0.0,
@@ -234,7 +234,7 @@ class _DrillRunnerScreenState extends State<DrillRunnerScreen>
     ).animate(CurvedAnimation(
       parent: _feedbackAnimationController,
       curve: Curves.easeOut,
-    ));
+    ),);
     
     _pulseAnimationController.repeat(reverse: true);
   }
@@ -259,7 +259,7 @@ class _DrillRunnerScreenState extends State<DrillRunnerScreen>
       });
       
       // Configure TTS settings
-      await _flutterTts.setLanguage("en-US");
+      await _flutterTts.setLanguage('en-US');
       await _flutterTts.setSpeechRate(0.5); // Slightly slower for clarity
       await _flutterTts.setVolume(1.0);
       await _flutterTts.setPitch(1.0);
@@ -280,7 +280,7 @@ class _DrillRunnerScreenState extends State<DrillRunnerScreen>
       
       // Test TTS with a silent test
       print('🔍 Testing TTS...');
-      final testResult = await _flutterTts.speak("");
+      final testResult = await _flutterTts.speak('');
       print('🔍 TTS test result: $testResult');
       await _flutterTts.stop();
       
@@ -863,7 +863,7 @@ void _completeRep() {
     SystemSound.play(SystemSoundType.click);
     
     // Show set completion feedback
-    _showFeedback('Set ${_currentSet} Complete!', Colors.green);
+    _showFeedback('Set $_currentSet Complete!', Colors.green);
     
     // Check if all sets are complete
     if (_currentSet >= _safeSetCount) {
@@ -1094,7 +1094,7 @@ void _completeRep() {
           context.go('/drill-results', extra: {
             'result': result,
             'detailedSetResults': detailedSetResults,
-          });
+          },);
         }
       }
     });
@@ -1138,7 +1138,6 @@ void _completeRep() {
             Container(
               decoration: BoxDecoration(
                 gradient: RadialGradient(
-                  center: Alignment.center,
                   radius: 1.5,
                   colors: [
                     Colors.grey.shade900,
@@ -1342,7 +1341,7 @@ void _completeRep() {
     return LayoutBuilder(
       builder: (context, constraints) {
         // Use full available space for better visibility
-        return Container(
+        return SizedBox(
           width: constraints.maxWidth,
           height: constraints.maxHeight,
           child: Stack(

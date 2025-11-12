@@ -475,7 +475,7 @@ class FirebaseSessionRepository implements SessionRepository {
         transaction.set(userRef, {
           'stats': stats,
           'updatedAt': FieldValue.serverTimestamp(),
-        }, SetOptions(merge: true));
+        }, SetOptions(merge: true),);
       });
     } catch (error) {
       print('❌ Error updating user statistics: $error');

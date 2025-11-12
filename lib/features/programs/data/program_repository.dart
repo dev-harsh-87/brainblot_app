@@ -44,13 +44,13 @@ class InMemoryProgramRepository implements ProgramRepository {
   @override
   Stream<List<Program>> watchByCategory(String category) {
     return _programsCtrl.stream.map((programs) => 
-        programs.where((p) => p.category == category).toList());
+        programs.where((p) => p.category == category).toList(),);
   }
 
   @override
   Stream<List<Program>> watchByLevel(String level) {
     return _programsCtrl.stream.map((programs) => 
-        programs.where((p) => p.level == level).toList());
+        programs.where((p) => p.level == level).toList(),);
   }
 
   @override
@@ -64,7 +64,7 @@ class InMemoryProgramRepository implements ProgramRepository {
       
       return programs.where((p) => 
           p.favorite &&
-          p.createdBy == currentUserId
+          p.createdBy == currentUserId,
       ).toList();
     });
   }
@@ -107,7 +107,7 @@ class InMemoryProgramRepository implements ProgramRepository {
       _programs = [
         ..._programs.sublist(0, index),
         program,
-        ..._programs.sublist(index + 1)
+        ..._programs.sublist(index + 1),
       ];
       _emitPrograms();
     }
@@ -194,7 +194,7 @@ class InMemoryProgramRepository implements ProgramRepository {
     
     // Only return public programs that are not created by current user
     Iterable<Program> out = _programs.where((program) =>
-        program.createdBy != currentUserId);
+        program.createdBy != currentUserId,);
     
     if (query != null && query.isNotEmpty) {
       out = out.where((p) => p.name.toLowerCase().contains(query.toLowerCase()));
@@ -219,7 +219,7 @@ class InMemoryProgramRepository implements ProgramRepository {
     // Return favorite programs that user can see (their own or public ones)
     Iterable<Program> out = _programs.where((program) => 
         program.favorite &&
-        program.createdBy == currentUserId);
+        program.createdBy == currentUserId,);
     
     if (query != null && query.isNotEmpty) {
       out = out.where((p) => p.name.toLowerCase().contains(query.toLowerCase()));
@@ -248,7 +248,7 @@ class InMemoryProgramRepository implements ProgramRepository {
         _programs = [
           ..._programs.sublist(0, index),
           _programs[index].copyWith(favorite: !_programs[index].favorite),
-          ..._programs.sublist(index + 1)
+          ..._programs.sublist(index + 1),
         ];
         _emitPrograms();
       }

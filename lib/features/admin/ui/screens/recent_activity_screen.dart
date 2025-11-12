@@ -1,5 +1,5 @@
-import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter/material.dart';
 import 'package:spark_app/core/auth/models/app_user.dart';
 import 'package:spark_app/core/theme/app_theme.dart';
 

@@ -1,7 +1,7 @@
+import 'package:spark_app/core/di/injection.dart';
 import 'package:spark_app/core/services/auto_refresh_service.dart';
 import 'package:spark_app/features/programs/data/program_repository.dart';
 import 'package:spark_app/features/programs/domain/program.dart';
-import 'package:spark_app/core/di/injection.dart';
 
 /// Service to handle program creation with auto-refresh integration
 class ProgramCreationService {

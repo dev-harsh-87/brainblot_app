@@ -104,7 +104,7 @@ class _ComprehensiveAnalyticsScreenState extends State<ComprehensiveAnalyticsScr
       metrics['totalPlanRequests'] = planRequestsSnapshot.docs.length;
       
       final pendingRequests = planRequestsSnapshot.docs.where((doc) => 
-        doc.data()['status'] == 'pending'
+        doc.data()['status'] == 'pending',
       ).length;
       metrics['pendingRequests'] = pendingRequests;
       

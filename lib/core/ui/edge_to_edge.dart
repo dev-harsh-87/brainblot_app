@@ -49,7 +49,6 @@ class EdgeToEdge {
   static void setDarkSystemUI(BuildContext context) {
     setSystemUIOverlayStyle(
       context: context,
-      isDark: false,
       statusBarIconBrightness: Brightness.dark,
     );
   }

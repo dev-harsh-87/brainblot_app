@@ -325,7 +325,6 @@ class _StatsScreenState extends State<StatsScreen> with SingleTickerProviderStat
         borderRadius: BorderRadius.circular(12),
         border: Border.all(
           color: const Color(0xFFE2E8F0),
-          width: 1,
         ),
       ),
       child: Row(
@@ -352,7 +351,6 @@ class _StatsScreenState extends State<StatsScreen> with SingleTickerProviderStat
           boxShadow: isSelected ? [
             BoxShadow(
               color: const Color(0xFF6366F1).withOpacity(0.3),
-              spreadRadius: 0,
               blurRadius: 8,
               offset: const Offset(0, 2),
             ),
@@ -439,7 +437,6 @@ class _StatsScreenState extends State<StatsScreen> with SingleTickerProviderStat
         boxShadow: [
           BoxShadow(
             color: color.withOpacity(0.3),
-            spreadRadius: 0,
             blurRadius: 20,
             offset: const Offset(0, 8),
           ),
@@ -533,11 +530,10 @@ class _StatsScreenState extends State<StatsScreen> with SingleTickerProviderStat
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: color.withOpacity(0.1), width: 1),
+        border: Border.all(color: color.withOpacity(0.1)),
         boxShadow: [
           BoxShadow(
             color: Colors.grey.withOpacity(0.08),
-            spreadRadius: 0,
             blurRadius: 10,
             offset: const Offset(0, 4),
           ),
@@ -590,7 +586,6 @@ class _StatsScreenState extends State<StatsScreen> with SingleTickerProviderStat
         boxShadow: [
           BoxShadow(
             color: Colors.grey.withOpacity(0.1),
-            spreadRadius: 0,
             blurRadius: 20,
             offset: const Offset(0, 8),
           ),
@@ -630,7 +625,6 @@ class _StatsScreenState extends State<StatsScreen> with SingleTickerProviderStat
               child: LineChart(
                 LineChartData(
                   gridData: FlGridData(
-                    show: true,
                     drawVerticalLine: false,
                     horizontalInterval: 50,
                     getDrawingHorizontalLine: (value) => FlLine(
@@ -649,9 +643,9 @@ class _StatsScreenState extends State<StatsScreen> with SingleTickerProviderStat
                         ),
                       ),
                     ),
-                    bottomTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-                    topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-                    rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                    bottomTitles: const AxisTitles(),
+                    topTitles: const AxisTitles(),
+                    rightTitles: const AxisTitles(),
                   ),
                   borderData: FlBorderData(show: false),
                   lineBarsData: [
@@ -664,7 +658,6 @@ class _StatsScreenState extends State<StatsScreen> with SingleTickerProviderStat
                       color: const Color(0xFF6366F1),
                       barWidth: 4,
                       dotData: FlDotData(
-                        show: true,
                         getDotPainter: (spot, percent, barData, index) => FlDotCirclePainter(
                           radius: 4,
                           color: const Color(0xFF6366F1),
@@ -705,7 +698,6 @@ class _StatsScreenState extends State<StatsScreen> with SingleTickerProviderStat
         boxShadow: [
           BoxShadow(
             color: Colors.grey.withOpacity(0.1),
-            spreadRadius: 0,
             blurRadius: 20,
             offset: const Offset(0, 8),
           ),
@@ -745,7 +737,6 @@ class _StatsScreenState extends State<StatsScreen> with SingleTickerProviderStat
               child: LineChart(
                 LineChartData(
                   gridData: FlGridData(
-                    show: true,
                     drawVerticalLine: false,
                     horizontalInterval: 0.1,
                     getDrawingHorizontalLine: (value) => FlLine(
@@ -764,9 +755,9 @@ class _StatsScreenState extends State<StatsScreen> with SingleTickerProviderStat
                         ),
                       ),
                     ),
-                    bottomTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-                    topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-                    rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                    bottomTitles: const AxisTitles(),
+                    topTitles: const AxisTitles(),
+                    rightTitles: const AxisTitles(),
                   ),
                   borderData: FlBorderData(show: false),
                   minY: 0,
@@ -781,7 +772,6 @@ class _StatsScreenState extends State<StatsScreen> with SingleTickerProviderStat
                       color: const Color(0xFF10B981),
                       barWidth: 4,
                       dotData: FlDotData(
-                        show: true,
                         getDotPainter: (spot, percent, barData, index) => FlDotCirclePainter(
                           radius: 4,
                           color: const Color(0xFF10B981),
@@ -947,7 +937,7 @@ class _StatsScreenState extends State<StatsScreen> with SingleTickerProviderStat
                   ),
                 ],
               ),
-            )),
+            ),),
           ],
         ),
       ),
@@ -972,7 +962,7 @@ class _StatsScreenState extends State<StatsScreen> with SingleTickerProviderStat
         subtitle: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('${DateFormat('MMM dd, yyyy • HH:mm').format(session.startedAt)}'),
+            Text(DateFormat('MMM dd, yyyy • HH:mm').format(session.startedAt)),
             const SizedBox(height: 4),
             Row(
               children: [

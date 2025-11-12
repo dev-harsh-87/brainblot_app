@@ -57,7 +57,7 @@ class SharingService {
               users.add(UserProfile.fromJson({
                 'id': doc.id,
                 ...data,
-              }));
+              }),);
             }
           }
         } catch (e) {
@@ -200,7 +200,7 @@ class SharingService {
           .map((doc) => ShareInvitation.fromJson({
                 'id': doc.id,
                 ...doc.data(),
-              }))
+              }),)
           .toList();
     } catch (e) {
       throw Exception('Failed to get invitations: $e');
@@ -351,11 +351,11 @@ class SharingService {
       final doc = await _firestore.collection(collection).doc(itemId).get();
       if (doc.exists) {
         final data = doc.data()!;
-        return data['name'] as String? ?? 'Unknown ${itemType}';
+        return data['name'] as String? ?? 'Unknown $itemType';
       }
-      return 'Unknown ${itemType}';
+      return 'Unknown $itemType';
     } catch (e) {
-      return 'Unknown ${itemType}';
+      return 'Unknown $itemType';
     }
   }
 
@@ -389,7 +389,7 @@ class SharingService {
             users.add(UserProfile.fromJson({
               'id': userDoc.id,
               ...userDoc.data()!,
-            }));
+            }),);
           }
         } catch (e) {
           // Skip users that can't be loaded
@@ -482,7 +482,7 @@ class SharingService {
       try {
         await _launchEmail(
           email: email,
-          subject: '$senderName shared a ${itemType} with you on Spark',
+          subject: '$senderName shared a $itemType with you on Spark',
           body: emailContent,
         );
       } catch (emailError) {
@@ -728,7 +728,7 @@ Making minds sharper, one drill at a time.
       return querySnapshot.docs.map((doc) => {
         'id': doc.id,
         ...doc.data(),
-      }).toList();
+      },).toList();
     } catch (e) {
       throw Exception('Failed to get your items: $e');
     }
@@ -747,7 +747,7 @@ Making minds sharper, one drill at a time.
       return querySnapshot.docs.map((doc) => {
         'id': doc.id,
         ...doc.data(),
-      }).toList();
+      },).toList();
     } catch (e) {
       throw Exception('Failed to get public items: $e');
     }

@@ -128,7 +128,7 @@ class PrivacyControlWidget extends StatelessWidget {
                     HapticFeedback.lightImpact();
                     onTogglePrivacy!();
                   } : null,
-                  activeColor: colorScheme.primary,
+                  activeThumbColor: colorScheme.primary,
                 ),
             ],
           ),
@@ -201,7 +201,6 @@ class PrivacyToggleButton extends StatelessWidget {
             color: isPublic 
                 ? Colors.green.withOpacity(0.4)
                 : Colors.grey.withOpacity(0.4),
-            width: 1,
           ),
         ),
         child: Row(

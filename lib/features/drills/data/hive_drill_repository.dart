@@ -147,7 +147,7 @@ class HiveDrillRepository implements DrillRepository {
         .whereType<Map<dynamic, dynamic>>()
         .map((e) => Drill.fromMap(Map<String, dynamic>.from(e)))
         .where((drill) => drill.favorite &&
-               drill.createdBy == user.uid)
+               drill.createdBy == user.uid,)
         .toList();
     
     Iterable<Drill> out = items;

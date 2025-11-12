@@ -1,11 +1,11 @@
-import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter/material.dart';
+import 'package:get_it/get_it.dart';
 import 'package:spark_app/core/auth/models/user_role.dart';
 import 'package:spark_app/core/auth/services/user_management_service.dart';
 import 'package:spark_app/core/theme/app_theme.dart';
-import 'package:spark_app/features/subscription/domain/subscription_plan.dart';
 import 'package:spark_app/features/subscription/data/subscription_plan_repository.dart';
-import 'package:get_it/get_it.dart';
+import 'package:spark_app/features/subscription/domain/subscription_plan.dart';
 
 class UserFormScreen extends StatefulWidget {
   final String? userId;

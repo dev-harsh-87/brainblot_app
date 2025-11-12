@@ -309,7 +309,7 @@ class _DeviceConflictDialogState extends State<DeviceConflictDialog> with Ticker
                           : const Icon(Icons.logout),
                       label: Text(_isLoading 
                           ? 'Logging out...' 
-                          : 'Logout All Other Devices'),
+                          : 'Logout All Other Devices',),
                       style: FilledButton.styleFrom(
                         backgroundColor: Colors.orange,
                         foregroundColor: Colors.white,

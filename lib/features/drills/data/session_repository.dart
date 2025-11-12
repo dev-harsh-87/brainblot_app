@@ -23,7 +23,7 @@ class InMemorySessionRepository implements SessionRepository {
   @override
   Stream<List<SessionResult>> watchByDrill(String drillId) {
     return _controller.stream.map((sessions) => 
-      sessions.where((session) => session.drill.id == drillId).toList());
+      sessions.where((session) => session.drill.id == drillId).toList(),);
   }
 
   @override

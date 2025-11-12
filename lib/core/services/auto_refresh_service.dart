@@ -62,7 +62,7 @@ class AutoRefreshService {
   /// Schedule refresh for multiple data types with delay
   void scheduleMultipleRefresh(
     List<String> dataTypes, 
-    {Duration delay = const Duration(milliseconds: 500)}
+    {Duration delay = const Duration(milliseconds: 500),}
   ) {
     for (final dataType in dataTypes) {
       scheduleRefresh(dataType, delay: delay);
@@ -104,7 +104,7 @@ class AutoRefreshService {
   /// Data will only refresh when manually triggered or when relevant actions occur
   void startPeriodicRefresh(
     String dataType,
-    {Duration interval = const Duration(minutes: 5)}
+    {Duration interval = const Duration(minutes: 5),}
   ) {
     // Periodic refresh disabled - data refreshes only when needed
     // No automatic background refreshing every few minutes
@@ -145,7 +145,7 @@ mixin AutoRefreshMixin<T extends StatefulWidget> on State<T> {
 
   /// Listen to multiple auto-refresh streams
   void listenToMultipleAutoRefresh(
-    Map<String, VoidCallback> refreshCallbacks
+    Map<String, VoidCallback> refreshCallbacks,
   ) {
     for (final entry in refreshCallbacks.entries) {
       listenToAutoRefresh(entry.key, entry.value);
@@ -240,7 +240,7 @@ extension AutoRefreshExtension on BuildContext {
   /// Schedule delayed refresh
   void scheduleAutoRefresh(
     String dataType, 
-    {Duration delay = const Duration(milliseconds: 500)}
+    {Duration delay = const Duration(milliseconds: 500),}
   ) {
     AutoRefreshService().scheduleRefresh(dataType, delay: delay);
   }

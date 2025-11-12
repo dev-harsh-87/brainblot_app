@@ -1,13 +1,13 @@
-import "package:flutter/material.dart";
-import "package:cloud_firestore/cloud_firestore.dart";
-import "package:spark_app/core/auth/services/permission_service.dart";
-import "package:spark_app/core/auth/guards/admin_guard.dart";
-import "package:spark_app/core/auth/models/user_role.dart";
-import "package:spark_app/features/admin/ui/user_management_screen.dart";
-import "package:spark_app/features/admin/ui/subscription_management_screen.dart";
-import "package:spark_app/features/admin/ui/screens/comprehensive_analytics_screen.dart";
-import "package:spark_app/features/admin/ui/plan_requests_screen.dart";
-import "package:spark_app/features/admin/ui/screens/comprehensive_activity_screen.dart";
+import 'package:flutter/material.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:spark_app/core/auth/services/permission_service.dart';
+import 'package:spark_app/core/auth/guards/admin_guard.dart';
+import 'package:spark_app/core/auth/models/user_role.dart';
+import 'package:spark_app/features/admin/ui/user_management_screen.dart';
+import 'package:spark_app/features/admin/ui/subscription_management_screen.dart';
+import 'package:spark_app/features/admin/ui/screens/comprehensive_analytics_screen.dart';
+import 'package:spark_app/features/admin/ui/plan_requests_screen.dart';
+import 'package:spark_app/features/admin/ui/screens/comprehensive_activity_screen.dart';
 
 
 class EnhancedAdminDashboardScreen extends StatelessWidget {
@@ -54,7 +54,7 @@ class EnhancedAdminDashboardScreen extends StatelessWidget {
 
   PreferredSizeWidget _buildAppBar(BuildContext context) {
     return AppBar(
-      title: const Text("Admin Dashboard"),
+      title: const Text('Admin Dashboard'),
       elevation: 0,
 
     );
@@ -65,14 +65,14 @@ class EnhancedAdminDashboardScreen extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          "Welcome, Admin",
+          'Welcome, Admin',
           style: Theme.of(context).textTheme.headlineMedium?.copyWith(
                 fontWeight: FontWeight.bold,
               ),
         ),
         const SizedBox(height: 8),
         Text(
-          "Manage your platform from this central hub",
+          'Manage your platform from this central hub',
           style: Theme.of(context).textTheme.bodyLarge?.copyWith(
                 color: Colors.grey[600],
               ),
@@ -83,32 +83,32 @@ class EnhancedAdminDashboardScreen extends StatelessWidget {
 
   Widget _buildRealTimeStats(BuildContext context) {
     return StreamBuilder<QuerySnapshot>(
-      stream: FirebaseFirestore.instance.collection("users").snapshots(),
+      stream: FirebaseFirestore.instance.collection('users').snapshots(),
       builder: (context, userSnapshot) {
         return FutureBuilder<QuerySnapshot>(
           future:
-              FirebaseFirestore.instance.collection("subscription_plans").get(),
+              FirebaseFirestore.instance.collection('subscription_plans').get(),
           builder: (context, planSnapshot) {
             final totalUsers = userSnapshot.data?.docs.length ?? 0;
             final activeUsers = userSnapshot.data?.docs.where((doc) {
                   final data = doc.data() as Map<String, dynamic>;
-                  final lastActive = _parseTimestamp(data["lastActiveAt"]);
+                  final lastActive = _parseTimestamp(data['lastActiveAt']);
                   if (lastActive == null) return false;
                   final date = lastActive.toDate();
                   return date.isAfter(
-                      DateTime.now().subtract(const Duration(days: 7)));
+                      DateTime.now().subtract(const Duration(days: 7)),);
                 }).length ??
                 0;
 
             final adminCount = userSnapshot.data?.docs.where((doc) {
                   final data = doc.data() as Map<String, dynamic>;
-                  return data["role"] == "admin";
+                  return data['role'] == 'admin';
                 }).length ??
                 0;
 
             final activePlans = planSnapshot.data?.docs.where((doc) {
                   final data = doc.data() as Map<String, dynamic>;
-                  return data["isActive"] == true;
+                  return data['isActive'] == true;
                 }).length ??
                 0;
 
@@ -122,28 +122,28 @@ class EnhancedAdminDashboardScreen extends StatelessWidget {
               children: [
                 _buildStatCard(
                   context,
-                  title: "Total Users",
+                  title: 'Total Users',
                   value: totalUsers.toString(),
                   icon: Icons.people,
                   color: Colors.blue,
                 ),
                 _buildStatCard(
                   context,
-                  title: "Active Users",
+                  title: 'Active Users',
                   value: activeUsers.toString(),
                   icon: Icons.trending_up,
                   color: Colors.green,
                 ),
                 _buildStatCard(
                   context,
-                  title: "Administrators",
+                  title: 'Administrators',
                   value: adminCount.toString(),
                   icon: Icons.admin_panel_settings,
                   color: Colors.red,
                 ),
                 _buildStatCard(
                   context,
-                  title: "Active Plans",
+                  title: 'Active Plans',
                   value: activePlans.toString(),
                   icon: Icons.card_membership,
                   color: Colors.purple,
@@ -240,7 +240,7 @@ Widget _buildStatCard(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          "Management Tools",
+          'Management Tools',
           style: Theme.of(context).textTheme.titleLarge?.copyWith(
                 fontWeight: FontWeight.bold,
               ),
@@ -256,8 +256,8 @@ Widget _buildStatCard(
           children: [
             _buildManagementCard(
               context,
-              title: "User Management",
-              description: "Manage users, roles & permissions",
+              title: 'User Management',
+              description: 'Manage users, roles & permissions',
               icon: Icons.people_outline,
               color: Colors.blue,
               onTap: () => Navigator.push(
@@ -269,8 +269,8 @@ Widget _buildStatCard(
             ),
             _buildManagementCard(
               context,
-              title: "Subscriptions",
-              description: "Manage plans & pricing",
+              title: 'Subscriptions',
+              description: 'Manage plans & pricing',
               icon: Icons.card_membership_outlined,
               color: Colors.green,
               onTap: () => Navigator.push(
@@ -282,8 +282,8 @@ Widget _buildStatCard(
             ),
             _buildManagementCard(
               context,
-              title: "Plan Requests",
-              description: "Review subscription requests",
+              title: 'Plan Requests',
+              description: 'Review subscription requests',
               icon: Icons.receipt_long_outlined,
               color: Colors.orange,
               onTap: () => Navigator.push(
@@ -295,8 +295,8 @@ Widget _buildStatCard(
             ),
             _buildManagementCard(
               context,
-              title: "Analytics",
-              description: "View insights & reports",
+              title: 'Analytics',
+              description: 'View insights & reports',
               icon: Icons.analytics_outlined,
               color: Colors.purple,
               onTap: () => Navigator.push(
@@ -406,7 +406,7 @@ Widget _buildManagementCard(
                 ),
                 const SizedBox(width: 12),
                 Text(
-                  "Recent Activity",
+                  'Recent Activity',
                   style: Theme.of(context).textTheme.titleLarge?.copyWith(
                         fontWeight: FontWeight.bold,
                       ),
@@ -423,15 +423,15 @@ Widget _buildManagementCard(
                 );
               },
               icon: const Icon(Icons.arrow_forward, size: 16),
-              label: const Text("View All"),
+              label: const Text('View All'),
             ),
           ],
         ),
         const SizedBox(height: 16),
         StreamBuilder<QuerySnapshot>(
           stream: FirebaseFirestore.instance
-              .collection("users")
-              .orderBy("createdAt", descending: true)
+              .collection('users')
+              .orderBy('createdAt', descending: true)
               .limit(3)
               .snapshots(),
           builder: (context, snapshot) {
@@ -455,7 +455,7 @@ Widget _buildManagementCard(
                       Icon(Icons.inbox_outlined, size: 48, color: Colors.grey[400]),
                       const SizedBox(height: 12),
                       Text(
-                        "No recent activity",
+                        'No recent activity',
                         style: TextStyle(
                           color: Colors.grey[600],
                           fontSize: 16,
@@ -489,9 +489,9 @@ Widget _buildManagementCard(
                 itemBuilder: (context, index) {
                   final doc = snapshot.data!.docs[index];
                   final data = doc.data() as Map<String, dynamic>;
-                  final displayName = data["displayName"] as String? ?? "Unknown";
-                  final email = data["email"] as String? ?? "";
-                  final createdAt = _parseTimestamp(data["createdAt"]);
+                  final displayName = data['displayName'] as String? ?? 'Unknown';
+                  final email = data['email'] as String? ?? '';
+                  final createdAt = _parseTimestamp(data['createdAt']);
 
                   return Container(
                     margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
@@ -546,7 +546,7 @@ Widget _buildManagementCard(
                               border: Border.all(color: Colors.green.withOpacity(0.3)),
                             ),
                             child: const Text(
-                              "NEW",
+                              'NEW',
                               style: TextStyle(
                                 color: Colors.green,
                                 fontSize: 10,
@@ -561,7 +561,7 @@ Widget _buildManagementCard(
                         children: [
                           const SizedBox(height: 4),
                           Text(
-                            "New user registration",
+                            'New user registration',
                             style: TextStyle(
                               fontSize: 13,
                               color: Colors.grey[600],
@@ -587,7 +587,7 @@ Widget _buildManagementCard(
                               Text(
                                 createdAt != null
                                     ? _formatTimeAgo(createdAt.toDate())
-                                    : "Recently",
+                                    : 'Recently',
                                 style: TextStyle(
                                   fontSize: 11,
                                   color: Colors.grey[500],
@@ -636,15 +636,15 @@ Timestamp? _parseTimestamp(dynamic timestampData) {
     final difference = now.difference(date);
 
     if (difference.inMinutes < 1) {
-      return "Just now";
+      return 'Just now';
     } else if (difference.inHours < 1) {
-      return "${difference.inMinutes}m ago";
+      return '${difference.inMinutes}m ago';
     } else if (difference.inDays < 1) {
-      return "${difference.inHours}h ago";
+      return '${difference.inHours}h ago';
     } else if (difference.inDays < 7) {
-      return "${difference.inDays}d ago";
+      return '${difference.inDays}d ago';
     } else {
-      return "${(difference.inDays / 7).floor()}w ago";
+      return '${(difference.inDays / 7).floor()}w ago';
     }
   }
 }

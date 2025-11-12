@@ -87,7 +87,7 @@ class BluetoothConnectionService {
         
         if (result.needsSettings) {
           _connectionStatusController.add(
-            'Some permissions are permanently denied. Please enable them in Settings.'
+            'Some permissions are permanently denied. Please enable them in Settings.',
           );
         }
       }
@@ -199,7 +199,7 @@ class BluetoothConnectionService {
 
   /// Join an existing session by session code. Completes when connected or throws.
   Future<ConnectionSession> joinSession(String sessionCode,
-      {Duration timeout = const Duration(seconds: 30)}) async {
+      {Duration timeout = const Duration(seconds: 30),}) async {
     if (_deviceId == null || _deviceName == null) {
       throw Exception('Service not initialized. Please restart the app.');
     }
@@ -245,7 +245,7 @@ class BluetoothConnectionService {
           _joinCompleter!.completeError(Exception('Session $sessionCode not found. Make sure:\n• The host is nearby and advertising\n• The session code is correct\n• Both devices have Bluetooth enabled'));
         }
         throw Exception('Session $sessionCode not found. Make sure:\n• The host is nearby and advertising\n• The session code is correct\n• Both devices have Bluetooth enabled');
-      });
+      },);
 
       debugPrint('✅ Successfully joined session: $sessionCode');
       return result;
@@ -583,7 +583,7 @@ class BluetoothConnectionService {
           hostName: 'Host',
         );
         _sessionController.add(_currentSession!);
-        _connectionStatusController.add('✅ Connected to session ${_advertisedSessionCode}');
+        _connectionStatusController.add('✅ Connected to session $_advertisedSessionCode');
         
         // Complete the join operation
         if (_joinCompleter != null && !_joinCompleter!.isCompleted) {

@@ -142,7 +142,7 @@ class SubscriptionPlanCard extends StatelessWidget {
                     ),
                   ],
                 ),
-              )),
+              ),),
               
               const SizedBox(height: AppTheme.spacing24),
               

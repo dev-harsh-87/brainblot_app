@@ -1,6 +1,6 @@
-import "package:flutter/material.dart";
-import "package:cloud_firestore/cloud_firestore.dart";
-import "package:spark_app/core/theme/app_theme.dart";
+import 'package:flutter/material.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:spark_app/core/theme/app_theme.dart';
 
 class AnalyticsScreen extends StatelessWidget {
   const AnalyticsScreen({super.key});
@@ -9,7 +9,7 @@ class AnalyticsScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text("Analytics & Insights"),
+        title: const Text('Analytics & Insights'),
         elevation: 0,
       ),
       body: SingleChildScrollView(
@@ -30,7 +30,7 @@ class AnalyticsScreen extends StatelessWidget {
 
   Widget _buildUserAnalytics() {
     return StreamBuilder<QuerySnapshot>(
-      stream: FirebaseFirestore.instance.collection("users").snapshots(),
+      stream: FirebaseFirestore.instance.collection('users').snapshots(),
       builder: (context, snapshot) {
         if (!snapshot.hasData) {
           return const Center(child: CircularProgressIndicator());
@@ -41,12 +41,12 @@ class AnalyticsScreen extends StatelessWidget {
         
         final adminUsers = users.where((doc) {
           final data = doc.data() as Map<String, dynamic>;
-          return data["role"] == "admin";
+          return data['role'] == 'admin';
         }).length;
 
         final activeUsers = users.where((doc) {
           final data = doc.data() as Map<String, dynamic>;
-          final lastActive = data["lastActiveAt"];
+          final lastActive = data['lastActiveAt'];
           if (lastActive == null) return false;
           final timestamp = lastActive is Timestamp
               ? lastActive.toDate()
@@ -57,7 +57,7 @@ class AnalyticsScreen extends StatelessWidget {
 
         final newUsersThisMonth = users.where((doc) {
           final data = doc.data() as Map<String, dynamic>;
-          final created = data["createdAt"];
+          final created = data['createdAt'];
           if (created == null) return false;
           final timestamp = created is Timestamp
               ? created.toDate()
@@ -89,7 +89,7 @@ class AnalyticsScreen extends StatelessWidget {
                     ),
                     const SizedBox(width: 16),
                     const Text(
-                      "User Analytics",
+                      'User Analytics',
                       style: TextStyle(
                         fontSize: 20,
                         fontWeight: FontWeight.bold,
@@ -107,25 +107,25 @@ class AnalyticsScreen extends StatelessWidget {
                   childAspectRatio: 1.8,
                   children: [
                     _buildStatCard(
-                      "Total Users",
+                      'Total Users',
                       totalUsers.toString(),
                       Icons.people,
                       Colors.blue,
                     ),
                     _buildStatCard(
-                      "Active (7 days)",
+                      'Active (7 days)',
                       activeUsers.toString(),
                       Icons.trending_up,
                       Colors.green,
                     ),
                     _buildStatCard(
-                      "Administrators",
+                      'Administrators',
                       adminUsers.toString(),
                       Icons.admin_panel_settings,
                       Colors.red,
                     ),
                     _buildStatCard(
-                      "New This Month",
+                      'New This Month',
                       newUsersThisMonth.toString(),
                       Icons.person_add,
                       Colors.orange,
@@ -142,7 +142,7 @@ class AnalyticsScreen extends StatelessWidget {
 
   Widget _buildSubscriptionAnalytics() {
     return StreamBuilder<QuerySnapshot>(
-      stream: FirebaseFirestore.instance.collection("users").snapshots(),
+      stream: FirebaseFirestore.instance.collection('users').snapshots(),
       builder: (context, snapshot) {
         if (!snapshot.hasData) {
           return const Center(child: CircularProgressIndicator());
@@ -152,20 +152,20 @@ class AnalyticsScreen extends StatelessWidget {
         
         final freeUsers = users.where((doc) {
           final data = doc.data() as Map<String, dynamic>;
-          final sub = data["subscription"] as Map<String, dynamic>?;
-          return sub?["plan"] == "free";
+          final sub = data['subscription'] as Map<String, dynamic>?;
+          return sub?['plan'] == 'free';
         }).length;
 
         final playerUsers = users.where((doc) {
           final data = doc.data() as Map<String, dynamic>;
-          final sub = data["subscription"] as Map<String, dynamic>?;
-          return sub?["plan"] == "player";
+          final sub = data['subscription'] as Map<String, dynamic>?;
+          return sub?['plan'] == 'player';
         }).length;
 
         final instituteUsers = users.where((doc) {
           final data = doc.data() as Map<String, dynamic>;
-          final sub = data["subscription"] as Map<String, dynamic>?;
-          return sub?["plan"] == "institute";
+          final sub = data['subscription'] as Map<String, dynamic>?;
+          return sub?['plan'] == 'institute';
         }).length;
 
         final totalRevenue = (playerUsers * 9.99) + (instituteUsers * 29.99);
@@ -189,11 +189,11 @@ class AnalyticsScreen extends StatelessWidget {
                         borderRadius: BorderRadius.circular(12),
                       ),
                       child: const Icon(Icons.card_membership,
-                          color: Colors.purple, size: 28),
+                          color: Colors.purple, size: 28,),
                     ),
                     const SizedBox(width: 16),
                     const Text(
-                      "Subscription Analytics",
+                      'Subscription Analytics',
                       style: TextStyle(
                         fontSize: 20,
                         fontWeight: FontWeight.bold,
@@ -211,26 +211,26 @@ class AnalyticsScreen extends StatelessWidget {
                   childAspectRatio: 1.8,
                   children: [
                     _buildStatCard(
-                      "Free Plan",
+                      'Free Plan',
                       freeUsers.toString(),
                       Icons.card_membership,
                       AppTheme.freeColor,
                     ),
                     _buildStatCard(
-                      "Player Plan",
+                      'Player Plan',
                       playerUsers.toString(),
                       Icons.card_membership,
                       AppTheme.playerColor,
                     ),
                     _buildStatCard(
-                      "Institute Plan",
+                      'Institute Plan',
                       instituteUsers.toString(),
                       Icons.card_membership,
                       AppTheme.instituteColor,
                     ),
                     _buildStatCard(
-                      "Est. Revenue",
-                      "\$${totalRevenue.toStringAsFixed(2)}",
+                      'Est. Revenue',
+                      '\$${totalRevenue.toStringAsFixed(2)}',
                       Icons.attach_money,
                       Colors.green,
                     ),
@@ -267,7 +267,7 @@ class AnalyticsScreen extends StatelessWidget {
                 ),
                 const SizedBox(width: 16),
                 const Text(
-                  "Recent Activity",
+                  'Recent Activity',
                   style: TextStyle(
                     fontSize: 20,
                     fontWeight: FontWeight.bold,
@@ -278,8 +278,8 @@ class AnalyticsScreen extends StatelessWidget {
             const SizedBox(height: 20),
             StreamBuilder<QuerySnapshot>(
               stream: FirebaseFirestore.instance
-                  .collection("users")
-                  .orderBy("createdAt", descending: true)
+                  .collection('users')
+                  .orderBy('createdAt', descending: true)
                   .limit(5)
                   .snapshots(),
               builder: (context, snapshot) {
@@ -287,7 +287,7 @@ class AnalyticsScreen extends StatelessWidget {
                   return const Center(
                     child: Padding(
                       padding: EdgeInsets.all(24.0),
-                      child: Text("No recent activity"),
+                      child: Text('No recent activity'),
                     ),
                   );
                 }
@@ -300,10 +300,10 @@ class AnalyticsScreen extends StatelessWidget {
                   itemBuilder: (context, index) {
                     final doc = snapshot.data!.docs[index];
                     final data = doc.data() as Map<String, dynamic>;
-                    final displayName = data["displayName"] as String? ?? "Unknown";
-                    final createdAt = data["createdAt"];
+                    final displayName = data['displayName'] as String? ?? 'Unknown';
+                    final createdAt = data['createdAt'];
                     
-                    String timeAgo = "Recently";
+                    String timeAgo = 'Recently';
                     if (createdAt != null) {
                       final timestamp = createdAt is Timestamp
                           ? createdAt.toDate()
@@ -317,10 +317,10 @@ class AnalyticsScreen extends StatelessWidget {
                       leading: CircleAvatar(
                         backgroundColor: Colors.blue.withOpacity(0.1),
                         child: const Icon(Icons.person_add,
-                            color: Colors.blue, size: 20),
+                            color: Colors.blue, size: 20,),
                       ),
                       title: const Text(
-                        "New user registered",
+                        'New user registered',
                         style: TextStyle(fontWeight: FontWeight.w600),
                       ),
                       subtitle: Text(displayName),
@@ -354,7 +354,6 @@ class AnalyticsScreen extends StatelessWidget {
       ),
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
-        crossAxisAlignment: CrossAxisAlignment.center,
         children: [
           Icon(icon, color: color, size: 24),
           const SizedBox(height: 6),
@@ -389,15 +388,15 @@ class AnalyticsScreen extends StatelessWidget {
     final difference = now.difference(date);
 
     if (difference.inMinutes < 1) {
-      return "Just now";
+      return 'Just now';
     } else if (difference.inHours < 1) {
-      return "${difference.inMinutes}m ago";
+      return '${difference.inMinutes}m ago';
     } else if (difference.inDays < 1) {
-      return "${difference.inHours}h ago";
+      return '${difference.inHours}h ago';
     } else if (difference.inDays < 7) {
-      return "${difference.inDays}d ago";
+      return '${difference.inDays}d ago';
     } else {
-      return "${(difference.inDays / 7).floor()}w ago";
+      return '${(difference.inDays / 7).floor()}w ago';
     }
   }
 }

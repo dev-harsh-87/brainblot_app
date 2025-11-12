@@ -1,7 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:permission_handler/permission_handler.dart' as permission_handler;
-import 'package:spark_app/core/utils/ios_permission_helper.dart';
 import 'package:spark_app/core/services/enhanced_ios_permission_service.dart';
+import 'package:spark_app/core/utils/ios_permission_helper.dart';
 
 /// Professional permission management system for multiplayer features
 /// Handles both iOS and Android permissions with platform-specific optimizations

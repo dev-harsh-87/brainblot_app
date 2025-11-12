@@ -80,7 +80,7 @@ class UserManagementService {
 // Step 3: Sign out from secondary auth to prevent conflicts
       await _secondaryAuth!.signOut();
       
-      print("✅ User created successfully without affecting admin session");
+      print('✅ User created successfully without affecting admin session');
 
       // Step 3: Create Firestore user document
       final newUser = AppUser(
@@ -92,7 +92,6 @@ class UserManagementService {
             ? UserSubscription.fromJson(subscriptionData)
             : const UserSubscription(
                 plan: 'free',
-                status: 'active',
                 moduleAccess: ['drills', 'profile', 'stats', 'analysis'],
               ),
         preferences: const UserPreferences(),
@@ -226,7 +225,6 @@ class UserManagementService {
             ? UserSubscription.fromJson(subscriptionData)
             : const UserSubscription(
                 plan: 'free',
-                status: 'active',
                 moduleAccess: ['drills', 'profile', 'stats', 'analysis'],
               ),
         preferences: const UserPreferences(),
@@ -281,7 +279,7 @@ class UserManagementService {
   Future<void> updateUserSubscription(String userId, Map<String, dynamic> subscriptionData) async {
     try {
       // Use dot notation to update nested subscription fields properly
-      Map<String, dynamic> updateData = {
+      final Map<String, dynamic> updateData = {
         'updatedAt': FieldValue.serverTimestamp(),
       };
       
@@ -392,7 +390,7 @@ class UserManagementService {
       return snapshot.docs.map((doc) => {
         'id': doc.id,
         ...doc.data() as Map<String, dynamic>,
-      }).toList();
+      },).toList();
     } catch (e) {
       throw Exception('Failed to get audit log: $e');
     }

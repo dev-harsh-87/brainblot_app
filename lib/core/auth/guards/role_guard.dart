@@ -1,11 +1,8 @@
 import 'package:flutter/material.dart';
-import 'package:spark_app/core/auth/services/permission_service.dart';
-import 'package:spark_app/core/auth/services/subscription_permission_service.dart';
-import 'package:spark_app/core/auth/services/session_management_service.dart';
-import 'package:spark_app/core/auth/models/user_role.dart';
-import 'package:spark_app/core/auth/models/permission.dart';
-import 'package:spark_app/core/di/injection.dart';
 import 'package:go_router/go_router.dart';
+import 'package:spark_app/core/auth/models/permission.dart';
+import 'package:spark_app/core/auth/models/user_role.dart';
+import 'package:spark_app/core/auth/services/permission_service.dart';
 
 /// Enhanced role-based guard for protecting routes and features
 class RoleGuard extends StatelessWidget {

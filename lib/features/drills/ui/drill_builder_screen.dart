@@ -54,7 +54,7 @@ class _DrillBuilderScreenState extends State<DrillBuilderScreen>
     ).animate(CurvedAnimation(
       parent: _animationController,
       curve: Curves.easeInOut,
-    ));
+    ),);
     
     final d = widget.initial;
     _name = TextEditingController(text: d?.name ?? 'Custom Drill');
@@ -319,7 +319,7 @@ class _DrillBuilderScreenState extends State<DrillBuilderScreen>
               runSpacing: 8,
               children: [
                 'fitness', 'soccer', 'basketball', 'hockey', 'tennis', 
-                'volleyball', 'football', 'lacrosse', 'physiotherapy', 'agility'
+                'volleyball', 'football', 'lacrosse', 'physiotherapy', 'agility',
               ].map((cat) => _buildCategoryChip(cat)).toList(),
             ),
             const SizedBox(height: 20),
@@ -504,7 +504,6 @@ class _DrillBuilderScreenState extends State<DrillBuilderScreen>
           SnackBar(
             content: Text('Please fix the following: ${stepErrors.join(', ')}'),
             backgroundColor: Colors.red,
-            duration: const Duration(seconds: 4),
           ),
         );
         HapticFeedback.heavyImpact();
@@ -694,7 +693,7 @@ class _DrillBuilderScreenState extends State<DrillBuilderScreen>
                 const SizedBox(height: 12),
                 _buildSummaryRow('Total drill time:', '${(_duration * _reps + _rest * (_reps - 1))}s'),
                 _buildSummaryRow('Total stimuli:', '${_numberOfStimuli * _reps}'),
-                _buildSummaryRow('Avg stimuli per second:', '${(_numberOfStimuli / _duration).toStringAsFixed(1)}'),
+                _buildSummaryRow('Avg stimuli per second:', (_numberOfStimuli / _duration).toStringAsFixed(1)),
               ],
             ),
           ),
@@ -972,7 +971,7 @@ class _DrillBuilderScreenState extends State<DrillBuilderScreen>
               _buildReviewItem('Name', _name.text),
               _buildReviewItem('Description', _description.text.isEmpty ? 'No description' : _description.text),
               _buildReviewItem('Category', _category ?? 'Not selected'),
-              _buildReviewItem('Difficulty', _difficulty?.name.toUpperCase() ?? 'Not selected'),
+              _buildReviewItem('Difficulty', _difficulty.name.toUpperCase() ?? 'Not selected'),
             ],
           ),
           const SizedBox(height: 20),
@@ -1038,7 +1037,7 @@ class _DrillBuilderScreenState extends State<DrillBuilderScreen>
                         color: Colors.red.shade700,
                       ),
                     ),
-                  )),
+                  ),),
                 ],
               ),
             ),
@@ -1396,14 +1395,6 @@ class _DrillBuilderScreenState extends State<DrillBuilderScreen>
     
     if (_name.text.trim().isEmpty) {
       errors.add('Drill name is required');
-    }
-    
-    if (_category == null) {
-      errors.add('Please select a category');
-    }
-    
-    if (_difficulty == null) {
-      errors.add('Please select a difficulty level');
     }
     
     // Validate minimum duration of 60 seconds

@@ -137,7 +137,7 @@ class FirebaseDrillRepository implements DrillRepository {
             final drills = _mapSnapshotToDrills(snapshot);
             // Filter to only show user's own drills
             final filtered = drills.where((drill) =>
-                drill.createdBy == userId).toList();
+                drill.createdBy == userId,).toList();
             // Sort by createdAt in memory
             filtered.sort((a, b) => b.createdAt.compareTo(a.createdAt));
             return filtered;
@@ -159,7 +159,7 @@ class FirebaseDrillRepository implements DrillRepository {
           .collection(_drillsCollection)
           .where('createdBy', isEqualTo: userId)
           .get();
-      List<Drill> myDrills = _mapSnapshotToDrills(myDrillsSnapshot);
+      final List<Drill> myDrills = _mapSnapshotToDrills(myDrillsSnapshot);
 
       // Get drills shared with the user
       final sharedDrills = await _getSharedDrills(userId);
@@ -190,7 +190,7 @@ class FirebaseDrillRepository implements DrillRepository {
         final queryLower = query.toLowerCase();
         filteredDrills = filteredDrills.where((drill) => 
           drill.name.toLowerCase().contains(queryLower) ||
-          (drill.category?.toLowerCase().contains(queryLower) ?? false)
+          (drill.category.toLowerCase().contains(queryLower) ?? false),
         ).toList();
       }
       
@@ -549,20 +549,20 @@ class FirebaseDrillRepository implements DrillRepository {
           .map((e) => StimulusType.values.firstWhere(
                 (s) => s.name == e,
                 orElse: () => StimulusType.color,
-              ))
+              ),)
           .toList(),
       numberOfStimuli: data['numberOfStimuli'] as int,
       zones: (data['zones'] as List)
           .map((e) => ReactionZone.values.firstWhere(
                 (z) => z.name == e,
                 orElse: () => ReactionZone.center,
-              ))
+              ),)
           .toList(),
       colors: (data['colors'] as List)
           .map((hex) => Color(int.parse(
                 (hex as String).replaceFirst('#', ''),
                 radix: 16,
-              )))
+              ),),)
           .toList(),
       presentationMode: data['presentationMode'] != null
           ? PresentationMode.values.firstWhere(
@@ -612,7 +612,7 @@ class FirebaseDrillRepository implements DrillRepository {
       if (query != null && query.isNotEmpty) {
         final queryLower = query.toLowerCase();
         drills = drills.where((drill) => 
-            drill.name.toLowerCase().contains(queryLower)).toList();
+            drill.name.toLowerCase().contains(queryLower),).toList();
       }
 
       // Sort by createdAt
@@ -654,7 +654,7 @@ class FirebaseDrillRepository implements DrillRepository {
       if (query != null && query.isNotEmpty) {
         final queryLower = query.toLowerCase();
         drills = drills.where((drill) =>
-            drill.name.toLowerCase().contains(queryLower)).toList();
+            drill.name.toLowerCase().contains(queryLower),).toList();
       }
 
       // Sort by createdAt
@@ -704,7 +704,7 @@ class FirebaseDrillRepository implements DrillRepository {
       if (query != null && query.isNotEmpty) {
         final queryLower = query.toLowerCase();
         drills = drills.where((drill) =>
-            drill.name.toLowerCase().contains(queryLower)).toList();
+            drill.name.toLowerCase().contains(queryLower),).toList();
       }
 
       // Sort by createdAt
@@ -734,7 +734,7 @@ class FirebaseDrillRepository implements DrillRepository {
 
       // Filter to only show drills user can see (their own or public ones)
       drills = drills.where((drill) =>
-          drill.createdBy == userId).toList();
+          drill.createdBy == userId,).toList();
 
       // Apply filters in memory to avoid complex indexes
       if (category != null && category.isNotEmpty) {
@@ -748,7 +748,7 @@ class FirebaseDrillRepository implements DrillRepository {
       if (query != null && query.isNotEmpty) {
         final queryLower = query.toLowerCase();
         drills = drills.where((drill) => 
-            drill.name.toLowerCase().contains(queryLower)).toList();
+            drill.name.toLowerCase().contains(queryLower),).toList();
       }
 
       // Sort by createdAt

@@ -25,7 +25,7 @@ class _ProgramCreationScreenState extends State<ProgramCreationScreen>
   final _pageController = PageController();
 
   String _selectedCategory = 'fitness';
-  String _selectedLevel = 'Beginner';
+  final String _selectedLevel = 'Beginner';
   int _programDuration = 30; // days instead of text field
   
   // Drill selection and assignment
@@ -476,7 +476,7 @@ class _ProgramCreationScreenState extends State<ProgramCreationScreen>
   }
 
   Widget _buildInfoChip(
-      BuildContext context, IconData icon, String label, bool active) {
+      BuildContext context, IconData icon, String label, bool active,) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
 
@@ -767,7 +767,7 @@ class _ProgramCreationScreenState extends State<ProgramCreationScreen>
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text('Available drills: ${_getFilteredDrills().length}', 
-                   style: Theme.of(context).textTheme.bodySmall),
+                   style: Theme.of(context).textTheme.bodySmall,),
               if (_getFilteredDrills().isNotEmpty)
                 TextButton.icon(
                   onPressed: _selectedDrillIds.length == _getFilteredDrills().length 
@@ -775,10 +775,10 @@ class _ProgramCreationScreenState extends State<ProgramCreationScreen>
                       : _selectAllDrills,
                   icon: Icon(_selectedDrillIds.length == _getFilteredDrills().length 
                       ? Icons.deselect 
-                      : Icons.select_all),
+                      : Icons.select_all,),
                   label: Text(_selectedDrillIds.length == _getFilteredDrills().length 
                       ? 'Deselect All' 
-                      : 'Select All'),
+                      : 'Select All',),
                 ),
             ],
           ),
@@ -796,7 +796,7 @@ class _ProgramCreationScreenState extends State<ProgramCreationScreen>
                             Text('No drills available'),
                             const SizedBox(height: 8),
                             Text('You can still create the program without drills',
-                                 style: Theme.of(context).textTheme.bodySmall),
+                                 style: Theme.of(context).textTheme.bodySmall,),
                           ],
                         ),
                       )
@@ -959,7 +959,7 @@ class _ProgramCreationScreenState extends State<ProgramCreationScreen>
                                     style: const TextStyle(fontSize: 12),
                                   ),
                                   dense: true,
-                                )).toList(),
+                                ),).toList(),
                         ),
                       );
                     },
@@ -1177,7 +1177,7 @@ class _ProgramCreationScreenState extends State<ProgramCreationScreen>
               ...errors.map((error) => Padding(
                 padding: const EdgeInsets.only(top: 4),
                 child: Text('• $error', style: TextStyle(color: Colors.red.shade700)),
-              )),
+              ),),
             ],
           ],
         ),

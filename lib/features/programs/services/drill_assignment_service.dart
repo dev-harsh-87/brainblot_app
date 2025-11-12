@@ -189,7 +189,7 @@ class DrillAssignmentService {
     
     // Sort by preset drills first, then by name
     levelDrills
-      ..sort((a, b) {
+      .sort((a, b) {
         if (a.isPreset && !b.isPreset) return -1;
         if (!a.isPreset && b.isPreset) return 1;
         return a.name.compareTo(b.name);

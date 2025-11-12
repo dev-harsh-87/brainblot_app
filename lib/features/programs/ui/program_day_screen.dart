@@ -118,9 +118,7 @@ class _ProgramDayScreenState extends State<ProgramDayScreen> {
       }
 
       // Load latest progress if not provided
-      if (_progress == null) {
-        _progress = await _progressService.getProgramProgress(widget.program.id);
-      }
+      _progress ??= await _progressService.getProgramProgress(widget.program.id);
     } catch (e) {
       print('❌ Error loading day data: $e');
       // Create fallback day
@@ -253,7 +251,7 @@ class _ProgramDayScreenState extends State<ProgramDayScreen> {
       'drill': drillToRun,
       'programId': widget.program.id,
       'programDayNumber': widget.dayNumber,
-    });
+    },);
   }
 
   String _formatDuration(Duration duration) {

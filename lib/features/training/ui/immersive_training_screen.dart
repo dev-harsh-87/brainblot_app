@@ -106,7 +106,7 @@ class _ImmersiveTrainingScreenState extends State<ImmersiveTrainingScreen> {
                   transform: Matrix4.translationValues(
                     0, 
                     _isImmersive ? 60 : 0, 
-                    0
+                    0,
                   ),
                   child: _buildBottomControls(context),
                 ),
@@ -132,7 +132,6 @@ class _ImmersiveTrainingScreenState extends State<ImmersiveTrainingScreen> {
     return Container(
       decoration: BoxDecoration(
         gradient: RadialGradient(
-          center: Alignment.center,
           radius: 1.0,
           colors: [
             Colors.blue.shade900.withOpacity(0.3),

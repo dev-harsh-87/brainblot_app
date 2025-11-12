@@ -65,7 +65,7 @@ class _DrillResultsScreenState extends State<DrillResultsScreen>
     ).animate(CurvedAnimation(
       parent: _animationController,
       curve: const Interval(0.0, 0.7, curve: Curves.easeOut),
-    ));
+    ),);
     
     _slideAnimation = Tween<double>(
       begin: 60.0,
@@ -73,7 +73,7 @@ class _DrillResultsScreenState extends State<DrillResultsScreen>
     ).animate(CurvedAnimation(
       parent: _animationController,
       curve: const Interval(0.3, 1.0, curve: Curves.easeOutCubic),
-    ));
+    ),);
     
     _chartAnimation = Tween<double>(
       begin: 0.0,
@@ -81,7 +81,7 @@ class _DrillResultsScreenState extends State<DrillResultsScreen>
     ).animate(CurvedAnimation(
       parent: _chartAnimationController,
       curve: Curves.elasticOut,
-    ));
+    ),);
     
     _animationController.forward();
     Future.delayed(const Duration(milliseconds: 600), () {
@@ -284,7 +284,6 @@ class _DrillResultsScreenState extends State<DrillResultsScreen>
         ],
         border: Border.all(
           color: colorScheme.outline.withOpacity(0.1),
-          width: 1,
         ),
       ),
       child: Column(
@@ -419,7 +418,6 @@ class _DrillResultsScreenState extends State<DrillResultsScreen>
         borderRadius: BorderRadius.circular(20),
         border: Border.all(
           color: accuracyColor.withOpacity(0.2),
-          width: 1,
         ),
       ),
       child: Column(
@@ -549,7 +547,6 @@ class _DrillResultsScreenState extends State<DrillResultsScreen>
         ],
         border: Border.all(
           color: colorScheme.outline.withOpacity(0.1),
-          width: 1,
         ),
       ),
       child: Column(
@@ -645,7 +642,7 @@ class _DrillResultsScreenState extends State<DrillResultsScreen>
     final stimuliPerRep = math.max(drill.numberOfStimuli, 1);
     
     // Create a structured approach to organize data by sets and reps
-    List<List<RepPerformanceData>> setBasedReps = [];
+    final List<List<RepPerformanceData>> setBasedReps = [];
     
     // Check if we have detailed set results from the drill runner
     if (widget.detailedSetResults != null && widget.detailedSetResults!.isNotEmpty) {
@@ -656,7 +653,7 @@ class _DrillResultsScreenState extends State<DrillResultsScreen>
       
       // Use the detailed results from the drill runner
       for (int setIndex = 0; setIndex < totalSets; setIndex++) {
-        List<RepPerformanceData> repsInThisSet = [];
+        final List<RepPerformanceData> repsInThisSet = [];
         
         for (int repIndex = 0; repIndex < totalReps; repIndex++) {
           // Try to find matching detailed data
@@ -693,7 +690,7 @@ class _DrillResultsScreenState extends State<DrillResultsScreen>
               totalStimuli: stimuliPerRep,
               avgReactionTime: 0.0,
               events: [],
-            ));
+            ),);
           }
         }
         setBasedReps.add(repsInThisSet);
@@ -704,14 +701,14 @@ class _DrillResultsScreenState extends State<DrillResultsScreen>
       final actualEventsPerRep = events.length / (totalSets * totalReps);
       
       for (int setIndex = 0; setIndex < totalSets; setIndex++) {
-        List<RepPerformanceData> repsInThisSet = [];
+        final List<RepPerformanceData> repsInThisSet = [];
         
         for (int repIndex = 0; repIndex < totalReps; repIndex++) {
           final globalRepIndex = (setIndex * totalReps) + repIndex;
           final eventStartIndex = (globalRepIndex * actualEventsPerRep).round();
           final eventEndIndex = math.min(
             ((globalRepIndex + 1) * actualEventsPerRep).round(),
-            events.length
+            events.length,
           );
           
           if (eventStartIndex < events.length) {
@@ -746,7 +743,7 @@ class _DrillResultsScreenState extends State<DrillResultsScreen>
               totalStimuli: 0,
               avgReactionTime: 0.0,
               events: [],
-            ));
+            ),);
           }
         }
         setBasedReps.add(repsInThisSet);
@@ -754,7 +751,7 @@ class _DrillResultsScreenState extends State<DrillResultsScreen>
     } else {
       // Create empty structure based on drill configuration
       for (int setIndex = 0; setIndex < totalSets; setIndex++) {
-        List<RepPerformanceData> repsInThisSet = [];
+        final List<RepPerformanceData> repsInThisSet = [];
         
         for (int repIndex = 0; repIndex < totalReps; repIndex++) {
           repsInThisSet.add(RepPerformanceData(
@@ -765,7 +762,7 @@ class _DrillResultsScreenState extends State<DrillResultsScreen>
             totalStimuli: stimuliPerRep,
             avgReactionTime: 0.0,
             events: [],
-          ));
+          ),);
         }
         setBasedReps.add(repsInThisSet);
       }
@@ -788,7 +785,6 @@ class _DrillResultsScreenState extends State<DrillResultsScreen>
         ],
         border: Border.all(
           color: colorScheme.outline.withOpacity(0.1),
-          width: 1,
         ),
       ),
       child: Column(
@@ -957,7 +953,6 @@ class _DrillResultsScreenState extends State<DrillResultsScreen>
             borderRadius: BorderRadius.circular(16),
             border: Border.all(
               color: Theme.of(context).colorScheme.outline.withOpacity(0.1),
-              width: 1,
             ),
             boxShadow: [
               BoxShadow(

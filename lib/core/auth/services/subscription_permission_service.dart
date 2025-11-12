@@ -1,8 +1,9 @@
+import 'dart:async';
+
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:spark_app/features/subscription/domain/subscription_plan.dart';
 import 'package:spark_app/core/auth/models/user_role.dart';
-import 'dart:async';
+import 'package:spark_app/features/subscription/domain/subscription_plan.dart';
 
 /// Centralized service for subscription-based permission checking
 /// Ensures consistent permission logic across the entire app

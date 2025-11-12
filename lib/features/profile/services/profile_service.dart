@@ -209,7 +209,7 @@ class ProfileService {
     
     for (final doc in sharedDrills.docs) {
       await doc.reference.update({
-        'sharedWith': FieldValue.arrayRemove([userId])
+        'sharedWith': FieldValue.arrayRemove([userId]),
       });
     }
 
@@ -221,7 +221,7 @@ class ProfileService {
     
     for (final doc in sharedPrograms.docs) {
       await doc.reference.update({
-        'sharedWith': FieldValue.arrayRemove([userId])
+        'sharedWith': FieldValue.arrayRemove([userId]),
       });
     }
   }

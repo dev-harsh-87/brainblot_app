@@ -344,14 +344,12 @@ class _ProfileScreenState extends State<ProfileScreen> with AutoRefreshMixin {
         borderRadius: BorderRadius.circular(20),
         border: Border.all(
           color: colorScheme.outline.withOpacity(0.1),
-          width: 1,
         ),
         boxShadow: [
           BoxShadow(
             color: colorScheme.shadow.withOpacity(0.08),
             blurRadius: 16,
             offset: const Offset(0, 6),
-            spreadRadius: 0,
           ),
         ],
       ),
@@ -376,7 +374,6 @@ class _ProfileScreenState extends State<ProfileScreen> with AutoRefreshMixin {
                     color: colorScheme.primary.withOpacity(0.3),
                     blurRadius: 12,
                     offset: const Offset(0, 4),
-                    spreadRadius: 0,
                   ),
                 ],
               ),
@@ -436,7 +433,6 @@ class _ProfileScreenState extends State<ProfileScreen> with AutoRefreshMixin {
                       borderRadius: BorderRadius.circular(16),
                       border: Border.all(
                         color: Colors.blue.withOpacity(0.2),
-                        width: 1,
                       ),
                     ),
                     child: Row(
@@ -527,14 +523,12 @@ class _ProfileScreenState extends State<ProfileScreen> with AutoRefreshMixin {
               borderRadius: BorderRadius.circular(16),
               border: Border.all(
                 color: colorScheme.outline.withOpacity(0.08),
-                width: 1,
               ),
               boxShadow: [
                 BoxShadow(
                   color: colorScheme.shadow.withOpacity(0.04),
                   blurRadius: 12,
                   offset: const Offset(0, 3),
-                  spreadRadius: 0,
                 ),
               ],
             ),
@@ -693,14 +687,12 @@ class _ProfileScreenState extends State<ProfileScreen> with AutoRefreshMixin {
         borderRadius: BorderRadius.circular(12),
         border: Border.all(
           color: iconColor.withOpacity(0.15),
-          width: 1,
         ),
         boxShadow: [
           BoxShadow(
             color: iconColor.withOpacity(0.1),
             blurRadius: 8,
             offset: const Offset(0, 2),
-            spreadRadius: 0,
           ),
         ],
       ),
@@ -874,14 +866,12 @@ class _ProfileScreenState extends State<ProfileScreen> with AutoRefreshMixin {
               borderRadius: BorderRadius.circular(16),
               border: Border.all(
                 color: colorScheme.outline.withOpacity(0.08),
-                width: 1,
               ),
               boxShadow: [
                 BoxShadow(
                   color: colorScheme.shadow.withOpacity(0.04),
                   blurRadius: 12,
                   offset: const Offset(0, 3),
-                  spreadRadius: 0,
                 ),
               ],
             ),
@@ -1206,14 +1196,12 @@ class _ProfileScreenState extends State<ProfileScreen> with AutoRefreshMixin {
               borderRadius: BorderRadius.circular(16),
               border: Border.all(
                 color: colorScheme.outline.withOpacity(0.08),
-                width: 1,
               ),
               boxShadow: [
                 BoxShadow(
                   color: colorScheme.shadow.withOpacity(0.04),
                   blurRadius: 12,
                   offset: const Offset(0, 3),
-                  spreadRadius: 0,
                 ),
               ],
             ),

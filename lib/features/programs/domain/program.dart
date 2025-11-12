@@ -13,7 +13,7 @@ class ProgramDay {
     required this.dayNumber, 
     required this.title, 
     required this.description, 
-    this.drillId
+    this.drillId,
   });
 
   factory ProgramDay.fromJson(Map<String, dynamic> json) => _$ProgramDayFromJson(json);

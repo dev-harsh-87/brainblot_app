@@ -7,13 +7,13 @@ import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 import 'package:permission_handler/permission_handler.dart';
 
-import '../../../core/di/injection.dart';
-import '../../drills/domain/drill.dart';
-import '../../drills/data/firebase_drill_repository.dart';
-import '../../drills/ui/drill_runner_screen.dart';
-import '../domain/connection_session.dart';
-import '../services/professional_permission_manager.dart';
-import '../services/session_sync_service.dart';
+import 'package:spark_app/core/di/injection.dart';
+import 'package:spark_app/features/drills/domain/drill.dart';
+import 'package:spark_app/features/drills/data/firebase_drill_repository.dart';
+import 'package:spark_app/features/drills/ui/drill_runner_screen.dart';
+import 'package:spark_app/features/multiplayer/domain/connection_session.dart';
+import 'package:spark_app/features/multiplayer/services/professional_permission_manager.dart';
+import 'package:spark_app/features/multiplayer/services/session_sync_service.dart';
 
 /// Screen for hosting a multiplayer training session
 class HostSessionScreen extends StatefulWidget {
@@ -58,7 +58,7 @@ class _HostSessionScreenState extends State<HostSessionScreen>
     ).animate(CurvedAnimation(
       parent: _animationController,
       curve: Curves.easeInOut,
-    ));
+    ),);
 
     _initialize();
   }
@@ -521,7 +521,7 @@ class _HostSessionScreenState extends State<HostSessionScreen>
             )
           else
             DropdownButtonFormField<Drill>(
-              value: _selectedDrill,
+              initialValue: _selectedDrill,
               decoration: InputDecoration(
                 hintText: 'Choose a drill to start training',
                 border: OutlineInputBorder(
@@ -829,7 +829,6 @@ class _HostSessionScreenState extends State<HostSessionScreen>
                     ],
                   ),
                   backgroundColor: Colors.green,
-                  duration: const Duration(seconds: 4),
                 ),
               );
             }
@@ -1089,7 +1088,7 @@ class _HostSessionScreenState extends State<HostSessionScreen>
                   ),
                 ],
               ),
-            )),
+            ),),
         ],
       ),
     );
@@ -1159,7 +1158,7 @@ class _HostSessionScreenState extends State<HostSessionScreen>
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: colorScheme.surfaceVariant.withOpacity(0.3),
+        color: colorScheme.surfaceContainerHighest.withOpacity(0.3),
         borderRadius: BorderRadius.circular(16),
         border: Border.all(
           color: colorScheme.outline.withOpacity(0.1),
@@ -1344,7 +1343,7 @@ class _HostSessionScreenState extends State<HostSessionScreen>
     try {
       // Use the professional permission manager for all platforms
       final result = await ProfessionalPermissionManager.requestPermissions(
-        showRationale: true,
+        
       );
       
       debugPrint('🔐 HOST: Permission request result: $result');

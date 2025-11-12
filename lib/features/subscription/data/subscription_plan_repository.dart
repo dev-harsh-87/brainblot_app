@@ -100,7 +100,7 @@ class SubscriptionPlanRepository {
         .snapshots()
         .map((snapshot) => snapshot.docs
             .map((doc) => SubscriptionPlan.fromFirestore(doc))
-            .toList());
+            .toList(),);
   }
 
   /// Toggle plan active status (admin only)

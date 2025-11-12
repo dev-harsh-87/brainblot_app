@@ -43,8 +43,7 @@ class ProgramsBloc extends Bloc<ProgramsEvent, ProgramsState> {
       () async {
         emit(state.copyWith(
           status: ProgramsStatus.loading,
-          errorMessage: null,
-        ));
+        ),);
         
         // Cancel any existing subscriptions
         await _subPrograms?.cancel();
@@ -97,9 +96,8 @@ class ProgramsBloc extends Bloc<ProgramsEvent, ProgramsState> {
       emit(state.copyWith(
         status: ProgramsStatus.loaded,
         programs: List.unmodifiable(event.programs),
-        errorMessage: null,
         lastUpdated: DateTime.now(),
-      ));
+      ),);
     }
   }
 
@@ -110,9 +108,8 @@ class ProgramsBloc extends Bloc<ProgramsEvent, ProgramsState> {
       emit(state.copyWith(
         status: ProgramsStatus.loaded,
         active: event.active,
-        errorMessage: null,
         lastUpdated: DateTime.now(),
-      ));
+      ),);
     }
   }
   
@@ -121,8 +118,7 @@ class ProgramsBloc extends Bloc<ProgramsEvent, ProgramsState> {
       status: ProgramsStatus.error,
       errorMessage: event.error,
       isRefreshing: false,
-      programBeingModified: null,
-    ));
+    ),);
   }
 
   Future<void> _onActivate(ProgramsActivateRequested event, Emitter<ProgramsState> emit) async {
@@ -131,26 +127,23 @@ class ProgramsBloc extends Bloc<ProgramsEvent, ProgramsState> {
         emit(state.copyWith(
           status: ProgramsStatus.activating,
           programBeingModified: event.program,
-          errorMessage: null,
-        ));
+        ),);
         
         await _repo.setActive(ActiveProgram(
           programId: event.program.id, 
           currentDay: 1,
           startedAt: DateTime.now(),
-        ));
+        ),);
         
         emit(state.copyWith(
           status: ProgramsStatus.loaded,
-          programBeingModified: null,
           lastUpdated: DateTime.now(),
-        ));
+        ),);
       },
       emit,
       (error) => state.copyWith(
         status: ProgramsStatus.error,
         errorMessage: 'Failed to activate program: ${error.message}',
-        programBeingModified: null,
       ),
     );
   }
@@ -161,22 +154,19 @@ class ProgramsBloc extends Bloc<ProgramsEvent, ProgramsState> {
         emit(state.copyWith(
           status: ProgramsStatus.creating,
           programBeingModified: event.program,
-          errorMessage: null,
-        ));
+        ),);
         
         await _repo.createProgram(event.program);
         
         emit(state.copyWith(
           status: ProgramsStatus.loaded,
-          programBeingModified: null,
           lastUpdated: DateTime.now(),
-        ));
+        ),);
       },
       emit,
       (error) => state.copyWith(
         status: ProgramsStatus.error,
         errorMessage: 'Failed to create program: ${error.message}',
-        programBeingModified: null,
       ),
     );
   }
@@ -187,8 +177,7 @@ class ProgramsBloc extends Bloc<ProgramsEvent, ProgramsState> {
         emit(state.copyWith(
           status: ProgramsStatus.updating,
           programBeingModified: event.program,
-          errorMessage: null,
-        ));
+        ),);
         
         if (_repo is FirebaseProgramRepository) {
           await (_repo as FirebaseProgramRepository).updateProgram(event.program);
@@ -198,15 +187,13 @@ class ProgramsBloc extends Bloc<ProgramsEvent, ProgramsState> {
         
         emit(state.copyWith(
           status: ProgramsStatus.loaded,
-          programBeingModified: null,
           lastUpdated: DateTime.now(),
-        ));
+        ),);
       },
       emit,
       (error) => state.copyWith(
         status: ProgramsStatus.error,
         errorMessage: 'Failed to update program: ${error.message}',
-        programBeingModified: null,
       ),
     );
   }
@@ -216,8 +203,7 @@ class ProgramsBloc extends Bloc<ProgramsEvent, ProgramsState> {
       () async {
         emit(state.copyWith(
           status: ProgramsStatus.deleting,
-          errorMessage: null,
-        ));
+        ),);
         
         if (_repo is FirebaseProgramRepository) {
           await (_repo as FirebaseProgramRepository).deleteProgram(event.programId);
@@ -228,7 +214,7 @@ class ProgramsBloc extends Bloc<ProgramsEvent, ProgramsState> {
         emit(state.copyWith(
           status: ProgramsStatus.loaded,
           lastUpdated: DateTime.now(),
-        ));
+        ),);
       },
       emit,
       (error) => state.copyWith(
@@ -244,7 +230,7 @@ class ProgramsBloc extends Bloc<ProgramsEvent, ProgramsState> {
     emit(state.copyWith(
       status: ProgramsStatus.loaded,
       lastUpdated: DateTime.now(),
-    ));
+    ),);
   }
 
   Future<void> _onRefreshRequested(ProgramsRefreshRequested event, Emitter<ProgramsState> emit) async {
@@ -253,8 +239,7 @@ class ProgramsBloc extends Bloc<ProgramsEvent, ProgramsState> {
         emit(state.copyWith(
           status: ProgramsStatus.refreshing,
           isRefreshing: true,
-          errorMessage: null,
-        ));
+        ),);
         
         try {
           // Cancel existing subscriptions and restart them with retry mechanism
@@ -302,7 +287,7 @@ class ProgramsBloc extends Bloc<ProgramsEvent, ProgramsState> {
             } catch (e) {
               retryCount++;
               if (retryCount >= maxRetries) {
-                throw e; // Re-throw after max retries
+                rethrow; // Re-throw after max retries
               }
               // Wait before retry with exponential backoff
               await Future.delayed(Duration(milliseconds: 500 * retryCount));
@@ -313,12 +298,11 @@ class ProgramsBloc extends Bloc<ProgramsEvent, ProgramsState> {
             status: ProgramsStatus.loaded,
             isRefreshing: false,
             lastUpdated: DateTime.now(),
-          ));
+          ),);
           
           print('✅ Successfully refreshed programs');
         } catch (e) {
-      ;
-          throw e;
+          rethrow;
         }
       },
       emit,
@@ -334,7 +318,7 @@ class ProgramsBloc extends Bloc<ProgramsEvent, ProgramsState> {
     emit(state.copyWith(
       selectedCategory: event.category,
       lastUpdated: DateTime.now(),
-    ));
+    ),);
   }
 
   Future<void> _onRetryRequested(ProgramsRetryRequested event, Emitter<ProgramsState> emit) async {

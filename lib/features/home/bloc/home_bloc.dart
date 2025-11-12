@@ -5,9 +5,9 @@ import 'package:spark_app/features/drills/data/drill_repository.dart';
 import 'package:spark_app/features/drills/data/session_repository.dart';
 import 'package:spark_app/features/drills/domain/drill.dart';
 import 'package:spark_app/features/drills/domain/session_result.dart';
-import '../../../core/error/app_error.dart';
-import '../../../core/error/error_handler.dart';
-import '../../../core/bloc/bloc_utils.dart';
+import 'package:spark_app/core/error/app_error.dart';
+import 'package:spark_app/core/error/error_handler.dart';
+import 'package:spark_app/core/bloc/bloc_utils.dart';
 
 part 'home_event.dart';
 part 'home_state.dart';
@@ -33,8 +33,7 @@ class HomeBloc extends Bloc<HomeEvent, HomeState> {
       () async {
         emit(state.copyWith(
           status: HomeStatus.loading,
-          errorMessage: null,
-        ));
+        ),);
 
         // Get recommended drill: first from repository for now
         final all = await _drills.fetchAll();
@@ -50,9 +49,8 @@ class HomeBloc extends Bloc<HomeEvent, HomeState> {
         emit(state.copyWith(
           status: HomeStatus.loaded,
           recommended: recommended,
-          errorMessage: null,
           lastUpdated: DateTime.now(),
-        ));
+        ),);
       },
       emit,
       (error) => state.copyWith(
@@ -68,9 +66,8 @@ class HomeBloc extends Bloc<HomeEvent, HomeState> {
     latest.sort((a, b) => b.startedAt.compareTo(a.startedAt));
     emit(state.copyWith(
       recent: latest.take(5).toList(),
-      errorMessage: null,
       lastUpdated: DateTime.now(),
-    ));
+    ),);
   }
 
   Future<void> _onRefreshRequested(HomeRefreshRequested event, Emitter<HomeState> emit) async {
@@ -79,8 +76,7 @@ class HomeBloc extends Bloc<HomeEvent, HomeState> {
         emit(state.copyWith(
           status: HomeStatus.refreshing,
           isRefreshing: true,
-          errorMessage: null,
-        ));
+        ),);
 
         // Refresh recommended drill
         final all = await _drills.fetchAll();
@@ -97,9 +93,8 @@ class HomeBloc extends Bloc<HomeEvent, HomeState> {
           status: HomeStatus.loaded,
           recommended: recommended,
           isRefreshing: false,
-          errorMessage: null,
           lastUpdated: DateTime.now(),
-        ));
+        ),);
       },
       emit,
       (error) => state.copyWith(
@@ -120,7 +115,7 @@ class HomeBloc extends Bloc<HomeEvent, HomeState> {
       status: HomeStatus.error,
       errorMessage: event.error,
       isRefreshing: false,
-    ));
+    ),);
   }
 
   @override

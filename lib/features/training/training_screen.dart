@@ -80,7 +80,7 @@ class _TrainingScreenState extends State<TrainingScreen> {
                 Switch(
                   value: _highBrightness,
                   onChanged: _toggleBrightness,
-                )
+                ),
               ],
             ),
             const SizedBox(height: 12),

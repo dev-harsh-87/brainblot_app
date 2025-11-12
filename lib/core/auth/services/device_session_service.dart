@@ -326,7 +326,7 @@ class DeviceSessionService {
       return snapshot.docs.map((doc) => {
         'id': doc.id,
         ...doc.data(),
-      }).toList();
+      },).toList();
     } catch (e) {
       print('❌ Failed to get active sessions: $e');
       return [];

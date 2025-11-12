@@ -30,7 +30,7 @@ class _MultiplayerSelectionScreenState extends State<MultiplayerSelectionScreen>
     ).animate(CurvedAnimation(
       parent: _animationController,
       curve: Curves.easeInOut,
-    ));
+    ),);
 
     _slideAnimation = Tween<Offset>(
       begin: const Offset(0, 0.3),
@@ -38,7 +38,7 @@ class _MultiplayerSelectionScreenState extends State<MultiplayerSelectionScreen>
     ).animate(CurvedAnimation(
       parent: _animationController,
       curve: Curves.easeOutCubic,
-    ));
+    ),);
 
     _animationController.forward();
   }
@@ -332,7 +332,7 @@ class _MultiplayerSelectionScreenState extends State<MultiplayerSelectionScreen>
                   ),
                 ],
               ),
-            )),
+            ),),
           ],
         ),
       ),
@@ -348,7 +348,7 @@ class _MultiplayerSelectionScreenState extends State<MultiplayerSelectionScreen>
         Container(
           padding: const EdgeInsets.all(20),
           decoration: BoxDecoration(
-            color: colorScheme.surfaceVariant.withOpacity(0.3),
+            color: colorScheme.surfaceContainerHighest.withOpacity(0.3),
             borderRadius: BorderRadius.circular(16),
             border: Border.all(
               color: colorScheme.outline.withOpacity(0.1),

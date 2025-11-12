@@ -452,7 +452,7 @@ class _ProgramStatsScreenState extends State<ProgramStatsScreen> {
             ? const Icon(Icons.check_circle, color: Colors.green)
             : const Icon(Icons.lock, color: Colors.grey),
       ),
-    )).toList();
+    ),).toList();
   }
 
   String _getMotivationalMessage() {

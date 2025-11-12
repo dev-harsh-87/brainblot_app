@@ -449,14 +449,12 @@ class _SettingsScreenState extends State<SettingsScreen> with AutoRefreshMixin {
               borderRadius: BorderRadius.circular(20),
               border: Border.all(
                 color: colorScheme.outline.withOpacity(0.08),
-                width: 1,
               ),
               boxShadow: [
                 BoxShadow(
                   color: colorScheme.shadow.withOpacity(0.04),
                   blurRadius: 16,
                   offset: const Offset(0, 4),
-                  spreadRadius: 0,
                 ),
               ],
             ),
@@ -753,7 +751,7 @@ class _SettingsScreenState extends State<SettingsScreen> with AutoRefreshMixin {
     final sports = [
       'Soccer', 'Basketball', 'Tennis', 'Baseball', 'Football',
       'Hockey', 'Volleyball', 'Golf', 'Swimming', 'Track & Field',
-      'Boxing', 'Martial Arts', 'General Fitness', 'Other'
+      'Boxing', 'Martial Arts', 'General Fitness', 'Other',
     ];
 
     showDialog(
@@ -883,7 +881,7 @@ class _SettingsScreenState extends State<SettingsScreen> with AutoRefreshMixin {
       darkMode: darkMode,
       colorblindMode: colorblindMode,
       notifications: notifications,
-    ));
+    ),);
   }
 
   void _updateProfile({String? name, String? sport, String? goals}) {
@@ -891,7 +889,7 @@ class _SettingsScreenState extends State<SettingsScreen> with AutoRefreshMixin {
       name: name,
       sport: sport,
       goals: goals,
-    ));
+    ),);
   }
 
   void _openNotificationSettings() {
@@ -943,7 +941,6 @@ class _SettingsScreenState extends State<SettingsScreen> with AutoRefreshMixin {
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(
         content: Text('Privacy Policy: https://brainblot.com/privacy'),
-        duration: Duration(seconds: 4),
       ),
     );
   }
@@ -952,7 +949,6 @@ class _SettingsScreenState extends State<SettingsScreen> with AutoRefreshMixin {
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(
         content: Text('Help Center: https://brainblot.com/help'),
-        duration: Duration(seconds: 4),
       ),
     );
   }
@@ -961,7 +957,6 @@ class _SettingsScreenState extends State<SettingsScreen> with AutoRefreshMixin {
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(
         content: Text('Contact Support: support@brainblot.com'),
-        duration: Duration(seconds: 4),
       ),
     );
   }
@@ -979,7 +974,6 @@ class _SettingsScreenState extends State<SettingsScreen> with AutoRefreshMixin {
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(
         content: Text('Terms of Service: https://brainblot.com/terms'),
-        duration: Duration(seconds: 4),
       ),
     );
   }
@@ -996,12 +990,12 @@ class _SettingsScreenState extends State<SettingsScreen> with AutoRefreshMixin {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text("Logout"),
-        content: const Text("Are you sure you want to logout?"),
+        title: const Text('Logout'),
+        content: const Text('Are you sure you want to logout?'),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(),
-            child: const Text("Cancel"),
+            child: const Text('Cancel'),
           ),
           FilledButton(
             onPressed: () {
@@ -1009,12 +1003,12 @@ class _SettingsScreenState extends State<SettingsScreen> with AutoRefreshMixin {
               // Trigger logout via AuthBloc
               context.read<AuthBloc>().add(const AuthLogoutRequested());
               // Navigate to auth screen
-              context.go("/auth");
+              context.go('/auth');
             },
             style: FilledButton.styleFrom(
               backgroundColor: Colors.red,
             ),
-            child: const Text("Logout"),
+            child: const Text('Logout'),
           ),
         ],
       ),

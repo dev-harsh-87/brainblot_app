@@ -1,10 +1,10 @@
-import "package:flutter/material.dart";
-import "package:cloud_firestore/cloud_firestore.dart";
-import "package:spark_app/features/subscription/domain/subscription_plan.dart";
-import "package:spark_app/features/subscription/data/subscription_plan_repository.dart";
-import "package:spark_app/core/theme/app_theme.dart";
-import "package:spark_app/features/admin/ui/screens/plan_form_screen.dart";
-import "package:get_it/get_it.dart";
+import 'package:flutter/material.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:spark_app/features/subscription/domain/subscription_plan.dart';
+import 'package:spark_app/features/subscription/data/subscription_plan_repository.dart';
+import 'package:spark_app/core/theme/app_theme.dart';
+import 'package:spark_app/features/admin/ui/screens/plan_form_screen.dart';
+import 'package:get_it/get_it.dart';
 
 class SubscriptionManagementScreen extends StatefulWidget {
   const SubscriptionManagementScreen({super.key});
@@ -23,7 +23,7 @@ class _SubscriptionManagementScreenState
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text("Subscription Management"),
+        title: const Text('Subscription Management'),
         elevation: 0,
       ),
       body: SingleChildScrollView(
@@ -40,7 +40,7 @@ class _SubscriptionManagementScreenState
       floatingActionButton: FloatingActionButton.extended(
         onPressed: _showCreatePlanDialog,
         icon: const Icon(Icons.add),
-        label: const Text("Create Plan"),
+        label: const Text('Create Plan'),
         backgroundColor: AppTheme.primaryColor,
       ),
     );
@@ -48,7 +48,7 @@ class _SubscriptionManagementScreenState
 
   Widget _buildSubscriptionStats() {
     return StreamBuilder<QuerySnapshot>(
-      stream: _firestore.collection("users").snapshots(),
+      stream: _firestore.collection('users').snapshots(),
       builder: (context, snapshot) {
         if (!snapshot.hasData) {
           return const Center(child: CircularProgressIndicator());
@@ -57,20 +57,20 @@ class _SubscriptionManagementScreenState
         final users = snapshot.data!.docs;
         final freeUsers = users.where((doc) {
           final data = doc.data() as Map<String, dynamic>;
-          final sub = data["subscription"] as Map<String, dynamic>?;
-          return sub?["plan"] == "free";
+          final sub = data['subscription'] as Map<String, dynamic>?;
+          return sub?['plan'] == 'free';
         }).length;
 
         final playerUsers = users.where((doc) {
           final data = doc.data() as Map<String, dynamic>;
-          final sub = data["subscription"] as Map<String, dynamic>?;
-          return sub?["plan"] == "player";
+          final sub = data['subscription'] as Map<String, dynamic>?;
+          return sub?['plan'] == 'player';
         }).length;
 
         final instituteUsers = users.where((doc) {
           final data = doc.data() as Map<String, dynamic>;
-          final sub = data["subscription"] as Map<String, dynamic>?;
-          return sub?["plan"] == "institute";
+          final sub = data['subscription'] as Map<String, dynamic>?;
+          return sub?['plan'] == 'institute';
         }).length;
 
         return Card(
@@ -84,7 +84,7 @@ class _SubscriptionManagementScreenState
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  "Subscription Overview",
+                  'Subscription Overview',
                   style: Theme.of(context).textTheme.titleLarge?.copyWith(
                         fontWeight: FontWeight.bold,
                       ),
@@ -93,11 +93,11 @@ class _SubscriptionManagementScreenState
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceAround,
                   children: [
-                    _buildStatColumn("Free", freeUsers, AppTheme.freeColor),
+                    _buildStatColumn('Free', freeUsers, AppTheme.freeColor),
                     _buildStatColumn(
-                        "Player", playerUsers, AppTheme.playerColor),
+                        'Player', playerUsers, AppTheme.playerColor,),
                     _buildStatColumn(
-                        "Institute", instituteUsers, AppTheme.instituteColor),
+                        'Institute', instituteUsers, AppTheme.instituteColor,),
                   ],
                 ),
               ],
@@ -143,7 +143,7 @@ class _SubscriptionManagementScreenState
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          "Subscription Plans",
+          'Subscription Plans',
           style: Theme.of(context).textTheme.titleLarge?.copyWith(
                 fontWeight: FontWeight.bold,
               ),
@@ -157,7 +157,7 @@ class _SubscriptionManagementScreenState
             }
 
             if (snapshot.hasError) {
-              return Center(child: Text("Error: ${snapshot.error}"));
+              return Center(child: Text('Error: ${snapshot.error}'));
             }
 
             final plans = snapshot.data ?? [];
@@ -166,10 +166,10 @@ class _SubscriptionManagementScreenState
                 child: Column(
                   children: [
                     Icon(Icons.card_membership,
-                        size: 64, color: Colors.grey[400]),
+                        size: 64, color: Colors.grey[400],),
                     const SizedBox(height: 16),
                     Text(
-                      "No subscription plans found",
+                      'No subscription plans found',
                       style: TextStyle(fontSize: 18, color: Colors.grey[600]),
                     ),
                   ],
@@ -218,7 +218,7 @@ class _SubscriptionManagementScreenState
                       borderRadius: BorderRadius.circular(12),
                     ),
                     child: Icon(Icons.card_membership,
-                        color: planColor, size: 28),
+                        color: planColor, size: 28,),
                   ),
                   const SizedBox(width: 16),
                   Expanded(
@@ -237,7 +237,7 @@ class _SubscriptionManagementScreenState
                             const SizedBox(width: 8),
                             Container(
                               padding: const EdgeInsets.symmetric(
-                                  horizontal: 8, vertical: 4),
+                                  horizontal: 8, vertical: 4,),
                               decoration: BoxDecoration(
                                 color: plan.isActive
                                     ? Colors.green.withOpacity(0.1)
@@ -250,7 +250,7 @@ class _SubscriptionManagementScreenState
                                 ),
                               ),
                               child: Text(
-                                plan.isActive ? "Active" : "Inactive",
+                                plan.isActive ? 'Active' : 'Inactive',
                                 style: TextStyle(
                                   fontSize: 12,
                                   fontWeight: FontWeight.w600,
@@ -276,38 +276,38 @@ class _SubscriptionManagementScreenState
                     onSelected: (value) => _handlePlanAction(value, plan),
                     itemBuilder: (context) => [
                       const PopupMenuItem(
-                        value: "edit",
+                        value: 'edit',
                         child: Row(
                           children: [
                             Icon(Icons.edit, size: 20),
                             SizedBox(width: 8),
-                            Text("Edit"),
+                            Text('Edit'),
                           ],
                         ),
                       ),
                       PopupMenuItem(
-                        value: "toggle",
+                        value: 'toggle',
                         child: Row(
                           children: [
                             Icon(
                                 plan.isActive
                                     ? Icons.visibility_off
                                     : Icons.visibility,
-                                size: 20),
+                                size: 20,),
                             const SizedBox(width: 8),
-                            Text(plan.isActive ? "Deactivate" : "Activate"),
+                            Text(plan.isActive ? 'Deactivate' : 'Activate'),
                           ],
                         ),
                       ),
                       const PopupMenuDivider(),
                       const PopupMenuItem(
-                        value: "delete",
+                        value: 'delete',
                         child: Row(
                           children: [
                             Icon(Icons.delete, size: 20, color: Colors.red),
                             SizedBox(width: 8),
-                            Text("Delete",
-                                style: TextStyle(color: Colors.red)),
+                            Text('Delete',
+                                style: TextStyle(color: Colors.red),),
                           ],
                         ),
                       ),
@@ -320,8 +320,8 @@ class _SubscriptionManagementScreenState
                 children: [
                   Expanded(
                     child: _buildInfoChip(
-                      "Price",
-                      "\$${plan.price.toStringAsFixed(2)}/month",
+                      'Price',
+                      '\$${plan.price.toStringAsFixed(2)}/month',
                       Icons.attach_money,
                       planColor,
                     ),
@@ -329,8 +329,8 @@ class _SubscriptionManagementScreenState
                   const SizedBox(width: 12),
                   Expanded(
                     child: _buildInfoChip(
-                      "Features",
-                      "${plan.features.length} items",
+                      'Features',
+                      '${plan.features.length} items',
                       Icons.list,
                       planColor,
                     ),
@@ -338,8 +338,8 @@ class _SubscriptionManagementScreenState
                   const SizedBox(width: 12),
                   Expanded(
                     child: _buildInfoChip(
-                      "Modules",
-                      "${plan.moduleAccess.length} modules",
+                      'Modules',
+                      '${plan.moduleAccess.length} modules',
                       Icons.apps,
                       planColor,
                     ),
@@ -354,7 +354,7 @@ class _SubscriptionManagementScreenState
   }
 
   Widget _buildInfoChip(
-      String label, String value, IconData icon, Color color) {
+      String label, String value, IconData icon, Color color,) {
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
@@ -391,13 +391,13 @@ class _SubscriptionManagementScreenState
 
   void _handlePlanAction(String action, SubscriptionPlan plan) {
     switch (action) {
-      case "edit":
+      case 'edit':
         _showEditPlanDialog(plan);
         break;
-      case "toggle":
+      case 'toggle':
         _togglePlanStatus(plan);
         break;
-      case "delete":
+      case 'delete':
         _showDeleteConfirmation(plan);
         break;
     }
@@ -413,15 +413,15 @@ class _SubscriptionManagementScreenState
             crossAxisAlignment: CrossAxisAlignment.start,
             mainAxisSize: MainAxisSize.min,
             children: [
-              _buildDetailRow("Description", plan.description),
+              _buildDetailRow('Description', plan.description),
               _buildDetailRow(
-                  "Price", "\$${plan.price.toStringAsFixed(2)}"),
-              _buildDetailRow("Billing Cycle", "month"),
+                  'Price', '\$${plan.price.toStringAsFixed(2)}',),
+              _buildDetailRow('Billing Cycle', 'month'),
               _buildDetailRow(
-                  "Status", plan.isActive ? "Active" : "Inactive"),
+                  'Status', plan.isActive ? 'Active' : 'Inactive',),
               const SizedBox(height: 16),
               const Text(
-                "Features:",
+                'Features:',
                 style: TextStyle(fontWeight: FontWeight.bold),
               ),
               ...plan.features.map((f) => Padding(
@@ -433,10 +433,10 @@ class _SubscriptionManagementScreenState
                         Expanded(child: Text(f)),
                       ],
                     ),
-                  )),
+                  ),),
               const SizedBox(height: 16),
               const Text(
-                "Module Access:",
+                'Module Access:',
                 style: TextStyle(fontWeight: FontWeight.bold),
               ),
               Wrap(
@@ -448,7 +448,7 @@ class _SubscriptionManagementScreenState
                           backgroundColor:
                               AppTheme.getSubscriptionColor(plan.id)
                                   .withOpacity(0.1),
-                        ))
+                        ),)
                     .toList(),
               ),
             ],
@@ -457,7 +457,7 @@ class _SubscriptionManagementScreenState
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: const Text("Close"),
+            child: const Text('Close'),
           ),
         ],
       ),
@@ -521,7 +521,7 @@ class _SubscriptionManagementScreenState
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(
-                "Plan ${plan.isActive ? "deactivated" : "activated"} successfully"),
+                "Plan ${plan.isActive ? "deactivated" : "activated"} successfully",),
             backgroundColor: Colors.green,
           ),
         );
@@ -530,7 +530,7 @@ class _SubscriptionManagementScreenState
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text("Failed to toggle plan: ${e.toString()}"),
+            content: Text('Failed to toggle plan: ${e.toString()}'),
             backgroundColor: Colors.red,
           ),
         );
@@ -542,12 +542,12 @@ class _SubscriptionManagementScreenState
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text("Delete Plan"),
+        title: const Text('Delete Plan'),
         content: Text('Are you sure you want to delete "${plan.name}"?'),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: const Text("Cancel"),
+            child: const Text('Cancel'),
           ),
           ElevatedButton(
             onPressed: () async {
@@ -555,7 +555,7 @@ class _SubscriptionManagementScreenState
               await _deletePlan(plan.id);
             },
             style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
-            child: const Text("Delete"),
+            child: const Text('Delete'),
           ),
         ],
       ),
@@ -569,7 +569,7 @@ class _SubscriptionManagementScreenState
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text("Plan deleted successfully"),
+            content: Text('Plan deleted successfully'),
             backgroundColor: Colors.green,
           ),
         );
@@ -578,7 +578,7 @@ class _SubscriptionManagementScreenState
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text("Failed to delete plan: ${e.toString()}"),
+            content: Text('Failed to delete plan: ${e.toString()}'),
             backgroundColor: Colors.red,
           ),
         );

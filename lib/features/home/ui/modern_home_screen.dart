@@ -11,8 +11,8 @@ import 'package:spark_app/features/subscription/domain/subscription_plan.dart';
 import 'package:spark_app/features/subscription/domain/subscription_request.dart';
 import 'package:spark_app/features/subscription/services/subscription_request_service.dart';
 import 'package:spark_app/features/auth/bloc/auth_bloc.dart';
-import "package:cloud_firestore/cloud_firestore.dart";
-import "package:spark_app/features/subscription/data/subscription_plan_repository.dart";
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:spark_app/features/subscription/data/subscription_plan_repository.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
 /// Modern home screen with professional UI design
@@ -53,7 +53,7 @@ class _ModernHomeScreenState extends State<ModernHomeScreen>
     ).animate(CurvedAnimation(
       parent: _slideController,
       curve: Curves.easeOutCubic,
-    ));
+    ),);
 
     // Start animations
     _fadeController.forward();
@@ -74,7 +74,7 @@ class _ModernHomeScreenState extends State<ModernHomeScreen>
         if (state.status == AuthStatus.authenticated && state.user != null) {
           return StreamBuilder<DocumentSnapshot>(
             stream: FirebaseFirestore.instance
-                .collection("users")
+                .collection('users')
                 .doc(state.user!.uid)
                 .snapshots(),
             builder: (context, snapshot) {
@@ -124,7 +124,7 @@ class _ModernHomeScreenState extends State<ModernHomeScreen>
           Padding(
             padding: const EdgeInsets.only(right: 16),
             child: GestureDetector(
-              onTap: () => context.push("/profile"),
+              onTap: () => context.push('/profile'),
               child: Container(
                 width: 40,
                 height: 40,
@@ -318,7 +318,7 @@ class _ModernHomeScreenState extends State<ModernHomeScreen>
           }
 
           final requests = snapshot.data ?? [];
-          print("📋 Displaying ${requests.length} requests");
+          print('📋 Displaying ${requests.length} requests');
 
           return Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -361,9 +361,9 @@ class _ModernHomeScreenState extends State<ModernHomeScreen>
                   ),
                   const Spacer(),
                   TextButton(
-                    onPressed: () => context.push("/user-requests"),
+                    onPressed: () => context.push('/user-requests'),
                     child: const Text('View All', style: TextStyle(
-                      fontSize: 13
+                      fontSize: 13,
                     ),),
                   ),
                 ],
@@ -416,7 +416,7 @@ class _ModernHomeScreenState extends State<ModernHomeScreen>
   }
 
   Widget _buildUserRequestCard(
-      BuildContext context, SubscriptionRequest request) {
+      BuildContext context, SubscriptionRequest request,) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
 
@@ -446,7 +446,6 @@ class _ModernHomeScreenState extends State<ModernHomeScreen>
         borderRadius: BorderRadius.circular(12),
         border: Border.all(
           color: statusColor.withOpacity(0.3),
-          width: 1,
         ),
       ),
       child: Row(
@@ -543,8 +542,8 @@ class _ModernHomeScreenState extends State<ModernHomeScreen>
         name: 'Drills',
         description: 'Practice exercises',
         icon: Icons.fitness_center,
-        hasAccess: isAdmin || userSubscription.moduleAccess.contains("drills"),
-        route: "/drills",
+        hasAccess: isAdmin || userSubscription.moduleAccess.contains('drills'),
+        route: '/drills',
         color: colorScheme.primary,
       ),
       _FeatureItem(
@@ -552,8 +551,8 @@ class _ModernHomeScreenState extends State<ModernHomeScreen>
         description: 'Training plans',
         icon: Icons.schedule,
         hasAccess:
-            isAdmin || userSubscription.moduleAccess.contains("programs"),
-        route: "/programs",
+            isAdmin || userSubscription.moduleAccess.contains('programs'),
+        route: '/programs',
         color: Colors.purple,
       ),
       _FeatureItem(
@@ -561,8 +560,8 @@ class _ModernHomeScreenState extends State<ModernHomeScreen>
         description: 'Train together',
         icon: Icons.group,
         hasAccess:
-            isAdmin || userSubscription.moduleAccess.contains("multiplayer"),
-        route: "/multiplayer",
+            isAdmin || userSubscription.moduleAccess.contains('multiplayer'),
+        route: '/multiplayer',
         color: Colors.blue,
       ),
       _FeatureItem(
@@ -570,8 +569,8 @@ class _ModernHomeScreenState extends State<ModernHomeScreen>
         description: 'Track progress',
         icon: Icons.analytics,
         hasAccess:
-            isAdmin || userSubscription.moduleAccess.contains("analysis"),
-        route: "/stats",
+            isAdmin || userSubscription.moduleAccess.contains('analysis'),
+        route: '/stats',
         color: Colors.green,
       ),
     ];
@@ -596,7 +595,6 @@ class _ModernHomeScreenState extends State<ModernHomeScreen>
               crossAxisCount: 2,
               crossAxisSpacing: 16,
               mainAxisSpacing: 16,
-              childAspectRatio: 1.0,
             ),
             itemCount: features.length,
             itemBuilder: (context, index) {
@@ -626,7 +624,7 @@ class _ModernHomeScreenState extends State<ModernHomeScreen>
     return InkWell(
       onTap: feature.hasAccess
           ? () => context.push(feature.route)
-          : () => context.push("/subscription"),
+          : () => context.push('/subscription'),
       borderRadius: BorderRadius.circular(20),
       child: Container(
         padding: const EdgeInsets.all(20),
@@ -741,7 +739,7 @@ class _ModernHomeScreenState extends State<ModernHomeScreen>
     return Container(
             margin: const EdgeInsets.all(24),
       child: InkWell(
-        onTap: () => context.push("/admin"),
+        onTap: () => context.push('/admin'),
         borderRadius: BorderRadius.circular(20),
         child: Container(
           padding: const EdgeInsets.all(24),
@@ -856,7 +854,7 @@ class _ModernHomeScreenState extends State<ModernHomeScreen>
           final isFreePlan = planId.toLowerCase() == 'free';
 
           return InkWell(
-            onTap: () => context.push("/subscription"),
+            onTap: () => context.push('/subscription'),
             borderRadius: BorderRadius.circular(20),
             child: Container(
               padding: const EdgeInsets.all(24),
@@ -938,7 +936,7 @@ class _ModernHomeScreenState extends State<ModernHomeScreen>
                           ),
                           const SizedBox(width: 4),
                           const Icon(Icons.arrow_forward,
-                              color: Colors.white, size: 16),
+                              color: Colors.white, size: 16,),
                         ],
                       ),
                     )

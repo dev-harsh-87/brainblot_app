@@ -5,12 +5,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 
-import '../../../core/di/injection.dart';
-import '../../drills/domain/drill.dart';
-import '../../drills/ui/drill_runner_screen.dart';
-import '../domain/connection_session.dart';
-import '../services/session_sync_service.dart';
-import '../services/professional_permission_manager.dart';
+import 'package:spark_app/core/di/injection.dart';
+import 'package:spark_app/features/drills/domain/drill.dart';
+import 'package:spark_app/features/drills/ui/drill_runner_screen.dart';
+import 'package:spark_app/features/multiplayer/domain/connection_session.dart';
+import 'package:spark_app/features/multiplayer/services/session_sync_service.dart';
+import 'package:spark_app/features/multiplayer/services/professional_permission_manager.dart';
 
 /// Screen for joining a multiplayer training session
 class JoinSessionScreen extends StatefulWidget {
@@ -55,7 +55,7 @@ class _JoinSessionScreenState extends State<JoinSessionScreen>
     ).animate(CurvedAnimation(
       parent: _animationController,
       curve: Curves.easeInOut,
-    ));
+    ),);
 
     _slideAnimation = Tween<Offset>(
       begin: const Offset(0, 0.3),
@@ -63,7 +63,7 @@ class _JoinSessionScreenState extends State<JoinSessionScreen>
     ).animate(CurvedAnimation(
       parent: _animationController,
       curve: Curves.easeOutCubic,
-    ));
+    ),);
 
     _initialize();
   }
@@ -237,7 +237,6 @@ class _JoinSessionScreenState extends State<JoinSessionScreen>
                     ],
                   ),
                   backgroundColor: Colors.green,
-                  duration: const Duration(seconds: 4),
                 ),
               );
             }
@@ -600,7 +599,7 @@ class _JoinSessionScreenState extends State<JoinSessionScreen>
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: colorScheme.surfaceVariant.withOpacity(0.3),
+        color: colorScheme.surfaceContainerHighest.withOpacity(0.3),
         borderRadius: BorderRadius.circular(16),
         border: Border.all(
           color: colorScheme.outline.withOpacity(0.1),
@@ -653,7 +652,7 @@ class _JoinSessionScreenState extends State<JoinSessionScreen>
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: colorScheme.surfaceVariant.withOpacity(0.3),
+        color: colorScheme.surfaceContainerHighest.withOpacity(0.3),
         borderRadius: BorderRadius.circular(16),
         border: Border.all(
           color: colorScheme.outline.withOpacity(0.1),
@@ -1219,7 +1218,6 @@ class _JoinSessionScreenState extends State<JoinSessionScreen>
           SnackBar(
             content: Text(errorMessage),
             backgroundColor: Colors.red,
-            duration: const Duration(seconds: 4),
             action: SnackBarAction(
               label: 'Retry',
               textColor: Colors.white,
@@ -1237,7 +1235,7 @@ class _JoinSessionScreenState extends State<JoinSessionScreen>
     try {
       // Use the professional permission manager for all platforms
       final result = await ProfessionalPermissionManager.requestPermissions(
-        showRationale: true,
+        
       );
       
       debugPrint('🔐 JOIN: Permission request result: $result');

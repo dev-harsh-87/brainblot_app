@@ -2,9 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:get_it/get_it.dart';
 import 'package:spark_app/core/ui/edge_to_edge.dart';
 import 'package:spark_app/features/programs/services/drill_assignment_service.dart';
-import '../../../core/di/injection.dart';
+import 'package:spark_app/core/di/injection.dart';
 
-import '../domain/program.dart';
+import 'package:spark_app/features/programs/domain/program.dart';
 
 class ProgramDetailsScreen extends StatefulWidget {
   final Program program;
@@ -190,7 +190,7 @@ class _ProgramDetailsScreenState extends State<ProgramDetailsScreen> {
   }
 
   Widget _buildEnhancedFormatDaysList(
-      ThemeData theme, ColorScheme colorScheme) {
+      ThemeData theme, ColorScheme colorScheme,) {
     // Build list from dayWiseDrillIds
     final sortedDays = widget.program.dayWiseDrillIds.keys.toList()..sort();
 
@@ -294,7 +294,7 @@ class _ProgramDetailsScreenState extends State<ProgramDetailsScreen> {
                     padding: const EdgeInsets.only(left: 4),
                     child: Container(
                       padding: const EdgeInsets.symmetric(
-                          horizontal: 6, vertical: 2),
+                          horizontal: 6, vertical: 2,),
                       decoration: BoxDecoration(
                         color: colorScheme.primary,
                         borderRadius: BorderRadius.circular(10),

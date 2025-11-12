@@ -1,7 +1,7 @@
-import "package:flutter/material.dart";
-import "package:intl/intl.dart";
-import "package:spark_app/features/subscription/domain/subscription_request.dart";
-import "package:spark_app/features/subscription/services/subscription_request_service.dart";
+import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
+import 'package:spark_app/features/subscription/domain/subscription_request.dart';
+import 'package:spark_app/features/subscription/services/subscription_request_service.dart';
 
 class PlanRequestsScreen extends StatefulWidget {
   const PlanRequestsScreen({super.key});
@@ -14,7 +14,7 @@ class _PlanRequestsScreenState extends State<PlanRequestsScreen>
     with SingleTickerProviderStateMixin {
   final SubscriptionRequestService _service = SubscriptionRequestService();
   late TabController _tabController;
-  String _selectedFilter = "all";
+  final String _selectedFilter = 'all';
 
   @override
   void initState() {
@@ -36,7 +36,7 @@ class _PlanRequestsScreenState extends State<PlanRequestsScreen>
     return Scaffold(
       backgroundColor: colorScheme.surface,
       appBar: AppBar(
-        title: const Text("Subscription Requests"),
+        title: const Text('Subscription Requests'),
         backgroundColor: colorScheme.primary,
         foregroundColor: colorScheme.onPrimary,
         elevation: 0,
@@ -46,20 +46,20 @@ class _PlanRequestsScreenState extends State<PlanRequestsScreen>
           labelColor: colorScheme.onPrimary,
           unselectedLabelColor: colorScheme.onPrimary.withOpacity(0.7),
           tabs: const [
-            Tab(text: "All"),
-            Tab(text: "Pending"),
-            Tab(text: "Approved"),
-            Tab(text: "Rejected"),
+            Tab(text: 'All'),
+            Tab(text: 'Pending'),
+            Tab(text: 'Approved'),
+            Tab(text: 'Rejected'),
           ],
         ),
       ),
       body: TabBarView(
         controller: _tabController,
         children: [
-          _buildRequestsList("all"),
-          _buildRequestsList("pending"),
-          _buildRequestsList("approved"),
-          _buildRequestsList("rejected"),
+          _buildRequestsList('all'),
+          _buildRequestsList('pending'),
+          _buildRequestsList('approved'),
+          _buildRequestsList('rejected'),
         ],
       ),
     );
@@ -83,7 +83,7 @@ class _PlanRequestsScreenState extends State<PlanRequestsScreen>
 
         // Filter requests based on selected tab
         List<SubscriptionRequest> requests = snapshot.data!;
-        if (filter != "all") {
+        if (filter != 'all') {
           requests = requests.where((r) => r.status == filter).toList();
         }
 
@@ -205,13 +205,13 @@ class _PlanRequestsScreenState extends State<PlanRequestsScreen>
               child: Row(
                 children: [
                   _buildPlanBadge(
-                      request.currentPlan.toUpperCase(), Colors.grey, theme),
+                      request.currentPlan.toUpperCase(), Colors.grey, theme,),
                   const SizedBox(width: 8),
                   Icon(Icons.arrow_forward,
-                      size: 20, color: colorScheme.primary),
+                      size: 20, color: colorScheme.primary,),
                   const SizedBox(width: 8),
                   _buildPlanBadge(request.requestedPlan.toUpperCase(),
-                      colorScheme.primary, theme),
+                      colorScheme.primary, theme,),
                 ],
               ),
             ),
@@ -220,7 +220,7 @@ class _PlanRequestsScreenState extends State<PlanRequestsScreen>
 
             // Reason
             Text(
-              "Reason:",
+              'Reason:',
               style: theme.textTheme.labelMedium?.copyWith(
                 fontWeight: FontWeight.bold,
                 color: colorScheme.onSurface.withOpacity(0.7),
@@ -238,10 +238,10 @@ class _PlanRequestsScreenState extends State<PlanRequestsScreen>
             Row(
               children: [
                 Icon(Icons.access_time,
-                    size: 16, color: colorScheme.onSurface.withOpacity(0.5)),
+                    size: 16, color: colorScheme.onSurface.withOpacity(0.5),),
                 const SizedBox(width: 4),
                 Text(
-                  "Requested: ${_formatDate(request.createdAt)}",
+                  'Requested: ${_formatDate(request.createdAt)}',
                   style: theme.textTheme.bodySmall?.copyWith(
                     color: colorScheme.onSurface.withOpacity(0.6),
                   ),
@@ -255,7 +255,7 @@ class _PlanRequestsScreenState extends State<PlanRequestsScreen>
               Row(
                 children: [
                   Icon(Icons.person,
-                      size: 16, color: colorScheme.onSurface.withOpacity(0.5)),
+                      size: 16, color: colorScheme.onSurface.withOpacity(0.5),),
                   const SizedBox(width: 4),
                   Text(
                     "By ${request.adminName ?? 'Unknown'} - ${_formatDate(request.processedAt!)}",
@@ -287,7 +287,7 @@ class _PlanRequestsScreenState extends State<PlanRequestsScreen>
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            "Rejection Reason:",
+                            'Rejection Reason:',
                             style: theme.textTheme.labelSmall?.copyWith(
                               color: Colors.red[700],
                               fontWeight: FontWeight.bold,
@@ -324,7 +324,7 @@ class _PlanRequestsScreenState extends State<PlanRequestsScreen>
                         ),
                       ),
                       icon: const Icon(Icons.close, size: 20),
-                      label: const Text("Reject"),
+                      label: const Text('Reject'),
                     ),
                   ),
                   const SizedBox(width: 12),
@@ -339,7 +339,7 @@ class _PlanRequestsScreenState extends State<PlanRequestsScreen>
                         ),
                       ),
                       icon: const Icon(Icons.check, size: 20),
-                      label: const Text("Approve"),
+                      label: const Text('Approve'),
                     ),
                   ),
                 ],
@@ -375,20 +375,20 @@ class _PlanRequestsScreenState extends State<PlanRequestsScreen>
     IconData icon;
 
     switch (filter) {
-      case "pending":
-        message = "No pending requests";
+      case 'pending':
+        message = 'No pending requests';
         icon = Icons.inbox_outlined;
         break;
-      case "approved":
-        message = "No approved requests";
+      case 'approved':
+        message = 'No approved requests';
         icon = Icons.check_circle_outline;
         break;
-      case "rejected":
-        message = "No rejected requests";
+      case 'rejected':
+        message = 'No rejected requests';
         icon = Icons.cancel_outlined;
         break;
       default:
-        message = "No subscription requests yet";
+        message = 'No subscription requests yet';
         icon = Icons.inbox_outlined;
     }
 
@@ -418,10 +418,10 @@ class _PlanRequestsScreenState extends State<PlanRequestsScreen>
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Icon(Icons.error_outline,
-                size: 64, color: theme.colorScheme.error),
+                size: 64, color: theme.colorScheme.error,),
             const SizedBox(height: 16),
             Text(
-              "Failed to Load Requests",
+              'Failed to Load Requests',
               style: theme.textTheme.titleLarge?.copyWith(
                 fontWeight: FontWeight.bold,
               ),
@@ -449,19 +449,19 @@ class _PlanRequestsScreenState extends State<PlanRequestsScreen>
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text("Approve Request"),
+        title: const Text('Approve Request'),
         content: Text(
           "Are you sure you want to approve ${request.userName}'s request to upgrade to ${request.requestedPlan.toUpperCase()}?",
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
-            child: const Text("Cancel"),
+            child: const Text('Cancel'),
           ),
           FilledButton(
             onPressed: () => Navigator.pop(context, true),
             style: FilledButton.styleFrom(backgroundColor: Colors.green),
-            child: const Text("Approve"),
+            child: const Text('Approve'),
           ),
         ],
       ),
@@ -491,7 +491,7 @@ class _PlanRequestsScreenState extends State<PlanRequestsScreen>
               const Icon(Icons.check_circle, color: Colors.white),
               const SizedBox(width: 12),
               Expanded(
-                child: Text("Request approved! User upgraded to ${request.requestedPlan}"),
+                child: Text('Request approved! User upgraded to ${request.requestedPlan}'),
               ),
             ],
           ),
@@ -505,7 +505,7 @@ class _PlanRequestsScreenState extends State<PlanRequestsScreen>
 
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text("Failed to approve request: $e"),
+          content: Text('Failed to approve request: $e'),
           backgroundColor: Colors.red,
           behavior: SnackBarBehavior.floating,
         ),
@@ -520,7 +520,7 @@ class _PlanRequestsScreenState extends State<PlanRequestsScreen>
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text("Reject Request"),
+        title: const Text('Reject Request'),
         content: Form(
           key: formKey,
           child: Column(
@@ -534,14 +534,14 @@ class _PlanRequestsScreenState extends State<PlanRequestsScreen>
               TextFormField(
                 controller: reasonController,
                 decoration: const InputDecoration(
-                  labelText: "Rejection Reason",
-                  hintText: "Please provide a reason for rejection",
+                  labelText: 'Rejection Reason',
+                  hintText: 'Please provide a reason for rejection',
                   border: OutlineInputBorder(),
                 ),
                 maxLines: 3,
                 validator: (value) {
                   if (value == null || value.trim().isEmpty) {
-                    return "Please provide a reason";
+                    return 'Please provide a reason';
                   }
                   return null;
                 },
@@ -552,7 +552,7 @@ class _PlanRequestsScreenState extends State<PlanRequestsScreen>
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
-            child: const Text("Cancel"),
+            child: const Text('Cancel'),
           ),
           FilledButton(
             onPressed: () {
@@ -561,7 +561,7 @@ class _PlanRequestsScreenState extends State<PlanRequestsScreen>
               }
             },
             style: FilledButton.styleFrom(backgroundColor: Colors.red),
-            child: const Text("Reject"),
+            child: const Text('Reject'),
           ),
         ],
       ),
@@ -596,7 +596,7 @@ class _PlanRequestsScreenState extends State<PlanRequestsScreen>
             children: [
               Icon(Icons.check_circle, color: Colors.white),
               SizedBox(width: 12),
-              Expanded(child: Text("Request rejected")),
+              Expanded(child: Text('Request rejected')),
             ],
           ),
           backgroundColor: Colors.orange,
@@ -609,7 +609,7 @@ class _PlanRequestsScreenState extends State<PlanRequestsScreen>
 
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text("Failed to reject request: $e"),
+          content: Text('Failed to reject request: $e'),
           backgroundColor: Colors.red,
           behavior: SnackBarBehavior.floating,
         ),

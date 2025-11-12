@@ -17,7 +17,7 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
   bool _isLoading = true;
   AppUser? _currentUser;
   List<SubscriptionPlan> _plans = [];
-  List<SubscriptionRequest> _userRequests = [];
+  final List<SubscriptionRequest> _userRequests = [];
   String? _error;
 
   @override
@@ -181,7 +181,7 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
                 ..._plans.map((plan) => Padding(
                   padding: const EdgeInsets.only(bottom: 16),
                   child: _buildPlanCard(plan, isSmallScreen),
-                )),
+                ),),
                 
                 const SizedBox(height: 32),
               ],
@@ -546,7 +546,7 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
                 ),
               ],
             ),
-          )),
+          ),),
           
           const SizedBox(height: 20),
           
@@ -581,7 +581,7 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
                     ),
                     icon: const Icon(Icons.send, size: 20),
                     label: Text(
-                      "Request ${plan.name}",
+                      'Request ${plan.name}',
                       style: const TextStyle(
                         fontSize: 15,
                         fontWeight: FontWeight.bold,
@@ -622,7 +622,7 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: Text("Request ${plan.name} Plan"),
+        title: Text('Request ${plan.name} Plan'),
         content: Form(
           key: formKey,
           child: Column(
@@ -637,17 +637,17 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
               TextFormField(
                 controller: reasonController,
                 decoration: const InputDecoration(
-                  labelText: "Reason for upgrade",
-                  hintText: "Why do you need this plan?",
+                  labelText: 'Reason for upgrade',
+                  hintText: 'Why do you need this plan?',
                   border: OutlineInputBorder(),
                 ),
                 maxLines: 3,
                 validator: (value) {
                   if (value == null || value.trim().isEmpty) {
-                    return "Please provide a reason";
+                    return 'Please provide a reason';
                   }
                   if (value.trim().length < 10) {
-                    return "Please provide more details (at least 10 characters)";
+                    return 'Please provide more details (at least 10 characters)';
                   }
                   return null;
                 },
@@ -685,7 +685,7 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
               Navigator.pop(context);
               reasonController.dispose();
             },
-            child: const Text("Cancel"),
+            child: const Text('Cancel'),
           ),
           FilledButton(
             onPressed: () async {
@@ -696,7 +696,7 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
                 await _submitUpgradeRequest(plan, reason);
               }
             },
-            child: const Text("Submit Request"),
+            child: const Text('Submit Request'),
           ),
         ],
       ),
@@ -729,7 +729,7 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
               const Icon(Icons.check_circle, color: Colors.white),
               const SizedBox(width: 12),
               Expanded(
-                child: Text("Upgrade request submitted for ${plan.name} plan!"),
+                child: Text('Upgrade request submitted for ${plan.name} plan!'),
               ),
             ],
           ),
@@ -740,7 +740,6 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
             textColor: Colors.white,
             onPressed: () {},
           ),
-          duration: const Duration(seconds: 4),
         ),
       );
     } catch (e) {
@@ -749,7 +748,7 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
 
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text("Failed to submit request: $e"),
+          content: Text('Failed to submit request: $e'),
           backgroundColor: Colors.red,
           behavior: SnackBarBehavior.floating,
         ),

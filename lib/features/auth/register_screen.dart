@@ -60,7 +60,7 @@ class _RegisterScreenState extends State<RegisterScreen> with TickerProviderStat
       context.read<AuthBloc>().add(AuthRegisterSubmitted(
             email: _emailCtrl.text.trim(),
             password: _passwordCtrl.text,
-          ));
+          ),);
     }
   }
 

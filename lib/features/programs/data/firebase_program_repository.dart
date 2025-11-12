@@ -41,7 +41,7 @@ class FirebaseProgramRepository implements ProgramRepository {
       // Filter out system-created programs
       return programs.where((program) => 
         program.createdBy != null && 
-        program.createdBy != 'system'
+        program.createdBy != 'system',
       ).toList();
     } catch (e) {
       print('Error fetching shared programs: $e');
@@ -144,7 +144,7 @@ class FirebaseProgramRepository implements ProgramRepository {
             final programs = _mapSnapshotToPrograms(snapshot);
             // Filter to only show programs user can see (their own or public ones)
             final filtered = programs.where((program) =>
-                program.createdBy == userId).toList();
+                program.createdBy == userId,).toList();
             // Sort by createdAt in memory
             filtered.sort((a, b) => b.createdAt.compareTo(a.createdAt));
             return filtered;
@@ -204,6 +204,7 @@ class FirebaseProgramRepository implements ProgramRepository {
         .set(activeWithUser.toJson());
   }
 
+  @override
   Future<void> createProgram(Program program) async {
     final userId = _currentUserId;
     
@@ -223,7 +224,6 @@ class FirebaseProgramRepository implements ProgramRepository {
         level: program.level,
         createdAt: DateTime.now(),
         createdBy: userId, // Can be null for anonymous users
-        favorite: false, // Default to not favorite
         dayWiseDrillIds: program.dayWiseDrillIds.map(
           (key, value) => MapEntry(key, List<String>.from(value)),
         ),
@@ -273,6 +273,7 @@ class FirebaseProgramRepository implements ProgramRepository {
     }
   }
 
+  @override
   Future<void> updateProgram(Program program) async {
     final userId = _currentUserId;
     if (userId == null) throw Exception('User not authenticated');
@@ -302,6 +303,7 @@ class FirebaseProgramRepository implements ProgramRepository {
         .update(program.toJson());
   }
 
+  @override
   Future<void> deleteProgram(String programId) async {
     final userId = _currentUserId;
     if (userId == null) throw Exception('User not authenticated');
@@ -452,7 +454,7 @@ class FirebaseProgramRepository implements ProgramRepository {
         .snapshots()
         .map((snapshot) => snapshot.docs
             .map((doc) => doc.data()['programId'] as String)
-            .toList());
+            .toList(),);
   }
 
   Future<void> seedDefaultPrograms() async {
@@ -495,7 +497,6 @@ class FirebaseProgramRepository implements ProgramRepository {
             level: program.level,
             createdAt: program.createdAt,
             createdBy: 'system', // Mark as system program
-            favorite: false,
             dayWiseDrillIds: program.dayWiseDrillIds,
             selectedDrillIds: program.selectedDrillIds,
           );
@@ -544,13 +545,11 @@ class FirebaseProgramRepository implements ProgramRepository {
       level: 'Beginner',
       createdAt: now,
       createdBy: 'system', // System program
-      favorite: false,
       days: List.generate(28, (i) => ProgramDay(
         dayNumber: i + 1, 
         title: 'Day ${i + 1}: ${_getAgilitydayTitle(i + 1)}', 
-        description: _getAgilityDayDescription(i + 1), 
-        drillId: null // Will be assigned during seeding
-      )),
+        description: _getAgilityDayDescription(i + 1)
+      ),),
     );
     
     final p2 = Program(
@@ -562,13 +561,11 @@ class FirebaseProgramRepository implements ProgramRepository {
       level: 'Intermediate',
       createdAt: now,
       createdBy: 'system',
-      favorite: false,
       days: List.generate(21, (i) => ProgramDay(
         dayNumber: i + 1, 
         title: 'Day ${i + 1}: ${_getSoccerDayTitle(i + 1)}', 
-        description: _getSoccerDayDescription(i + 1), 
-        drillId: null
-      )),
+        description: _getSoccerDayDescription(i + 1),
+      ),),
     );
     
     final p3 = Program(
@@ -580,13 +577,11 @@ class FirebaseProgramRepository implements ProgramRepository {
       level: 'Advanced',
       createdAt: now,
       createdBy: 'system',
-      favorite: false,
       days: List.generate(14, (i) => ProgramDay(
         dayNumber: i + 1, 
         title: 'Day ${i + 1}: ${_getBasketballDayTitle(i + 1)}', 
-        description: _getBasketballDayDescription(i + 1), 
-        drillId: null
-      )),
+        description: _getBasketballDayDescription(i + 1),
+      ),),
     );
     
     final p4 = Program(
@@ -598,13 +593,11 @@ class FirebaseProgramRepository implements ProgramRepository {
       level: 'Intermediate',
       createdAt: now,
       createdBy: 'system',
-      favorite: false,
       days: List.generate(35, (i) => ProgramDay(
         dayNumber: i + 1, 
         title: 'Day ${i + 1}: ${_getTennisDayTitle(i + 1)}', 
-        description: _getTennisDayDescription(i + 1), 
-        drillId: null
-      )),
+        description: _getTennisDayDescription(i + 1),
+      ),),
     );
     
     final p5 = Program(
@@ -616,13 +609,11 @@ class FirebaseProgramRepository implements ProgramRepository {
       level: 'Beginner',
       createdAt: now,
       createdBy: 'system',
-      favorite: false,
       days: List.generate(7, (i) => ProgramDay(
         dayNumber: i + 1, 
         title: 'Day ${i + 1}: ${_getGeneralDayTitle(i + 1)}', 
-        description: _getGeneralDayDescription(i + 1), 
-        drillId: null
-      )),
+        description: _getGeneralDayDescription(i + 1),
+      ),),
     );
     
     return [p1, p2, p3, p4, p5];
@@ -636,7 +627,7 @@ class FirebaseProgramRepository implements ProgramRepository {
       'Balance Training', 'Rest Day', 'Plyometric Power', 'Direction Changes',
       'Speed Endurance', 'Reactive Agility', 'Competition Prep', 'Peak Performance',
       'Recovery Session', 'Advanced Patterns', 'Sport-Specific Moves', 'Power Testing',
-      'Final Preparations', 'Peak Training', 'Active Recovery', 'Program Completion'
+      'Final Preparations', 'Peak Training', 'Active Recovery', 'Program Completion',
     ];
     return titles[(day - 1) % titles.length];
   }
@@ -654,7 +645,7 @@ class FirebaseProgramRepository implements ProgramRepository {
       'Goalkeeper Training', 'Set Piece Focus', 'Rest Day', 'Match Simulation',
       'Technical Skills', 'Tactical Awareness', 'Physical Conditioning', 'Mental Training',
       'Team Coordination', 'Rest & Recovery', 'Competition Prep', 'Advanced Tactics',
-      'Finishing Practice', 'Midfield Play', 'Wing Play', 'Final Assessment', 'Peak Performance'
+      'Finishing Practice', 'Midfield Play', 'Wing Play', 'Final Assessment', 'Peak Performance',
     ];
     return titles[(day - 1) % titles.length];
   }
@@ -670,7 +661,7 @@ class FirebaseProgramRepository implements ProgramRepository {
       'Court Vision', 'Defensive Reactions', 'Shooting Accuracy', 'Ball Handling',
       'Rebounding Skills', 'Fast Break Training', 'Rest Day', 'Game Situations',
       'Footwork Drills', 'Passing Precision', 'Defensive Stance', 'Offensive Moves',
-      'Conditioning', 'Competition Ready'
+      'Conditioning', 'Competition Ready',
     ];
     return titles[(day - 1) % titles.length];
   }
@@ -685,7 +676,7 @@ class FirebaseProgramRepository implements ProgramRepository {
       'Serve Returns', 'Baseline Play', 'Net Approach', 'Volley Training',
       'Footwork Focus', 'Match Play', 'Rest Day', 'Power Training',
       'Precision Shots', 'Court Coverage', 'Mental Toughness', 'Strategy Work',
-      'Endurance Building', 'Technical Refinement', 'Competition Prep'
+      'Endurance Building', 'Technical Refinement', 'Competition Prep',
     ];
     return titles[(day - 1) % titles.length];
   }
@@ -704,7 +695,7 @@ class FirebaseProgramRepository implements ProgramRepository {
   String _getGeneralDayTitle(int day) {
     final titles = [
       'Introduction', 'Basic Training', 'Skill Building', 'Coordination',
-      'Speed Work', 'Power Development', 'Assessment'
+      'Speed Work', 'Power Development', 'Assessment',
     ];
     return titles[day - 1];
   }
@@ -717,7 +708,7 @@ class FirebaseProgramRepository implements ProgramRepository {
       'Hand-eye coordination and multi-tasking training',
       'Speed-focused drills and rapid decision making',
       'Power and precision training with complex patterns',
-      'Final assessment and progress evaluation'
+      'Final assessment and progress evaluation',
     ];
     return descriptions[day - 1];
   }
@@ -825,7 +816,7 @@ class FirebaseProgramRepository implements ProgramRepository {
       if (query != null && query.isNotEmpty) {
         final queryLower = query.toLowerCase();
         programs = programs.where((program) => 
-            program.name.toLowerCase().contains(queryLower)).toList();
+            program.name.toLowerCase().contains(queryLower),).toList();
       }
 
       // Sort by createdAt
@@ -871,7 +862,7 @@ class FirebaseProgramRepository implements ProgramRepository {
       if (query != null && query.isNotEmpty) {
         final queryLower = query.toLowerCase();
         programs = programs.where((program) => 
-            program.name.toLowerCase().contains(queryLower)).toList();
+            program.name.toLowerCase().contains(queryLower),).toList();
       }
 
       // Sort by createdAt
@@ -931,8 +922,8 @@ class FirebaseProgramRepository implements ProgramRepository {
           program.level.toLowerCase().contains(queryLower) ||
           program.days.any((day) => 
             day.title.toLowerCase().contains(queryLower) ||
-            day.description.toLowerCase().contains(queryLower)
-          )
+            day.description.toLowerCase().contains(queryLower),
+          ),
         ).toList();
       }
 
@@ -962,7 +953,7 @@ class FirebaseProgramRepository implements ProgramRepository {
 
       // Filter to only show programs user can see (their own or public ones)
       programs = programs.where((program) =>
-          program.createdBy == userId).toList();
+          program.createdBy == userId,).toList();
 
       // Apply filters in memory to avoid complex indexes
       if (category != null && category.isNotEmpty) {
@@ -976,7 +967,7 @@ class FirebaseProgramRepository implements ProgramRepository {
       if (query != null && query.isNotEmpty) {
         final queryLower = query.toLowerCase();
         programs = programs.where((program) => 
-            program.name.toLowerCase().contains(queryLower)).toList();
+            program.name.toLowerCase().contains(queryLower),).toList();
       }
 
       // Sort by createdAt

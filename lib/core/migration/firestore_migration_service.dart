@@ -216,7 +216,7 @@ class FirestoreMigrationService {
           batch.set(
             _firestore.collection('users').doc(userId),
             enhancedUserData,
-            SetOptions(merge: true)
+            SetOptions(merge: true),
           );
           
           migratedUsers++;
