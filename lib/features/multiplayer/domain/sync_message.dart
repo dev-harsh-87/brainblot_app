@@ -207,6 +207,86 @@ class SyncMessage extends Equatable {
     );
   }
 
+  /// Creates a drill content message (for syncing visual/audio content)
+  factory SyncMessage.drillContent({
+    required String senderId,
+    required String senderName,
+    required Map<String, dynamic> contentData,
+    String? targetId,
+  }) {
+    return SyncMessage(
+      type: SyncMessageType.drillContent,
+      senderId: senderId,
+      senderName: senderName,
+      targetId: targetId,
+      data: {
+        'contentData': contentData,
+      },
+      timestamp: DateTime.now(),
+      messageId: DateTime.now().millisecondsSinceEpoch.toString(),
+    );
+  }
+
+  /// Creates a drill stimulus message (for syncing individual stimuli)
+  factory SyncMessage.drillStimulus({
+    required String senderId,
+    required String senderName,
+    required Map<String, dynamic> stimulusData,
+    String? targetId,
+  }) {
+    return SyncMessage(
+      type: SyncMessageType.drillStimulus,
+      senderId: senderId,
+      senderName: senderName,
+      targetId: targetId,
+      data: {
+        'stimulusData': stimulusData,
+      },
+      timestamp: DateTime.now(),
+      messageId: DateTime.now().millisecondsSinceEpoch.toString(),
+    );
+  }
+
+  /// Creates a score update message
+  factory SyncMessage.scoreUpdate({
+    required String senderId,
+    required String senderName,
+    required Map<String, dynamic> scoreData,
+    String? targetId,
+  }) {
+    return SyncMessage(
+      type: SyncMessageType.drillScoreUpdate,
+      senderId: senderId,
+      senderName: senderName,
+      targetId: targetId,
+      data: {
+        'scoreData': scoreData,
+      },
+      timestamp: DateTime.now(),
+      messageId: DateTime.now().millisecondsSinceEpoch.toString(),
+    );
+  }
+
+  /// Creates a rep complete message
+  factory SyncMessage.repComplete({
+    required String senderId,
+    required String senderName,
+    required Map<String, dynamic> repData,
+    String? targetId,
+  }) {
+    return SyncMessage(
+      type: SyncMessageType.drillRepComplete,
+      senderId: senderId,
+      senderName: senderName,
+      targetId: targetId,
+      data: {
+        'repData': repData,
+      },
+      timestamp: DateTime.now(),
+      messageId: DateTime.now().millisecondsSinceEpoch.toString(),
+    );
+  }
+
   /// Checks if message is a broadcast (no specific target)
   bool get isBroadcast => targetId == null;
 
@@ -268,6 +348,18 @@ enum SyncMessageType {
   
   @JsonValue('chat')
   chat,
+  
+  @JsonValue('drill_content')
+  drillContent,
+  
+  @JsonValue('drill_stimulus')
+  drillStimulus,
+  
+  @JsonValue('drill_score_update')
+  drillScoreUpdate,
+  
+  @JsonValue('drill_rep_complete')
+  drillRepComplete,
 }
 
 /// Extension for message type display
@@ -292,6 +384,14 @@ extension SyncMessageTypeExtension on SyncMessageType {
         return 'Heartbeat';
       case SyncMessageType.chat:
         return 'Chat Message';
+      case SyncMessageType.drillContent:
+        return 'Drill Content';
+      case SyncMessageType.drillStimulus:
+        return 'Drill Stimulus';
+      case SyncMessageType.drillScoreUpdate:
+        return 'Score Update';
+      case SyncMessageType.drillRepComplete:
+        return 'Rep Complete';
     }
   }
 

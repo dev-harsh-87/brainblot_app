@@ -4,6 +4,9 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import 'package:spark_app/features/auth/bloc/auth_bloc.dart';
 import 'package:spark_app/core/services/preferences_service.dart';
+import 'package:spark_app/features/auth/ui/device_conflict_dialog.dart';
+import 'package:spark_app/features/auth/domain/device_session.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -391,6 +394,45 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
           if (state.status == AuthStatus.authenticated) {
             HapticFeedback.heavyImpact();
             context.go('/');
+          }
+          if (state.status == AuthStatus.deviceConflict && state.existingSessions != null) {
+            HapticFeedback.heavyImpact();
+            
+            // Convert the session data to DeviceSession objects
+            final sessions = state.existingSessions!.map((sessionData) {
+              return DeviceSession(
+                userId: (sessionData['userId'] as String?) ?? '',
+                deviceId: (sessionData['deviceId'] as String?) ?? '',
+                deviceName: (sessionData['deviceName'] as String?) ?? 'Unknown Device',
+                deviceType: (sessionData['deviceType'] as String?) ?? 'Unknown',
+                platform: (sessionData['platform'] as String?) ?? 'Unknown',
+                appVersion: (sessionData['appVersion'] as String?) ?? '1.0.0',
+                fcmToken: sessionData['fcmToken'] as String?,
+                loginTime: sessionData['loginTime'] != null
+                    ? (sessionData['loginTime'] as Timestamp).toDate()
+                    : DateTime.now(),
+                lastActiveTime: sessionData['lastActiveTime'] != null
+                    ? (sessionData['lastActiveTime'] as Timestamp).toDate()
+                    : DateTime.now(),
+                isActive: (sessionData['isActive'] as bool?) ?? false,
+                isCurrentDevice: false,
+              );
+            }).toList();
+            
+            showDialog(
+              context: context,
+              barrierDismissible: false,
+              builder: (context) => DeviceConflictDialog(
+                existingSessions: sessions,
+                onContinue: () {
+                  context.read<AuthBloc>().add(const AuthContinueWithCurrentDevice());
+                },
+                onCancel: () {
+                  // User cancelled login, reset auth state
+                  context.read<AuthBloc>().add(const AuthLogoutRequested());
+                },
+              ),
+            );
           }
           if (state.status == AuthStatus.failure && state.error != null) {
             HapticFeedback.heavyImpact();

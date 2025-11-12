@@ -43,3 +43,14 @@ class AuthForgotPasswordSubmitted extends AuthEvent {
   @override
   List<Object?> get props => [email];
 }
+
+class AuthDeviceConflictDetected extends AuthEvent {
+  final List<dynamic> existingSessions;
+  const AuthDeviceConflictDetected({required this.existingSessions});
+  @override
+  List<Object?> get props => [existingSessions];
+}
+
+class AuthContinueWithCurrentDevice extends AuthEvent {
+  const AuthContinueWithCurrentDevice();
+}

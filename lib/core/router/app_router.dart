@@ -114,8 +114,18 @@ class AppRouter {
       return '/';
     }
     
-    // Unauthenticated user trying to access protected routes -> redirect to login
+    // For hot reload: Check if Firebase Auth has a user before redirecting to login
     if (authState.status == AuthStatus.initial && !isAuthRoute) {
+      // In debug mode, check if Firebase Auth still has a user (hot reload case)
+      if (kDebugMode) {
+        final currentUser = FirebaseAuth.instance.currentUser;
+        if (currentUser != null) {
+          // User is still logged in Firebase Auth, don't redirect to login
+          // Let AuthBloc handle the state restoration
+          debugPrint('[Router] Hot reload detected: User still in Firebase Auth, allowing navigation');
+          return null;
+        }
+      }
       return '/login';
     }
     

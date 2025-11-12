@@ -1,5 +1,7 @@
 import 'package:firebase_core/firebase_core.dart';
 import 'package:spark_app/core/services/database_initialization_service.dart';
+import 'package:spark_app/core/services/enhanced_ios_permission_service.dart';
+import 'package:spark_app/core/services/fcm_token_service.dart';
 
 /// Service to initialize the app with database setup
 class AppInitializationService {
@@ -12,6 +14,18 @@ class AppInitializationService {
 
     try {
       print('🚀 Initializing application...');
+
+      // Initialize iOS permission service first (if on iOS)
+      if (EnhancedIOSPermissionService.isIOS) {
+        print('🍎 Initializing iOS permission service...');
+        await EnhancedIOSPermissionService.initialize();
+        print('✅ iOS permission service initialized');
+      }
+
+      // Initialize FCM token service
+      print('🔔 Initializing FCM token service...');
+      await FCMTokenService.instance.initialize();
+      print('✅ FCM token service initialized');
 
       final initService = DatabaseInitializationService();
 
@@ -34,7 +48,14 @@ class AppInitializationService {
         print('✅ Database already initialized');
       }
 
+      // Log permission status for debugging
+      if (EnhancedIOSPermissionService.isIOS) {
+        final permissionStatus = await EnhancedIOSPermissionService.getDetailedStatus();
+        print('🔐 iOS Permission Status: $permissionStatus');
+      }
+
       _isInitialized = true;
+      print('🎉 Application initialization completed successfully!');
     } catch (e) {
       print('❌ Application initialization failed: $e');
       rethrow;

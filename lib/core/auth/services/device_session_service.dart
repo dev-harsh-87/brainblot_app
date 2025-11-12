@@ -24,11 +24,11 @@ class DeviceSessionService {
         _messaging = messaging ?? FirebaseMessaging.instance;
  
   /// Register a new device session for the current user
-  /// If another device is already logged in, it will be force logged out (unless user is admin)
-  Future<void> registerDeviceSession(String userId, {bool isAdmin = false}) async {
+  /// Returns existing sessions if any, without automatically logging them out
+  Future<List<Map<String, dynamic>>> registerDeviceSession(String userId, {bool isAdmin = false, bool forceLogoutOthers = false}) async {
     try {
       // Get device information
-      final deviceInfo = await _getDeviceInfo();
+      final deviceInfo = await getDeviceInfo();
       
       // Try to get FCM token, but don't fail if it's not available
       String? fcmToken;
@@ -40,22 +40,80 @@ class DeviceSessionService {
       }
       
       // Check if user has an existing active session on another device
-      // Skip for admins as they can have multiple concurrent sessions
+      List<Map<String, dynamic>> existingSessions = [];
       if (!isAdmin) {
-        await _checkAndHandleExistingSession(userId, deviceInfo['deviceId'] as String);
+        existingSessions = await _checkForExistingSessions(userId, deviceInfo['deviceId'] as String);
+        
+        // If forceLogoutOthers is true, logout existing sessions
+        if (forceLogoutOthers && existingSessions.isNotEmpty) {
+          await _logoutExistingSessions(userId, deviceInfo['deviceId'] as String);
+        }
       }
       
       // Register new device session
       await _createDeviceSession(userId, deviceInfo, fcmToken);
       
       print('✅ Device session registered successfully');
+      return existingSessions;
     } catch (e) {
       print('❌ Failed to register device session: $e');
       rethrow;
     }
   }
 
-  /// Check for existing sessions and handle device conflicts
+  /// Check for existing sessions without logging them out
+  Future<List<Map<String, dynamic>>> _checkForExistingSessions(String userId, String currentDeviceId) async {
+    try {
+      // Get all active sessions for this user
+      final existingSessionsQuery = await _firestore
+          .collection(_deviceSessionsCollection)
+          .where('userId', isEqualTo: userId)
+          .where('isActive', isEqualTo: true)
+          .get();
+
+      final existingSessions = <Map<String, dynamic>>[];
+      
+      for (final doc in existingSessionsQuery.docs) {
+        final sessionData = doc.data();
+        final existingDeviceId = sessionData['deviceId'] as String?;
+        
+        // Skip current device
+        if (existingDeviceId != currentDeviceId) {
+          existingSessions.add(sessionData);
+        }
+      }
+      
+      return existingSessions;
+    } catch (e) {
+      print('⚠️ Error checking existing sessions: $e');
+      return [];
+    }
+  }
+
+  /// Logout existing sessions (the old behavior)
+  Future<void> _logoutExistingSessions(String userId, String currentDeviceId) async {
+    try {
+      final existingSessions = await _checkForExistingSessions(userId, currentDeviceId);
+      
+      for (final sessionData in existingSessions) {
+        final existingDeviceId = sessionData['deviceId'] as String?;
+        final existingFcmToken = sessionData['fcmToken'] as String?;
+        
+        print('🔄 Logging out existing device: $existingDeviceId');
+        
+        if (existingFcmToken != null) {
+          await _sendLogoutNotification(existingFcmToken, sessionData);
+        }
+        
+        // Remove the device session
+        await _removeDeviceSession(userId, existingDeviceId);
+      }
+    } catch (e) {
+      print('⚠️ Error logging out existing sessions: $e');
+    }
+  }
+
+  /// Check for existing sessions and handle device conflicts (DEPRECATED - kept for compatibility)
   Future<void> _checkAndHandleExistingSession(String userId, String currentDeviceId) async {
     try {
       // Get current active session for this user
@@ -193,7 +251,7 @@ class DeviceSessionService {
   }
 
   /// Get device information
-  Future<Map<String, dynamic>> _getDeviceInfo() async {
+  Future<Map<String, dynamic>> getDeviceInfo() async {
     final packageInfo = await PackageInfo.fromPlatform();
     
     // Generate a unique device ID (you might want to use a more sophisticated method)
@@ -229,7 +287,7 @@ class DeviceSessionService {
   /// Cleanup session on logout
   Future<void> cleanupSession(String userId) async {
     try {
-      final deviceInfo = await _getDeviceInfo();
+      final deviceInfo = await getDeviceInfo();
       await _removeDeviceSession(userId, deviceInfo['deviceId'] as String?);
       print('✅ Device session cleaned up');
     } catch (e) {
@@ -243,7 +301,7 @@ class DeviceSessionService {
       final userId = _auth.currentUser?.uid;
       if (userId == null) return false;
 
-      final deviceInfo = await _getDeviceInfo();
+      final deviceInfo = await getDeviceInfo();
       final sessionDoc = await _firestore
           .collection(_userSessionsCollection)
           .doc(userId)

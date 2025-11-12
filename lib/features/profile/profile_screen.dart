@@ -15,6 +15,7 @@ import 'package:spark_app/features/drills/domain/session_result.dart';
 import 'package:spark_app/features/profile/services/profile_service.dart';
 import 'package:spark_app/features/sharing/domain/user_profile.dart';
 import 'package:spark_app/features/settings/ui/settings_screen.dart';
+import 'package:spark_app/features/auth/ui/device_sessions_screen.dart';
 import 'package:spark_app/core/ui/edge_to_edge.dart';
 import 'package:spark_app/core/services/auto_refresh_service.dart';
 
@@ -147,6 +148,13 @@ class _ProfileScreenState extends State<ProfileScreen> with AutoRefreshMixin {
               case 'settings':
                 context.go('/settings');
                 break;
+              case 'device_sessions':
+                Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (context) => const DeviceSessionsScreen(),
+                  ),
+                );
+                break;
               case 'change_password':
                 _showChangePasswordDialog();
                 break;
@@ -161,6 +169,14 @@ class _ProfileScreenState extends State<ProfileScreen> with AutoRefreshMixin {
               child: ListTile(
                 leading: Icon(Icons.settings_rounded),
                 title: Text('Settings'),
+                contentPadding: EdgeInsets.zero,
+              ),
+            ),
+            const PopupMenuItem(
+              value: 'device_sessions',
+              child: ListTile(
+                leading: Icon(Icons.devices),
+                title: Text('Device Sessions'),
                 contentPadding: EdgeInsets.zero,
               ),
             ),

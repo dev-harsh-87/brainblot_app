@@ -4,12 +4,12 @@ import 'dart:math';
 import 'dart:typed_data';
 
 import 'package:flutter/foundation.dart';
-import 'package:flutter/services.dart';
 import 'package:nearby_connections/nearby_connections.dart';
 import 'package:permission_handler/permission_handler.dart';
 
 import 'package:spark_app/features/multiplayer/domain/connection_session.dart';
 import 'package:spark_app/features/multiplayer/domain/sync_message.dart';
+import 'package:spark_app/features/multiplayer/services/professional_permission_manager.dart';
 
 /// Robust, null-safe and more predictable Bluetooth P2P manager for Spark.
 ///
@@ -57,9 +57,16 @@ class BluetoothConnectionService {
       _deviceId = _generateDeviceId();
       _deviceName = await _getDeviceName();
       debugPrint('BluetoothConnectionService initialized: $_deviceId ($_deviceName)');
+      
+      // Don't automatically request permissions during initialization
+      // Let the user trigger permission requests when they actually need multiplayer features
+      debugPrint('🔄 Service initialized - permissions will be requested when needed');
+      _connectionStatusController.add('Bluetooth service ready - permissions required for multiplayer');
+      
     } catch (e) {
       debugPrint('Failed to initialize BluetoothConnectionService: $e');
-      rethrow;
+      // Still allow the service to be created, just mark it as not ready
+      _connectionStatusController.add('Bluetooth service initialization failed');
     }
   }
 
@@ -67,85 +74,32 @@ class BluetoothConnectionService {
   /// Returns true if all required permissions are granted.
   Future<bool> requestPermissions() async {
     try {
-      // Build list depending on platform requirements.
-      final List<Permission> permissions = [];
-
-      if (defaultTargetPlatform == TargetPlatform.iOS) {
-        permissions.addAll([
-          Permission.bluetooth,
-          Permission.locationWhenInUse,
-        ]);
+      debugPrint('🔐 Using Professional Permission Manager');
+      
+      final result = await ProfessionalPermissionManager.requestPermissions();
+      
+      _connectionStatusController.add(result.message);
+      
+      if (result.success) {
+        debugPrint('✅ All permissions granted via Professional Permission Manager');
       } else {
-        // Android: include fine-grained Bluetooth permissions where available.
-        permissions.addAll([
-          Permission.bluetooth,
-          Permission.bluetoothScan,
-          Permission.bluetoothConnect,
-          Permission.bluetoothAdvertise,
-          Permission.locationWhenInUse,
-        ]);
-
-        // Some Android versions expose nearbyWifiDevices permission in permission_handler; add defensively.
-        try {
-          permissions.add(Permission.nearbyWifiDevices);
-        } catch (_) {
-          // ignore if not available in the permission handler version used.
+        debugPrint('❌ Permission request failed: ${result.message}');
+        
+        if (result.needsSettings) {
+          _connectionStatusController.add(
+            'Some permissions are permanently denied. Please enable them in Settings.'
+          );
         }
       }
-
-      // Query statuses
-      final statuses = <Permission, PermissionStatus>{};
-      for (final p in permissions) {
-        statuses[p] = await p.status;
-      }
-
-      // If any permanently denied -> inform user and return false.
-      final permanentlyDenied = statuses.entries
-          .where((e) => e.value == PermissionStatus.permanentlyDenied)
-          .map((e) => e.key)
-          .toList();
-
-      if (permanentlyDenied.isNotEmpty) {
-        debugPrint('Permanently denied permissions: $permanentlyDenied');
-        _connectionStatusController.add(
-          defaultTargetPlatform == TargetPlatform.iOS
-              ? 'Bluetooth and Location permissions are required. Please enable them in Settings > Privacy.'
-              : 'Some permissions are permanently denied. Please enable them in Settings.',
-        );
-        return false;
-      }
-
-      // Request any that aren't granted
-      final toRequest = statuses.entries
-          .where((e) => e.value != PermissionStatus.granted)
-          .map((e) => e.key)
-          .toList();
-
-      if (toRequest.isNotEmpty) {
-        final results = await toRequest.request();
-        results.forEach((permission, status) {
-          statuses[permission] = status;
-        });
-      }
-
-      final allGranted = statuses.values.every((s) => s == PermissionStatus.granted);
-
-      if (allGranted) {
-        _connectionStatusController.add('Permissions granted');
-        debugPrint('All required permissions granted for ${defaultTargetPlatform.name}');
-      } else {
-        _connectionStatusController.add('Some permissions denied');
-        debugPrint('Permission results:');
-        statuses.forEach((p, s) => debugPrint('  $p: $s'));
-      }
-
-      return allGranted;
+      
+      return result.success;
     } catch (e) {
-      debugPrint('Error requesting permissions: $e');
-      _connectionStatusController.add('Permission error: $e');
+      debugPrint('❌ Error requesting permissions: $e');
+      _connectionStatusController.add('Permission error: $e. Please try again or enable permissions manually.');
       return false;
     }
   }
+
 
   Future<void> openPermissionSettings() async {
     try {
@@ -170,10 +124,8 @@ class BluetoothConnectionService {
           Permission.bluetoothConnect,
           Permission.bluetoothAdvertise,
           Permission.locationWhenInUse,
+          Permission.nearbyWifiDevices,
         ]);
-        try {
-          permissions.add(Permission.nearbyWifiDevices);
-        } catch (_) {}
       }
 
       final statuses = await Future.wait(permissions.map((p) => p.status));
@@ -188,14 +140,30 @@ class BluetoothConnectionService {
   Future<ConnectionSession> createHostSession({
     int maxParticipants = 8,
   }) async {
+    debugPrint('🔗 Creating host session...');
+    
     if (_deviceId == null || _deviceName == null) {
-      throw Exception('Service not initialized');
+      debugPrint('🔗 ❌ Service not initialized');
+      throw Exception('Bluetooth service not initialized. Please restart the app.');
     }
 
+    debugPrint('🔗 Checking permissions...');
     final hasPermissions = await requestPermissions();
-    if (!hasPermissions) throw Exception('Required permissions not granted');
+    if (!hasPermissions) {
+      debugPrint('🔗 ❌ Permissions not granted');
+      throw Exception('Required permissions not granted. Please enable Bluetooth and Location permissions.');
+    }
 
+    debugPrint('🔗 Generating session code...');
     final sessionId = _generateSessionCode();
+    
+    // Validate session code format
+    if (sessionId.length != 6 || !RegExp(r'^\d{6}$').hasMatch(sessionId)) {
+      debugPrint('🔗 ❌ Invalid session code generated: $sessionId');
+      throw Exception('Failed to generate valid session code');
+    }
+    
+    debugPrint('🔗 ✅ Session code generated: $sessionId');
 
     _currentSession = ConnectionSession.createHost(
       sessionId: sessionId,
@@ -208,27 +176,54 @@ class BluetoothConnectionService {
     _isConnected = true;
     _advertisedSessionCode = sessionId;
 
-    await _startAdvertising(sessionId);
-    _startHeartbeat();
+    try {
+      debugPrint('🔗 Starting advertising...');
+      await _startAdvertising(sessionId);
+      _startHeartbeat();
+      
+      debugPrint('🔗 ✅ Host session created successfully: $sessionId');
+      _connectionStatusController.add('Hosting session: $sessionId');
+      _sessionController.add(_currentSession!);
 
-    _connectionStatusController.add('Hosting session: $sessionId');
-    _sessionController.add(_currentSession!);
-
-    return _currentSession!;
+      return _currentSession!;
+    } catch (e) {
+      debugPrint('🔗 ❌ Failed to start advertising: $e');
+      // Clean up on failure
+      _isHost = false;
+      _isConnected = false;
+      _advertisedSessionCode = null;
+      _currentSession = null;
+      throw Exception('Failed to start hosting session: $e');
+    }
   }
 
   /// Join an existing session by session code. Completes when connected or throws.
   Future<ConnectionSession> joinSession(String sessionCode,
       {Duration timeout = const Duration(seconds: 30)}) async {
-    if (_deviceId == null || _deviceName == null) throw Exception('Service not initialized');
+    if (_deviceId == null || _deviceName == null) {
+      throw Exception('Service not initialized. Please restart the app.');
+    }
 
+    // Validate session code format
+    if (sessionCode.length != 6 || !RegExp(r'^\d{6}$').hasMatch(sessionCode)) {
+      throw Exception('Invalid session code format. Please enter a 6-digit code.');
+    }
+
+    debugPrint('🔗 Attempting to join session: $sessionCode');
+    
     final hasPermissions = await requestPermissions();
-    if (!hasPermissions) throw Exception('Required permissions not granted');
+    if (!hasPermissions) {
+      throw Exception('Required permissions not granted. Please enable Bluetooth and Location permissions.');
+    }
+
+    // Clean up any previous state
+    await _cleanupPreviousConnection();
 
     _isHost = false;
     _joinCompleter = Completer<ConnectionSession>();
 
-    _connectionStatusController.add('Searching for session: $sessionCode');
+    _connectionStatusController.add('Searching for session: $sessionCode...');
+    debugPrint('🔍 Starting discovery for session: $sessionCode');
 
     try {
       // Start discovery and wait for a matching endpoint to connect.
@@ -236,26 +231,32 @@ class BluetoothConnectionService {
 
       // Fail-fast on timeout with better error message.
       final result = await _joinCompleter!.future.timeout(timeout, onTimeout: () async {
+        debugPrint('⏰ Join session timeout for: $sessionCode');
+        
         // Stop discovery if timed out
         try {
           await Nearby().stopDiscovery();
+          debugPrint('🛑 Discovery stopped due to timeout');
         } catch (e) {
-          debugPrint('Error stopping discovery on timeout: $e');
+          debugPrint('❌ Error stopping discovery on timeout: $e');
         }
         
         if (!_joinCompleter!.isCompleted) {
-          _joinCompleter!.completeError(Exception('Session $sessionCode not found. Make sure the host is nearby and the session code is correct.'));
+          _joinCompleter!.completeError(Exception('Session $sessionCode not found. Make sure:\n• The host is nearby and advertising\n• The session code is correct\n• Both devices have Bluetooth enabled'));
         }
-        throw Exception('Session $sessionCode not found. Make sure the host is nearby and the session code is correct.');
+        throw Exception('Session $sessionCode not found. Make sure:\n• The host is nearby and advertising\n• The session code is correct\n• Both devices have Bluetooth enabled');
       });
 
+      debugPrint('✅ Successfully joined session: $sessionCode');
       return result;
     } catch (e) {
+      debugPrint('❌ Failed to join session $sessionCode: $e');
+      
       // Clean up on any error
       try {
         await Nearby().stopDiscovery();
       } catch (cleanupError) {
-        debugPrint('Error during cleanup: $cleanupError');
+        debugPrint('❌ Error during cleanup: $cleanupError');
       }
       
       // Reset state
@@ -264,6 +265,19 @@ class BluetoothConnectionService {
       _joinCompleter = null;
       
       rethrow;
+    }
+  }
+
+  /// Clean up any previous connection state
+  Future<void> _cleanupPreviousConnection() async {
+    try {
+      if (_isConnected) {
+        await disconnect();
+      }
+      await Nearby().stopDiscovery();
+      await Nearby().stopAdvertising();
+    } catch (e) {
+      debugPrint('Cleanup error (non-critical): $e');
     }
   }
 
@@ -323,55 +337,113 @@ class BluetoothConnectionService {
   }
 
   Future<void> startDrillForAll(String drillId, Map<String, dynamic> drillData) async {
-    if (!_isHost) throw Exception('Only host can start drills');
+    _validateDrillControlPermissions('start');
 
-    final message = SyncMessage.drillStart(
-      senderId: _deviceId!,
-      senderName: _deviceName!,
-      drillId: drillId,
-      drillData: drillData,
-    );
+    try {
+      // Update local session state first
+      _currentSession = _currentSession?.setActiveDrill(drillId);
+      if (_currentSession != null) {
+        _sessionController.add(_currentSession!);
+      }
 
-    await sendMessage(message);
+      final message = SyncMessage.drillStart(
+        senderId: _deviceId!,
+        senderName: _deviceName!,
+        drillId: drillId,
+        drillData: drillData,
+      );
 
-    _currentSession = _currentSession?.setActiveDrill(drillId);
-    if (_currentSession != null) _sessionController.add(_currentSession!);
+      // Send to all participants
+      await sendMessage(message);
+
+      _connectionStatusController.add('Drill "$drillId" started for all participants');
+      debugPrint('✅ Drill started for all participants: $drillId');
+      
+      // Send a follow-up session status update to ensure synchronization
+      await _sendSessionStatusUpdate();
+      
+    } catch (e) {
+      debugPrint('❌ Failed to start drill for all: $e');
+      _connectionStatusController.add('Failed to start drill: $e');
+      // Revert local state on failure
+      _currentSession = _currentSession?.setActiveDrill(null);
+      if (_currentSession != null) {
+        _sessionController.add(_currentSession!);
+      }
+      rethrow;
+    }
   }
 
   Future<void> stopDrillForAll() async {
-    if (!_isHost) throw Exception('Only host can stop drills');
+    _validateDrillControlPermissions('stop');
 
-    final message = SyncMessage.drillStop(
-      senderId: _deviceId!,
-      senderName: _deviceName!,
-    );
+    try {
+      // Update local session state first
+      final previousDrillId = _currentSession!.activeDrillId;
+      _currentSession = _currentSession?.setActiveDrill(null);
+      if (_currentSession != null) {
+        _sessionController.add(_currentSession!);
+      }
 
-    await sendMessage(message);
+      final message = SyncMessage.drillStop(
+        senderId: _deviceId!,
+        senderName: _deviceName!,
+      );
 
-    _currentSession = _currentSession?.setActiveDrill(null);
-    if (_currentSession != null) _sessionController.add(_currentSession!);
+      // Send to all participants
+      await sendMessage(message);
+
+      _connectionStatusController.add('Drill stopped for all participants');
+      debugPrint('✅ Drill stopped for all participants: $previousDrillId');
+      
+      // Send a follow-up session status update to ensure synchronization
+      await _sendSessionStatusUpdate();
+      
+    } catch (e) {
+      debugPrint('❌ Failed to stop drill for all: $e');
+      _connectionStatusController.add('Failed to stop drill: $e');
+      rethrow;
+    }
   }
 
   Future<void> pauseDrillForAll() async {
-    if (!_isHost) throw Exception('Only host can pause drills');
+    _validateDrillControlPermissions('pause');
 
-    final message = SyncMessage.drillPause(
-      senderId: _deviceId!,
-      senderName: _deviceName!,
-    );
+    try {
+      final message = SyncMessage.drillPause(
+        senderId: _deviceId!,
+        senderName: _deviceName!,
+      );
 
-    await sendMessage(message);
+      await sendMessage(message);
+      _connectionStatusController.add('Drill paused for all participants');
+      
+      debugPrint('✅ Drill paused for all participants');
+    } catch (e) {
+      debugPrint('❌ Failed to pause drill for all: $e');
+      _connectionStatusController.add('Failed to pause drill: $e');
+      rethrow;
+    }
   }
 
   Future<void> resumeDrillForAll() async {
-    if (!_isHost) throw Exception('Only host can resume drills');
+    _validateDrillControlPermissions('resume');
 
-    final message = SyncMessage.drillResume(
-      senderId: _deviceId!,
-      senderName: _deviceName!,
-    );
+    try {
+      final message = SyncMessage.drillResume(
+        senderId: _deviceId!,
+        senderName: _deviceName!,
+      );
 
-    await sendMessage(message);
+      await sendMessage(message);
+      _connectionStatusController.add('Drill resumed for all participants');
+      
+      debugPrint('✅ Drill resumed for all participants');
+    } catch (e) {
+      debugPrint('❌ Failed to resume drill for all: $e');
+      _connectionStatusController.add('Failed to resume drill: $e');
+      rethrow;
+    }
   }
 
   Future<void> sendChatMessage(String message) async {
@@ -382,6 +454,33 @@ class BluetoothConnectionService {
     );
 
     await sendMessage(chatMessage);
+  }
+
+  /// Checks if the current device can control drills (only host can)
+  bool get canControlDrills => _isHost;
+
+  /// Helper method to validate drill control permissions
+  void _validateDrillControlPermissions(String action) {
+    if (!_isHost) {
+      throw Exception('Access denied: Only the session host can $action drills. Participants automatically follow the host\'s drill state.');
+    }
+    if (!_isConnected || _currentSession == null) {
+      throw Exception('Not connected to a session. Please join or create a session first.');
+    }
+  }
+
+  /// Debug method to print current connection state
+  void debugConnectionState() {
+    debugPrint('🔍 CONNECTION STATE DEBUG:');
+    debugPrint('   Device ID: $_deviceId');
+    debugPrint('   Device Name: $_deviceName');
+    debugPrint('   Is Host: $_isHost');
+    debugPrint('   Is Connected: $_isConnected');
+    debugPrint('   Current Session: ${_currentSession?.sessionId ?? 'null'}');
+    debugPrint('   Join Completer: ${_joinCompleter != null ? 'active' : 'null'}');
+    debugPrint('   Advertised Session Code: $_advertisedSessionCode');
+    debugPrint('   Service ID: $_serviceId');
+    debugPrint('   Strategy: $_strategy');
   }
 
   // Private methods
@@ -409,6 +508,13 @@ class BluetoothConnectionService {
 
   Future<void> _startDiscovery(String sessionCode) async {
     try {
+      debugPrint('🔍 Starting discovery with:');
+      debugPrint('   Device Name: $_deviceName');
+      debugPrint('   Strategy: $_strategy');
+      debugPrint('   Service ID: $_serviceId');
+      debugPrint('   Looking for session: $sessionCode');
+      debugPrint('   Expected advertised name format: DeviceName-$sessionCode');
+      
       await Nearby().startDiscovery(
         _deviceName!,
         _strategy,
@@ -417,9 +523,22 @@ class BluetoothConnectionService {
         serviceId: _serviceId,
       );
 
-      debugPrint('Started discovery for session: $sessionCode');
+      debugPrint('✅ Discovery started successfully for session: $sessionCode');
+      _connectionStatusController.add('Scanning for nearby sessions...');
+      
+      // Add a timer to provide periodic updates about discovery status
+      Timer.periodic(const Duration(seconds: 5), (timer) {
+        if (!_isConnected && _joinCompleter != null && !_joinCompleter!.isCompleted) {
+          debugPrint('🔍 Still searching for session $sessionCode... (${timer.tick * 5}s elapsed)');
+          _connectionStatusController.add('Still searching for session $sessionCode... Make sure the host is nearby and advertising.');
+        } else {
+          timer.cancel();
+        }
+      });
+      
     } catch (e) {
-      debugPrint('Failed to start discovery: $e');
+      debugPrint('❌ Failed to start discovery: $e');
+      _connectionStatusController.add('Failed to start scanning: $e');
       rethrow;
     }
   }
@@ -436,33 +555,64 @@ class BluetoothConnectionService {
   }
 
   void _onConnectionResult(String endpointId, Status status) {
-    debugPrint('Connection result: $endpointId - ${status.toString()}');
+    debugPrint('🔗 Connection result: $endpointId - ${status.toString()}');
 
     if (status == Status.CONNECTED) {
+      debugPrint('✅ Successfully connected to endpoint: $endpointId');
+      
       if (_isHost) {
         // Add participant to session
         final nextIndex = (_currentSession?.participantIds.length ?? 0) + 1;
         _addParticipant(endpointId, 'Participant $nextIndex');
+        debugPrint('👥 Added participant $nextIndex to session');
       } else {
         _isConnected = true;
-        // Create a basic session for the participant
+        
+        // Stop discovery since we're now connected
+        try {
+          Nearby().stopDiscovery();
+          debugPrint('🛑 Discovery stopped after successful connection');
+        } catch (e) {
+          debugPrint('⚠️ Error stopping discovery: $e');
+        }
+        
+        // Create a participant session
         _currentSession = ConnectionSession.createHost(
           sessionId: _advertisedSessionCode ?? _generateSessionCode(),
-          hostId: 'host',
+          hostId: endpointId, // Use the host's endpoint ID
           hostName: 'Host',
         );
         _sessionController.add(_currentSession!);
-        _connectionStatusController.add('Connected to session');
+        _connectionStatusController.add('✅ Connected to session ${_advertisedSessionCode}');
         
         // Complete the join operation
         if (_joinCompleter != null && !_joinCompleter!.isCompleted) {
+          debugPrint('✅ Join operation completed successfully');
           _joinCompleter!.complete(_currentSession!);
         }
       }
     } else {
       // Connection failed
+      debugPrint('❌ Connection failed: ${status.toString()}');
+      
       if (!_isHost && _joinCompleter != null && !_joinCompleter!.isCompleted) {
-        _joinCompleter!.completeError(Exception('Failed to connect: ${status.toString()}'));
+        String errorMessage = 'Failed to connect to session';
+        
+        // Provide user-friendly error messages based on status
+        if (status.toString().contains('REJECTED')) {
+          errorMessage = 'Connection was rejected by the host';
+        } else if (status.toString().contains('ALREADY_CONNECTED')) {
+          errorMessage = 'Already connected to this session';
+        } else if (status.toString().contains('BLUETOOTH')) {
+          errorMessage = 'Bluetooth error occurred. Please check your Bluetooth settings';
+        } else if (status.toString().contains('TIMEOUT')) {
+          errorMessage = 'Connection timed out. Please try again';
+        } else {
+          errorMessage = 'Connection failed: ${status.toString()}. Please try again';
+        }
+        
+        _connectionStatusController.add('❌ $errorMessage');
+        _joinCompleter!.completeError(Exception(errorMessage));
       }
     }
   }
@@ -479,28 +629,49 @@ class BluetoothConnectionService {
   }
 
   void _onEndpointFound(String endpointId, String name, String serviceId, String sessionCode) {
-    debugPrint('Found endpoint: $endpointId - $name');
+    debugPrint('🔍 Found endpoint: $endpointId - $name (serviceId: $serviceId)');
+
+    // Validate service ID first
+    if (serviceId != _serviceId) {
+      debugPrint('❌ Service ID mismatch: expected $_serviceId, got $serviceId');
+      return;
+    }
 
     // Check if this endpoint matches our target session code
-    if (name.contains(sessionCode)) {
-      debugPrint('Found matching session: $name');
+    // The advertised name format is: "DeviceName-SessionCode"
+    if (name.contains('-$sessionCode')) {
+      debugPrint('✅ Found matching session: $name for code $sessionCode');
       _advertisedSessionCode = sessionCode;
       
+      _connectionStatusController.add('Found session $sessionCode, connecting...');
+      
       // Request connection
-      Nearby().requestConnection(
-        _deviceName!,
-        endpointId,
-        onConnectionInitiated: _onConnectionInitiated,
-        onConnectionResult: _onConnectionResult,
-        onDisconnected: _onDisconnected,
-      );
+      try {
+        Nearby().requestConnection(
+          _deviceName!,
+          endpointId,
+          onConnectionInitiated: _onConnectionInitiated,
+          onConnectionResult: _onConnectionResult,
+          onDisconnected: _onDisconnected,
+        );
+        debugPrint('🔗 Connection requested to endpoint: $endpointId');
+      } catch (e) {
+        debugPrint('❌ Failed to request connection: $e');
+        if (_joinCompleter != null && !_joinCompleter!.isCompleted) {
+          _joinCompleter!.completeError(Exception('Failed to connect to session: $e'));
+        }
+      }
     } else {
-      debugPrint('Session code mismatch: looking for $sessionCode, found $name');
+      debugPrint('❌ Session code mismatch: looking for $sessionCode, found $name');
+      debugPrint('   Expected format: DeviceName-$sessionCode');
     }
   }
 
   void _onEndpointLost(String? endpointId) {
-    debugPrint('Lost endpoint: $endpointId');
+    debugPrint('📡 Lost endpoint: $endpointId');
+    if (!_isConnected && _joinCompleter != null && !_joinCompleter!.isCompleted) {
+      _connectionStatusController.add('Lost connection to a nearby device. Still searching...');
+    }
   }
 
   void _onPayloadReceived(String endpointId, Payload payload) {
@@ -533,10 +704,52 @@ class BluetoothConnectionService {
         if (_isHost) _removeParticipant(fromEndpointId);
         break;
       case SyncMessageType.drillStart:
+        // Handle drill start - update session state and forward to UI
+        if (message.data.containsKey('drillId')) {
+          final drillId = message.data['drillId'] as String?;
+          if (drillId != null) {
+            _currentSession = _currentSession?.setActiveDrill(drillId);
+            if (_currentSession != null) {
+              _sessionController.add(_currentSession!);
+            }
+          }
+        }
+        _messageController.add(message);
+        _connectionStatusController.add('Drill started: ${message.data['drillId'] ?? 'Unknown'}');
+        break;
       case SyncMessageType.drillStop:
+        // Handle drill stop - clear active drill and forward to UI
+        _currentSession = _currentSession?.setActiveDrill(null);
+        if (_currentSession != null) {
+          _sessionController.add(_currentSession!);
+        }
+        _messageController.add(message);
+        _connectionStatusController.add('Drill stopped');
+        break;
       case SyncMessageType.drillPause:
+        // Forward drill pause messages to UI
+        _messageController.add(message);
+        _connectionStatusController.add('Drill paused');
+        break;
       case SyncMessageType.drillResume:
-        // Forward drill control messages to UI
+        // Forward drill resume messages to UI
+        _messageController.add(message);
+        _connectionStatusController.add('Drill resumed');
+        break;
+      case SyncMessageType.drillContent:
+        // Forward drill content messages to UI
+        _messageController.add(message);
+        break;
+      case SyncMessageType.drillStimulus:
+        // Forward drill stimulus messages to UI
+        _messageController.add(message);
+        break;
+      case SyncMessageType.drillScoreUpdate:
+        // Forward drill score update messages to UI
+        _messageController.add(message);
+        break;
+      case SyncMessageType.drillRepComplete:
+        // Forward drill rep complete messages to UI
         _messageController.add(message);
         break;
       case SyncMessageType.chat:
@@ -551,15 +764,18 @@ class BluetoothConnectionService {
         }
         break;
       case SyncMessageType.sessionStatus:
-        // Handle session status updates
-        try {
-          final sessionData = message.data;
-          if (sessionData.isNotEmpty) {
-            // Update session from received data
-            _updateSessionFromData(sessionData);
+        // Handle session status updates from host
+        if (!_isHost) {
+          try {
+            final sessionData = message.data;
+            if (sessionData.isNotEmpty) {
+              // Update session from received data
+              _updateSessionFromData(sessionData);
+              debugPrint('✅ Session status updated from host');
+            }
+          } catch (e) {
+            debugPrint('❌ Error handling session status: $e');
           }
-        } catch (e) {
-          debugPrint('Error handling session status: $e');
         }
         break;
     }
@@ -568,14 +784,30 @@ class BluetoothConnectionService {
   void _updateSessionFromData(Map<String, dynamic> sessionData) {
     try {
       if (_currentSession != null) {
+        // Extract data from the session update
+        final activeDrillId = sessionData['activeDrillId'] as String?;
+        final participantCount = sessionData['participantCount'] as int?;
+        
+        // Update session with new data
         _currentSession = _currentSession!.copyWith(
+          activeDrillId: activeDrillId,
           lastActivity: DateTime.now(),
-          // Add other fields as needed
+          status: activeDrillId != null ? SessionStatus.active : SessionStatus.waiting,
         );
+        
         _sessionController.add(_currentSession!);
+        
+        // Update connection status based on drill state
+        if (activeDrillId != null) {
+          _connectionStatusController.add('Drill "$activeDrillId" is active');
+        } else {
+          _connectionStatusController.add('No active drill - waiting');
+        }
+        
+        debugPrint('✅ Session updated: activeDrill=$activeDrillId, participants=$participantCount');
       }
     } catch (e) {
-      debugPrint('Error updating session from data: $e');
+      debugPrint('❌ Error updating session from data: $e');
     }
   }
 
@@ -589,7 +821,10 @@ class BluetoothConnectionService {
         senderId: participantId,
         senderName: participantName,
       );
-      sendMessage(joinMessage);
+      // Fire and forget - don't await to avoid blocking
+      sendMessage(joinMessage).catchError((e) {
+        debugPrint('Failed to send join message: $e');
+      });
       
       _connectionStatusController.add('$participantName joined the session');
     }
@@ -608,7 +843,10 @@ class BluetoothConnectionService {
           senderId: participantId,
           senderName: participantName,
         );
-        sendMessage(leaveMessage);
+        // Fire and forget - don't await to avoid blocking
+        sendMessage(leaveMessage).catchError((e) {
+          debugPrint('Failed to send leave message: $e');
+        });
         
         _connectionStatusController.add('$participantName left the session');
       }
@@ -623,9 +861,38 @@ class BluetoothConnectionService {
           senderId: _deviceId!,
           senderName: _deviceName!,
         );
-        sendMessage(heartbeat);
+        // Fire and forget - don't await to avoid blocking the timer
+        sendMessage(heartbeat).catchError((e) {
+          debugPrint('Failed to send heartbeat: $e');
+        });
       }
     });
+  }
+
+  Future<void> _sendSessionStatusUpdate() async {
+    if (!_isHost || _currentSession == null || _deviceId == null || _deviceName == null) {
+      return;
+    }
+
+    try {
+      final sessionData = <String, dynamic>{
+        'sessionId': _currentSession!.sessionId,
+        'activeDrillId': _currentSession!.activeDrillId,
+        'participantCount': _currentSession!.participantIds.length,
+        'lastActivity': _currentSession!.lastActivity.toIso8601String(),
+      };
+
+      final message = SyncMessage.sessionStatus(
+        senderId: _deviceId!,
+        senderName: _deviceName!,
+        sessionData: sessionData,
+      );
+
+      await sendMessage(message);
+      debugPrint('✅ Session status update sent');
+    } catch (e) {
+      debugPrint('❌ Failed to send session status update: $e');
+    }
   }
 
   Future<void> _stopServices() async {

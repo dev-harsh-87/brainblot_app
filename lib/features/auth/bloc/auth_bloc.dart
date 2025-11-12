@@ -5,6 +5,7 @@ import 'package:spark_app/features/auth/data/auth_repository.dart';
 import 'package:spark_app/features/auth/data/firebase_user_repository.dart';
 import 'package:spark_app/core/services/preferences_service.dart';
 import 'package:spark_app/core/auth/services/session_management_service.dart';
+import 'package:spark_app/features/auth/services/multi_device_session_service.dart';
 import 'package:spark_app/core/di/injection.dart';
 import 'dart:async';
 
@@ -15,21 +16,26 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
   final AuthRepository _repo;
   final FirebaseUserRepository? _userRepo;
   final SessionManagementService? _sessionService;
+  final MultiDeviceSessionService _multiDeviceService;
   late final StreamSubscription<User?> _authSubscription;
   
   AuthBloc(
     this._repo, {
     FirebaseUserRepository? userRepo,
     SessionManagementService? sessionService,
+    MultiDeviceSessionService? multiDeviceService,
   })  : _userRepo = userRepo,
         _sessionService = sessionService ?? getIt<SessionManagementService>(),
-        super(const AuthState.initial()) {
+        _multiDeviceService = multiDeviceService ?? getIt<MultiDeviceSessionService>(),
+        super(_getInitialState()) {
     on<AuthLoginSubmitted>(_onLogin);
     on<AuthRegisterSubmitted>(_onRegister);
     on<AuthLogoutRequested>(_onLogout);
     on<AuthUserChanged>(_onUserChanged);
     on<AuthCheckRequested>(_onAuthCheck);
     on<AuthForgotPasswordSubmitted>(_onForgotPassword);
+    on<AuthDeviceConflictDetected>(_onDeviceConflictDetected);
+    on<AuthContinueWithCurrentDevice>(_onContinueWithCurrentDevice);
     
     // Listen to auth state changes for automatic session management
     _authSubscription = _repo.authState().listen((user) {
@@ -37,13 +43,37 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
     });
   }
 
+  /// Determines initial state based on current Firebase Auth state
+  /// This helps with hot reload scenarios
+  static AuthState _getInitialState() {
+    final currentUser = FirebaseAuth.instance.currentUser;
+    if (currentUser != null) {
+      // User is logged in, start with loading to prevent premature redirects
+      return const AuthState(status: AuthStatus.loading);
+    }
+    return const AuthState.initial();
+  }
+
   Future<void> _onLogin(AuthLoginSubmitted event, Emitter<AuthState> emit) async {
     emit(state.copyWith(status: AuthStatus.loading, error: null));
     try {
       final cred = await _repo.signInWithEmailPassword(email: event.email, password: event.password);
       
-      // Profile creation is now handled by SessionManagementService
-      emit(state.copyWith(status: AuthStatus.authenticated, user: cred.user));
+      // Check for existing sessions before completing login
+      final existingSessions = await _multiDeviceService.getActiveSessions();
+      final otherSessions = existingSessions.where((session) => !session.isCurrentDevice).toList();
+      
+      if (otherSessions.isNotEmpty) {
+        // There are other active sessions, show device conflict
+        emit(state.copyWith(
+          status: AuthStatus.deviceConflict,
+          user: cred.user,
+          existingSessions: otherSessions.map((s) => s.toFirestore()).toList(),
+        ));
+      } else {
+        // No conflicts, proceed with normal authentication
+        emit(state.copyWith(status: AuthStatus.authenticated, user: cred.user));
+      }
     } on FirebaseAuthException catch (e) {
       emit(state.copyWith(status: AuthStatus.failure, error: e.message ?? 'Authentication failed'));
     } catch (e) {
@@ -152,6 +182,31 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
           errorMessage = e.message ?? 'Failed to send password reset email';
       }
       emit(state.copyWith(status: AuthStatus.failure, error: errorMessage));
+    } catch (e) {
+      emit(state.copyWith(status: AuthStatus.failure, error: e.toString()));
+    }
+  }
+
+  Future<void> _onDeviceConflictDetected(AuthDeviceConflictDetected event, Emitter<AuthState> emit) async {
+    emit(state.copyWith(
+      status: AuthStatus.deviceConflict,
+      existingSessions: event.existingSessions,
+    ));
+  }
+
+  Future<void> _onContinueWithCurrentDevice(AuthContinueWithCurrentDevice event, Emitter<AuthState> emit) async {
+    emit(state.copyWith(status: AuthStatus.loading));
+    try {
+      // Force logout from other devices and continue with current login
+      await _sessionService!.forceLogoutOtherDevicesAndContinue();
+      
+      // Complete the authentication
+      final currentUser = FirebaseAuth.instance.currentUser;
+      if (currentUser != null) {
+        emit(state.copyWith(status: AuthStatus.authenticated, user: currentUser));
+      } else {
+        emit(state.copyWith(status: AuthStatus.failure, error: 'Authentication failed'));
+      }
     } catch (e) {
       emit(state.copyWith(status: AuthStatus.failure, error: e.toString()));
     }

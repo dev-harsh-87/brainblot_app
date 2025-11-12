@@ -76,28 +76,56 @@ class SessionManagementService {
       final isAdmin = userRole == 'admin';
       
       print("🔄 Registering device session...");
-      await _deviceSessionService.registerDeviceSession(firebaseUser.uid, isAdmin: isAdmin);
-      print("✅ Device session registered (Admin: $isAdmin)");
+      try {
+        final existingSessions = await _deviceSessionService.registerDeviceSession(
+          firebaseUser.uid,
+          isAdmin: isAdmin,
+          forceLogoutOthers: false, // Don't automatically logout others
+        );
+        
+        // If there are existing sessions and user is not admin, we should handle this
+        // For now, we'll just log it - the UI will handle showing the conflict dialog
+        if (existingSessions.isNotEmpty && !isAdmin) {
+          print("⚠️ Found ${existingSessions.length} existing sessions for user");
+          // You could emit an event here to show device conflict dialog
+        }
+        
+        print("✅ Device session registered (Admin: $isAdmin)");
+      } catch (e) {
+        print("⚠️ Device session registration failed: $e");
+        // Continue with session establishment - this is not critical
+      }
       
       // Listen for logout notifications from other devices
-      _logoutSubscription = _deviceSessionService.listenForLogoutNotifications().listen(
-        (notification) async {
-          print("📱 Received logout notification from another device");
-          await _handleForceLogout();
-        },
-        onError: (error) {
-          // Silent fail - notification system is not critical
-          print("⚠️ Logout notification error: $error");
-        },
-      );
+      try {
+        _logoutSubscription = _deviceSessionService.listenForLogoutNotifications().listen(
+          (notification) async {
+            print("📱 Received logout notification from another device");
+            await _handleForceLogout();
+          },
+          onError: (error) {
+            // Silent fail - notification system is not critical
+            print("⚠️ Logout notification error: $error");
+          },
+        );
+      } catch (e) {
+        print("⚠️ Failed to setup logout notifications: $e");
+        // Continue - this is not critical for session establishment
+      }
       
       // First ensure user profile exists
-// CRITICAL: Sync subscription BEFORE listening to snapshots
+      await _ensureUserProfileExists(firebaseUser);
+      
+      // CRITICAL: Sync subscription BEFORE listening to snapshots
       // This ensures the user gets the correct moduleAccess from their plan
       print("🔄 Syncing subscription before establishing session...");
-      await _subscriptionSync.syncUserOnLogin(firebaseUser.uid);
-      print("✅ Subscription synced");
-      await _ensureUserProfileExists(firebaseUser);
+      try {
+        await _subscriptionSync.syncUserOnLogin(firebaseUser.uid);
+        print("✅ Subscription synced");
+      } catch (e) {
+        print("⚠️ Subscription sync failed: $e");
+        // Continue - user can still use the app with default permissions
+      }
       
       // Listen to user document changes for real-time role/permission updates
       _userSubscription = _firestore
@@ -132,11 +160,15 @@ class SessionManagementService {
         }
       }, onError: (error) {
         print('❌ Session monitoring error: $error');
+        // Don't clear session completely - user might still be authenticated
+        // Just log the error and continue
+        print('⚠️ Auth check: Session failed to establish, clearing auth state');
         _currentSession = null;
         _notifySessionListeners(null);
       });
     } catch (e) {
       print('❌ Failed to establish session: $e');
+      print('⚠️ Auth check: Session failed to establish, clearing auth state');
       _currentSession = null;
       _notifySessionListeners(null);
     }
@@ -297,6 +329,30 @@ class SessionManagementService {
     final user = _auth.currentUser;
     if (user != null) {
       await _establishSession(user);
+    }
+  }
+
+  /// Force logout from all other devices and continue with current login
+  Future<void> forceLogoutOtherDevicesAndContinue() async {
+    final user = _auth.currentUser;
+    if (user == null) return;
+
+    try {
+      // Check if user is admin
+      final userRole = _determineUserRole(user.email);
+      final isAdmin = userRole == 'admin';
+
+      // Force logout from other devices
+      await _deviceSessionService.registerDeviceSession(
+        user.uid,
+        isAdmin: isAdmin,
+        forceLogoutOthers: true, // This will logout other devices
+      );
+
+      print("✅ Forced logout from other devices completed");
+    } catch (e) {
+      print("❌ Failed to force logout other devices: $e");
+      rethrow;
     }
   }
 

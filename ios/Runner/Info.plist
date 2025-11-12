@@ -2,10 +2,12 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
+	<key>CADisableMinimumFrameDurationOnPhone</key>
+	<true/>
 	<key>CFBundleDevelopmentRegion</key>
 	<string>$(DEVELOPMENT_LANGUAGE)</string>
 	<key>CFBundleDisplayName</key>
-	<string>Spark App</string>
+	<string>Spark</string>
 	<key>CFBundleExecutable</key>
 	<string>$(EXECUTABLE_NAME)</string>
 	<key>CFBundleIdentifier</key>
@@ -13,7 +15,7 @@
 	<key>CFBundleInfoDictionaryVersion</key>
 	<string>6.0</string>
 	<key>CFBundleName</key>
-	<string>spark_app</string>
+	<string>Spark</string>
 	<key>CFBundlePackageType</key>
 	<string>APPL</string>
 	<key>CFBundleShortVersionString</key>
@@ -24,6 +26,41 @@
 	<string>$(FLUTTER_BUILD_NUMBER)</string>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
+	<key>NSBluetoothAlwaysUsageDescription</key>
+	<string>Spark uses Bluetooth to connect with training devices and other users for multiplayer sessions. This enables synchronized workouts and device connectivity for enhanced training experiences.</string>
+	<key>NSBluetoothPeripheralUsageDescription</key>
+	<string>Spark uses Bluetooth to connect with training devices and other users for multiplayer sessions. This enables synchronized workouts and device connectivity for enhanced training experiences.</string>
+	<key>NSBluetoothWhileInUseUsageDescription</key>
+	<string>Spark uses Bluetooth to connect with training devices and other users for multiplayer sessions. This enables synchronized workouts and device connectivity for enhanced training experiences.</string>
+	<key>NSCameraUsageDescription</key>
+	<string>Spark may use camera access for enhanced training features, form analysis, and multiplayer session management.</string>
+	<key>NSHealthShareUsageDescription</key>
+	<string>Spark can read your health data to provide personalized training recommendations and track your fitness progress.</string>
+	<key>NSHealthUpdateUsageDescription</key>
+	<string>Spark can save your workout data to the Health app to keep a comprehensive record of your training sessions.</string>
+	<key>NSLocalNetworkUsageDescription</key>
+	<string>Spark uses local network access to connect with nearby training devices and users for multiplayer sessions. This enables peer-to-peer connections for synchronized training experiences.</string>
+	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
+	<string>Spark needs location access to discover nearby training devices and users for multiplayer sessions. Your precise location is never stored, shared, or transmitted - it's only used locally for Bluetooth device discovery as required by iOS.</string>
+	<key>NSLocationUsageDescription</key>
+	<string>Spark needs location access to discover nearby training devices and users for multiplayer sessions. Your precise location is never stored, shared, or transmitted - it's only used locally for Bluetooth device discovery as required by iOS.</string>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>Spark needs location access to discover nearby training devices and users for multiplayer sessions. Your precise location is never stored, shared, or transmitted - it's only used locally for Bluetooth device discovery as required by iOS.</string>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>Spark may use microphone access for voice commands, audio feedback, and enhanced multiplayer communication features during training sessions.</string>
+	<key>NSMotionUsageDescription</key>
+	<string>Spark uses motion data to track your training performance, analyze movement patterns, and provide personalized workout feedback.</string>
+	<key>NSNearbyInteractionUsageDescription</key>
+	<string>Spark uses nearby interaction to enhance multiplayer training sessions by providing better device discovery and connection stability for synchronized workouts.</string>
+	<key>UIApplicationSupportsIndirectInputEvents</key>
+	<true/>
+	<key>UIBackgroundModes</key>
+	<array>
+		<string>remote-notification</string>
+		<string>background-fetch</string>
+		<string>bluetooth-central</string>
+		<string>bluetooth-peripheral</string>
+	</array>
 	<key>UILaunchStoryboardName</key>
 	<string>LaunchScreen</string>
 	<key>UIMainStoryboardFile</key>
@@ -41,23 +78,7 @@
 		<string>UIInterfaceOrientationLandscapeLeft</string>
 		<string>UIInterfaceOrientationLandscapeRight</string>
 	</array>
-	<key>CADisableMinimumFrameDurationOnPhone</key>
-	<true/>
-	<key>UIApplicationSupportsIndirectInputEvents</key>
-	<true/>
-	
-	<!-- Bluetooth permissions -->
-	<key>NSBluetoothAlwaysUsageDescription</key>
-	<string>Spark uses Bluetooth to connect with other devices for multiplayer training sessions. This allows you to train together with friends and synchronize drill timing across devices.</string>
-	
-	<!-- Location permissions (required for Bluetooth on iOS) -->
-	<key>NSLocationWhenInUseUsageDescription</key>
-	<string>Spark needs location access to discover nearby devices for multiplayer training sessions via Bluetooth.</string>
-	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
-	<string>Spark needs location access to discover nearby devices for multiplayer training sessions via Bluetooth.</string>
-	
-	<!-- Local Network permissions -->
-	<key>NSLocalNetworkUsageDescription</key>
-	<string>Spark uses local network access to connect with nearby devices for multiplayer training sessions.</string>
+	<key>aps-environment</key>
+	<string>development</string>
 </dict>
 </plist>

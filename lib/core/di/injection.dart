@@ -28,8 +28,11 @@ import 'package:spark_app/features/multiplayer/services/session_sync_service.dar
 import 'package:spark_app/core/auth/services/permission_service.dart';
 import 'package:spark_app/core/auth/services/subscription_permission_service.dart';
 import 'package:spark_app/features/subscription/data/subscription_plan_repository.dart';
+import 'package:spark_app/features/subscription/services/subscription_sync_service.dart';
+import 'package:spark_app/core/services/fcm_token_service.dart';
 import 'package:spark_app/core/auth/services/session_management_service.dart';
 import 'package:spark_app/core/auth/services/user_management_service.dart';
+import 'package:spark_app/features/auth/services/multi_device_session_service.dart';
 
 final GetIt getIt = GetIt.instance;
 
@@ -112,6 +115,9 @@ Future<void> configureDependencies() async {
   // Auto Refresh Service
   getIt.registerLazySingleton<AutoRefreshService>(() => AutoRefreshService());
 
+  // FCM Token Service
+  getIt.registerLazySingleton<FCMTokenService>(() => FCMTokenService.instance);
+
   // Creation Services with Auto-Refresh
   getIt.registerLazySingleton<DrillCreationService>(() => DrillCreationService());
   getIt.registerLazySingleton<ProgramCreationService>(() => ProgramCreationService());
@@ -129,11 +135,25 @@ Future<void> configureDependencies() async {
   getIt.registerLazySingleton<SubscriptionPlanRepository>(() => SubscriptionPlanRepository(
     firestore: firebaseFirestore,
   ));
+  
+  // Register Subscription Sync Service
+  getIt.registerLazySingleton<SubscriptionSyncService>(() => SubscriptionSyncService(
+    firestore: firebaseFirestore,
+    planRepository: getIt<SubscriptionPlanRepository>(),
+  ));
+  
 // Register Session Management Service (singleton for app-wide session tracking)
   getIt.registerLazySingleton<SessionManagementService>(() => SessionManagementService(
     auth: firebaseAuth,
     firestore: firebaseFirestore,
     permissionService: getIt<PermissionService>(),
+    subscriptionSync: getIt<SubscriptionSyncService>(),
+  ));
+  
+  // Register Multi-Device Session Service
+  getIt.registerLazySingleton<MultiDeviceSessionService>(() => MultiDeviceSessionService(
+    firestore: firebaseFirestore,
+    auth: firebaseAuth,
   ));
   
   // Register Subscription Permission Service

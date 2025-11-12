@@ -298,13 +298,34 @@ class _DrillRunnerScreenState extends State<DrillRunnerScreen>
       _syncService = getIt<SessionSyncService>();
       
       // Listen for drill synchronization events
-      _drillEventSubscription = _syncService!.drillEventStream.listen((event) {
-        _handleMultiplayerDrillEvent(event);
-      });
+      _drillEventSubscription = _syncService!.drillEventStream.listen(
+        (event) {
+          _handleMultiplayerDrillEvent(event);
+        },
+        onError: (error) {
+          print('❌ Multiplayer sync error: $error');
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text('Sync error: $error'),
+                backgroundColor: Colors.orange,
+              ),
+            );
+          }
+        },
+      );
       
       print('🔗 Multiplayer sync initialized for drill runner');
     } catch (e) {
       print('❌ Failed to initialize multiplayer sync: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Failed to initialize multiplayer sync'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
     }
   }
 
@@ -313,29 +334,123 @@ class _DrillRunnerScreenState extends State<DrillRunnerScreen>
     
     print('🎮 Multiplayer drill event received: ${event.runtimeType}');
     
-    if (event is DrillStartedEvent) {
-      // Host started the drill - start locally if not already running
-      if (_state == DrillRunnerState.ready || _state == DrillRunnerState.paused) {
-        print('🎮 Starting drill from multiplayer sync');
-        _startDrill();
+    try {
+      if (event is DrillStartedEvent) {
+        // Host started the drill - start locally if not already running
+        if (_state == DrillRunnerState.ready || _state == DrillRunnerState.paused) {
+          print('🎮 Starting drill from multiplayer sync');
+          _startDrillFromSync();
+        }
+      } else if (event is DrillStoppedEvent) {
+        // Host stopped the drill - stop locally
+        if (_state == DrillRunnerState.running || _state == DrillRunnerState.paused) {
+          print('🎮 Stopping drill from multiplayer sync');
+          _stopDrillFromSync();
+        }
+      } else if (event is DrillPausedEvent) {
+        // Host paused the drill - pause locally
+        if (_state == DrillRunnerState.running) {
+          print('🎮 Pausing drill from multiplayer sync');
+          _pauseDrillFromSync();
+        }
+      } else if (event is DrillResumedEvent) {
+        // Host resumed the drill - resume locally
+        if (_state == DrillRunnerState.paused || _isMultiplayerPaused) {
+          print('🎮 Resuming drill from multiplayer sync');
+          _resumeDrillFromSync();
+        }
       }
-    } else if (event is DrillStoppedEvent) {
-      // Host stopped the drill - stop locally
-      if (_state == DrillRunnerState.running || _state == DrillRunnerState.paused) {
-        print('🎮 Stopping drill from multiplayer sync');
-        _finish();
+    } catch (e) {
+      print('❌ Error handling multiplayer drill event: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Sync error: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
       }
-    } else if (event is DrillPausedEvent) {
-      // Host paused the drill - pause locally
-      if (_state == DrillRunnerState.running) {
-        print('🎮 Pausing drill from multiplayer sync');
-        _pauseDrillFromSync();
+    }
+  }
+
+  void _startDrillFromSync() {
+    if (_state != DrillRunnerState.ready && _state != DrillRunnerState.paused) return;
+    
+    try {
+      // Start the drill without countdown for sync
+      _startedAt = DateTime.now();
+      _currentRepStartTime = _startedAt;
+      _currentSetStartTime = _startedAt;
+      
+      _stopwatch.start();
+      _ticker = Timer.periodic(const Duration(milliseconds: 8), _onTick);
+      
+      setState(() {
+        _state = DrillRunnerState.running;
+        _display = 'Ready';
+        _displayColor = Colors.white;
+      });
+      
+      _showFeedback('Started by Host', Colors.green);
+      HapticFeedback.mediumImpact();
+      
+      print('✅ Drill started from multiplayer sync');
+    } catch (e) {
+      print('❌ Error starting drill from sync: $e');
+    }
+  }
+
+  void _stopDrillFromSync() {
+    if (_state != DrillRunnerState.running && _state != DrillRunnerState.paused) return;
+    
+    try {
+      _ticker?.cancel();
+      _stopwatch.stop();
+      _endedAt = DateTime.now();
+      
+      setState(() {
+        _state = DrillRunnerState.finished;
+      });
+      
+      _showFeedback('Stopped by Host', Colors.red);
+      HapticFeedback.mediumImpact();
+      
+      // Complete the drill and navigate back
+      _completeMultiplayerDrill();
+      
+      print('✅ Drill stopped from multiplayer sync');
+    } catch (e) {
+      print('❌ Error stopping drill from sync: $e');
+    }
+  }
+
+  void _completeMultiplayerDrill() {
+    try {
+      // Create a basic session result for multiplayer mode
+      final sessionResult = SessionResult(
+        id: _uuid.v4(),
+        drill: widget.drill,
+        startedAt: _startedAt,
+        endedAt: _endedAt ?? DateTime.now(),
+        events: List.from(_events),
+      );
+      
+      // Call completion callback if provided
+      if (widget.onDrillComplete != null) {
+        widget.onDrillComplete!(sessionResult);
       }
-    } else if (event is DrillResumedEvent) {
-      // Host resumed the drill - resume locally
-      if (_state == DrillRunnerState.paused || _isMultiplayerPaused) {
-        print('🎮 Resuming drill from multiplayer sync');
-        _resumeDrillFromSync();
+      
+      // Navigate back after a short delay
+      Future.delayed(const Duration(seconds: 1), () {
+        if (mounted) {
+          Navigator.of(context).pop();
+        }
+      });
+    } catch (e) {
+      print('❌ Error completing multiplayer drill: $e');
+      // Still navigate back on error
+      if (mounted) {
+        Navigator.of(context).pop();
       }
     }
   }

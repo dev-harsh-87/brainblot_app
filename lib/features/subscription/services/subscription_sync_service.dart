@@ -44,12 +44,109 @@ class SubscriptionSyncService {
       final plans = await _planRepository.getAllPlans();
       if (plans.isEmpty) {
         print('📦 Creating default subscription plans...');
-        await _planRepository.initializeDefaultPlans();
+        await _createDefaultPlans();
         print('✅ Default plans created');
       }
     } catch (e) {
       print('❌ Error ensuring default plans: $e');
-      rethrow;
+      // Don't rethrow - this is not critical for app startup
+      print('⚠️ Continuing without default plans - they can be created via admin panel');
+    }
+  }
+
+  /// Create default subscription plans
+  Future<void> _createDefaultPlans() async {
+    final defaultPlans = [
+      SubscriptionPlan(
+        id: 'free',
+        name: 'Free Plan',
+        description: 'Basic access to core features',
+        price: 0.0,
+        currency: 'USD',
+        billingPeriod: 'lifetime',
+        features: [
+          'Basic drills',
+          'Basic programs',
+          'Progress tracking',
+        ],
+        moduleAccess: [
+          'basic_drills',
+          'basic_programs',
+          'stats',
+        ],
+        maxDrills: 10,
+        maxPrograms: 3,
+        isActive: true,
+        priority: 1,
+        createdAt: DateTime.now(),
+        updatedAt: DateTime.now(),
+      ),
+      SubscriptionPlan(
+        id: 'institute',
+        name: 'Institute Plan',
+        description: 'Full access for educational institutions',
+        price: 99.99,
+        currency: 'USD',
+        billingPeriod: 'monthly',
+        features: [
+          'All drills and programs',
+          'Advanced analytics',
+          'Multiplayer sessions',
+          'Admin dashboard',
+          'User management',
+          'Custom branding',
+        ],
+        moduleAccess: [
+          'all_drills',
+          'all_programs',
+          'advanced_stats',
+          'multiplayer',
+          'admin',
+          'analytics',
+          'user_management',
+        ],
+        maxDrills: -1, // unlimited
+        maxPrograms: -1, // unlimited
+        isActive: true,
+        priority: 3,
+        createdAt: DateTime.now(),
+        updatedAt: DateTime.now(),
+      ),
+      SubscriptionPlan(
+        id: 'premium',
+        name: 'Premium Plan',
+        description: 'Advanced features for serious trainers',
+        price: 19.99,
+        currency: 'USD',
+        billingPeriod: 'monthly',
+        features: [
+          'All drills and programs',
+          'Advanced analytics',
+          'Multiplayer sessions',
+          'Priority support',
+        ],
+        moduleAccess: [
+          'all_drills',
+          'all_programs',
+          'advanced_stats',
+          'multiplayer',
+        ],
+        maxDrills: -1, // unlimited
+        maxPrograms: -1, // unlimited
+        isActive: true,
+        priority: 2,
+        createdAt: DateTime.now(),
+        updatedAt: DateTime.now(),
+      ),
+    ];
+
+    for (final plan in defaultPlans) {
+      try {
+        await _planRepository.createPlan(plan);
+        print('✅ Created plan: ${plan.name}');
+      } catch (e) {
+        print('❌ Failed to create plan ${plan.name}: $e');
+      }
     }
   }
 

@@ -12,6 +12,7 @@ import 'package:spark_app/features/auth/bloc/auth_bloc.dart';
 import 'package:spark_app/core/auth/auth_wrapper.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:spark_app/features/subscription/services/subscription_fix_service.dart';
+import 'package:spark_app/core/services/fcm_token_service.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -27,6 +28,9 @@ Future<void> main() async {
   
   // Configure dependency injection
   await configureDependencies();
+  
+  // Initialize FCM token service
+  await FCMTokenService.instance.initialize();
   
   // Fix subscription for current user if logged in
   _fixSubscriptionOnStartup();
@@ -66,10 +70,17 @@ class CogniTrainApp extends StatelessWidget {
           sessionService: getIt(),
         );
         
-        // Delay auth check slightly to allow Firebase Auth to initialize
-        Future.delayed(const Duration(milliseconds: 100), () {
+        // For hot reload: Check Firebase Auth state immediately if user exists
+        final currentUser = FirebaseAuth.instance.currentUser;
+        if (currentUser != null) {
+          // User is logged in, trigger auth check immediately to prevent login redirect
           authBloc.add(const AuthCheckRequested());
-        });
+        } else {
+          // No user, delay auth check slightly to allow Firebase Auth to initialize
+          Future.delayed(const Duration(milliseconds: 100), () {
+            authBloc.add(const AuthCheckRequested());
+          });
+        }
         
         return authBloc;
       },
