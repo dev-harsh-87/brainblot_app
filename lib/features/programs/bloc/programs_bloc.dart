@@ -6,6 +6,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:collection/collection.dart';
 import 'package:spark_app/features/programs/data/program_repository.dart';
 import 'package:spark_app/features/programs/domain/program.dart';
+import 'package:spark_app/core/utils/app_logger.dart';
 import 'package:spark_app/core/bloc/bloc_utils.dart';
 
 part 'programs_event.dart';
@@ -17,8 +18,8 @@ class ProgramsBloc extends Bloc<ProgramsEvent, ProgramsState> {
   StreamSubscription<ActiveProgram?>? _subActive;
 
   ProgramsBloc(this._repo) : super(const ProgramsState.initial()) {
-    print('🏗️ ProgramsBloc: Initializing with repository type: ${_repo.runtimeType}');
-    print('🔍 ProgramsBloc: Is FirebaseProgramRepository? ${_repo is FirebaseProgramRepository}');
+    AppLogger.info('ProgramsBloc: Initializing with repository type: ${_repo.runtimeType}', tag: 'ProgramsBloc');
+    AppLogger.debug('ProgramsBloc: Is FirebaseProgramRepository? ${_repo is FirebaseProgramRepository}', tag: 'ProgramsBloc');
     
     // Event handlers
     on<ProgramsStarted>(_onStarted);
@@ -50,7 +51,7 @@ class ProgramsBloc extends Bloc<ProgramsEvent, ProgramsState> {
         await _subActive?.cancel();
         
         // Seeding disabled - only show user-created programs
-        print('📝 Loading user-created programs only...');
+        AppLogger.info('Loading user-created programs only...', tag: 'ProgramsBloc');
         
         // Set up new subscriptions with error handling
         _subPrograms = _repo.watchAll().listen(
@@ -226,7 +227,7 @@ class ProgramsBloc extends Bloc<ProgramsEvent, ProgramsState> {
 
   Future<void> _onSeedDefault(ProgramsSeedDefaultRequested event, Emitter<ProgramsState> emit) async {
     // Seeding disabled - no default programs will be created
-    print('🚫 Default program seeding is disabled');
+    AppLogger.info('Default program seeding is disabled', tag: 'ProgramsBloc');
     emit(state.copyWith(
       status: ProgramsStatus.loaded,
       lastUpdated: DateTime.now(),
@@ -252,7 +253,7 @@ class ProgramsBloc extends Bloc<ProgramsEvent, ProgramsState> {
           while (retryCount < maxRetries) {
             try {
               // Seeding disabled - only load user-created programs
-              print('🔄 Refreshing user-created programs...');
+              AppLogger.info('Refreshing user-created programs...', tag: 'ProgramsBloc');
               
               // Set up new subscriptions
               _subPrograms = _repo.watchAll().listen(
@@ -300,7 +301,7 @@ class ProgramsBloc extends Bloc<ProgramsEvent, ProgramsState> {
             lastUpdated: DateTime.now(),
           ),);
           
-          print('✅ Successfully refreshed programs');
+          AppLogger.success('Successfully refreshed programs', tag: 'ProgramsBloc');
         } catch (e) {
           rethrow;
         }

@@ -124,23 +124,48 @@ class Drill {
         id: map['id'] as String,
         name: map['name'] as String,
         category: map['category'] as String,
-        difficulty: Difficulty.values.firstWhere((d) => d.name == map['difficulty']),
+        difficulty: Difficulty.values.firstWhere(
+          (d) => d.name == map['difficulty'],
+          orElse: () => Difficulty.beginner,
+        ),
         durationSec: map['durationSec'] as int,
         restSec: map['restSec'] as int,
-        sets: (map['sets'] as int?) ?? 1, // default to 1 for backward compatibility
+        sets: (map['sets'] as int?) ?? 1,
         reps: map['reps'] as int,
-        stimulusTypes: (map['stimulusTypes'] as List).map((e) => StimulusType.values.firstWhere((s) => s.name == e)).toList(),
+        stimulusTypes: (map['stimulusTypes'] as List?)
+                ?.map((e) => StimulusType.values.firstWhere(
+                      (s) => s.name == e,
+                      orElse: () => StimulusType.color,
+                    ))
+                .toList() ??
+            [StimulusType.color],
         numberOfStimuli: map['numberOfStimuli'] as int,
-        zones: (map['zones'] as List).map((e) => ReactionZone.values.firstWhere((z) => z.name == e)).toList(),
-        colors: (map['colors'] as List).map((hex) => Color(int.parse((hex as String).replaceFirst('#', ''), radix: 16))).toList(),
+        zones: (map['zones'] as List?)
+                ?.map((e) => ReactionZone.values.firstWhere(
+                      (z) => z.name == e,
+                      orElse: () => ReactionZone.center,
+                    ))
+                .toList() ??
+            [ReactionZone.center],
+        colors: (map['colors'] as List?)
+                ?.map((hex) => Color(int.parse(
+                    (hex as String).replaceFirst('#', ''),
+                    radix: 16)))
+                .toList() ??
+            [Colors.blue, Colors.red, Colors.green],
         presentationMode: map['presentationMode'] != null
-            ? PresentationMode.values.firstWhere((p) => p.name == map['presentationMode'], orElse: () => PresentationMode.visual)
-            : PresentationMode.visual, // default to visual for backward compatibility
+            ? PresentationMode.values.firstWhere(
+                (p) => p.name == map['presentationMode'],
+                orElse: () => PresentationMode.visual,
+              )
+            : PresentationMode.visual,
         favorite: (map['favorite'] as bool?) ?? false,
         isPreset: (map['isPreset'] as bool?) ?? false,
         createdBy: map['createdBy'] as String?,
         sharedWith: List<String>.from((map['sharedWith'] as List?) ?? []),
-        createdAt: map['createdAt'] != null ? DateTime.parse(map['createdAt'] as String) : DateTime.now(),
+        createdAt: map['createdAt'] != null
+            ? DateTime.parse(map['createdAt'] as String)
+            : DateTime.now(),
         videoUrl: map['videoUrl'] as String?,
         stepImageUrl: map['stepImageUrl'] as String?,
       );

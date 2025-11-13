@@ -6,6 +6,7 @@ import 'package:spark_app/core/services/preferences_service.dart';
 import 'package:spark_app/core/auth/services/permission_service.dart';
 import 'package:spark_app/core/auth/services/device_session_service.dart';
 import 'package:spark_app/features/subscription/services/subscription_sync_service.dart';
+import 'package:spark_app/core/utils/app_logger.dart';
 import 'dart:async';
 
 /// Centralized session management service
@@ -44,15 +45,15 @@ class SessionManagementService {
   void _initializeSessionMonitoring() {
     // Initialize subscription sync service
     _subscriptionSync.initialize().catchError((e) {
-      print('⚠️ Failed to initialize subscription sync: $e');
+      AppLogger.error('Failed to initialize subscription sync', error: e);
     });
     
     // Check if there's an existing Firebase Auth user on init
     final currentUser = _auth.currentUser;
     if (currentUser != null) {
-      print('🔄 Session init: Found existing Firebase user, establishing session...');
+      AppLogger.debug('Session init: Found existing Firebase user, establishing session');
       _establishSession(currentUser).catchError((e) {
-        print('❌ Failed to establish initial session: $e');
+        AppLogger.error('Failed to establish initial session', error: e);
       });
     }
     
@@ -68,56 +69,60 @@ class SessionManagementService {
       return;
     }
 
-    // User logged in - establish session
-    await _establishSession(firebaseUser);
+    // User logged in - establish session WITHOUT device registration
+    // Device registration will happen after conflict check in AuthBloc
+    await _establishSession(firebaseUser, skipDeviceRegistration: true);
   }
 
   /// Establish user session
-  Future<void> _establishSession(User firebaseUser) async {
+  /// Set skipDeviceRegistration=true to defer device session creation (for conflict handling)
+  Future<void> _establishSession(User firebaseUser, {bool skipDeviceRegistration = false}) async {
     try {
       // Cancel existing user subscription if any
       await _userSubscription?.cancel();
       await _logoutSubscription?.cancel();
       
-      // Register device session (handles single device login)
-      // Check if user is admin first
-      final userRole = _determineUserRole(firebaseUser.email);
-      final isAdmin = userRole == 'admin';
-      
-      print('🔄 Registering device session...');
-      try {
-        final existingSessions = await _deviceSessionService.registerDeviceSession(
-          firebaseUser.uid,
-          isAdmin: isAdmin,
-        );
+      // Only register device session if not skipped (conflict check happens in AuthBloc first)
+      if (!skipDeviceRegistration) {
+        // Check if user is admin first
+        final userRole = _determineUserRole(firebaseUser.email);
+        final isAdmin = userRole == 'admin';
         
-        // If there are existing sessions and user is not admin, we should handle this
-        // For now, we'll just log it - the UI will handle showing the conflict dialog
-        if (existingSessions.isNotEmpty && !isAdmin) {
-          print('⚠️ Found ${existingSessions.length} existing sessions for user');
-          // You could emit an event here to show device conflict dialog
+        AppLogger.debug('Registering device session');
+        try {
+          final existingSessions = await _deviceSessionService.registerDeviceSession(
+            firebaseUser.uid,
+            isAdmin: isAdmin,
+          );
+          
+          // If there are existing sessions and user is not admin, log it
+          if (existingSessions.isNotEmpty && !isAdmin) {
+            AppLogger.warning('Found ${existingSessions.length} existing sessions for user');
+          }
+          
+          AppLogger.info('Device session registered (Admin: $isAdmin)');
+        } catch (e) {
+          AppLogger.error('Device session registration failed', error: e);
+          // Continue with session establishment - this is not critical
         }
-        
-        print('✅ Device session registered (Admin: $isAdmin)');
-      } catch (e) {
-        print('⚠️ Device session registration failed: $e');
-        // Continue with session establishment - this is not critical
+      } else {
+        AppLogger.debug('Skipping device registration - will be handled after conflict check');
       }
       
       // Listen for logout notifications from other devices
       try {
         _logoutSubscription = _deviceSessionService.listenForLogoutNotifications().listen(
           (notification) async {
-            print('📱 Received logout notification from another device');
+            AppLogger.info('Received logout notification from another device');
             await _handleForceLogout();
           },
           onError: (error) {
             // Silent fail - notification system is not critical
-            print('⚠️ Logout notification error: $error');
+            AppLogger.error('Logout notification error', error: error);
           },
         );
       } catch (e) {
-        print('⚠️ Failed to setup logout notifications: $e');
+        AppLogger.error('Failed to setup logout notifications', error: e);
         // Continue - this is not critical for session establishment
       }
       
@@ -126,12 +131,12 @@ class SessionManagementService {
       
       // CRITICAL: Sync subscription BEFORE listening to snapshots
       // This ensures the user gets the correct moduleAccess from their plan
-      print('🔄 Syncing subscription before establishing session...');
+      AppLogger.debug('Syncing subscription before establishing session');
       try {
         await _subscriptionSync.syncUserOnLogin(firebaseUser.uid);
-        print('✅ Subscription synced');
+        AppLogger.info('Subscription synced');
       } catch (e) {
-        print('⚠️ Subscription sync failed: $e');
+        AppLogger.error('Subscription sync failed', error: e);
         // Continue - user can still use the app with default permissions
       }
       
@@ -147,7 +152,7 @@ class SessionManagementService {
             _notifySessionListeners(_currentSession);
 // Sync user subscription on login
             _subscriptionSync.syncUserOnLogin(doc.id).catchError((e) {
-              print('⚠️ Failed to sync subscription: $e');
+              AppLogger.error('Failed to sync subscription', error: e);
             });
             
             // Only clear cache if role actually changed
@@ -155,28 +160,28 @@ class SessionManagementService {
               _permissionService!.clearCache();
             }
             
-            print('✅ Session established for user: ${_currentSession!.email}, role: ${_currentSession!.role.value}');
+            AppLogger.info('Session established for user: ${_currentSession!.email}, role: ${_currentSession!.role.value}');
           } catch (e) {
-            print('❌ Failed to parse user profile: $e');
-            print('📝 Recreating user profile with proper structure...');
+            AppLogger.error('Failed to parse user profile', error: e);
+            AppLogger.debug('Recreating user profile with proper structure');
             _createUserProfile(firebaseUser);
           }
         } else {
           // User document doesn't exist, create it
-          print('📝 User document not found, creating profile...');
+          AppLogger.debug('User document not found, creating profile');
           _createUserProfile(firebaseUser);
         }
       }, onError: (error) {
-        print('❌ Session monitoring error: $error');
+        AppLogger.error('Session monitoring error', error: error);
         // Don't clear session completely - user might still be authenticated
         // Just log the error and continue
-        print('⚠️ Auth check: Session failed to establish, clearing auth state');
+        AppLogger.warning('Auth check: Session failed to establish, clearing auth state');
         _currentSession = null;
         _notifySessionListeners(null);
       },);
     } catch (e) {
-      print('❌ Failed to establish session: $e');
-      print('⚠️ Auth check: Session failed to establish, clearing auth state');
+      AppLogger.error('Failed to establish session', error: e);
+      AppLogger.warning('Auth check: Session failed to establish, clearing auth state');
       _currentSession = null;
       _notifySessionListeners(null);
     }
@@ -184,13 +189,13 @@ class SessionManagementService {
 
   /// Handle force logout from another device
   Future<void> _handleForceLogout() async {
-    print('🚪 Force logout initiated - another device logged in');
+    AppLogger.info('Force logout initiated - another device logged in');
     
     // Sign out from Firebase Auth
     await _auth.signOut();
     
     // Show user notification (you can customize this)
-    print('📱 You have been logged out because your account was accessed from another device');
+    AppLogger.info('You have been logged out because your account was accessed from another device');
   }
 
   /// Clear user session
@@ -214,13 +219,13 @@ class SessionManagementService {
       final prefs = await PreferencesService.getInstance();
       await prefs.clearSavedCredentials();
     } catch (e) {
-      print('⚠️ Failed to clear saved credentials: $e');
+      AppLogger.error('Failed to clear saved credentials', error: e);
     }
     
     // Notify listeners
     _notifySessionListeners(null);
     
-    print('✅ Session cleared');
+    AppLogger.info('Session cleared');
   }
 
   /// Update user's last active timestamp
@@ -231,7 +236,7 @@ class SessionManagementService {
       });
     } catch (e) {
       // Silent fail - not critical
-      print('⚠️ Failed to update last active: $e');
+      AppLogger.error('Failed to update last active', error: e);
     }
   }
 
@@ -247,7 +252,7 @@ class SessionManagementService {
     
     // If we have Firebase user but no session yet, session is being established
     if (hasFirebaseUser && !hasSession) {
-      print('ℹ️ isLoggedIn: Firebase user exists, session establishing...');
+      AppLogger.debug('isLoggedIn: Firebase user exists, session establishing');
     }
     
     return hasSession || hasFirebaseUser;
@@ -328,7 +333,7 @@ class SessionManagementService {
       try {
         listener(session);
       } catch (e) {
-        print('⚠️ Session listener error: $e');
+        AppLogger.error('Session listener error', error: e);
       }
     }
   }
@@ -339,7 +344,7 @@ class SessionManagementService {
       await _auth.signOut();
       // _clearSession will be called automatically via auth state changes
     } catch (e) {
-      print('❌ Sign out error: $e');
+      AppLogger.error('Sign out error', error: e);
       rethrow;
     }
   }
@@ -349,6 +354,30 @@ class SessionManagementService {
     final user = _auth.currentUser;
     if (user != null) {
       await _establishSession(user);
+    }
+  }
+
+  /// Register device session without forcing logout (for initial login when no conflicts)
+  Future<void> registerCurrentDeviceSession() async {
+    final user = _auth.currentUser;
+    if (user == null) return;
+
+    try {
+      // Check if user is admin
+      final userRole = _determineUserRole(user.email);
+      final isAdmin = userRole == 'admin';
+
+      // Register device session without forcing logout
+      await _deviceSessionService.registerDeviceSession(
+        user.uid,
+        isAdmin: isAdmin,
+        forceLogoutOthers: false,
+      );
+
+      AppLogger.info('Device session registered');
+    } catch (e) {
+      AppLogger.error('Failed to register device session', error: e);
+      rethrow;
     }
   }
 
@@ -369,9 +398,9 @@ class SessionManagementService {
         forceLogoutOthers: true, // This will logout other devices
       );
 
-      print('✅ Forced logout from other devices completed');
+      AppLogger.info('Forced logout from other devices completed');
     } catch (e) {
-      print('❌ Failed to force logout other devices: $e');
+      AppLogger.error('Failed to force logout other devices', error: e);
       rethrow;
     }
   }
@@ -427,14 +456,14 @@ class SessionManagementService {
   /// Ensure user profile exists in Firestore
   Future<void> _ensureUserProfileExists(User firebaseUser) async {
     try {
-      print('🔍 Checking if user profile exists for: ${firebaseUser.uid}');
+      AppLogger.debug('Checking if user profile exists for: ${firebaseUser.uid}');
       final userDoc = await _firestore.collection('users').doc(firebaseUser.uid).get();
       
       if (!userDoc.exists) {
-        print('📝 Creating user profile for: ${firebaseUser.email}');
+        AppLogger.debug('Creating user profile for: ${firebaseUser.email}');
         await _createUserProfile(firebaseUser);
       } else {
-        print('✅ User profile already exists');
+        AppLogger.debug('User profile already exists');
         
         // Check if role needs to be updated for existing users
         final currentData = userDoc.data()!;
@@ -442,13 +471,13 @@ class SessionManagementService {
         final expectedRole = _determineUserRole(firebaseUser.email);
         
         if (currentRole != expectedRole) {
-          print('🔄 Updating role from "$currentRole" to "$expectedRole" for: ${firebaseUser.email}');
+          AppLogger.debug('Updating role from "$currentRole" to "$expectedRole" for: ${firebaseUser.email}');
           await _firestore.collection('users').doc(firebaseUser.uid).update({
             'role': expectedRole,
             'lastActiveAt': FieldValue.serverTimestamp(),
             'updatedAt': FieldValue.serverTimestamp(),
           });
-          print('✅ Role updated successfully');
+          AppLogger.info('Role updated successfully');
         } else {
           // Just update lastActiveAt
           await _firestore.collection('users').doc(firebaseUser.uid).update({
@@ -457,7 +486,7 @@ class SessionManagementService {
         }
       }
     } catch (e) {
-      print('❌ Error ensuring user profile: $e');
+      AppLogger.error('Error ensuring user profile', error: e);
     }
   }
 
@@ -466,7 +495,7 @@ class SessionManagementService {
     try {
       final userRole = _determineUserRole(firebaseUser.email);
       final isAdmin = userRole == 'admin';
-      print('🔑 Assigning $userRole role to: ${firebaseUser.email}');
+      AppLogger.debug('Assigning $userRole role to: ${firebaseUser.email}');
       
       // Create proper AppUser object and convert to Firestore format
       final appUser = AppUser(
@@ -508,9 +537,9 @@ class SessionManagementService {
       );
 
       await _firestore.collection('users').doc(firebaseUser.uid).set(appUser.toFirestore());
-      print('✅ Created profile for: ${firebaseUser.email} with role: $userRole');
+      AppLogger.info('Created profile for: ${firebaseUser.email} with role: $userRole');
     } catch (e) {
-      print('❌ Failed to create user profile: $e');
+      AppLogger.error('Failed to create user profile', error: e);
       rethrow;
     }
   }

@@ -34,11 +34,12 @@ import 'package:spark_app/core/services/fcm_token_service.dart';
 import 'package:spark_app/core/auth/services/session_management_service.dart';
 import 'package:spark_app/core/auth/services/user_management_service.dart';
 import 'package:spark_app/features/auth/services/multi_device_session_service.dart';
+import 'package:spark_app/core/utils/app_logger.dart';
 
 final GetIt getIt = GetIt.instance;
 
 Future<void> configureDependencies() async {
-  print('🔧 DI: Starting professional Firebase dependency injection configuration');
+  AppLogger.info('Starting Firebase dependency injection configuration');
   
   // Core Firebase instances
   final firebaseAuth = FirebaseAuth.instance;
@@ -52,14 +53,14 @@ Future<void> configureDependencies() async {
   ),);
   
   // Professional Firebase Repositories
-  print('🔧 DI: Registering professional Firebase repositories');
+  AppLogger.debug('Registering Firebase repositories');
   
   getIt.registerLazySingleton<DrillRepository>(() {
     final repo = FirebaseDrillRepository(
       firestore: firebaseFirestore,
       auth: firebaseAuth,
     );
-    print('🔧 DI: Created FirebaseDrillRepository instance');
+    AppLogger.debug('Created FirebaseDrillRepository instance');
     return repo;
   });
   
@@ -72,7 +73,7 @@ Future<void> configureDependencies() async {
     final repo = DrillCategoryRepository(
       firestore: firebaseFirestore,
     );
-    print('🔧 DI: Created DrillCategoryRepository instance');
+    AppLogger.debug('Created DrillCategoryRepository instance');
     return repo;
   });
   
@@ -81,7 +82,7 @@ Future<void> configureDependencies() async {
       firestore: firebaseFirestore,
       auth: firebaseAuth,
     );
-    print('🔧 DI: Created FirebaseSessionRepository instance');
+    AppLogger.debug('Created FirebaseSessionRepository instance');
     return repo;
   });
   
@@ -98,7 +99,7 @@ Future<void> configureDependencies() async {
   getIt.registerLazySingleton<SessionRepository>(() => HiveSessionRepository(), instanceName: 'local');
   
   // Services
-  print('🔧 DI: Registering services');
+  AppLogger.debug('Registering services');
   getIt.registerLazySingleton<DrillAssignmentService>(() => DrillAssignmentService(getIt<DrillRepository>()));
   getIt.registerLazySingleton<ProgramProgressService>(() => ProgramProgressService());
   
@@ -136,7 +137,7 @@ Future<void> configureDependencies() async {
   getIt.registerLazySingleton<SessionSyncService>(() => SessionSyncService(getIt<BluetoothConnectionService>()));
   
   // RBAC Services
-  print('🔧 DI: Registering RBAC services');
+  AppLogger.debug('Registering RBAC services');
   getIt.registerLazySingleton<PermissionService>(() => PermissionService(
     firestore: firebaseFirestore,
     auth: firebaseAuth,
@@ -173,8 +174,8 @@ Future<void> configureDependencies() async {
 // Register User Management Service
   getIt.registerLazySingleton<UserManagementService>(() => UserManagementService());
   
-  print('🔧 DI: Professional Firebase dependency injection configuration completed successfully');
-  print('🔧 DI: Available repositories: Firebase (primary), Hive (local fallback)');
-  print('🔧 DI: RBAC system initialized with PermissionService and SubscriptionPlanRepository');
-  print('🔧 DI: Session management service registered - centralized auth handling enabled');
+  AppLogger.info('Firebase dependency injection configuration completed successfully');
+  AppLogger.debug('Available repositories: Firebase (primary), Hive (local fallback)');
+  AppLogger.debug('RBAC system initialized with PermissionService and SubscriptionPlanRepository');
+  AppLogger.debug('Session management service registered - centralized auth handling enabled');
 }

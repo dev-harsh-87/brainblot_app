@@ -258,15 +258,17 @@ class _JoinSessionScreenState extends State<JoinSessionScreen>
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
+    final size = MediaQuery.of(context).size;
+    final isSmallScreen = size.width < 360;
 
     return Scaffold(
       backgroundColor: colorScheme.surface,
       appBar: AppBar(
-        title: const Text(
+        title: Text(
           'Join Session',
           style: TextStyle(
             fontWeight: FontWeight.bold,
-            fontSize: 20,
+            fontSize: isSmallScreen ? 18 : 20,
             letterSpacing: -0.5,
           ),
         ),
@@ -315,33 +317,34 @@ class _JoinSessionScreenState extends State<JoinSessionScreen>
   }
 
   Widget _buildJoinState(BuildContext context) {
-    final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
+    final size = MediaQuery.of(context).size;
+    final isSmallScreen = size.width < 360;
+    final padding = isSmallScreen ? 16.0 : 24.0;
 
     return SingleChildScrollView(
-      padding: const EdgeInsets.all(24),
+      padding: EdgeInsets.all(padding),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           // Header
           _buildHeader(context),
-          const SizedBox(height: 32),
+          SizedBox(height: isSmallScreen ? 24 : 32),
 
           // Code Input
           _buildCodeInput(context),
-          const SizedBox(height: 24),
+          SizedBox(height: isSmallScreen ? 16 : 24),
 
           // Join Button
           _buildJoinButton(context),
-          const SizedBox(height: 16),
+          SizedBox(height: isSmallScreen ? 12 : 16),
 
           // Permission Button (if needed)
           _buildPermissionButton(context),
-          const SizedBox(height: 32),
+          SizedBox(height: isSmallScreen ? 24 : 32),
 
           // Status
           _buildStatusCard(context),
-          const SizedBox(height: 24),
+          SizedBox(height: isSmallScreen ? 16 : 24),
 
           // Instructions
           _buildInstructions(context),
@@ -351,22 +354,26 @@ class _JoinSessionScreenState extends State<JoinSessionScreen>
   }
 
   Widget _buildConnectedState(BuildContext context) {
+    final size = MediaQuery.of(context).size;
+    final isSmallScreen = size.width < 360;
+    final padding = isSmallScreen ? 16.0 : 24.0;
+
     return SingleChildScrollView(
-      padding: const EdgeInsets.all(24),
+      padding: EdgeInsets.all(padding),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           // Session Info
           _buildSessionInfo(context),
-          const SizedBox(height: 24),
+          SizedBox(height: isSmallScreen ? 16 : 24),
 
           // Participants
           _buildParticipantsList(context),
-          const SizedBox(height: 24),
+          SizedBox(height: isSmallScreen ? 16 : 24),
 
           // Current Drill Status
           _buildDrillStatus(context),
-          const SizedBox(height: 24),
+          SizedBox(height: isSmallScreen ? 16 : 24),
 
           // Instructions for participants
           _buildParticipantInstructions(context),
@@ -378,9 +385,11 @@ class _JoinSessionScreenState extends State<JoinSessionScreen>
   Widget _buildHeader(BuildContext context) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
+    final size = MediaQuery.of(context).size;
+    final isSmallScreen = size.width < 360;
 
     return Container(
-      padding: const EdgeInsets.all(24),
+      padding: EdgeInsets.all(isSmallScreen ? 16 : 24),
       decoration: BoxDecoration(
         gradient: LinearGradient(
           colors: [
@@ -390,7 +399,7 @@ class _JoinSessionScreenState extends State<JoinSessionScreen>
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(isSmallScreen ? 16 : 20),
         border: Border.all(
           color: colorScheme.outline.withOpacity(0.1),
         ),
@@ -398,18 +407,18 @@ class _JoinSessionScreenState extends State<JoinSessionScreen>
       child: Row(
         children: [
           Container(
-            padding: const EdgeInsets.all(12),
+            padding: EdgeInsets.all(isSmallScreen ? 10 : 12),
             decoration: BoxDecoration(
               color: Colors.green.withOpacity(0.1),
               borderRadius: BorderRadius.circular(12),
             ),
-            child: const Icon(
+            child: Icon(
               Icons.login_rounded,
               color: Colors.green,
-              size: 28,
+              size: isSmallScreen ? 24 : 28,
             ),
           ),
-          const SizedBox(width: 16),
+          SizedBox(width: isSmallScreen ? 12 : 16),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -418,6 +427,7 @@ class _JoinSessionScreenState extends State<JoinSessionScreen>
                   'Join Training Session',
                   style: theme.textTheme.headlineSmall?.copyWith(
                     fontWeight: FontWeight.bold,
+                    fontSize: isSmallScreen ? 20 : null,
                     color: colorScheme.onSurface,
                   ),
                 ),
@@ -425,6 +435,7 @@ class _JoinSessionScreenState extends State<JoinSessionScreen>
                 Text(
                   'Enter the 6-digit code from your host',
                   style: theme.textTheme.bodyMedium?.copyWith(
+                    fontSize: isSmallScreen ? 13 : null,
                     color: colorScheme.onSurface.withOpacity(0.7),
                   ),
                 ),
@@ -439,6 +450,8 @@ class _JoinSessionScreenState extends State<JoinSessionScreen>
   Widget _buildCodeInput(BuildContext context) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
+    final size = MediaQuery.of(context).size;
+    final isSmallScreen = size.width < 360;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -447,9 +460,10 @@ class _JoinSessionScreenState extends State<JoinSessionScreen>
           'Session Code',
           style: theme.textTheme.titleMedium?.copyWith(
             fontWeight: FontWeight.bold,
+            fontSize: isSmallScreen ? 15 : null,
           ),
         ),
-        const SizedBox(height: 12),
+        SizedBox(height: isSmallScreen ? 10 : 12),
         TextFormField(
           controller: _codeController,
           focusNode: _codeFocusNode,
@@ -460,7 +474,8 @@ class _JoinSessionScreenState extends State<JoinSessionScreen>
           ],
           style: theme.textTheme.headlineMedium?.copyWith(
             fontWeight: FontWeight.bold,
-            letterSpacing: 8,
+            fontSize: isSmallScreen ? 28 : null,
+            letterSpacing: isSmallScreen ? 6 : 8,
             fontFamily: 'monospace',
           ),
           textAlign: TextAlign.center,
@@ -468,25 +483,25 @@ class _JoinSessionScreenState extends State<JoinSessionScreen>
             hintText: '000000',
             hintStyle: TextStyle(
               color: colorScheme.onSurface.withOpacity(0.3),
-              letterSpacing: 8,
+              letterSpacing: isSmallScreen ? 6 : 8,
             ),
             border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(16),
+              borderRadius: BorderRadius.circular(isSmallScreen ? 12 : 16),
               borderSide: BorderSide(
                 color: colorScheme.outline,
                 width: 2,
               ),
             ),
             focusedBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(16),
+              borderRadius: BorderRadius.circular(isSmallScreen ? 12 : 16),
               borderSide: BorderSide(
                 color: colorScheme.primary,
                 width: 2,
               ),
             ),
-            contentPadding: const EdgeInsets.symmetric(
-              horizontal: 24,
-              vertical: 20,
+            contentPadding: EdgeInsets.symmetric(
+              horizontal: isSmallScreen ? 16 : 24,
+              vertical: isSmallScreen ? 16 : 20,
             ),
           ),
           onChanged: (value) {
@@ -649,12 +664,14 @@ class _JoinSessionScreenState extends State<JoinSessionScreen>
   Widget _buildInstructions(BuildContext context) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
+    final size = MediaQuery.of(context).size;
+    final isSmallScreen = size.width < 360;
 
     return Container(
-      padding: const EdgeInsets.all(20),
+      padding: EdgeInsets.all(isSmallScreen ? 16 : 20),
       decoration: BoxDecoration(
         color: colorScheme.surfaceContainerHighest.withOpacity(0.3),
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(isSmallScreen ? 12 : 16),
         border: Border.all(
           color: colorScheme.outline.withOpacity(0.1),
         ),
@@ -667,18 +684,19 @@ class _JoinSessionScreenState extends State<JoinSessionScreen>
               Icon(
                 Icons.help_outline_rounded,
                 color: colorScheme.primary,
-                size: 20,
+                size: isSmallScreen ? 18 : 20,
               ),
-              const SizedBox(width: 8),
+              SizedBox(width: isSmallScreen ? 6 : 8),
               Text(
                 'How to join',
                 style: theme.textTheme.titleMedium?.copyWith(
                   fontWeight: FontWeight.bold,
+                  fontSize: isSmallScreen ? 15 : null,
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 12),
+          SizedBox(height: isSmallScreen ? 10 : 12),
           Text(
             '1. Get the 6-digit session code from the host\n'
             '2. Enter the code in the field above\n'
@@ -686,6 +704,7 @@ class _JoinSessionScreenState extends State<JoinSessionScreen>
             '4. Wait for the host to start training\n'
             '5. Follow along with synchronized drills',
             style: theme.textTheme.bodyMedium?.copyWith(
+              fontSize: isSmallScreen ? 13 : null,
               color: colorScheme.onSurface.withOpacity(0.7),
               height: 1.5,
             ),

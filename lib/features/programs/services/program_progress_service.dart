@@ -1,6 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:spark_app/features/programs/domain/program.dart';
+import 'package:spark_app/core/utils/app_logger.dart';
 
 class ProgramProgressService {
   final FirebaseFirestore _firestore;
@@ -19,7 +20,7 @@ class ProgramProgressService {
     final userId = _currentUserId;
     if (userId == null) throw Exception('User not authenticated');
 
-    print('✅ Completing program day: $programId, day $dayNumber');
+    AppLogger.info('Completing program day: $programId, day $dayNumber');
 
     final batch = _firestore.batch();
 
@@ -96,7 +97,7 @@ class ProgramProgressService {
     });
 
     await batch.commit();
-    print('🎉 Program day $dayNumber completed successfully');
+    AppLogger.info('Program day $dayNumber completed successfully');
 
     // Check if program is fully completed
     final program = await _getProgram(programId);
@@ -142,7 +143,7 @@ class ProgramProgressService {
             : null,
       );
     } catch (e) {
-      print('❌ Error getting program progress: $e');
+      AppLogger.error('Error getting program progress', error: e);
       return null;
     }
   }
@@ -227,7 +228,7 @@ class ProgramProgressService {
         longestStreak: streaks['longest'] ?? 0,
       );
     } catch (e) {
-      print('❌ Error getting program stats: $e');
+      AppLogger.error('Error getting program stats', error: e);
       return ProgramStats(
         totalProgramsStarted: 0,
         totalProgramsCompleted: 0,
@@ -271,7 +272,7 @@ class ProgramProgressService {
     });
 
     await batch.commit();
-    print('🔄 Program progress reset for $programId');
+    AppLogger.info('Program progress reset for $programId');
   }
 
   // Private helper methods
@@ -288,13 +289,13 @@ class ProgramProgressService {
       }
       return null;
     } catch (e) {
-      print('❌ Error getting program: $e');
+      AppLogger.error('Error getting program', error: e);
       return null;
     }
   }
 
   Future<void> _completeProgram(String programId, String userId) async {
-    print('🏆 Completing entire program: $programId');
+    AppLogger.info('Completing entire program: $programId');
 
     final batch = _firestore.batch();
 
@@ -317,7 +318,7 @@ class ProgramProgressService {
     }
 
     await batch.commit();
-    print('🎉 Program completed and moved to completed programs!');
+    AppLogger.info('Program completed and moved to completed programs');
   }
 
   double _calculateProgressPercentage(int completedDays, int totalDays) {
@@ -392,7 +393,7 @@ class ProgramProgressService {
 
       return {'current': currentStreak, 'longest': longestStreak};
     } catch (e) {
-      print('❌ Error calculating streaks: $e');
+      AppLogger.error('Error calculating streaks', error: e);
       return {'current': 0, 'longest': 0};
     }
   }

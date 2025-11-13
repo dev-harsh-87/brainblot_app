@@ -5,7 +5,6 @@ import 'package:spark_app/core/auth/guards/admin_guard.dart';
 import 'package:spark_app/core/auth/models/user_role.dart';
 import 'package:spark_app/features/admin/ui/user_management_screen.dart';
 import 'package:spark_app/features/admin/ui/subscription_management_screen.dart';
-import 'package:spark_app/features/admin/ui/screens/comprehensive_analytics_screen.dart';
 import 'package:spark_app/features/admin/ui/plan_requests_screen.dart';
 import 'package:spark_app/features/admin/ui/screens/comprehensive_activity_screen.dart';
 import 'package:spark_app/features/admin/ui/category_management_screen.dart';
@@ -304,19 +303,6 @@ Widget _buildStatCard(
                 context,
                 MaterialPageRoute(
                   builder: (context) => const PlanRequestsScreen(),
-                ),
-              ),
-            ),
-            _buildManagementCard(
-              context,
-              title: 'Analytics',
-              description: 'View insights & reports',
-              icon: Icons.analytics_outlined,
-              color: Colors.purple,
-              onTap: () => Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => const ComprehensiveAnalyticsScreen(),
                 ),
               ),
             ),

@@ -11,6 +11,7 @@ import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 import 'package:uuid/uuid.dart';
 import 'package:flutter_tts/flutter_tts.dart';
+import 'package:spark_app/core/utils/app_logger.dart';
 
 // Data structures for detailed results tracking
 class RepResult {
@@ -178,24 +179,122 @@ class _DrillRunnerScreenState extends State<DrillRunnerScreen>
       _checkMultiplayerDrillState();
     }
     
-    // Debug: Print drill configuration to verify sets value
-    print('🏃‍♂️ Drill Runner - Drill Configuration:');
-    print('  Name: ${widget.drill.name}');
-    print('  Sets: ${widget.drill.sets}');
-    print('  Reps: ${widget.drill.reps}');
-    print('  Duration: ${widget.drill.durationSec}s');
-    print('  Rest: ${widget.drill.restSec}s');
-    print('  Presentation Mode: ${widget.drill.presentationMode.name}');
-    print('  Created At: ${widget.drill.createdAt}');
+    // Validate and enhance drill configuration for proper functionality
+    final validatedDrill = _validateAndEnhanceDrillConfiguration(widget.drill);
     
-    // Additional safety check for invalid sets value
-    if (widget.drill.sets < 1) {
-      print('⚠️ WARNING: Invalid sets value (${widget.drill.sets}), defaulting to 1');
-    }
+    // Debug: Print drill configuration to verify values
+    AppLogger.debug('Drill Runner - Enhanced Drill Configuration: ${validatedDrill.name}, Sets: ${validatedDrill.sets}, Reps: ${validatedDrill.reps}, Duration: ${validatedDrill.durationSec}s, Rest: ${validatedDrill.restSec}s, Stimuli: ${validatedDrill.numberOfStimuli}');
     
-    _schedule = _generateSchedule(widget.drill);
+    _schedule = _generateSchedule(validatedDrill);
     _initializeAnimations();
     _initializeTts();
+  }
+  
+  /// Validates and enhances drill configuration to ensure proper functionality
+  /// This ensures stimulus selection, zone selection, and screen coverage work correctly
+  Drill _validateAndEnhanceDrillConfiguration(Drill drill) {
+    AppLogger.debug('Validating drill configuration for proper functionality');
+    
+    var enhancedDrill = drill;
+    bool needsUpdate = false;
+    
+    // 1. Validate sets (minimum 1)
+    if (drill.sets < 1) {
+      AppLogger.warning('Invalid sets value (${drill.sets}), correcting to 1');
+      enhancedDrill = enhancedDrill.copyWith(sets: 1);
+      needsUpdate = true;
+    }
+    
+    // 2. Validate reps (minimum 1)
+    if (drill.reps < 1) {
+      AppLogger.warning('Invalid reps value (${drill.reps}), correcting to 1');
+      enhancedDrill = enhancedDrill.copyWith(reps: 1);
+      needsUpdate = true;
+    }
+    
+    // 3. Validate duration (minimum 10 seconds for meaningful drill)
+    if (drill.durationSec < 10) {
+      AppLogger.warning('Duration too short (${drill.durationSec}s), correcting to 30s', tag: 'DrillValidation');
+      enhancedDrill = enhancedDrill.copyWith(durationSec: 30);
+      needsUpdate = true;
+    }
+    
+    // 4. Validate and optimize number of stimuli for proper timing
+    final maxReasonableStimuli = (drill.durationSec / 1.5).floor(); // Max 1 stimulus per 1.5 seconds
+    final minStimuli = max(1, (drill.durationSec / 10).floor()); // Min 1 stimulus per 10 seconds
+    
+    if (drill.numberOfStimuli < minStimuli) {
+      AppLogger.warning('Too few stimuli (${drill.numberOfStimuli}), correcting to $minStimuli', tag: 'DrillValidation');
+      enhancedDrill = enhancedDrill.copyWith(numberOfStimuli: minStimuli);
+      needsUpdate = true;
+    } else if (drill.numberOfStimuli > maxReasonableStimuli) {
+      AppLogger.warning('Too many stimuli (${drill.numberOfStimuli}) for duration, correcting to $maxReasonableStimuli', tag: 'DrillValidation');
+      enhancedDrill = enhancedDrill.copyWith(numberOfStimuli: maxReasonableStimuli);
+      needsUpdate = true;
+    }
+    
+    // 5. Ensure stimulus types are present and valid
+    if (drill.stimulusTypes.isEmpty) {
+      AppLogger.warning('No stimulus types specified, adding color stimulus for proper functionality', tag: 'DrillValidation');
+      enhancedDrill = enhancedDrill.copyWith(stimulusTypes: [StimulusType.color]);
+      needsUpdate = true;
+    }
+    
+    // 6. Ensure zones are present for proper screen coverage
+    if (drill.zones.isEmpty) {
+      AppLogger.warning('No zones specified, adding center zone for screen coverage', tag: 'DrillValidation');
+      enhancedDrill = enhancedDrill.copyWith(zones: [ReactionZone.center]);
+      needsUpdate = true;
+    }
+    
+    // 7. Validate colors for color stimulus type
+    if (drill.stimulusTypes.contains(StimulusType.color)) {
+      if (drill.colors.isEmpty) {
+        AppLogger.warning('Color stimulus specified but no colors provided, adding default colors', tag: 'DrillValidation');
+        enhancedDrill = enhancedDrill.copyWith(colors: [
+          Colors.red, Colors.green, Colors.blue, Colors.yellow,
+          Colors.orange, Colors.purple, Colors.cyan, Colors.pink
+        ]);
+        needsUpdate = true;
+      } else if (drill.colors.length < 3) {
+        AppLogger.warning('Insufficient colors for variety, adding more colors', tag: 'DrillValidation');
+        final additionalColors = [Colors.red, Colors.green, Colors.blue, Colors.yellow]
+            .where((color) => !drill.colors.contains(color))
+            .take(4 - drill.colors.length)
+            .toList();
+        enhancedDrill = enhancedDrill.copyWith(colors: [...drill.colors, ...additionalColors]);
+        needsUpdate = true;
+      }
+    }
+    
+    // 8. Validate presentation mode compatibility
+    if (drill.presentationMode == PresentationMode.audio) {
+      // Ensure all stimulus types are audio-compatible
+      final audioCompatibleTypes = drill.stimulusTypes.where((type) =>
+        type == StimulusType.color ||
+        type == StimulusType.arrow ||
+        type == StimulusType.number ||
+        type == StimulusType.shape
+      ).toList();
+      
+      if (audioCompatibleTypes.isEmpty) {
+        AppLogger.warning('Audio mode requires compatible stimulus types, adding color', tag: 'DrillValidation');
+        enhancedDrill = enhancedDrill.copyWith(stimulusTypes: [StimulusType.color]);
+        needsUpdate = true;
+      } else if (audioCompatibleTypes.length != drill.stimulusTypes.length) {
+        AppLogger.warning('Some stimulus types not compatible with audio mode, filtering', tag: 'DrillValidation');
+        enhancedDrill = enhancedDrill.copyWith(stimulusTypes: audioCompatibleTypes);
+        needsUpdate = true;
+      }
+    }
+    
+    if (needsUpdate) {
+      AppLogger.success('Drill configuration enhanced for proper functionality', tag: 'DrillValidation');
+    } else {
+      AppLogger.success('Drill configuration is already optimal', tag: 'DrillValidation');
+    }
+    
+    return enhancedDrill;
   }
   
   // Helper method to get safe sets value (minimum 1)
@@ -246,21 +345,21 @@ class _DrillRunnerScreenState extends State<DrillRunnerScreen>
 
   Future<void> _initializeTts() async {
     try {
-      print('🔧 Initializing TTS...');
+      AppLogger.info('Initializing TTS...', tag: 'TTS');
       
       // Set completion handler to track speech completion
       _flutterTts.setCompletionHandler(() {
-        print('✅ TTS speech completed');
+        AppLogger.success('TTS speech completed', tag: 'TTS');
       });
       
       // Set error handler
       _flutterTts.setErrorHandler((msg) {
-        print('❌ TTS error handler: $msg');
+        AppLogger.error('TTS error handler: $msg', tag: 'TTS');
       });
       
       // Set start handler
       _flutterTts.setStartHandler(() {
-        print('▶️ TTS speech started');
+        AppLogger.info('TTS speech started', tag: 'TTS');
       });
       
       // Configure TTS settings
@@ -284,16 +383,15 @@ class _DrillRunnerScreenState extends State<DrillRunnerScreen>
       }
       
       // Test TTS with a silent test
-      print('🔍 Testing TTS...');
+      AppLogger.debug('Testing TTS...', tag: 'TTS');
       final testResult = await _flutterTts.speak('');
-      print('🔍 TTS test result: $testResult');
+      AppLogger.debug('TTS test result: $testResult', tag: 'TTS');
       await _flutterTts.stop();
       
       _isTtsInitialized = true;
-      print('✅ TTS initialized successfully with handlers');
+      AppLogger.success('TTS initialized successfully with handlers', tag: 'TTS');
     } catch (e, stackTrace) {
-      print('❌ TTS initialization error: $e');
-      print('Stack trace: $stackTrace');
+      AppLogger.error('TTS initialization error', error: e, stackTrace: stackTrace, tag: 'TTS');
       _isTtsInitialized = false;
     }
   }
@@ -308,7 +406,7 @@ class _DrillRunnerScreenState extends State<DrillRunnerScreen>
           _handleMultiplayerDrillEvent(event);
         },
         onError: (error) {
-          print('❌ Multiplayer sync error: $error');
+          AppLogger.error('Multiplayer sync error', error: error, tag: 'Multiplayer');
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(
@@ -320,9 +418,9 @@ class _DrillRunnerScreenState extends State<DrillRunnerScreen>
         },
       );
       
-      print('🔗 Multiplayer sync initialized for drill runner');
+      AppLogger.success('Multiplayer sync initialized for drill runner', tag: 'Multiplayer');
     } catch (e) {
-      print('❌ Failed to initialize multiplayer sync: $e');
+      AppLogger.error('Failed to initialize multiplayer sync', error: e, tag: 'Multiplayer');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
@@ -342,11 +440,11 @@ class _DrillRunnerScreenState extends State<DrillRunnerScreen>
       final isDrillActive = _syncService!.isDrillActive;
       final isDrillPaused = _syncService!.isDrillPaused;
       
-      print('🔍 Checking multiplayer drill state: active=$isDrillActive, paused=$isDrillPaused');
+      AppLogger.debug('Checking multiplayer drill state: active=$isDrillActive, paused=$isDrillPaused', tag: 'Multiplayer');
       
       if (isDrillActive && !isDrillPaused) {
         // Drill is already running, start it immediately for this participant
-        print('🎮 Drill already active, auto-starting for participant');
+        AppLogger.info('Drill already active, auto-starting for participant', tag: 'Multiplayer');
         
         // Use a post-frame callback to ensure the widget is fully built
         WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -356,7 +454,7 @@ class _DrillRunnerScreenState extends State<DrillRunnerScreen>
         });
       } else if (isDrillActive && isDrillPaused) {
         // Drill is paused, set the paused state
-        print('🎮 Drill is paused, setting paused state for participant');
+        AppLogger.info('Drill is paused, setting paused state for participant', tag: 'Multiplayer');
         
         WidgetsBinding.instance.addPostFrameCallback((_) {
           if (mounted && _state == DrillRunnerState.ready) {
@@ -368,38 +466,38 @@ class _DrillRunnerScreenState extends State<DrillRunnerScreen>
         });
       }
     } catch (e) {
-      print('❌ Error checking multiplayer drill state: $e');
+      AppLogger.error('Error checking multiplayer drill state', error: e, tag: 'Multiplayer');
     }
   }
 
   void _handleMultiplayerDrillEvent(dynamic event) {
     if (!widget.isMultiplayerMode || !mounted) return;
     
-    print('🎮 Multiplayer drill event received: ${event.runtimeType}');
+    AppLogger.debug('Multiplayer drill event received: ${event.runtimeType}', tag: 'Multiplayer');
     
     try {
       if (event is DrillStartedEvent) {
         // Host started the drill - start locally if not already running
         if (_state == DrillRunnerState.ready || _state == DrillRunnerState.paused) {
-          print('🎮 Starting drill from multiplayer sync');
+          AppLogger.info('Starting drill from multiplayer sync', tag: 'Multiplayer');
           _startDrillFromSync();
         }
       } else if (event is DrillStoppedEvent) {
         // Host stopped the drill - stop locally
         if (_state == DrillRunnerState.running || _state == DrillRunnerState.paused) {
-          print('🎮 Stopping drill from multiplayer sync');
+          AppLogger.info('Stopping drill from multiplayer sync', tag: 'Multiplayer');
           _stopDrillFromSync();
         }
       } else if (event is DrillPausedEvent) {
         // Host paused the drill - pause locally
         if (_state == DrillRunnerState.running) {
-          print('🎮 Pausing drill from multiplayer sync');
+          AppLogger.info('Pausing drill from multiplayer sync', tag: 'Multiplayer');
           _pauseDrillFromSync();
         }
       } else if (event is DrillResumedEvent) {
         // Host resumed the drill - resume locally
         if (_state == DrillRunnerState.paused || _isMultiplayerPaused) {
-          print('🎮 Resuming drill from multiplayer sync');
+          AppLogger.info('Resuming drill from multiplayer sync', tag: 'Multiplayer');
           _resumeDrillFromSync();
         }
       } else if (event is StimulusEvent) {
@@ -409,7 +507,7 @@ class _DrillRunnerScreenState extends State<DrillRunnerScreen>
         }
       }
     } catch (e) {
-      print('❌ Error handling multiplayer drill event: $e');
+      AppLogger.error('Error handling multiplayer drill event', error: e, tag: 'Multiplayer');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -445,21 +543,21 @@ class _DrillRunnerScreenState extends State<DrillRunnerScreen>
       final color = Color(colorValue);
       _showStimulus(label, color, stimulusType);
       
-      print('🎯 Participant received stimulus: type=$stimulusTypeStr, color=${color.value}, index=$index');
+      AppLogger.debug('Participant received stimulus: type=$stimulusTypeStr, color=${color.value}, index=$index', tag: 'Multiplayer');
     } catch (e) {
-      print('❌ Error handling stimulus from host: $e');
+      AppLogger.error('Error handling stimulus from host', error: e, tag: 'Multiplayer');
     }
   }
 
   void _startDrillFromSync() {
     // Allow starting from ready or paused states
     if (_state != DrillRunnerState.ready && _state != DrillRunnerState.paused) {
-      print('⚠️ Cannot start drill from sync in state: $_state');
+      AppLogger.warning('Cannot start drill from sync in state: $_state', tag: 'Multiplayer');
       return;
     }
     
     try {
-      print('🎮 Starting drill from sync in state: $_state');
+      AppLogger.info('Starting drill from sync in state: $_state', tag: 'Multiplayer');
       
       // Start the drill without countdown for sync
       _startedAt = DateTime.now();
@@ -480,9 +578,9 @@ class _DrillRunnerScreenState extends State<DrillRunnerScreen>
       _showFeedback('Started by Host', Colors.green);
       HapticFeedback.mediumImpact();
       
-      print('✅ Drill started from multiplayer sync');
+      AppLogger.success('Drill started from multiplayer sync', tag: 'Multiplayer');
     } catch (e) {
-      print('❌ Error starting drill from sync: $e');
+      AppLogger.error('Error starting drill from sync', error: e, tag: 'Multiplayer');
     }
   }
 
@@ -504,9 +602,9 @@ class _DrillRunnerScreenState extends State<DrillRunnerScreen>
       // Complete the drill and navigate back
       _completeMultiplayerDrill();
       
-      print('✅ Drill stopped from multiplayer sync');
+      AppLogger.success('Drill stopped from multiplayer sync', tag: 'Multiplayer');
     } catch (e) {
-      print('❌ Error stopping drill from sync: $e');
+      AppLogger.error('Error stopping drill from sync', error: e, tag: 'Multiplayer');
     }
   }
 
@@ -526,16 +624,16 @@ class _DrillRunnerScreenState extends State<DrillRunnerScreen>
         widget.onDrillComplete!(sessionResult);
       }
       
-      // Navigate back after a short delay
+      // Navigate back after a short delay with proper navigation guard
       Future.delayed(const Duration(seconds: 1), () {
-        if (mounted) {
+        if (mounted && Navigator.of(context).canPop()) {
           Navigator.of(context).pop();
         }
       });
     } catch (e) {
-      print('❌ Error completing multiplayer drill: $e');
-      // Still navigate back on error
-      if (mounted) {
+      AppLogger.error('Error completing multiplayer drill', error: e, tag: 'Multiplayer');
+      // Still navigate back on error with proper navigation guard
+      if (mounted && Navigator.of(context).canPop()) {
         Navigator.of(context).pop();
       }
     }
@@ -573,9 +671,23 @@ class _DrillRunnerScreenState extends State<DrillRunnerScreen>
     HapticFeedback.mediumImpact();
   }
 
+  void _resumeDrill() {
+    if (_state != DrillRunnerState.paused) return;
+    
+    _stopwatch.start();
+    _ticker = Timer.periodic(const Duration(milliseconds: 8), _onTick);
+    
+    setState(() {
+      _state = DrillRunnerState.running;
+    });
+    
+    _showFeedback('Resumed', Colors.green);
+    HapticFeedback.mediumImpact();
+  }
+
   Future<void> _speakStimulus(String text) async {
     if (!_isTtsInitialized) {
-      print('⚠️ TTS not initialized, skipping speech');
+      AppLogger.warning('TTS not initialized, skipping speech', tag: 'TTS');
       return;
     }
     
@@ -593,14 +705,13 @@ class _DrillRunnerScreenState extends State<DrillRunnerScreen>
       
       // Speak the stimulus
       final result = await _flutterTts.speak(text);
-      print('🔊 Speaking: $text (result: $result)');
+      AppLogger.debug('Speaking: $text (result: $result)', tag: 'TTS');
       
       if (result == 0) {
-        print('❌ TTS speak failed with result 0');
+        AppLogger.error('TTS speak failed with result 0', tag: 'TTS');
       }
     } catch (e) {
-      print('❌ TTS speak error: $e');
-      print('Stack trace: ${StackTrace.current}');
+      AppLogger.error('TTS speak error', error: e, stackTrace: StackTrace.current, tag: 'TTS');
     }
   }
 
@@ -669,29 +780,67 @@ class _DrillRunnerScreenState extends State<DrillRunnerScreen>
   }
 
   String _labelFor(StimulusType t, Drill drill) {
+    final rnd = Random();
+    
     switch (t) {
       case StimulusType.arrow:
         const dirs = ['↑', '→', '↓', '←'];
-        return dirs[Random().nextInt(dirs.length)];
+        return dirs[rnd.nextInt(dirs.length)];
       case StimulusType.number:
-        return (1 + Random().nextInt(9)).toString();
+        // Generate numbers 1-9 for better variety
+        return (1 + rnd.nextInt(9)).toString();
       case StimulusType.shape:
-        const shapes = ['●', '■', '▲'];
-        return shapes[Random().nextInt(shapes.length)];
+        const shapes = ['●', '■', '▲', '♦', '★']; // Added more shapes for variety
+        return shapes[rnd.nextInt(shapes.length)];
       case StimulusType.color:
       default:
-        final colors = drill.colors.isEmpty
-            ? [Colors.red, Colors.green, Colors.blue, Colors.yellow]
-            : drill.colors;
-        final c = colors[Random().nextInt(colors.length)];
-        _displayColor = c;
-        return '';
+        // Enhanced color selection with validation
+        List<Color> availableColors = drill.colors.isNotEmpty
+            ? drill.colors
+            : [Colors.red, Colors.green, Colors.blue, Colors.yellow, Colors.orange, Colors.purple];
+        
+        // Ensure we have sufficient colors for variety
+        if (availableColors.length < 3) {
+          availableColors = [Colors.red, Colors.green, Colors.blue, Colors.yellow, Colors.orange, Colors.purple];
+          AppLogger.warning('Insufficient colors provided, using enhanced default color set', tag: 'DrillValidation');
+        }
+        
+        final selectedColor = availableColors[rnd.nextInt(availableColors.length)];
+        _displayColor = selectedColor;
+        
+        // For audio mode, return color name for TTS
+        if (drill.presentationMode == PresentationMode.audio) {
+          return _getColorName(selectedColor);
+        }
+        
+        return ''; // Empty for visual color display
     }
   }
 
   void _start() {
-    if (_state != DrillRunnerState.ready) return;
-    _startCountdown();
+    try {
+      if (_state != DrillRunnerState.ready) {
+        AppLogger.warning('Cannot start drill in current state: $_state', tag: 'DrillRunner');
+        return;
+      }
+      
+      // Validate drill configuration before starting
+      if (widget.drill.numberOfStimuli <= 0) {
+        _showFeedback('Invalid drill configuration', Colors.red);
+        return;
+      }
+      
+      if (_schedule.isEmpty) {
+        _showFeedback('No stimuli scheduled', Colors.red);
+        return;
+      }
+      
+      AppLogger.success('Starting drill with ${_schedule.length} stimuli', tag: 'DrillRunner');
+      _startCountdown();
+    } catch (e) {
+      AppLogger.error('Error starting drill', error: e, tag: 'DrillRunner');
+      _showFeedback('Failed to start drill', Colors.red);
+    }
   }
   
   void _startCountdown() {
@@ -737,8 +886,8 @@ class _DrillRunnerScreenState extends State<DrillRunnerScreen>
   }
 
   void _initializeNewSet() {
-    print('🔧 _initializeNewSet called: _currentSet=$_currentSet, existing sets=${_setResults.length}');
-    print('   Stack trace: ${StackTrace.current}');
+    AppLogger.debug('_initializeNewSet called: _currentSet=$_currentSet, existing sets=${_setResults.length}', tag: 'DrillRunner');
+    AppLogger.debug('Stack trace: ${StackTrace.current}', tag: 'DrillRunner');
     _currentSetStartTime = DateTime.now();
     final newSet = SetResult(
       setNumber: _currentSet,
@@ -746,7 +895,7 @@ class _DrillRunnerScreenState extends State<DrillRunnerScreen>
       startTime: _currentSetStartTime!,
     );
     _setResults.add(newSet);
-    print('✅ Set initialized: setNumber=${newSet.setNumber}, total sets now=${_setResults.length}');
+    AppLogger.success('Set initialized: setNumber=${newSet.setNumber}, total sets now=${_setResults.length}', tag: 'DrillRunner');
   }
 
   void _initializeNewRep() {
@@ -812,7 +961,7 @@ class _DrillRunnerScreenState extends State<DrillRunnerScreen>
       _displayColor = color;
     });
     
-    print('🎬 Stimulus shown: type=$type, mode=${widget.drill.presentationMode.name}');
+    AppLogger.debug('Stimulus shown: type=$type, mode=${widget.drill.presentationMode.name}', tag: 'DrillRunner');
     
     // Speak the stimulus if in audio mode
     if (widget.drill.presentationMode == PresentationMode.audio) {
@@ -822,10 +971,10 @@ class _DrillRunnerScreenState extends State<DrillRunnerScreen>
         type: type,
         label: label,
       ));
-      print('🎯 Attempting to speak: "$textToSpeak" for stimulus type: $type');
+      AppLogger.debug('Attempting to speak: "$textToSpeak" for stimulus type: $type', tag: 'TTS');
       _speakStimulus(textToSpeak);
     } else {
-      print('👁️ Visual mode - showing stimulus visually');
+      AppLogger.debug('Visual mode - showing stimulus visually', tag: 'DrillRunner');
     }
     
     // Enhanced feedback based on stimulus type
@@ -905,7 +1054,7 @@ class _DrillRunnerScreenState extends State<DrillRunnerScreen>
     return colors[Random().nextInt(colors.length)];
   }
 void _completeRep() {
-    print('🔄 _completeRep called: Set $_currentSet, Rep $_currentRep');
+    AppLogger.debug('_completeRep called: Set $_currentSet, Rep $_currentRep', tag: 'DrillRunner');
     _ticker?.cancel();
     _stopwatch.stop();
     
@@ -930,25 +1079,25 @@ void _completeRep() {
         accuracy: accuracy,
       );
       
-      print('   Rep result: score=$repScore, events=${_currentRepEvents.length}');
+      AppLogger.debug('Rep result: score=$repScore, events=${_currentRepEvents.length}', tag: 'DrillRunner');
       
       // Add to current set's rep results
       if (_setResults.isNotEmpty) {
         _setResults.last.repResults.add(repResult);
-        print('   Added to set ${_setResults.last.setNumber}, total reps now: ${_setResults.last.repResults.length}');
+        AppLogger.debug('Added to set ${_setResults.last.setNumber}, total reps now: ${_setResults.last.repResults.length}', tag: 'DrillRunner');
       }
     }
     
     // Check if set is complete
-    print('   Checking: _currentRep=$_currentRep >= widget.drill.reps=${widget.drill.reps}?');
+    AppLogger.debug('Checking: _currentRep=$_currentRep >= widget.drill.reps=${widget.drill.reps}?', tag: 'DrillRunner');
     if (_currentRep >= widget.drill.reps) {
-      print('   ✅ Set complete! Calling _completeSet()');
+      AppLogger.success('Set complete! Calling _completeSet()', tag: 'DrillRunner');
       _completeSet();
     } else {
-      print('   ⏭️ More reps needed');
+      AppLogger.debug('More reps needed', tag: 'DrillRunner');
       // Increment rep counter for next rep
       _currentRep++;
-      print('   Incremented _currentRep to $_currentRep');
+      AppLogger.debug('Incremented _currentRep to $_currentRep', tag: 'DrillRunner');
       
       // Start rest period between reps if rest time is configured
       if (widget.drill.restSec > 0) {
@@ -960,13 +1109,13 @@ void _completeRep() {
   }
 
   void _completeSet() {
-    print('🏁 _completeSet called: _currentSet=$_currentSet, _safeSetCount=$_safeSetCount');
+    AppLogger.debug('_completeSet called: _currentSet=$_currentSet, _safeSetCount=$_safeSetCount', tag: 'DrillRunner');
     
     // Update current set's end time and stats
     if (_setResults.isNotEmpty) {
       _setResults.last.endTime = DateTime.now();
       _setResults.last.updateStats();
-      print('   Updated set ${_setResults.last.setNumber}: ${_setResults.last.repResults.length} reps');
+      AppLogger.debug('Updated set ${_setResults.last.setNumber}: ${_setResults.last.repResults.length} reps', tag: 'DrillRunner');
     }
     
     HapticFeedback.heavyImpact();
@@ -977,7 +1126,7 @@ void _completeRep() {
     
     // Check if all sets are complete
     if (_currentSet >= _safeSetCount) {
-      print('✅ All sets complete! Finishing drill...');
+      AppLogger.success('All sets complete! Finishing drill...', tag: 'DrillRunner');
       // All sets complete - finish drill
       setState(() {
         _state = DrillRunnerState.finished;
@@ -986,11 +1135,11 @@ void _completeRep() {
         _finish();
       });
     } else {
-      print('➡️ Moving to next set...');
+      AppLogger.info('Moving to next set...', tag: 'DrillRunner');
       // Move to next set
       _currentSet++;
       _currentRep = 1; // Initialize rep counter for new set
-      print('   New values: _currentSet=$_currentSet, _currentRep=$_currentRep');
+      AppLogger.debug('New values: _currentSet=$_currentSet, _currentRep=$_currentRep', tag: 'DrillRunner');
       
       Future.delayed(const Duration(milliseconds: 1500), () {
         _initializeNewSet();
@@ -1154,7 +1303,7 @@ void _completeRep() {
         final progressService = getIt<ProgramProgressService>();
         await progressService.completeProgramDay(widget.programId!, widget.programDayNumber!);
       } catch (e) {
-        print('❌ Error completing program day: $e');
+        AppLogger.error('Error completing program day', error: e, tag: 'DrillRunner');
       }
     }
     
@@ -1163,31 +1312,37 @@ void _completeRep() {
     // Show completion feedback
     HapticFeedback.heavyImpact();
     
-    // Navigate to detailed results after a brief delay
+    // Navigate to detailed results after a brief delay with proper navigation guards
     Future.delayed(const Duration(milliseconds: 500), () {
-      if (mounted) {
+      if (!mounted) return;
+      
+      try {
         if (widget.isMultiplayerMode) {
           // Multiplayer mode - call completion callback
           widget.onDrillComplete?.call(result);
         } else if (widget.programId != null && widget.programDayNumber != null) {
           // Show success message for program completion
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('Day ${widget.programDayNumber} completed! 🎉'),
-              backgroundColor: Colors.green,
-              duration: const Duration(seconds: 3),
-            ),
-          );
-          // Navigate back to program
-          context.go('/programs');
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text('Day ${widget.programDayNumber} completed! 🎉'),
+                backgroundColor: Colors.green,
+                duration: const Duration(seconds: 3),
+              ),
+            );
+          }
+          // Navigate back to program with guard
+          if (mounted && context.mounted) {
+            context.go('/programs');
+          }
         } else {
           // Navigate to drill results screen with detailed set results
           final detailedSetResults = _setResults.map((setResult) {
-            print('📊 Set ${setResult.setNumber}: ${setResult.repResults.length} reps');
+            AppLogger.debug('Set ${setResult.setNumber}: ${setResult.repResults.length} reps', tag: 'DrillRunner');
             return {
               'setNumber': setResult.setNumber,
               'reps': setResult.repResults.map((repResult) {
-                print('  Rep ${repResult.repNumber}: ${repResult.score} hits, ${repResult.events.length} stimuli');
+                AppLogger.debug('Rep ${repResult.repNumber}: ${repResult.score} hits, ${repResult.events.length} stimuli', tag: 'DrillRunner');
                 return {
                   'repNumber': repResult.repNumber,
                   'hits': repResult.score,
@@ -1199,12 +1354,21 @@ void _completeRep() {
             };
           }).toList();
           
-          print('📦 Total sets being passed: ${detailedSetResults.length}');
+          AppLogger.debug('Total sets being passed: ${detailedSetResults.length}', tag: 'DrillRunner');
           
-          context.go('/drill-results', extra: {
-            'result': result,
-            'detailedSetResults': detailedSetResults,
-          },);
+          // Navigate with proper guard
+          if (mounted && context.mounted) {
+            context.go('/drill-results', extra: {
+              'result': result,
+              'detailedSetResults': detailedSetResults,
+            });
+          }
+        }
+      } catch (e) {
+        AppLogger.error('Navigation error in _finish', error: e, tag: 'DrillRunner');
+        // Fallback navigation
+        if (mounted && Navigator.of(context).canPop()) {
+          Navigator.of(context).pop();
         }
       }
     });
@@ -1222,7 +1386,7 @@ void _completeRep() {
     _feedbackAnimationController.dispose();
     // Stop and cleanup TTS synchronously
     _flutterTts.stop();
-    print('🛑 TTS stopped on dispose');
+    AppLogger.info('TTS stopped on dispose', tag: 'TTS');
     // Clean up multiplayer subscription
     _drillEventSubscription?.cancel();
     super.dispose();
@@ -1470,12 +1634,13 @@ void _completeRep() {
   }
 
   List<Widget> _buildZoneIndicators(BoxConstraints constraints) {
-    final zones = widget.drill.zones.isEmpty ? [ReactionZone.center] : widget.drill.zones;
+    // Always use only center zone - ignore drill configuration for consistent UX
+    final zones = [ReactionZone.center];
     return zones.map((zone) => _buildZoneIndicator(zone, constraints)).toList();
   }
 
   Widget _buildZoneIndicator(ReactionZone zone, BoxConstraints constraints) {
-    final position = _getZonePosition(zone, constraints);
+    
     final isActive = _current != null && _getCurrentZone() == zone;
     
     // Calculate size based on available space - much larger for better visibility
@@ -1485,8 +1650,8 @@ void _completeRep() {
     final iconSize = stimulusSize * 0.25; // 25% of stimulus size
     
     return Positioned(
-      left: position.dx,
-      top: position.dy,
+      left: (constraints.maxWidth - stimulusSize) / 2,
+      top: (constraints.maxHeight - stimulusSize) / 2,
       child: GestureDetector(
         onTap: () => _registerZoneTap(zone),
         child: AnimatedBuilder(
@@ -1560,32 +1725,7 @@ void _completeRep() {
     return const SizedBox.shrink();
   }
 
-  Offset _getZonePosition(ReactionZone zone, BoxConstraints constraints) {
-    final centerX = constraints.maxWidth / 2;
-    final centerY = constraints.maxHeight / 2;
-    
-    // Calculate size based on available space
-    final availableSize = constraints.maxHeight.clamp(200.0, 600.0);
-    final stimulusSize = availableSize * 0.6;
-    final halfSize = stimulusSize / 2;
-    final offset = stimulusSize * 0.8; // Distance from center
-    
-    switch (zone) {
-      case ReactionZone.center:
-        return Offset(centerX - halfSize, centerY - halfSize);
-      case ReactionZone.top:
-        return Offset(centerX - halfSize, centerY - offset - halfSize);
-      case ReactionZone.bottom:
-        return Offset(centerX - halfSize, centerY + offset - halfSize);
-      case ReactionZone.left:
-        return Offset(centerX - offset - halfSize, centerY - halfSize);
-      case ReactionZone.right:
-        return Offset(centerX + offset - halfSize, centerY - halfSize);
-      case ReactionZone.quadrants:
-        // For quadrants, we'll show multiple zones
-        return Offset(centerX - halfSize, centerY - halfSize);
-    }
-  }
+  
 
   IconData _getZoneIcon(ReactionZone zone) {
     switch (zone) {
@@ -1605,14 +1745,8 @@ void _completeRep() {
   }
 
   ReactionZone _getCurrentZone() {
-    if (_current == null) return ReactionZone.center;
-    
-    final zones = widget.drill.zones.isEmpty ? [ReactionZone.center] : widget.drill.zones;
-    if (zones.length == 1) return zones.first;
-    
-    // For multiple zones, randomly select one for this stimulus
-    final random = Random(_current!.index); // Use stimulus index as seed for consistency
-    return zones[random.nextInt(zones.length)];
+    // Always return center zone - stimuli should always appear in the center
+    return ReactionZone.center;
   }
 
   void _registerZoneTap(ReactionZone zone) {
@@ -1641,32 +1775,59 @@ void _completeRep() {
       return Padding(
         padding: const EdgeInsets.symmetric(horizontal: 32),
         child: Container(
-          padding: const EdgeInsets.all(16),
+          padding: const EdgeInsets.all(20),
           decoration: BoxDecoration(
-            color: Colors.blue.withOpacity(0.2),
-            borderRadius: BorderRadius.circular(12),
+            gradient: LinearGradient(
+              colors: [
+                Colors.blue.withOpacity(0.15),
+                Colors.blue.withOpacity(0.25),
+              ],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+            borderRadius: BorderRadius.circular(16),
             border: Border.all(
               color: Colors.blue.withOpacity(0.4),
+              width: 1.5,
             ),
           ),
           child: Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Icon(
-                Icons.people_outline_rounded,
-                color: Colors.blue[300],
-                size: 20,
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: Colors.blue.withOpacity(0.2),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Icon(
+                  Icons.people_outline_rounded,
+                  color: Colors.blue[300],
+                  size: 24,
+                ),
               ),
-              const SizedBox(width: 12),
+              const SizedBox(width: 16),
               Expanded(
-                child: Text(
-                  'Participant Mode - Host controls the drill',
-                  style: TextStyle(
-                    color: Colors.blue[300],
-                    fontWeight: FontWeight.w500,
-                    fontSize: 14,
-                  ),
-                  textAlign: TextAlign.center,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Participant Mode',
+                      style: TextStyle(
+                        color: Colors.blue[200],
+                        fontWeight: FontWeight.w600,
+                        fontSize: 16,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      'Host controls the drill session',
+                      style: TextStyle(
+                        color: Colors.blue[300],
+                        fontSize: 13,
+                      ),
+                    ),
+                  ],
                 ),
               ),
             ],
@@ -1675,78 +1836,291 @@ void _completeRep() {
       );
     }
     
-    // Show normal controls for host or non-multiplayer mode
+    // Enhanced controls for host or non-multiplayer mode
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 32),
-      child: Row(
-        children: [
-          if (_state == DrillRunnerState.ready) ...[
-            Expanded(
-              child: FilledButton.icon(
+      child: Container(
+        padding: const EdgeInsets.all(20),
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            colors: [
+              Colors.grey.shade900.withOpacity(0.8),
+              Colors.grey.shade800.withOpacity(0.9),
+            ],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(
+            color: Colors.white.withOpacity(0.1),
+            width: 1,
+          ),
+        ),
+        child: Column(
+          children: [
+            // Main control button
+            if (_state == DrillRunnerState.ready) ...[
+              _buildPrimaryButton(
                 onPressed: _start,
-                icon: const Icon(Icons.play_arrow),
-                label: const Text('Start Drill'),
-                style: FilledButton.styleFrom(
-                  backgroundColor: Colors.green,
-                  foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(vertical: 16),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
+                icon: Icons.play_arrow_rounded,
+                label: 'START DRILL',
+                color: Colors.green,
+                gradient: LinearGradient(
+                  colors: [Colors.green.shade400, Colors.green.shade600],
                 ),
               ),
-            ),
-          ] else if (_state == DrillRunnerState.running) ...[
-            Expanded(
-              child: OutlinedButton.icon(
-                onPressed: _finish,
-                icon: const Icon(Icons.stop),
-                label: const Text('End Early'),
-                style: OutlinedButton.styleFrom(
-                  foregroundColor: Colors.red,
-                  side: const BorderSide(color: Colors.red),
-                  padding: const EdgeInsets.symmetric(vertical: 16),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                ),
-              ),
-            ),
-          ] else if (_state == DrillRunnerState.rest) ...[
-            Expanded(
-              child: FilledButton.icon(
+            ] else if (_state == DrillRunnerState.countdown) ...[
+              _buildPrimaryButton(
                 onPressed: null,
-                icon: const Icon(Icons.hourglass_empty),
-                label: Text('Resting... ${_restCountdown}s'),
-                style: FilledButton.styleFrom(
-                  backgroundColor: Colors.blue,
-                  foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(vertical: 16),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
+                icon: Icons.timer,
+                label: 'STARTING...',
+                color: Colors.orange,
+                gradient: LinearGradient(
+                  colors: [Colors.orange.shade400, Colors.orange.shade600],
                 ),
               ),
-            ),
-          ] else if (_state == DrillRunnerState.finished) ...[
-            Expanded(
-              child: FilledButton.icon(
+            ] else if (_state == DrillRunnerState.running) ...[
+              Row(
+                children: [
+                  Expanded(
+                    child: _buildSecondaryButton(
+                      onPressed: _showPauseDialog,
+                      icon: Icons.pause_rounded,
+                      label: 'PAUSE',
+                      color: Colors.orange,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: _buildPrimaryButton(
+                      onPressed: _finish,
+                      icon: Icons.stop_rounded,
+                      label: 'STOP',
+                      color: Colors.red,
+                      gradient: LinearGradient(
+                        colors: [Colors.red.shade400, Colors.red.shade600],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ] else if (_state == DrillRunnerState.paused) ...[
+              Row(
+                children: [
+                  Expanded(
+                    child: _buildPrimaryButton(
+                      onPressed: _resumeDrill,
+                      icon: Icons.play_arrow_rounded,
+                      label: 'RESUME',
+                      color: Colors.green,
+                      gradient: LinearGradient(
+                        colors: [Colors.green.shade400, Colors.green.shade600],
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: _buildSecondaryButton(
+                      onPressed: _finish,
+                      icon: Icons.stop_rounded,
+                      label: 'STOP',
+                      color: Colors.red,
+                    ),
+                  ),
+                ],
+              ),
+            ] else if (_state == DrillRunnerState.rest) ...[
+              _buildPrimaryButton(
                 onPressed: null,
-                icon: const Icon(Icons.check),
-                label: const Text('Completed!'),
-                style: FilledButton.styleFrom(
-                  backgroundColor: Colors.green,
-                  foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(vertical: 16),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
+                icon: Icons.hourglass_empty_rounded,
+                label: 'RESTING... ${_restCountdown}s',
+                color: Colors.blue,
+                gradient: LinearGradient(
+                  colors: [Colors.blue.shade400, Colors.blue.shade600],
                 ),
               ),
-            ),
+            ] else if (_state == DrillRunnerState.finished) ...[
+              _buildPrimaryButton(
+                onPressed: null,
+                icon: Icons.check_circle_rounded,
+                label: 'COMPLETED!',
+                color: Colors.green,
+                gradient: LinearGradient(
+                  colors: [Colors.green.shade400, Colors.green.shade600],
+                ),
+              ),
+            ],
+            
+            // Status indicator
+            const SizedBox(height: 12),
+            _buildStatusIndicator(),
           ],
-        ],
+        ),
       ),
+    );
+  }
+  
+  Widget _buildPrimaryButton({
+    required VoidCallback? onPressed,
+    required IconData icon,
+    required String label,
+    required Color color,
+    Gradient? gradient,
+  }) {
+    return Container(
+      width: double.infinity,
+      height: 56,
+      decoration: BoxDecoration(
+        gradient: gradient ?? LinearGradient(
+          colors: [color.withOpacity(0.8), color],
+        ),
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: onPressed != null ? [
+          BoxShadow(
+            color: color.withOpacity(0.3),
+            blurRadius: 12,
+            offset: const Offset(0, 4),
+          ),
+        ] : null,
+      ),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: onPressed,
+          borderRadius: BorderRadius.circular(16),
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 20),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(
+                  icon,
+                  color: Colors.white,
+                  size: 24,
+                ),
+                const SizedBox(width: 12),
+                Text(
+                  label,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 16,
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: 0.5,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+  
+  Widget _buildSecondaryButton({
+    required VoidCallback? onPressed,
+    required IconData icon,
+    required String label,
+    required Color color,
+  }) {
+    return Container(
+      height: 56,
+      decoration: BoxDecoration(
+        color: Colors.transparent,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: color.withOpacity(0.6),
+          width: 2,
+        ),
+      ),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: onPressed,
+          borderRadius: BorderRadius.circular(16),
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(
+                  icon,
+                  color: color,
+                  size: 20,
+                ),
+                const SizedBox(width: 8),
+                Text(
+                  label,
+                  style: TextStyle(
+                    color: color,
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                    letterSpacing: 0.3,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+  
+  Widget _buildStatusIndicator() {
+    String statusText;
+    Color statusColor;
+    IconData statusIcon;
+    
+    switch (_state) {
+      case DrillRunnerState.ready:
+        statusText = 'Ready to start';
+        statusColor = Colors.white70;
+        statusIcon = Icons.radio_button_unchecked;
+        break;
+      case DrillRunnerState.countdown:
+        statusText = 'Get ready...';
+        statusColor = Colors.orange;
+        statusIcon = Icons.timer;
+        break;
+      case DrillRunnerState.running:
+        statusText = 'Drill in progress';
+        statusColor = Colors.green;
+        statusIcon = Icons.play_circle_filled;
+        break;
+      case DrillRunnerState.paused:
+        statusText = 'Drill paused';
+        statusColor = Colors.orange;
+        statusIcon = Icons.pause_circle_filled;
+        break;
+      case DrillRunnerState.rest:
+        statusText = 'Rest period';
+        statusColor = Colors.blue;
+        statusIcon = Icons.hourglass_empty;
+        break;
+      case DrillRunnerState.finished:
+        statusText = 'Drill completed';
+        statusColor = Colors.green;
+        statusIcon = Icons.check_circle;
+        break;
+    }
+    
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        Icon(
+          statusIcon,
+          color: statusColor,
+          size: 16,
+        ),
+        const SizedBox(width: 8),
+        Text(
+          statusText,
+          style: TextStyle(
+            color: statusColor,
+            fontSize: 13,
+            fontWeight: FontWeight.w500,
+          ),
+        ),
+      ],
     );
   }
   
@@ -1809,25 +2183,63 @@ void _completeRep() {
   }
   
   void _showPauseDialog() {
+    // Pause the drill immediately
+    _ticker?.cancel();
+    _stopwatch.stop();
+    
+    setState(() {
+      _state = DrillRunnerState.paused;
+    });
+    
+    _showFeedback('Paused', Colors.orange);
+    HapticFeedback.mediumImpact();
+    
     showDialog(
       context: context,
       barrierDismissible: false,
       builder: (context) => AlertDialog(
-        title: const Text('Pause Drill'),
-        content: const Text('The drill is paused. What would you like to do?'),
+        backgroundColor: Theme.of(context).colorScheme.surface,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+        ),
+        title: Row(
+          children: [
+            Icon(
+              Icons.pause_circle_filled,
+              color: Colors.orange,
+              size: 28,
+            ),
+            const SizedBox(width: 12),
+            const Text('Drill Paused'),
+          ],
+        ),
+        content: const Text('The drill has been paused. What would you like to do?'),
         actions: [
-          TextButton(
+          TextButton.icon(
             onPressed: () {
-              Navigator.of(context).pop();
+              if (Navigator.of(context).canPop()) {
+                Navigator.of(context).pop();
+              }
+              _resumeDrill();
             },
-            child: const Text('Resume'),
+            icon: const Icon(Icons.play_arrow),
+            label: const Text('Resume'),
+            style: TextButton.styleFrom(
+              foregroundColor: Colors.green,
+            ),
           ),
-          TextButton(
+          TextButton.icon(
             onPressed: () {
-              Navigator.of(context).pop();
+              if (Navigator.of(context).canPop()) {
+                Navigator.of(context).pop();
+              }
               _finish();
             },
-            child: const Text('End Drill'),
+            icon: const Icon(Icons.stop),
+            label: const Text('End Drill'),
+            style: TextButton.styleFrom(
+              foregroundColor: Colors.red,
+            ),
           ),
         ],
       ),

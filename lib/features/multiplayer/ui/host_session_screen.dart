@@ -1,5 +1,3 @@
-
-
 import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -55,10 +53,12 @@ class _HostSessionScreenState extends State<HostSessionScreen>
     _fadeAnimation = Tween<double>(
       begin: 0.0,
       end: 1.0,
-    ).animate(CurvedAnimation(
-      parent: _animationController,
-      curve: Curves.easeInOut,
-    ),);
+    ).animate(
+      CurvedAnimation(
+        parent: _animationController,
+        curve: Curves.easeInOut,
+      ),
+    );
 
     _initialize();
   }
@@ -68,17 +68,17 @@ class _HostSessionScreenState extends State<HostSessionScreen>
     // Cancel all subscriptions to prevent memory leaks
     _sessionSubscription?.cancel();
     _statusSubscription?.cancel();
-    
+
     // Dispose animation controller
     _animationController.dispose();
-    
+
     // Disconnect from session if still connected
     if (_isHosting && _session != null) {
       _syncService.disconnect().catchError((e) {
         debugPrint('Error disconnecting during dispose: $e');
       });
     }
-    
+
     super.dispose();
   }
 
@@ -119,31 +119,36 @@ class _HostSessionScreenState extends State<HostSessionScreen>
 
   Future<void> _checkPermissions() async {
     try {
-      debugPrint('🔐 HOST: Checking permissions using Professional Permission Manager...');
-      
+      debugPrint(
+          '🔐 HOST: Checking permissions using Professional Permission Manager...');
+
       // Use the professional permission manager for consistent permission checking
-      _permissionsGranted = await ProfessionalPermissionManager.areAllPermissionsGranted();
-      
+      _permissionsGranted =
+          await ProfessionalPermissionManager.areAllPermissionsGranted();
+
       debugPrint('🔐 HOST: All permissions granted: $_permissionsGranted');
-      
+
       if (!_permissionsGranted) {
         // Get detailed status for better error messages
-        final status = await ProfessionalPermissionManager.getPermissionStatus();
-        
+        final status =
+            await ProfessionalPermissionManager.getPermissionStatus();
+
         if (status.hasPermissionIssues) {
           if (mounted) {
             setState(() {
-              _statusMessage = 'Some permissions are permanently denied. Please enable them in Settings.';
+              _statusMessage =
+                  'Some permissions are permanently denied. Please enable them in Settings.';
             });
           }
         } else {
           if (mounted) {
             setState(() {
-              _statusMessage = 'Permissions required for multiplayer features. Tap "Check Permissions" to grant them.';
+              _statusMessage =
+                  'Permissions required for multiplayer features. Tap "Check Permissions" to grant them.';
             });
           }
         }
-        
+
         debugPrint('🔐 HOST: Permission status: $status');
       }
     } catch (e) {
@@ -192,15 +197,17 @@ class _HostSessionScreenState extends State<HostSessionScreen>
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
+    final size = MediaQuery.of(context).size;
+    final isSmallScreen = size.width < 360;
 
     return Scaffold(
       backgroundColor: colorScheme.surface,
       appBar: AppBar(
-        title: const Text(
+        title: Text(
           'Host Session',
           style: TextStyle(
             fontWeight: FontWeight.bold,
-            fontSize: 20,
+            fontSize: isSmallScreen ? 18 : 20,
             letterSpacing: -0.5,
           ),
         ),
@@ -269,28 +276,27 @@ class _HostSessionScreenState extends State<HostSessionScreen>
   }
 
   Widget _buildSetupState(BuildContext context) {
-    final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
+    final size = MediaQuery.of(context).size;
+    final isSmallScreen = size.width < 360;
+    final padding = isSmallScreen ? 16.0 : 24.0;
 
     return SingleChildScrollView(
-      padding: const EdgeInsets.all(24),
+      padding: EdgeInsets.all(padding),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           // Permission Warning (if not granted)
-          if (!_permissionsGranted)
-            _buildPermissionWarning(context),
+          if (!_permissionsGranted) _buildPermissionWarning(context),
 
-          if (!_permissionsGranted)
-            const SizedBox(height: 16),
+          if (!_permissionsGranted) SizedBox(height: isSmallScreen ? 12 : 16),
 
           // Status Card
           _buildStatusCard(context),
-          const SizedBox(height: 24),
+          SizedBox(height: isSmallScreen ? 16 : 24),
 
           // Host Button
           _buildHostButton(context),
-          const SizedBox(height: 32),
+          SizedBox(height: isSmallScreen ? 24 : 32),
 
           // Instructions
           _buildInstructions(context),
@@ -302,13 +308,15 @@ class _HostSessionScreenState extends State<HostSessionScreen>
   Widget _buildPermissionWarning(BuildContext context) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
+    final size = MediaQuery.of(context).size;
+    final isSmallScreen = size.width < 360;
     final isIOS = defaultTargetPlatform == TargetPlatform.iOS;
 
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: EdgeInsets.all(isSmallScreen ? 12 : 16),
       decoration: BoxDecoration(
         color: Colors.orange.withOpacity(0.1),
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(isSmallScreen ? 10 : 12),
         border: Border.all(
           color: Colors.orange.withOpacity(0.3),
           width: 2,
@@ -322,30 +330,32 @@ class _HostSessionScreenState extends State<HostSessionScreen>
               Icon(
                 Icons.warning_rounded,
                 color: Colors.orange[700],
-                size: 24,
+                size: isSmallScreen ? 20 : 24,
               ),
-              const SizedBox(width: 12),
+              SizedBox(width: isSmallScreen ? 10 : 12),
               Expanded(
                 child: Text(
                   'Permissions Required',
                   style: theme.textTheme.titleMedium?.copyWith(
                     fontWeight: FontWeight.bold,
+                    fontSize: isSmallScreen ? 15 : null,
                     color: Colors.orange[700],
                   ),
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 8),
+          SizedBox(height: isSmallScreen ? 6 : 8),
           Text(
             isIOS
                 ? 'Bluetooth and Location permissions are required. Please enable them in Settings to use multiplayer features.'
                 : 'Bluetooth and Location permissions are required. Please grant them to use multiplayer features.',
             style: theme.textTheme.bodyMedium?.copyWith(
+              fontSize: isSmallScreen ? 13 : null,
               color: colorScheme.onSurface.withOpacity(0.8),
             ),
           ),
-          const SizedBox(height: 12),
+          SizedBox(height: isSmallScreen ? 10 : 12),
           SizedBox(
             width: double.infinity,
             child: ElevatedButton.icon(
@@ -353,13 +363,17 @@ class _HostSessionScreenState extends State<HostSessionScreen>
               style: ElevatedButton.styleFrom(
                 backgroundColor: Colors.orange,
                 foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(vertical: 12),
+                padding:
+                    EdgeInsets.symmetric(vertical: isSmallScreen ? 10 : 12),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(8),
                 ),
               ),
-              icon: const Icon(Icons.settings, size: 20),
-              label: Text(isIOS ? 'Request Permissions' : 'Grant Permissions'),
+              icon: Icon(Icons.settings, size: isSmallScreen ? 18 : 20),
+              label: Text(
+                isIOS ? 'Request Permissions' : 'Grant Permissions',
+                style: TextStyle(fontSize: isSmallScreen ? 13 : null),
+              ),
             ),
           ),
         ],
@@ -399,12 +413,16 @@ class _HostSessionScreenState extends State<HostSessionScreen>
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
                       Icon(
-                        _permissionsGranted ? Icons.wifi_tethering_rounded : Icons.security_rounded,
+                        _permissionsGranted
+                            ? Icons.wifi_tethering_rounded
+                            : Icons.security_rounded,
                         size: 24,
                       ),
                       const SizedBox(width: 8),
                       Text(
-                        _permissionsGranted ? 'Start Hosting Session' : 'Request Permissions & Host',
+                        _permissionsGranted
+                            ? 'Start Hosting Session'
+                            : 'Request Permissions & Host',
                         style: theme.textTheme.titleMedium?.copyWith(
                           fontWeight: FontWeight.bold,
                           color: colorScheme.onPrimary,
@@ -447,22 +465,26 @@ class _HostSessionScreenState extends State<HostSessionScreen>
   }
 
   Widget _buildHostingState(BuildContext context) {
+    final size = MediaQuery.of(context).size;
+    final isSmallScreen = size.width < 360;
+    final padding = isSmallScreen ? 16.0 : 24.0;
+
     return SingleChildScrollView(
-      padding: const EdgeInsets.all(24),
+      padding: EdgeInsets.all(padding),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           // Session Info
           _buildSessionInfo(context),
-          const SizedBox(height: 24),
+          SizedBox(height: isSmallScreen ? 16 : 24),
 
           // Participants
           _buildParticipantsList(context),
-          const SizedBox(height: 24),
+          SizedBox(height: isSmallScreen ? 16 : 24),
 
           // Drill Selection
           _buildDrillSelection(context),
-          const SizedBox(height: 24),
+          SizedBox(height: isSmallScreen ? 16 : 24),
 
           // Drill Controls
           if (_selectedDrill != null) _buildDrillControls(context),
@@ -521,6 +543,8 @@ class _HostSessionScreenState extends State<HostSessionScreen>
             )
           else
             DropdownButtonFormField<Drill>(
+              isDense: false,
+   
               initialValue: _selectedDrill,
               decoration: InputDecoration(
                 hintText: 'Choose a drill to start training',
@@ -639,6 +663,7 @@ class _HostSessionScreenState extends State<HostSessionScreen>
 
           // Selected drill info
           Container(
+            width: double.infinity,
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
               color: colorScheme.primaryContainer.withOpacity(0.3),
@@ -785,10 +810,10 @@ class _HostSessionScreenState extends State<HostSessionScreen>
     try {
       // Start drill for all participants first
       await _syncService.startDrillForAll(_selectedDrill!);
-      
+
       // Navigate host to drill runner as well
       _navigateHostToDrillRunner(_selectedDrill!);
-      
+
       HapticFeedback.mediumImpact();
     } catch (e) {
       if (mounted) {
@@ -984,7 +1009,8 @@ class _HostSessionScreenState extends State<HostSessionScreen>
                 ),
                 const SizedBox(height: 8),
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                   decoration: BoxDecoration(
                     color: Colors.white.withOpacity(0.2),
                     borderRadius: BorderRadius.circular(12),
@@ -999,7 +1025,7 @@ class _HostSessionScreenState extends State<HostSessionScreen>
                       ),
                       const SizedBox(width: 6),
                       Text(
-                        'Tap to copy and share with participants',
+                        'Share this code with participants',
                         style: theme.textTheme.bodySmall?.copyWith(
                           color: Colors.white.withOpacity(0.8),
                           fontSize: 12,
@@ -1066,38 +1092,36 @@ class _HostSessionScreenState extends State<HostSessionScreen>
               ),
             )
           else
-            ...participants.map((name) => Padding(
-              padding: const EdgeInsets.only(bottom: 8),
-              child: Row(
-                children: [
-                  CircleAvatar(
-                    radius: 16,
-                    backgroundColor: colorScheme.primary.withOpacity(0.1),
-                    child: Text(
-                      name.isNotEmpty ? name[0].toUpperCase() : 'P',
-                      style: TextStyle(
-                        color: colorScheme.primary,
-                        fontWeight: FontWeight.bold,
-                        fontSize: 14,
+            ...participants.map(
+              (name) => Padding(
+                padding: const EdgeInsets.only(bottom: 8),
+                child: Row(
+                  children: [
+                    CircleAvatar(
+                      radius: 16,
+                      backgroundColor: colorScheme.primary.withOpacity(0.1),
+                      child: Text(
+                        name.isNotEmpty ? name[0].toUpperCase() : 'P',
+                        style: TextStyle(
+                          color: colorScheme.primary,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 14,
+                        ),
                       ),
                     ),
-                  ),
-                  const SizedBox(width: 12),
-                  Text(
-                    name,
-                    style: theme.textTheme.bodyMedium,
-                  ),
-                ],
+                    const SizedBox(width: 12),
+                    Text(
+                      name,
+                      style: theme.textTheme.bodyMedium,
+                    ),
+                  ],
+                ),
               ),
-            ),),
+            ),
         ],
       ),
     );
   }
-
-  // ... (keep all other existing _build methods: _buildStatusCard, _buildInstructions,
-  // _buildHostingState, _buildSessionInfo, _buildParticipantsList,
-  // _buildDrillSelection, _buildDrillControls - they remain unchanged)
 
   Widget _buildStatusCard(BuildContext context) {
     final theme = Theme.of(context);
@@ -1187,10 +1211,10 @@ class _HostSessionScreenState extends State<HostSessionScreen>
           const SizedBox(height: 12),
           Text(
             '1. Tap "Start Hosting Session" to create a new session\n'
-                '2. Share the 6-digit session code with participants\n'
-                '3. Wait for participants to join your session\n'
-                '4. Select a drill and start training together\n'
-                '5. Control drill timing for all connected devices',
+            '2. Share the 6-digit session code with participants\n'
+            '3. Wait for participants to join your session\n'
+            '4. Select a drill and start training together\n'
+            '5. Control drill timing for all connected devices',
             style: theme.textTheme.bodyMedium?.copyWith(
               color: colorScheme.onSurface.withOpacity(0.7),
               height: 1.5,
@@ -1263,7 +1287,7 @@ class _HostSessionScreenState extends State<HostSessionScreen>
 
   Future<void> _handlePermissionRequest() async {
     final isIOS = defaultTargetPlatform == TargetPlatform.iOS;
-    
+
     if (mounted) {
       setState(() {
         _isLoading = true;
@@ -1274,7 +1298,7 @@ class _HostSessionScreenState extends State<HostSessionScreen>
     try {
       // Use the professional permission manager for all platforms
       final result = await ProfessionalPermissionManager.requestPermissions();
-      
+
       if (mounted) {
         setState(() {
           _isLoading = false;
@@ -1296,7 +1320,8 @@ class _HostSessionScreenState extends State<HostSessionScreen>
       } else {
         if (result.needsSettings) {
           // Show professional permission screen for permanently denied permissions
-          debugPrint('🔧 HOST: Showing permission dialog (needsSettings: ${result.needsSettings})');
+          debugPrint(
+              '🔧 HOST: Showing permission dialog (needsSettings: ${result.needsSettings})');
           _showPermissionDialog();
         } else {
           // Show a simple message for denied permissions
@@ -1340,35 +1365,34 @@ class _HostSessionScreenState extends State<HostSessionScreen>
 
   void _showPermissionDialog() async {
     debugPrint('🔐 HOST: Showing permission dialog...');
-    
+
     try {
       // Use the professional permission manager for all platforms
-      final result = await ProfessionalPermissionManager.requestPermissions(
-        
-      );
-      
+      final result = await ProfessionalPermissionManager.requestPermissions();
+
       debugPrint('🔐 HOST: Permission request result: $result');
-      
+
       // Refresh permission status after request
       await _checkPermissions();
-      
+
       if (mounted) {
         setState(() {
           if (result.success) {
             _statusMessage = 'All permissions granted! Ready to host session.';
           } else if (result.needsSettings) {
-            _statusMessage = 'Please enable permissions in Settings and try again.';
+            _statusMessage =
+                'Please enable permissions in Settings and try again.';
           } else {
-            _statusMessage = 'Some permissions were not granted. Please try again.';
+            _statusMessage =
+                'Some permissions were not granted. Please try again.';
           }
         });
       }
-      
+
       // If permissions still not granted and need settings, show settings dialog
       if (!result.success && result.needsSettings && mounted) {
         _showSettingsDialog();
       }
-      
     } catch (e) {
       debugPrint('🔐 HOST: ❌ Error requesting permissions: $e');
       if (mounted) {
@@ -1378,10 +1402,10 @@ class _HostSessionScreenState extends State<HostSessionScreen>
       }
     }
   }
-  
+
   void _showSettingsDialog() {
     if (!mounted) return;
-    
+
     final isIOS = defaultTargetPlatform == TargetPlatform.iOS;
 
     showDialog(
@@ -1423,10 +1447,14 @@ class _HostSessionScreenState extends State<HostSessionScreen>
                   style: theme.textTheme.bodyLarge,
                 ),
                 const SizedBox(height: 16),
-                _buildPermissionItem('📶 Bluetooth', 'Connect with nearby devices'),
-                _buildPermissionItem('📡 Bluetooth Scan', 'Discover other devices'),
-                _buildPermissionItem('🔗 Bluetooth Connect', 'Establish connections'),
-                _buildPermissionItem('📍 Location', 'Required for Bluetooth discovery'),
+                _buildPermissionItem(
+                    '📶 Bluetooth', 'Connect with nearby devices'),
+                _buildPermissionItem(
+                    '📡 Bluetooth Scan', 'Discover other devices'),
+                _buildPermissionItem(
+                    '🔗 Bluetooth Connect', 'Establish connections'),
+                _buildPermissionItem(
+                    '📍 Location', 'Required for Bluetooth discovery'),
               ],
             ),
           ),
@@ -1472,13 +1500,14 @@ class _HostSessionScreenState extends State<HostSessionScreen>
                   try {
                     final bluetoothService = _syncService.getBluetoothService();
                     final granted = await bluetoothService.requestPermissions();
-                    
+
                     if (granted) {
                       // Permissions granted, show success message
                       if (mounted) {
                         ScaffoldMessenger.of(context).showSnackBar(
                           const SnackBar(
-                            content: Text('Permissions granted! You can now host sessions.'),
+                            content: Text(
+                                'Permissions granted! You can now host sessions.'),
                             backgroundColor: Colors.green,
                             duration: Duration(seconds: 3),
                           ),
@@ -1487,7 +1516,7 @@ class _HostSessionScreenState extends State<HostSessionScreen>
                     } else {
                       // Some permissions denied, open settings
                       await openAppSettings();
-                      
+
                       if (mounted) {
                         ScaffoldMessenger.of(context).showSnackBar(
                           SnackBar(
@@ -1526,44 +1555,6 @@ class _HostSessionScreenState extends State<HostSessionScreen>
     );
   }
 
-  Widget _buildIOSStep(String number, String text) {
-    final theme = Theme.of(context);
-
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 6),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Container(
-            width: 20,
-            height: 20,
-            decoration: BoxDecoration(
-              color: Colors.blue,
-              borderRadius: BorderRadius.circular(10),
-            ),
-            child: Center(
-              child: Text(
-                number,
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 11,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-            ),
-          ),
-          const SizedBox(width: 8),
-          Expanded(
-            child: Text(
-              text,
-              style: theme.textTheme.bodySmall,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
   Widget _buildPermissionItem(String title, String description) {
     final theme = Theme.of(context);
 
@@ -1597,14 +1588,15 @@ class _HostSessionScreenState extends State<HostSessionScreen>
     if (!_permissionsGranted) {
       // First request permissions
       await _handlePermissionRequest();
-      
+
       // Check if permissions were granted after the request
       if (!_permissionsGranted) {
         // Permissions still not granted, show message
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
-              content: Text('Permissions are required to host a session. Please grant them and try again.'),
+              content: Text(
+                  'Permissions are required to host a session. Please grant them and try again.'),
               backgroundColor: Colors.orange,
               duration: Duration(seconds: 3),
             ),
@@ -1613,7 +1605,7 @@ class _HostSessionScreenState extends State<HostSessionScreen>
         return;
       }
     }
-    
+
     // Permissions are granted, start hosting
     await _startHosting();
   }

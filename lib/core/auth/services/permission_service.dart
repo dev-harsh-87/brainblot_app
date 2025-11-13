@@ -1,6 +1,7 @@
 import 'package:spark_app/core/auth/models/user_role.dart';
 import 'package:spark_app/core/auth/models/permission.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:spark_app/core/utils/app_logger.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 /// Service for managing permissions and role-based access control
@@ -21,7 +22,7 @@ class PermissionService {
     _auth.authStateChanges().listen((user) {
       final newUserId = user?.uid;
       if (newUserId != _currentUserId) {
-        print('🔄 Auth state changed from $_currentUserId to $newUserId - clearing role cache');
+        AppLogger.info('Auth state changed from $_currentUserId to $newUserId - clearing role cache', tag: 'PermissionService');
         _currentUserId = newUserId;
         _roleCache.clear();
         
@@ -66,7 +67,7 @@ class PermissionService {
 
   /// Clear the role cache (useful after role updates)
   void clearCache() {
-    print('🗑️ Clearing permission service role cache');
+    AppLogger.info('Clearing permission service role cache', tag: 'PermissionService');
     _roleCache.clear();
   }
 
@@ -159,7 +160,7 @@ class PermissionService {
 
       return moduleAccess.contains(module);
     } catch (e) {
-      print('Error checking module access: $e');
+      AppLogger.error('Error checking module access', error: e, tag: 'PermissionService');
       return false;
     }
   }
@@ -182,7 +183,7 @@ class PermissionService {
       // Advanced features available for Player and Institute plans
       return plan == 'player' || plan == 'institute';
     } catch (e) {
-      print('Error checking advanced features access: $e');
+      AppLogger.error('Error checking advanced features access', error: e, tag: 'PermissionService');
       return false;
     }
   }
@@ -198,7 +199,7 @@ class PermissionService {
 
       return doc.data();
     } catch (e) {
-      print('Error getting user profile: $e');
+      AppLogger.error('Error getting user profile', error: e, tag: 'PermissionService');
       return null;
     }
   }

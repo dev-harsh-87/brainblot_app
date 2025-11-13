@@ -1,6 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:spark_app/features/subscription/domain/subscription_plan.dart';
 import 'package:spark_app/features/subscription/data/subscription_plan_repository.dart';
+import 'package:spark_app/core/utils/app_logger.dart';
 import 'dart:async';
 
 /// Automatic subscription synchronization service
@@ -22,7 +23,7 @@ class SubscriptionSyncService {
     if (_isInitialized) return;
     
     try {
-      print('🔄 Initializing subscription sync service...');
+      AppLogger.debug('Initializing subscription sync service');
       
       // Initialize default plans if they don't exist
       await _ensureDefaultPlansExist();
@@ -31,9 +32,9 @@ class SubscriptionSyncService {
       _startPlanChangeListener();
       
       _isInitialized = true;
-      print('✅ Subscription sync service initialized');
+      AppLogger.info('Subscription sync service initialized');
     } catch (e) {
-      print('❌ Failed to initialize subscription sync service: $e');
+      AppLogger.error('Failed to initialize subscription sync service', error: e);
       rethrow;
     }
   }
@@ -43,14 +44,14 @@ class SubscriptionSyncService {
     try {
       final plans = await _planRepository.getAllPlans();
       if (plans.isEmpty) {
-        print('📦 Creating default subscription plans...');
+        AppLogger.debug('Creating default subscription plans');
         await _createDefaultPlans();
-        print('✅ Default plans created');
+        AppLogger.info('Default plans created');
       }
     } catch (e) {
-      print('❌ Error ensuring default plans: $e');
+      AppLogger.error('Error ensuring default plans', error: e);
       // Don't rethrow - this is not critical for app startup
-      print('⚠️ Continuing without default plans - they can be created via admin panel');
+      AppLogger.warning('Continuing without default plans - they can be created via admin panel');
     }
   }
 
@@ -131,9 +132,9 @@ class SubscriptionSyncService {
     for (final plan in defaultPlans) {
       try {
         await _planRepository.createPlan(plan);
-        print('✅ Created plan: ${plan.name}');
+        AppLogger.info('Created plan: ${plan.name}');
       } catch (e) {
-        print('❌ Failed to create plan ${plan.name}: $e');
+        AppLogger.error('Failed to create plan ${plan.name}', error: e);
       }
     }
   }
@@ -147,7 +148,7 @@ class SubscriptionSyncService {
       for (final change in snapshot.docChanges) {
         if (change.type == DocumentChangeType.modified) {
           final planId = change.doc.id;
-          print('📡 Plan $planId was modified, syncing affected users...');
+          AppLogger.debug('Plan $planId was modified, syncing affected users');
           _syncUsersForPlan(planId);
         }
       }
@@ -169,9 +170,9 @@ class SubscriptionSyncService {
         await _updateUserModuleAccess(userDoc.id, plan.moduleAccess);
       }
       
-      print('✅ Synced ${usersSnapshot.docs.length} users for plan $planId');
+      AppLogger.info('Synced ${usersSnapshot.docs.length} users for plan $planId');
     } catch (e) {
-      print('❌ Error syncing users for plan $planId: $e');
+      AppLogger.error('Error syncing users for plan $planId', error: e);
     }
   }
 
@@ -183,7 +184,7 @@ class SubscriptionSyncService {
         'updatedAt': FieldValue.serverTimestamp(),
       });
     } catch (e) {
-      print('❌ Error updating module access for user $userId: $e');
+      AppLogger.error('Error updating module access for user $userId', error: e);
     }
   }
 
@@ -212,10 +213,10 @@ class SubscriptionSyncService {
 
       if (!_listsEqual(currentModuleAccess, plan.moduleAccess)) {
         await _updateUserModuleAccess(userId, plan.moduleAccess);
-        print('✅ Synced module access for user $userId on login');
+        AppLogger.info('Synced module access for user $userId on login');
       }
     } catch (e) {
-      print('❌ Error syncing user on login: $e');
+      AppLogger.error('Error syncing user on login', error: e);
     }
   }
 

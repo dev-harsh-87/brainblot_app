@@ -40,7 +40,7 @@ class _DrillBuilderScreenState extends State<DrillBuilderScreen>
   int _reps = 3;
   int _numberOfStimuli = 30;
   final Set<StimulusType> _stimuli = {StimulusType.color};
-  final Set<ReactionZone> _zones = {ReactionZone.center};
+  final Set<ReactionZone> _zones = {ReactionZone.center}; // Always center only
   final List<Color> _selectedColors = [Colors.red, Colors.green, Colors.blue, Colors.yellow];
   PresentationMode _presentationMode = PresentationMode.visual;
   
@@ -1126,43 +1126,6 @@ class _DrillBuilderScreenState extends State<DrillBuilderScreen>
             ),
             const SizedBox(height: 32),
           ],
-
-          // Reaction Zones Section - Simplified with fullscreen option
-          Text(
-            'Screen Coverage',
-            style: theme.textTheme.titleMedium?.copyWith(
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            'Choose where stimuli can appear on the screen',
-            style: theme.textTheme.bodySmall?.copyWith(
-              color: colorScheme.onSurface.withOpacity(0.7),
-            ),
-          ),
-          const SizedBox(height: 16),
-          Row(
-            children: [
-              Expanded(
-                child: _buildReactionZoneCard(
-                  'Fullscreen',
-                  Icons.fullscreen,
-                  'Stimuli appear anywhere on the full screen',
-                  ReactionZone.quadrants,
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: _buildReactionZoneCard(
-                  'Center',
-                  Icons.center_focus_strong,
-                  'Stimuli appear in the center area',
-                  ReactionZone.center,
-                ),
-              ),
-            ],
-          ),
         ],
       ),
     );
@@ -1668,9 +1631,7 @@ class _DrillBuilderScreenState extends State<DrillBuilderScreen>
       errors.add('Please select at least one stimulus type');
     }
     
-    if (_zones.isEmpty) {
-      errors.add('Please select at least one reaction zone');
-    }
+    // Zones are always set to center, no validation needed
     
     if (_selectedColors.length < 2) {
       errors.add('Please select at least 2 colors');
@@ -1708,9 +1669,7 @@ class _DrillBuilderScreenState extends State<DrillBuilderScreen>
         if (_stimuli.isEmpty) {
           errors.add('Select at least one stimulus type');
         }
-        if (_zones.isEmpty) {
-          errors.add('Select at least one reaction zone');
-        }
+        // Zones are always set to center, no validation needed
         if (_stimuli.contains(StimulusType.color) && _selectedColors.length < 2) {
           errors.add('Select at least 2 colors for color stimulus');
         }

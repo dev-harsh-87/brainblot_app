@@ -1,5 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:spark_app/core/utils/app_logger.dart';
 
 import 'package:spark_app/features/sharing/domain/user_profile.dart';
 
@@ -38,7 +39,7 @@ class ProfileService {
         ...data,
       });
     } catch (e) {
-      print('Error getting user profile: $e');
+      AppLogger.error('Error getting user profile', error: e, tag: 'ProfileService');
       return null;
     }
   }
@@ -261,7 +262,7 @@ class ProfileService {
         'lastActive': profile?.lastActiveAt ?? DateTime.now(),
       };
     } catch (e) {
-      print('Error getting user stats: $e');
+      AppLogger.error('Error getting user stats', error: e, tag: 'ProfileService');
       return {};
     }
   }

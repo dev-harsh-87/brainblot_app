@@ -8,6 +8,7 @@ import 'package:spark_app/core/services/preferences_service.dart';
 import 'package:spark_app/core/auth/services/session_management_service.dart';
 import 'package:spark_app/features/auth/services/multi_device_session_service.dart';
 import 'package:spark_app/core/di/injection.dart';
+import 'package:spark_app/core/utils/app_logger.dart';
 import 'dart:async';
 
 part 'auth_event.dart';
@@ -62,6 +63,9 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
     try {
       final cred = await _repo.signInWithEmailPassword(email: event.email, password: event.password);
       
+      // Wait a moment for auth state to settle
+      await Future.delayed(const Duration(milliseconds: 100));
+      
       // Check for existing sessions before completing login
       final existingSessions = await _multiDeviceService.getActiveSessions();
       final otherSessions = existingSessions.where((session) => !session.isCurrentDevice).toList();
@@ -74,7 +78,8 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
           existingSessions: otherSessions.map((s) => s.toFirestore()).toList(),
         ),);
       } else {
-        // No conflicts, proceed with normal authentication
+        // No conflicts, register device session without forcing logout
+        await _sessionService!.registerCurrentDeviceSession();
         emit(state.copyWith(status: AuthStatus.authenticated, user: cred.user));
       }
     } on FirebaseAuthException catch (e) {
@@ -107,7 +112,7 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
       // Clear state completely
       emit(const AuthState.initial());
       
-      print('✅ Logout successful - session and credentials cleared');
+      AppLogger.success('Logout successful - session and credentials cleared', tag: 'Auth');
     } catch (e) {
       emit(state.copyWith(status: AuthStatus.failure, error: 'Logout failed: ${e.toString()}'));
     }
@@ -126,11 +131,11 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
     if (currentUser != null) {
       // User exists in Firebase Auth, mark as authenticated immediately
       // Session establishment happens asynchronously via SessionManagementService
-      print('🔍 Auth check: Found Firebase user, marking as authenticated');
+      AppLogger.debug('Auth check: Found Firebase user, marking as authenticated', tag: 'Auth');
       emit(state.copyWith(status: AuthStatus.authenticated, user: currentUser));
     } else {
       // No user found
-      print('🔍 Auth check: No Firebase user found');
+      AppLogger.debug('Auth check: No Firebase user found', tag: 'Auth');
       emit(const AuthState.initial());
     }
   }

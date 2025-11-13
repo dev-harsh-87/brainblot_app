@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import 'package:share_plus/share_plus.dart';
+import 'package:spark_app/core/utils/app_logger.dart';
 import 'dart:math' as math;
 
 // Data class to hold rep performance information
@@ -646,9 +647,9 @@ class _DrillResultsScreenState extends State<DrillResultsScreen>
     
     // Check if we have detailed set results from the drill runner
     if (widget.detailedSetResults != null && widget.detailedSetResults!.isNotEmpty) {
-      print('📥 Received detailed set results: ${widget.detailedSetResults!.length} sets');
+      AppLogger.debug('Received detailed set results: ${widget.detailedSetResults!.length} sets', tag: 'DrillResults');
       for (var setData in widget.detailedSetResults!) {
-        print('  Set ${setData['setNumber']}: ${(setData['reps'] as List).length} reps');
+        AppLogger.debug('Set ${setData['setNumber']}: ${(setData['reps'] as List).length} reps', tag: 'DrillResults');
       }
       
       // Use the detailed results from the drill runner

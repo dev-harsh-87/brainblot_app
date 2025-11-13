@@ -4,6 +4,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:spark_app/features/drills/domain/drill.dart';
 import 'package:spark_app/features/drills/data/drill_repository.dart';
+import 'package:spark_app/core/utils/app_logger.dart';
 import 'package:uuid/uuid.dart';
 
 /// Professional Firebase implementation of DrillRepository
@@ -62,7 +63,7 @@ class FirebaseDrillRepository implements DrillRepository {
             
             return allDrills;
           } catch (error) {
-            print('❌ Error in watchAll: $error');
+            AppLogger.error('Error in watchAll', error: error);
             return <Drill>[];
           }
         });
@@ -78,7 +79,7 @@ class FirebaseDrillRepository implements DrillRepository {
           
       return _mapSnapshotToDrills(sharedDrills);
     } catch (e) {
-      print('Error fetching shared drills: $e');
+      AppLogger.error('Error fetching shared drills', error: e);
       return [];
     }
   }
@@ -96,7 +97,7 @@ class FirebaseDrillRepository implements DrillRepository {
             drills.sort((a, b) => b.createdAt.compareTo(a.createdAt));
             return drills;
           } catch (error) {
-            print('Error watching drills by category: $error');
+            AppLogger.error('Error watching drills by category', error: error);
             return <Drill>[];
           }
         });
@@ -115,7 +116,7 @@ class FirebaseDrillRepository implements DrillRepository {
             drills.sort((a, b) => b.createdAt.compareTo(a.createdAt));
             return drills;
           } catch (error) {
-            print('Error watching drills by difficulty: $error');
+            AppLogger.error('Error watching drills by difficulty', error: error);
             return <Drill>[];
           }
         });
@@ -142,7 +143,7 @@ class FirebaseDrillRepository implements DrillRepository {
             filtered.sort((a, b) => b.createdAt.compareTo(a.createdAt));
             return filtered;
           } catch (error) {
-            print('Error watching favorite drills: $error');
+            AppLogger.error('Error watching favorite drills', error: error);
             return <Drill>[];
           }
         });
@@ -199,7 +200,7 @@ class FirebaseDrillRepository implements DrillRepository {
 
       return filteredDrills;
     } catch (error) {
-      print('❌ Error fetching all drills: $error');
+      AppLogger.error('Error fetching all drills', error: error);
       throw Exception('Failed to fetch drills: $error');
     }
   }
@@ -237,7 +238,7 @@ class FirebaseDrillRepository implements DrillRepository {
 
       return _mapDocumentToDrill(doc);
     } catch (error) {
-      print('Error fetching drill by ID: $error');
+      AppLogger.error('Error fetching drill by ID', error: error);
       throw Exception('Failed to fetch drill: $error');
     }
   }

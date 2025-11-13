@@ -61,38 +61,21 @@ class AppRouter {
   AppRouter(this._authBloc);
 
   /// Determines the initial route based on authentication state
-  /// In debug mode, preserves last location for better development experience
+  /// Always starts at home screen for authenticated users to ensure consistent experience
   String _getInitialLocation() {
     final currentUser = FirebaseAuth.instance.currentUser;
     
-    // In debug mode, try to restore last location for hot reload
-    if (kDebugMode && currentUser != null) {
-      try {
-        final lastLocation = AppStorage.getString(_lastLocationKey);
-        if (lastLocation != null && 
-            lastLocation.isNotEmpty && 
-            !_authRoutes.contains(lastLocation)) {
-          debugPrint('[Router] Hot reload: Restoring location: $lastLocation');
-          return lastLocation;
-        }
-      } catch (e) {
-        debugPrint('[Router] Failed to restore location: $e');
-      }
-    }
-    
-    // Default routing based on auth state
+    // Always start at home screen for authenticated users
+    // This ensures consistent behavior on app restart
     return currentUser != null ? '/' : '/login';
   }
 
   /// Saves current location for hot reload restoration (debug mode only)
+  /// Disabled to ensure app always starts at home screen
   void _saveLocationForHotReload(String location) {
-    if (!kDebugMode || _authRoutes.contains(location)) return;
-    
-    try {
-      AppStorage.setString(_lastLocationKey, location);
-    } catch (e) {
-      debugPrint('[Router] Failed to save location: $e');
-    }
+    // Disabled - we want the app to always start at home screen on restart
+    // This prevents unwanted navigation to drill creation or other screens
+    return;
   }
 
   /// Main redirect logic for authentication and route protection

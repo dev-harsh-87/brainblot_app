@@ -2,6 +2,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:spark_app/features/auth/domain/device_session.dart';
 import 'package:spark_app/core/auth/services/device_session_service.dart';
+import 'package:spark_app/core/utils/app_logger.dart';
 import 'dart:async';
 
 /// Service to manage multiple device sessions for a user
@@ -55,7 +56,7 @@ class MultiDeviceSessionService {
 
       return sessions;
     } catch (e) {
-      print('❌ Failed to get active sessions: $e');
+      AppLogger.error('Failed to get active sessions', error: e, tag: 'MultiDeviceSession');
       return [];
     }
   }

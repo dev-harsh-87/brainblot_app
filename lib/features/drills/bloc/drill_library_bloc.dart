@@ -4,6 +4,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:spark_app/features/drills/data/drill_repository.dart';
 import 'package:spark_app/features/drills/data/firebase_drill_repository.dart';
 import 'package:spark_app/features/drills/domain/drill.dart';
+import 'package:spark_app/core/utils/app_logger.dart';
 import 'package:spark_app/core/bloc/bloc_utils.dart';
 
 part 'drill_library_event.dart';
@@ -41,7 +42,7 @@ class DrillLibraryBloc extends Bloc<DrillLibraryEvent, DrillLibraryState> {
             await (_repo as FirebaseDrillRepository).seedDefaultDrills();
           }
         } catch (e) {
-          print('⚠️ Warning: Could not seed default drills: $e');
+          AppLogger.warning('Could not seed default drills', tag: 'DrillLibraryBloc');
           // Continue even if seeding fails
         }
         
@@ -176,7 +177,7 @@ class DrillLibraryBloc extends Bloc<DrillLibraryEvent, DrillLibraryState> {
             lastUpdated: DateTime.now(),
           ),);
           
-          print('✅ Successfully refreshed ${items.length} drills');
+          AppLogger.success('Successfully refreshed ${items.length} drills', tag: 'DrillLibraryBloc');
         } catch (e) {
 
           rethrow;

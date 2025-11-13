@@ -2,12 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:spark_app/features/auth/domain/device_session.dart';
 import 'package:spark_app/features/auth/services/multi_device_session_service.dart';
-import 'package:spark_app/features/auth/ui/device_sessions_screen.dart';
 import 'package:spark_app/core/di/injection.dart';
-import 'package:go_router/go_router.dart';
 
 /// Dialog shown when user logs in on a new device while already logged in elsewhere
-/// Provides options to manage existing sessions
+/// Shows single device info and allows logout from previous device
 class DeviceConflictDialog extends StatefulWidget {
   final List<DeviceSession> existingSessions;
   final VoidCallback? onContinue;
@@ -63,11 +61,12 @@ class _DeviceConflictDialogState extends State<DeviceConflictDialog> with Ticker
     super.dispose();
   }
 
-  Future<void> _logoutFromAllOtherDevices() async {
+  Future<void> _logoutFromPreviousDevice() async {
     setState(() => _isLoading = true);
     HapticFeedback.mediumImpact();
 
     try {
+      // Logout from all other devices
       await _sessionService.logoutFromAllOtherDevices();
       
       if (mounted) {
@@ -81,7 +80,7 @@ class _DeviceConflictDialogState extends State<DeviceConflictDialog> with Ticker
               children: [
                 Icon(Icons.check_circle, color: Colors.white),
                 SizedBox(width: 12),
-                Expanded(child: Text('Logged out from all other devices')),
+                Expanded(child: Text('Logged out from previous device')),
               ],
             ),
             backgroundColor: Colors.green,
@@ -115,55 +114,40 @@ class _DeviceConflictDialogState extends State<DeviceConflictDialog> with Ticker
     }
   }
 
-  void _viewAllSessions() {
-    Navigator.of(context).pop();
-    Navigator.of(context).push(
-      MaterialPageRoute(
-        builder: (context) => const DeviceSessionsScreen(),
-      ),
-    );
-  }
-
-  void _continueWithCurrentLogin() {
-    HapticFeedback.lightImpact();
-    Navigator.of(context).pop();
-    widget.onContinue?.call();
-  }
-
   void _cancelLogin() {
     HapticFeedback.lightImpact();
     Navigator.of(context).pop();
     widget.onCancel?.call();
   }
 
-  Widget _buildSessionPreview(DeviceSession session, ColorScheme colorScheme) {
+  Widget _buildDeviceInfo(DeviceSession session, ColorScheme colorScheme) {
     return Container(
-      margin: const EdgeInsets.only(bottom: 8),
-      padding: const EdgeInsets.all(12),
+      padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: colorScheme.surfaceContainerHighest.withOpacity(0.5),
-        borderRadius: BorderRadius.circular(12),
+        color: colorScheme.errorContainer.withOpacity(0.3),
+        borderRadius: BorderRadius.circular(16),
         border: Border.all(
-          color: colorScheme.outline.withOpacity(0.2),
+          color: colorScheme.error.withOpacity(0.3),
+          width: 2,
         ),
       ),
       child: Row(
         children: [
           Container(
-            width: 36,
-            height: 36,
+            width: 56,
+            height: 56,
             decoration: BoxDecoration(
-              color: colorScheme.primary.withOpacity(0.1),
-              borderRadius: BorderRadius.circular(8),
+              color: colorScheme.error.withOpacity(0.2),
+              borderRadius: BorderRadius.circular(12),
             ),
             child: Center(
               child: Text(
                 session.deviceIcon,
-                style: const TextStyle(fontSize: 18),
+                style: const TextStyle(fontSize: 28),
               ),
             ),
           ),
-          const SizedBox(width: 12),
+          const SizedBox(width: 16),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -171,12 +155,22 @@ class _DeviceConflictDialogState extends State<DeviceConflictDialog> with Ticker
                 Text(
                   session.deviceName,
                   style: const TextStyle(
-                    fontWeight: FontWeight.w600,
-                    fontSize: 14,
+                    fontWeight: FontWeight.w700,
+                    fontSize: 16,
                   ),
                 ),
+                const SizedBox(height: 4),
                 Text(
-                  '${session.platform} • ${session.formattedLastActive}',
+                  session.platform,
+                  style: TextStyle(
+                    fontSize: 14,
+                    color: colorScheme.onSurface.withOpacity(0.7),
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  'Last active: ${session.formattedLastActive}',
                   style: TextStyle(
                     fontSize: 12,
                     color: colorScheme.onSurface.withOpacity(0.6),
@@ -187,11 +181,18 @@ class _DeviceConflictDialogState extends State<DeviceConflictDialog> with Ticker
           ),
           if (session.isOnline)
             Container(
-              width: 8,
-              height: 8,
-              decoration: const BoxDecoration(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              decoration: BoxDecoration(
                 color: Colors.green,
-                shape: BoxShape.circle,
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: const Text(
+                'Online',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 10,
+                  fontWeight: FontWeight.w600,
+                ),
               ),
             ),
         ],
@@ -203,7 +204,7 @@ class _DeviceConflictDialogState extends State<DeviceConflictDialog> with Ticker
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
-    final otherSessions = widget.existingSessions.where((s) => !s.isCurrentDevice).toList();
+    final previousDevice = widget.existingSessions.first;
 
     return FadeTransition(
       opacity: _fadeAnimation,
@@ -215,105 +216,72 @@ class _DeviceConflictDialogState extends State<DeviceConflictDialog> with Ticker
           content: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              // Header
+              // Warning Icon
               Container(
-                width: 64,
-                height: 64,
+                width: 80,
+                height: 80,
                 decoration: BoxDecoration(
-                  color: colorScheme.primaryContainer,
+                  color: colorScheme.errorContainer,
                   shape: BoxShape.circle,
                 ),
                 child: Icon(
-                  Icons.devices,
-                  size: 32,
-                  color: colorScheme.onPrimaryContainer,
+                  Icons.warning_rounded,
+                  size: 40,
+                  color: colorScheme.error,
                 ),
               ),
-              const SizedBox(height: 20),
+              const SizedBox(height: 24),
               
+              // Title
               Text(
-                'Multiple Device Login Detected',
-                style: theme.textTheme.titleLarge?.copyWith(
+                'Device Already Logged In',
+                style: theme.textTheme.headlineSmall?.copyWith(
                   fontWeight: FontWeight.bold,
+                  color: colorScheme.error,
                 ),
                 textAlign: TextAlign.center,
               ),
               const SizedBox(height: 12),
               
+              // Description
               Text(
-                'You are already logged in on ${otherSessions.length} other device${otherSessions.length > 1 ? 's' : ''}. What would you like to do?',
+                'Your account is currently logged in on another device. You can only be logged in on one device at a time.',
                 style: theme.textTheme.bodyMedium?.copyWith(
-                  color: colorScheme.onSurface.withOpacity(0.7),
+                  color: colorScheme.onSurface.withOpacity(0.8),
                 ),
                 textAlign: TextAlign.center,
               ),
-              const SizedBox(height: 20),
-              
-              // Session previews (show up to 3)
-              Container(
-                constraints: const BoxConstraints(maxHeight: 200),
-                child: SingleChildScrollView(
-                  child: Column(
-                    children: otherSessions
-                        .take(3)
-                        .map((session) => _buildSessionPreview(session, colorScheme))
-                        .toList(),
-                  ),
-                ),
-              ),
-              
-              if (otherSessions.length > 3) ...[
-                const SizedBox(height: 8),
-                Text(
-                  'and ${otherSessions.length - 3} more device${otherSessions.length - 3 > 1 ? 's' : ''}...',
-                  style: theme.textTheme.bodySmall?.copyWith(
-                    color: colorScheme.onSurface.withOpacity(0.6),
-                    fontStyle: FontStyle.italic,
-                  ),
-                ),
-              ],
-              
               const SizedBox(height: 24),
+              
+              // Device Info
+              _buildDeviceInfo(previousDevice, colorScheme),
+              const SizedBox(height: 32),
               
               // Action buttons
               Column(
                 children: [
-                  // Continue with current login
+                  // Logout and continue button
                   SizedBox(
                     width: double.infinity,
                     child: FilledButton.icon(
-                      onPressed: _isLoading ? null : _continueWithCurrentLogin,
-                      icon: const Icon(Icons.login),
-                      label: const Text('Continue on This Device'),
-                      style: FilledButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(vertical: 12),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  
-                  // Logout from all other devices
-                  SizedBox(
-                    width: double.infinity,
-                    child: FilledButton.icon(
-                      onPressed: _isLoading ? null : _logoutFromAllOtherDevices,
+                      onPressed: _isLoading ? null : _logoutFromPreviousDevice,
                       icon: _isLoading 
                           ? const SizedBox(
-                              width: 16,
-                              height: 16,
-                              child: CircularProgressIndicator(strokeWidth: 2),
+                              width: 20,
+                              height: 20,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color: Colors.white,
+                              ),
                             )
                           : const Icon(Icons.logout),
                       label: Text(_isLoading 
                           ? 'Logging out...' 
-                          : 'Logout All Other Devices',),
+                          : 'Logout Previous Device & Continue'),
                       style: FilledButton.styleFrom(
-                        backgroundColor: Colors.orange,
+                        backgroundColor: colorScheme.error,
                         foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        padding: const EdgeInsets.symmetric(vertical: 16),
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(12),
                         ),
@@ -322,27 +290,19 @@ class _DeviceConflictDialogState extends State<DeviceConflictDialog> with Ticker
                   ),
                   const SizedBox(height: 12),
                   
-                  // View all sessions
+                  // Cancel button
                   SizedBox(
                     width: double.infinity,
-                    child: OutlinedButton.icon(
-                      onPressed: _isLoading ? null : _viewAllSessions,
-                      icon: const Icon(Icons.manage_accounts),
-                      label: const Text('Manage All Sessions'),
+                    child: OutlinedButton(
+                      onPressed: _isLoading ? null : _cancelLogin,
                       style: OutlinedButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        padding: const EdgeInsets.symmetric(vertical: 16),
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(12),
                         ),
                       ),
+                      child: const Text('Cancel Login'),
                     ),
-                  ),
-                  const SizedBox(height: 16),
-                  
-                  // Cancel
-                  TextButton(
-                    onPressed: _isLoading ? null : _cancelLogin,
-                    child: const Text('Cancel Login'),
                   ),
                 ],
               ),

@@ -53,15 +53,17 @@ class _MultiplayerSelectionScreenState extends State<MultiplayerSelectionScreen>
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
+    final size = MediaQuery.of(context).size;
+    final isSmallScreen = size.width < 360;
 
     return Scaffold(
       backgroundColor: colorScheme.surface,
       appBar: AppBar(
-        title: const Text(
+        title: Text(
           'Multiplayer Training',
           style: TextStyle(
             fontWeight: FontWeight.bold,
-            fontSize: 20,
+            fontSize: isSmallScreen ? 18 : 20,
             letterSpacing: -0.5,
           ),
         ),
@@ -86,24 +88,25 @@ class _MultiplayerSelectionScreenState extends State<MultiplayerSelectionScreen>
   }
 
   Widget _buildContent(BuildContext context) {
-    final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
+    final size = MediaQuery.of(context).size;
+    final isSmallScreen = size.width < 360;
+    final padding = isSmallScreen ? 16.0 : 24.0;
 
     return SingleChildScrollView(
-      padding: const EdgeInsets.all(24),
+      padding: EdgeInsets.all(padding),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           // Header Section
           _buildHeader(context),
-          const SizedBox(height: 40),
+          SizedBox(height: isSmallScreen ? 24 : 40),
 
           // Selection Cards
           _buildSelectionCards(context),
-          const SizedBox(height: 32),
+          SizedBox(height: isSmallScreen ? 24 : 32),
 
-          // Info Section
-          _buildInfoSection(context),
+          // Condensed Info Section with button to expand
+          _buildCondensedInfoSection(context),
         ],
       ),
     );
@@ -112,9 +115,11 @@ class _MultiplayerSelectionScreenState extends State<MultiplayerSelectionScreen>
   Widget _buildHeader(BuildContext context) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
+    final size = MediaQuery.of(context).size;
+    final isSmallScreen = size.width < 360;
 
     return Container(
-      padding: const EdgeInsets.all(24),
+      padding: EdgeInsets.all(isSmallScreen ? 16 : 24),
       decoration: BoxDecoration(
         gradient: LinearGradient(
           colors: [
@@ -124,7 +129,7 @@ class _MultiplayerSelectionScreenState extends State<MultiplayerSelectionScreen>
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(isSmallScreen ? 16 : 20),
         border: Border.all(
           color: colorScheme.outline.withOpacity(0.1),
         ),
@@ -135,7 +140,7 @@ class _MultiplayerSelectionScreenState extends State<MultiplayerSelectionScreen>
           Row(
             children: [
               Container(
-                padding: const EdgeInsets.all(12),
+                padding: EdgeInsets.all(isSmallScreen ? 10 : 12),
                 decoration: BoxDecoration(
                   color: colorScheme.primary.withOpacity(0.1),
                   borderRadius: BorderRadius.circular(12),
@@ -143,10 +148,10 @@ class _MultiplayerSelectionScreenState extends State<MultiplayerSelectionScreen>
                 child: Icon(
                   Icons.people_rounded,
                   color: colorScheme.primary,
-                  size: 28,
+                  size: isSmallScreen ? 24 : 28,
                 ),
               ),
-              const SizedBox(width: 16),
+              SizedBox(width: isSmallScreen ? 12 : 16),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -155,6 +160,7 @@ class _MultiplayerSelectionScreenState extends State<MultiplayerSelectionScreen>
                       'Train Together',
                       style: theme.textTheme.headlineSmall?.copyWith(
                         fontWeight: FontWeight.bold,
+                        fontSize: isSmallScreen ? 20 : null,
                         color: colorScheme.onSurface,
                       ),
                     ),
@@ -162,6 +168,7 @@ class _MultiplayerSelectionScreenState extends State<MultiplayerSelectionScreen>
                     Text(
                       'Connect with friends and train simultaneously',
                       style: theme.textTheme.bodyMedium?.copyWith(
+                        fontSize: isSmallScreen ? 13 : null,
                         color: colorScheme.onSurface.withOpacity(0.7),
                       ),
                     ),
@@ -222,6 +229,8 @@ class _MultiplayerSelectionScreenState extends State<MultiplayerSelectionScreen>
   }) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
+    final size = MediaQuery.of(context).size;
+    final isSmallScreen = size.width < 360;
 
     return GestureDetector(
       onTap: () {
@@ -229,10 +238,10 @@ class _MultiplayerSelectionScreenState extends State<MultiplayerSelectionScreen>
         onTap();
       },
       child: Container(
-        padding: const EdgeInsets.all(24),
+        padding: EdgeInsets.all(isSmallScreen ? 16 : 24),
         decoration: BoxDecoration(
           color: colorScheme.surface,
-          borderRadius: BorderRadius.circular(20),
+          borderRadius: BorderRadius.circular(isSmallScreen ? 16 : 20),
           border: Border.all(
             color: color.withOpacity(0.2),
             width: 2,
@@ -252,14 +261,14 @@ class _MultiplayerSelectionScreenState extends State<MultiplayerSelectionScreen>
             Row(
               children: [
                 Container(
-                  padding: const EdgeInsets.all(16),
+                  padding: EdgeInsets.all(isSmallScreen ? 12 : 16),
                   decoration: BoxDecoration(
                     gradient: LinearGradient(
                       colors: [color, color.withOpacity(0.8)],
                       begin: Alignment.topLeft,
                       end: Alignment.bottomRight,
                     ),
-                    borderRadius: BorderRadius.circular(16),
+                    borderRadius: BorderRadius.circular(isSmallScreen ? 12 : 16),
                     boxShadow: [
                       BoxShadow(
                         color: color.withOpacity(0.3),
@@ -271,10 +280,10 @@ class _MultiplayerSelectionScreenState extends State<MultiplayerSelectionScreen>
                   child: Icon(
                     icon,
                     color: Colors.white,
-                    size: 32,
+                    size: isSmallScreen ? 28 : 32,
                   ),
                 ),
-                const SizedBox(width: 16),
+                SizedBox(width: isSmallScreen ? 12 : 16),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -283,6 +292,7 @@ class _MultiplayerSelectionScreenState extends State<MultiplayerSelectionScreen>
                         title,
                         style: theme.textTheme.titleLarge?.copyWith(
                           fontWeight: FontWeight.bold,
+                          fontSize: isSmallScreen ? 18 : null,
                           color: colorScheme.onSurface,
                         ),
                       ),
@@ -290,6 +300,7 @@ class _MultiplayerSelectionScreenState extends State<MultiplayerSelectionScreen>
                       Text(
                         subtitle,
                         style: theme.textTheme.bodyMedium?.copyWith(
+                          fontSize: isSmallScreen ? 12 : null,
                           color: colorScheme.onSurface.withOpacity(0.7),
                         ),
                       ),
@@ -299,30 +310,31 @@ class _MultiplayerSelectionScreenState extends State<MultiplayerSelectionScreen>
                 Icon(
                   Icons.arrow_forward_ios_rounded,
                   color: color,
-                  size: 20,
+                  size: isSmallScreen ? 16 : 20,
                 ),
               ],
             ),
-            const SizedBox(height: 20),
+            SizedBox(height: isSmallScreen ? 12 : 20),
             
             // Features
             ...features.map((feature) => Padding(
-              padding: const EdgeInsets.only(bottom: 8),
+              padding: EdgeInsets.only(bottom: isSmallScreen ? 6 : 8),
               child: Row(
                 children: [
                   Container(
-                    width: 6,
-                    height: 6,
+                    width: isSmallScreen ? 5 : 6,
+                    height: isSmallScreen ? 5 : 6,
                     decoration: BoxDecoration(
                       color: color,
                       borderRadius: BorderRadius.circular(3),
                     ),
                   ),
-                  const SizedBox(width: 12),
+                  SizedBox(width: isSmallScreen ? 10 : 12),
                   Expanded(
                     child: Text(
                       feature,
                       style: theme.textTheme.bodyMedium?.copyWith(
+                        fontSize: isSmallScreen ? 13 : null,
                         color: colorScheme.onSurface.withOpacity(0.8),
                       ),
                     ),
@@ -336,121 +348,230 @@ class _MultiplayerSelectionScreenState extends State<MultiplayerSelectionScreen>
     );
   }
 
-  Widget _buildInfoSection(BuildContext context) {
+  Widget _buildCondensedInfoSection(BuildContext context) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
+    final size = MediaQuery.of(context).size;
+    final isSmallScreen = size.width < 360;
 
-    return Column(
-      children: [
-        Container(
-          padding: const EdgeInsets.all(20),
-          decoration: BoxDecoration(
-            color: colorScheme.surfaceContainerHighest.withOpacity(0.3),
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(
-              color: colorScheme.outline.withOpacity(0.1),
-            ),
+    return GestureDetector(
+      onTap: () => _showInfoBottomSheet(context),
+      child: Container(
+        padding: EdgeInsets.all(isSmallScreen ? 14 : 16),
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            colors: [
+              colorScheme.primaryContainer.withOpacity(0.2),
+              colorScheme.secondaryContainer.withOpacity(0.1),
+            ],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
           ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
+          borderRadius: BorderRadius.circular(isSmallScreen ? 12 : 16),
+          border: Border.all(
+            color: colorScheme.outline.withOpacity(0.2),
+          ),
+        ),
+        child: Row(
+          children: [
+            Container(
+              padding: EdgeInsets.all(isSmallScreen ? 8 : 10),
+              decoration: BoxDecoration(
+                color: colorScheme.primary.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Icon(
+                Icons.info_outline_rounded,
+                color: colorScheme.primary,
+                size: isSmallScreen ? 20 : 22,
+              ),
+            ),
+            SizedBox(width: isSmallScreen ? 10 : 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Icon(
-                    Icons.info_outline_rounded,
-                    color: colorScheme.primary,
-                    size: 20,
-                  ),
-                  const SizedBox(width: 8),
                   Text(
-                    'How it works',
-                    style: theme.textTheme.titleMedium?.copyWith(
+                    'How it works & Requirements',
+                    style: theme.textTheme.titleSmall?.copyWith(
                       fontWeight: FontWeight.bold,
+                      fontSize: isSmallScreen ? 14 : null,
                       color: colorScheme.onSurface,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    'Tap to view instructions and requirements',
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      fontSize: isSmallScreen ? 11 : null,
+                      color: colorScheme.onSurface.withOpacity(0.6),
                     ),
                   ),
                 ],
               ),
-              const SizedBox(height: 12),
-              Text(
-                '• Host creates a session and shares the 6-digit code\n'
-                '• Participants join using the session code\n'
-                '• Host controls drill timing for all connected devices\n'
-                '• Everyone trains simultaneously with synchronized drills\n'
-                '• Real-time synchronization with pause/resume controls',
-                style: theme.textTheme.bodyMedium?.copyWith(
-                  color: colorScheme.onSurface.withOpacity(0.7),
-                  height: 1.5,
-                ),
-              ),
-            ],
-          ),
+            ),
+            Icon(
+              Icons.arrow_forward_ios_rounded,
+              color: colorScheme.primary,
+              size: isSmallScreen ? 14 : 16,
+            ),
+          ],
         ),
-        const SizedBox(height: 16),
-        _buildRequirementsSection(context),
-      ],
+      ),
     );
   }
 
-  Widget _buildRequirementsSection(BuildContext context) {
+  void _showInfoBottomSheet(BuildContext context) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
+    final size = MediaQuery.of(context).size;
+    final isSmallScreen = size.width < 360;
 
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: Colors.blue.withOpacity(0.05),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: Colors.blue.withOpacity(0.2),
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => Container(
+        height: size.height * 0.7,
+        decoration: BoxDecoration(
+          color: colorScheme.surface,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
         ),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Icon(
-                Icons.checklist_rounded,
-                color: Colors.blue,
-                size: 20,
+        child: Column(
+          children: [
+            // Handle bar
+            Container(
+              margin: const EdgeInsets.only(top: 12, bottom: 8),
+              width: 40,
+              height: 4,
+              decoration: BoxDecoration(
+                color: colorScheme.onSurface.withOpacity(0.3),
+                borderRadius: BorderRadius.circular(2),
               ),
-              const SizedBox(width: 8),
-              Text(
-                'Requirements',
-                style: theme.textTheme.titleMedium?.copyWith(
-                  fontWeight: FontWeight.bold,
-                  color: Colors.blue,
+            ),
+            Expanded(
+              child: SingleChildScrollView(
+                padding: EdgeInsets.all(isSmallScreen ? 16 : 24),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // How it works section
+                    Container(
+                      padding: EdgeInsets.all(isSmallScreen ? 16 : 20),
+                      decoration: BoxDecoration(
+                        color: colorScheme.surfaceContainerHighest.withOpacity(0.3),
+                        borderRadius: BorderRadius.circular(isSmallScreen ? 12 : 16),
+                        border: Border.all(
+                          color: colorScheme.outline.withOpacity(0.1),
+                        ),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Icon(
+                                Icons.info_outline_rounded,
+                                color: colorScheme.primary,
+                                size: isSmallScreen ? 18 : 20,
+                              ),
+                              SizedBox(width: isSmallScreen ? 6 : 8),
+                              Text(
+                                'How it works',
+                                style: theme.textTheme.titleMedium?.copyWith(
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: isSmallScreen ? 15 : null,
+                                  color: colorScheme.onSurface,
+                                ),
+                              ),
+                            ],
+                          ),
+                          SizedBox(height: isSmallScreen ? 10 : 12),
+                          Text(
+                            '• Host creates a session and shares the 6-digit code\n'
+                            '• Participants join using the session code\n'
+                            '• Host controls drill timing for all connected devices\n'
+                            '• Everyone trains simultaneously with synchronized drills\n'
+                            '• Real-time synchronization with pause/resume controls',
+                            style: theme.textTheme.bodyMedium?.copyWith(
+                              fontSize: isSmallScreen ? 13 : null,
+                              color: colorScheme.onSurface.withOpacity(0.7),
+                              height: 1.5,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    SizedBox(height: isSmallScreen ? 12 : 16),
+                    // Requirements section
+                    Container(
+                      padding: EdgeInsets.all(isSmallScreen ? 16 : 20),
+                      decoration: BoxDecoration(
+                        color: Colors.blue.withOpacity(0.05),
+                        borderRadius: BorderRadius.circular(isSmallScreen ? 12 : 16),
+                        border: Border.all(
+                          color: Colors.blue.withOpacity(0.2),
+                        ),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Icon(
+                                Icons.checklist_rounded,
+                                color: Colors.blue,
+                                size: isSmallScreen ? 18 : 20,
+                              ),
+                              SizedBox(width: isSmallScreen ? 6 : 8),
+                              Text(
+                                'Requirements',
+                                style: theme.textTheme.titleMedium?.copyWith(
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: isSmallScreen ? 15 : null,
+                                  color: Colors.blue,
+                                ),
+                              ),
+                            ],
+                          ),
+                          SizedBox(height: isSmallScreen ? 10 : 12),
+                          _buildRequirementItem('📱 Bluetooth enabled on both devices'),
+                          _buildRequirementItem('📍 Location permission granted'),
+                          _buildRequirementItem('🔄 Devices within Bluetooth range (~10m)'),
+                          _buildRequirementItem('⚡ Stable connection for best experience'),
+                          SizedBox(height: isSmallScreen ? 6 : 8),
+                          Text(
+                            'Note: Permissions will be requested when you start hosting or joining.',
+                            style: theme.textTheme.bodySmall?.copyWith(
+                              fontSize: isSmallScreen ? 11 : null,
+                              color: Colors.blue.withOpacity(0.8),
+                              fontStyle: FontStyle.italic,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
                 ),
               ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          _buildRequirementItem('📱 Bluetooth enabled on both devices'),
-          _buildRequirementItem('📍 Location permission granted'),
-          _buildRequirementItem('🔄 Devices within Bluetooth range (~10m)'),
-          _buildRequirementItem('⚡ Stable connection for best experience'),
-          const SizedBox(height: 8),
-          Text(
-            'Note: Permissions will be requested when you start hosting or joining.',
-            style: theme.textTheme.bodySmall?.copyWith(
-              color: Colors.blue.withOpacity(0.8),
-              fontStyle: FontStyle.italic,
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
 
   Widget _buildRequirementItem(String text) {
     final theme = Theme.of(context);
+    final size = MediaQuery.of(context).size;
+    final isSmallScreen = size.width < 360;
     
     return Padding(
-      padding: const EdgeInsets.only(bottom: 4),
+      padding: EdgeInsets.only(bottom: isSmallScreen ? 3 : 4),
       child: Text(
         text,
         style: theme.textTheme.bodyMedium?.copyWith(
+          fontSize: isSmallScreen ? 13 : null,
           color: Colors.blue.withOpacity(0.9),
           height: 1.3,
         ),

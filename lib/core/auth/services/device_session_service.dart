@@ -5,6 +5,7 @@ import 'package:package_info_plus/package_info_plus.dart';
 import 'package:spark_app/core/storage/app_storage.dart';
 import 'package:device_info_plus/device_info_plus.dart';
 import 'dart:io';
+import 'package:spark_app/core/utils/app_logger.dart';
 import 'dart:async';
 
 /// Service to manage single device login sessions
@@ -37,7 +38,7 @@ class DeviceSessionService {
       try {
         fcmToken = await _messaging.getToken();
       } catch (e) {
-        print('⚠️ FCM token not available: $e');
+        AppLogger.warning('FCM token not available', tag: 'DeviceSession');
         fcmToken = null; // Continue without FCM token
       }
       
@@ -55,10 +56,10 @@ class DeviceSessionService {
       // Register new device session
       await _createDeviceSession(userId, deviceInfo, fcmToken);
       
-      print('✅ Device session registered successfully');
+      AppLogger.success('Device session registered successfully', tag: 'DeviceSession');
       return existingSessions;
     } catch (e) {
-      print('❌ Failed to register device session: $e');
+      AppLogger.error('Failed to register device session', error: e, tag: 'DeviceSession');
       rethrow;
     }
   }
@@ -87,7 +88,7 @@ class DeviceSessionService {
       
       return existingSessions;
     } catch (e) {
-      print('⚠️ Error checking existing sessions: $e');
+      AppLogger.warning('Error checking existing sessions', tag: 'DeviceSession');
       return [];
     }
   }
@@ -101,7 +102,7 @@ class DeviceSessionService {
         final existingDeviceId = sessionData['deviceId'] as String?;
         final existingFcmToken = sessionData['fcmToken'] as String?;
         
-        print('🔄 Logging out existing device: $existingDeviceId');
+        AppLogger.info('Logging out existing device: $existingDeviceId', tag: 'DeviceSession');
         
         if (existingFcmToken != null) {
           await _sendLogoutNotification(existingFcmToken, sessionData);
@@ -111,7 +112,7 @@ class DeviceSessionService {
         await _removeDeviceSession(userId, existingDeviceId);
       }
     } catch (e) {
-      print('⚠️ Error logging out existing sessions: $e');
+      AppLogger.warning('Error logging out existing sessions', tag: 'DeviceSession');
     }
   }
 
@@ -136,7 +137,7 @@ class DeviceSessionService {
         }
         
         // Different device detected - force logout the previous device
-        print('🔄 Different device detected, logging out previous session...');
+        AppLogger.info('Different device detected, logging out previous session...', tag: 'DeviceSession');
         
         if (existingFcmToken != null) {
           await _sendLogoutNotification(existingFcmToken, sessionData);
@@ -146,7 +147,7 @@ class DeviceSessionService {
         await _removeDeviceSession(userId, existingDeviceId);
       }
     } catch (e) {
-      print('⚠️ Error checking existing session: $e');
+      AppLogger.warning('Error checking existing session', tag: 'DeviceSession');
       // Continue with registration even if check fails
     }
   }
@@ -183,7 +184,7 @@ class DeviceSessionService {
         'lastActiveTime': FieldValue.serverTimestamp(),
       });
     } catch (e) {
-      print('⚠️ Failed to update session timestamp: $e');
+      AppLogger.warning('Failed to update session timestamp', tag: 'DeviceSession');
     }
   }
 
@@ -201,7 +202,7 @@ class DeviceSessionService {
             .delete();
       }
     } catch (e) {
-      print('⚠️ Failed to remove device session: $e');
+      AppLogger.warning('Failed to remove device session', tag: 'DeviceSession');
     }
   }
 
@@ -219,9 +220,9 @@ class DeviceSessionService {
         'processed': false,
       });
       
-      print('📱 Logout notification sent to previous device');
+      AppLogger.info('Logout notification sent to previous device', tag: 'DeviceSession');
     } catch (e) {
-      print('⚠️ Failed to send logout notification: $e');
+      AppLogger.warning('Failed to send logout notification', tag: 'DeviceSession');
     }
   }
 
@@ -248,7 +249,7 @@ class DeviceSessionService {
         'processedAt': FieldValue.serverTimestamp(),
       });
     } catch (e) {
-      print('⚠️ Failed to mark notification as processed: $e');
+      AppLogger.warning('Failed to mark notification as processed', tag: 'DeviceSession');
     }
   }
 
@@ -283,7 +284,7 @@ class DeviceSessionService {
           await AppStorage.setString(deviceIdKey, deviceId);
         }
       } catch (e) {
-        print('⚠️ Failed to get Android device info: $e');
+        AppLogger.warning('Failed to get Android device info', tag: 'DeviceSession');
         deviceName = 'Android Device';
         // Fallback to stored ID or generate new one
         if (storedDeviceId != null) {
@@ -310,7 +311,7 @@ class DeviceSessionService {
           await AppStorage.setString(deviceIdKey, deviceId);
         }
       } catch (e) {
-        print('⚠️ Failed to get iOS device info: $e');
+        AppLogger.warning('Failed to get iOS device info', tag: 'DeviceSession');
         deviceName = 'iPhone';
         // Fallback to stored ID or generate new one
         if (storedDeviceId != null) {
@@ -337,9 +338,9 @@ class DeviceSessionService {
     try {
       final deviceInfo = await getDeviceInfo();
       await _removeDeviceSession(userId, deviceInfo['deviceId'] as String?);
-      print('✅ Device session cleaned up');
+      AppLogger.success('Device session cleaned up', tag: 'DeviceSession');
     } catch (e) {
-      print('⚠️ Failed to cleanup device session: $e');
+      AppLogger.warning('Failed to cleanup device session', tag: 'DeviceSession');
     }
   }
 
@@ -362,7 +363,7 @@ class DeviceSessionService {
       
       return sessionDeviceId == deviceInfo['deviceId'];
     } catch (e) {
-      print('⚠️ Failed to validate session: $e');
+      AppLogger.warning('Failed to validate session', tag: 'DeviceSession');
       return false;
     }
   }
@@ -376,7 +377,7 @@ class DeviceSessionService {
         ...doc.data(),
       },).toList();
     } catch (e) {
-      print('❌ Failed to get active sessions: $e');
+      AppLogger.error('Failed to get active sessions', error: e, tag: 'DeviceSession');
       return [];
     }
   }

@@ -516,80 +516,6 @@ class _ProgramCreationScreenState extends State<ProgramCreationScreen>
     );
   }
 
-  Widget _buildFooter(BuildContext context, bool isTablet) {
-    final colorScheme = Theme.of(context).colorScheme;
-
-    return Container(
-      padding: EdgeInsets.all(isTablet ? 24 : 20),
-      decoration: BoxDecoration(
-        color: colorScheme.surface,
-        border: Border(
-          top: BorderSide(
-            color: colorScheme.outline.withValues(alpha: 0.2),
-          ),
-        ),
-        borderRadius: const BorderRadius.only(
-          bottomLeft: Radius.circular(20),
-          bottomRight: Radius.circular(20),
-        ),
-      ),
-      child: BlocBuilder<ProgramsBloc, ProgramsState>(
-        builder: (context, state) {
-          final isCreating = state.status == ProgramsStatus.creating;
-
-          return Row(
-            children: [
-              Expanded(
-                child: OutlinedButton(
-                  onPressed:
-                      isCreating ? null : () => Navigator.of(context).pop(),
-                  style: OutlinedButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(vertical: 16),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                  ),
-                  child: const Text('Cancel'),
-                ),
-              ),
-              const SizedBox(width: 16),
-              Expanded(
-                flex: 2,
-                child: FilledButton(
-                  onPressed: isCreating ? null : _createProgram,
-                  style: FilledButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(vertical: 16),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                  ),
-                  child: isCreating
-                      ? const SizedBox(
-                          width: 24,
-                          height: 24,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2.5,
-                            valueColor:
-                                AlwaysStoppedAnimation<Color>(Colors.white),
-                          ),
-                        )
-                      : Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: const [
-                            Icon(Icons.add_circle, size: 20),
-                            SizedBox(width: 8),
-                            Text('Create Program'),
-                          ],
-                        ),
-                ),
-              ),
-            ],
-          );
-        },
-      ),
-    );
-  }
-
   // Navigation methods
   void _nextStep() {
     if (_currentStep < _totalSteps - 1) {
@@ -856,7 +782,7 @@ class _ProgramCreationScreenState extends State<ProgramCreationScreen>
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            'Day-wise Assignment',
+            'Day-wise Drill Assignment',
             style: Theme.of(context).textTheme.headlineSmall?.copyWith(
               fontWeight: FontWeight.bold,
             ),
@@ -870,7 +796,7 @@ class _ProgramCreationScreenState extends State<ProgramCreationScreen>
                 child: ElevatedButton.icon(
                   onPressed: _selectedDrillIds.isNotEmpty ? _autoAssignDrills : null,
                   icon: const Icon(Icons.auto_fix_high),
-                  label: const Text('Auto-assign Drills'),
+                  label: const Text('Auto Assign'),
                 ),
               ),
               const SizedBox(width: 12),
@@ -1412,6 +1338,8 @@ class _ProgramCreationScreenState extends State<ProgramCreationScreen>
   }
 
   String _formatCategoryName(String category) {
+    if (category.isEmpty) return '';
+    if (category.length == 1) return category.toUpperCase();
     return category.substring(0, 1).toUpperCase() + category.substring(1).toLowerCase();
   }
 

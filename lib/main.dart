@@ -13,6 +13,7 @@ import 'package:spark_app/core/auth/auth_wrapper.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:spark_app/features/subscription/services/subscription_fix_service.dart';
 import 'package:spark_app/core/services/fcm_token_service.dart';
+import 'package:spark_app/core/utils/app_logger.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -44,13 +45,13 @@ void _fixSubscriptionOnStartup() {
   Future.delayed(const Duration(seconds: 2), () async {
     final currentUser = FirebaseAuth.instance.currentUser;
     if (currentUser != null) {
-      print('🔧 Running subscription fix for logged-in user...');
+      AppLogger.info('Running subscription fix for logged-in user');
       try {
         final fixService = SubscriptionFixService();
         await fixService.fixCurrentUserSubscription();
-        print('✅ Subscription fix completed');
+        AppLogger.info('Subscription fix completed');
       } catch (e) {
-        print('❌ Subscription fix failed: $e');
+        AppLogger.error('Subscription fix failed', error: e);
       }
     }
   });
@@ -72,7 +73,7 @@ class CogniTrainApp extends StatelessWidget {
         
         // AuthBloc now initializes with correct state based on Firebase Auth
         // No need for explicit auth check - SessionManagementService handles it
-        print('🔄 App initialization: AuthBloc created with initial state');
+        AppLogger.debug('App initialization: AuthBloc created with initial state');
         
         return authBloc;
       },
@@ -112,22 +113,14 @@ class _NavigationStateTrackerState extends State<NavigationStateTracker> {
   void initState() {
     super.initState();
     
-    // Clear navigation state on fresh app start (not hot reload)
+    // Clear navigation state on app start to ensure home screen is always shown
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (kDebugMode) {
-        try {
-          // Only clear if this is a fresh start, not a hot reload
-          final lastLocation = AppStorage.getString('last_navigation_location');
-          if (lastLocation != null) {
-            print('[NAVIGATION] Found preserved location: $lastLocation');
-            // Clear it after a delay to prevent infinite loops
-            Future.delayed(const Duration(seconds: 5), () {
-              AppStorage.remove('last_navigation_location');
-            });
-          }
-        } catch (e) {
-          print('[NAVIGATION] State tracking error: $e');
-        }
+      try {
+        // Always clear stored navigation location to ensure fresh start at home screen
+        AppStorage.remove('last_navigation_location');
+        AppLogger.debug('Cleared stored navigation state - app will start at home screen');
+      } catch (e) {
+        AppLogger.error('Error clearing navigation state', error: e);
       }
     });
   }
