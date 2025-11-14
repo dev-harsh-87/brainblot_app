@@ -66,12 +66,23 @@ class _DeviceConflictDialogState extends State<DeviceConflictDialog> with Ticker
     HapticFeedback.mediumImpact();
 
     try {
-      // Logout from all other devices
-      await _sessionService.logoutFromAllOtherDevices();
+      // Add timeout to prevent indefinite loading
+      await _sessionService.logoutFromAllOtherDevices().timeout(
+        const Duration(seconds: 10),
+        onTimeout: () {
+          throw Exception('Logout operation timed out. Please try again.');
+        },
+      );
       
       if (mounted) {
         HapticFeedback.heavyImpact();
+        // Close dialog first
         Navigator.of(context).pop();
+        
+        // Small delay to ensure dialog closes before continuing
+        await Future.delayed(const Duration(milliseconds: 100));
+        
+        // Then trigger continue callback
         widget.onContinue?.call();
         
         ScaffoldMessenger.of(context).showSnackBar(
@@ -80,43 +91,62 @@ class _DeviceConflictDialogState extends State<DeviceConflictDialog> with Ticker
               children: [
                 Icon(Icons.check_circle, color: Colors.white),
                 SizedBox(width: 12),
-                Expanded(child: Text('Logged out from previous device')),
+                Expanded(child: Text('Successfully logged out from other devices')),
               ],
             ),
             backgroundColor: Colors.green,
             behavior: SnackBarBehavior.floating,
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            duration: const Duration(seconds: 2),
           ),
         );
       }
     } catch (e) {
       if (mounted) {
         HapticFeedback.heavyImpact();
+        setState(() => _isLoading = false);
+        
+        String errorMessage = 'Failed to logout from other devices';
+        if (e.toString().contains('timeout')) {
+          errorMessage = 'Operation timed out. Please check your connection and try again.';
+        } else if (e.toString().contains('network')) {
+          errorMessage = 'Network error. Please check your connection.';
+        }
+        
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Row(
               children: [
                 const Icon(Icons.error, color: Colors.white),
                 const SizedBox(width: 12),
-                Expanded(child: Text('Failed to logout: $e')),
+                Expanded(child: Text(errorMessage)),
               ],
             ),
             backgroundColor: Colors.red,
             behavior: SnackBarBehavior.floating,
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            duration: const Duration(seconds: 4),
+            action: SnackBarAction(
+              label: 'Retry',
+              textColor: Colors.white,
+              onPressed: _logoutFromPreviousDevice,
+            ),
           ),
         );
-      }
-    } finally {
-      if (mounted) {
-        setState(() => _isLoading = false);
       }
     }
   }
 
-  void _cancelLogin() {
+  void _cancelLogin() async {
     HapticFeedback.lightImpact();
+    
+    // Close dialog first
     Navigator.of(context).pop();
+    
+    // Small delay to ensure dialog closes
+    await Future.delayed(const Duration(milliseconds: 100));
+    
+    // Then trigger cancel callback which will logout
     widget.onCancel?.call();
   }
 

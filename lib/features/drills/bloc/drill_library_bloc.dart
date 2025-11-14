@@ -131,12 +131,21 @@ class DrillLibraryBloc extends Bloc<DrillLibraryEvent, DrillLibraryState> {
       currentView: event.view,
     ),);
     
-    final filtered = _applyFilters(state.all, view: event.view);
-    emit(state.copyWith(
-      status: DrillLibraryStatus.loaded,
-      items: filtered,
-      lastUpdated: DateTime.now(),
-    ),);
+    // For favorites view, we need to use a different data source
+    if (event.view == DrillLibraryView.favorites) {
+      await _sub?.cancel();
+      _sub = _repo.watchFavorites().listen(
+        (drills) => add(_DrillLibraryItemsUpdated(drills as List<Drill>)),
+        onError: (error) => add(_DrillLibraryErrorOccurred(error.toString())),
+      );
+    } else {
+      // For other views, use the regular watchAll stream
+      await _sub?.cancel();
+      _sub = _repo.watchAll().listen(
+        (drills) => add(_DrillLibraryItemsUpdated(drills as List<Drill>)),
+        onError: (error) => add(_DrillLibraryErrorOccurred(error.toString())),
+      );
+    }
   }
 
   Future<void> _onRefreshRequested(DrillLibraryRefreshRequested event, Emitter<DrillLibraryState> emit) async {
@@ -230,7 +239,7 @@ class DrillLibraryBloc extends Bloc<DrillLibraryEvent, DrillLibraryState> {
     // Apply view filter first
     switch (currentView) {
       case DrillLibraryView.favorites:
-        out = out.where((d) => d.favorite);
+        // No filtering needed - the stream already provides only favorites
         break;
       case DrillLibraryView.custom:
         out = out.where((d) => !d.isPreset);

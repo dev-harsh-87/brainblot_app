@@ -20,24 +20,44 @@ class ProfileService {
   /// Get current user's profile data
   Future<UserProfile?> getCurrentUserProfile() async {
     final userId = currentUserId;
-    if (userId == null) return null;
+    if (userId == null) {
+      AppLogger.warning('No current user ID available', tag: 'ProfileService');
+      return null;
+    }
 
     try {
-      final doc = await _firestore
-          .collection('users')
-          .doc(userId)
-          .get();
+      // Add retry logic to handle case where profile is being created
+      for (int attempt = 0; attempt < 3; attempt++) {
+        final doc = await _firestore
+            .collection('users')
+            .doc(userId)
+            .get();
 
-      if (!doc.exists) {
-        // Create profile if it doesn't exist
-        return await _createUserProfileFromAuth();
+        if (doc.exists) {
+          final data = doc.data();
+          if (data != null && data.isNotEmpty) {
+            return UserProfile.fromJson({
+              'id': userId,
+              ...data,
+            });
+          }
+        }
+        
+        // Profile doesn't exist or is empty, try creating it
+        if (attempt == 0) {
+          AppLogger.debug('Profile not found, creating...', tag: 'ProfileService');
+          final created = await _createUserProfileFromAuth();
+          if (created != null) return created;
+        }
+        
+        // Wait before retrying
+        if (attempt < 2) {
+          await Future.delayed(Duration(milliseconds: 500 * (attempt + 1)));
+        }
       }
-
-      final data = doc.data()!;
-      return UserProfile.fromJson({
-        'id': userId,
-        ...data,
-      });
+      
+      AppLogger.error('Profile not found after retries', tag: 'ProfileService');
+      return null;
     } catch (e) {
       AppLogger.error('Error getting user profile', error: e, tag: 'ProfileService');
       return null;
@@ -49,6 +69,15 @@ class ProfileService {
     final user = currentUser;
     if (user == null) return null;
 
+    // Check if this is the first user (admin setup)
+    final existingUsers = await _firestore
+        .collection('users')
+        .limit(1)
+        .get();
+    
+    final isFirstUser = existingUsers.docs.isEmpty;
+    final role = isFirstUser ? 'admin' : 'user';
+
     final profile = UserProfile(
       id: user.uid,
       email: user.email ?? '',
@@ -56,6 +85,7 @@ class ProfileService {
       photoUrl: user.photoURL,
       createdAt: DateTime.now(),
       lastActiveAt: DateTime.now(),
+      role: role,
     );
 
     await _firestore
@@ -69,6 +99,7 @@ class ProfileService {
   /// Update user profile
   Future<void> updateProfile({
     String? displayName,
+    String? role,
   }) async {
     final userId = currentUserId;
     if (userId == null) throw Exception('User not authenticated');
@@ -83,6 +114,10 @@ class ProfileService {
       await currentUser?.updateDisplayName(displayName);
     }
 
+    if (role != null) {
+      updates['role'] = role;
+      updates['is_admin'] = role == 'admin';
+    }
 
     await _firestore
         .collection('users')

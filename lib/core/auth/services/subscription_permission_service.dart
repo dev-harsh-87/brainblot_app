@@ -52,26 +52,38 @@ class SubscriptionPermissionService {
   Future<bool> hasModuleAccess(String module) async {
     try {
       final user = _auth.currentUser;
-      if (user == null) return false;
+      if (user == null) {
+        print('🔍 hasModuleAccess($module): No authenticated user');
+        return false;
+      }
 
       // Check cache first
       final cacheKey = '${user.uid}:$module';
       if (_moduleAccessCache.containsKey(cacheKey)) {
-        return _moduleAccessCache[cacheKey]!;
+        final cachedResult = _moduleAccessCache[cacheKey]!;
+        print('🔍 hasModuleAccess($module): Using cached result = $cachedResult');
+        return cachedResult;
       }
+
+      print('🔍 hasModuleAccess($module): Fetching fresh data for user ${user.uid}');
 
       // Get fresh user data from Firestore
       final userDoc = await _firestore.collection('users').doc(user.uid).get();
       if (!userDoc.exists) {
+        print('🔍 hasModuleAccess($module): User document does not exist');
         _moduleAccessCache[cacheKey] = false;
         return false;
       }
 
       final userData = userDoc.data()!;
+      print('🔍 hasModuleAccess($module): User data retrieved');
       
       // Check if user is admin (admin has access to everything)
       final role = UserRole.fromString(userData['role'] as String? ?? 'user');
+      print('🔍 hasModuleAccess($module): User role = ${role.value}');
+      
       if (role.isAdmin()) {
+        print('🔍 hasModuleAccess($module): Admin user - granting access');
         _moduleAccessCache[cacheKey] = true;
         return true;
       }
@@ -79,13 +91,19 @@ class SubscriptionPermissionService {
       // Check subscription-based access
       final subscription = userData['subscription'] as Map<String, dynamic>?;
       if (subscription == null) {
+        print('🔍 hasModuleAccess($module): No subscription data found');
         _moduleAccessCache[cacheKey] = false;
         return false;
       }
 
+      print('🔍 hasModuleAccess($module): Subscription data found');
+
       // Check if subscription is active
       final status = subscription['status'] as String?;
+      print('🔍 hasModuleAccess($module): Subscription status = $status');
+      
       if (status != 'active') {
+        print('🔍 hasModuleAccess($module): Subscription not active');
         _moduleAccessCache[cacheKey] = false;
         return false;
       }
@@ -93,6 +111,7 @@ class SubscriptionPermissionService {
       // Check expiration
       final expiresAt = subscription['expiresAt'] as Timestamp?;
       if (expiresAt != null && DateTime.now().isAfter(expiresAt.toDate())) {
+        print('🔍 hasModuleAccess($module): Subscription expired');
         _moduleAccessCache[cacheKey] = false;
         return false;
       }
@@ -100,11 +119,17 @@ class SubscriptionPermissionService {
       // Check module access
       final moduleAccess = subscription['moduleAccess'] as List<dynamic>?;
       if (moduleAccess == null) {
+        print('🔍 hasModuleAccess($module): No moduleAccess list found');
         _moduleAccessCache[cacheKey] = false;
         return false;
       }
 
-      final hasAccess = moduleAccess.contains(module);
+      final moduleAccessList = List<String>.from(moduleAccess);
+      print('🔍 hasModuleAccess($module): Available modules = $moduleAccessList');
+
+      final hasAccess = moduleAccessList.contains(module);
+      print('🔍 hasModuleAccess($module): Access result = $hasAccess');
+      
       _moduleAccessCache[cacheKey] = hasAccess;
       return hasAccess;
 

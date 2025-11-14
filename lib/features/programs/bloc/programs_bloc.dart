@@ -33,6 +33,7 @@ class ProgramsBloc extends Bloc<ProgramsEvent, ProgramsState> {
     on<ProgramsSeedDefaultRequested>(_onSeedDefault);
     on<ProgramsRefreshRequested>(_onRefreshRequested);
     on<ProgramsCategoryFilterChanged>(_onCategoryFilterChanged);
+    on<ProgramsQueryChanged>(_onQueryChanged);
     on<ProgramsRetryRequested>(_onRetryRequested);
     
     // Initial load
@@ -318,6 +319,13 @@ class ProgramsBloc extends Bloc<ProgramsEvent, ProgramsState> {
   Future<void> _onCategoryFilterChanged(ProgramsCategoryFilterChanged event, Emitter<ProgramsState> emit) async {
     emit(state.copyWith(
       selectedCategory: event.category,
+      lastUpdated: DateTime.now(),
+    ),);
+  }
+
+  Future<void> _onQueryChanged(ProgramsQueryChanged event, Emitter<ProgramsState> emit) async {
+    emit(state.copyWith(
+      searchQuery: event.query,
       lastUpdated: DateTime.now(),
     ),);
   }

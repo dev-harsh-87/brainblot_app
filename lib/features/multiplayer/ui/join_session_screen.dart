@@ -965,6 +965,7 @@ class _JoinSessionScreenState extends State<JoinSessionScreen>
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Container(
+                                    width: double.infinity,
                   padding: const EdgeInsets.all(16),
                   decoration: BoxDecoration(
                     color: colorScheme.primaryContainer.withOpacity(0.3),
@@ -993,6 +994,7 @@ class _JoinSessionScreenState extends State<JoinSessionScreen>
                 
                 // Status indicator
                 Container(
+                  width: double.infinity,
                   padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                   decoration: BoxDecoration(
                     color: _getDrillStatusColor(isActive, isPaused).withOpacity(0.1),

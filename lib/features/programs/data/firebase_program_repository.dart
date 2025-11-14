@@ -136,18 +136,44 @@ class FirebaseProgramRepository implements ProgramRepository {
     }
 
     return _firestore
-        .collection(_programsCollection)
-        .where('favorite', isEqualTo: true)
+        .collection('user_favorites')
+        .where('userId', isEqualTo: userId)
         .snapshots()
-        .map((snapshot) {
+        .asyncMap((favoritesSnapshot) async {
           try {
-            final programs = _mapSnapshotToPrograms(snapshot);
-            // Filter to only show programs user can see (their own or public ones)
-            final filtered = programs.where((program) =>
-                program.createdBy == userId,).toList();
+            final favoriteIds = favoritesSnapshot.docs
+                .map((doc) => doc.data()['programId'] as String)
+                .toList();
+
+            if (favoriteIds.isEmpty) {
+              return <Program>[];
+            }
+
+            // Get the actual programs
+            final programs = <Program>[];
+            for (final programId in favoriteIds) {
+              try {
+                final programDoc = await _firestore
+                    .collection(_programsCollection)
+                    .doc(programId)
+                    .get();
+                
+                if (programDoc.exists) {
+                  final program = Program.fromJson({
+                    'id': programDoc.id,
+                    ...programDoc.data()!,
+                  });
+                  programs.add(program);
+                }
+              } catch (e) {
+                // Skip programs that can't be loaded
+                continue;
+              }
+            }
+
             // Sort by createdAt in memory
-            filtered.sort((a, b) => b.createdAt.compareTo(a.createdAt));
-            return filtered;
+            programs.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+            return programs;
           } catch (e) {
             developer.log(
               'Error in watchFavorites',
@@ -209,6 +235,25 @@ class FirebaseProgramRepository implements ProgramRepository {
     final userId = _currentUserId;
     
     try {
+      // Get user profile to check admin status
+      bool isAdmin = false;
+      String? userRole;
+      if (userId != null) {
+        try {
+          final userDoc = await _firestore
+              .collection('users')
+              .doc(userId)
+              .get();
+          if (userDoc.exists) {
+            final userData = userDoc.data()!;
+            userRole = userData['role'] as String?;
+            isAdmin = userData['role'] == 'admin' || userData['is_admin'] == true;
+          }
+        } catch (e) {
+          print('Error checking user admin status: $e');
+        }
+      }
+      
       // Assign drills to program days
       final drillAssignmentService = getIt<DrillAssignmentService>();
       final daysWithDrills = await drillAssignmentService.assignDrillsToProgram(program);
@@ -239,6 +284,11 @@ class FirebaseProgramRepository implements ProgramRepository {
       
       // Convert to JSON and ensure proper formatting for Firestore
       final programData = programWithMetadata.toJson();
+      
+      // Add admin status and role to program data
+      programData['is_admin'] = isAdmin;
+      programData['createdByRole'] = userRole ?? 'user';
+      programData['status'] = 'active';
       
       // Ensure dayWiseDrillIds is properly formatted as Map<String, dynamic>
       if (programData['dayWiseDrillIds'] != null) {
@@ -278,7 +328,7 @@ class FirebaseProgramRepository implements ProgramRepository {
     final userId = _currentUserId;
     if (userId == null) throw Exception('User not authenticated');
 
-    // Check if user owns this program
+    // Check if user owns this program or has admin access
     final programDoc = await _firestore
         .collection(_programsCollection)
         .doc(program.id)
@@ -293,7 +343,42 @@ class FirebaseProgramRepository implements ProgramRepository {
       ...programDoc.data()!,
     });
 
-    if (existingProgram.createdBy != userId) {
+    // Check if user is authorized to update this program
+    bool canUpdate = false;
+    
+    // User owns the program
+    if (existingProgram.createdBy == userId) {
+      canUpdate = true;
+    } else {
+      // Check if user is admin or has admin_programs access
+      try {
+        final userDoc = await _firestore
+            .collection('users')
+            .doc(userId)
+            .get();
+        if (userDoc.exists) {
+          final userData = userDoc.data()!;
+          final isAdmin = userData['role'] == 'admin' || userData['is_admin'] == true;
+          
+          if (isAdmin) {
+            canUpdate = true;
+          } else {
+            // Check for admin_programs module access
+            final subscription = userData['subscription'] as Map<String, dynamic>?;
+            if (subscription != null && subscription['moduleAccess'] is Map) {
+              final moduleAccess = subscription['moduleAccess'] as Map<String, dynamic>;
+              if (moduleAccess['admin_programs'] == true) {
+                canUpdate = true;
+              }
+            }
+          }
+        }
+      } catch (e) {
+        print('Error checking user permissions: $e');
+      }
+    }
+
+    if (!canUpdate) {
       throw Exception('Not authorized to update this program');
     }
 
@@ -308,7 +393,7 @@ class FirebaseProgramRepository implements ProgramRepository {
     final userId = _currentUserId;
     if (userId == null) throw Exception('User not authenticated');
 
-    // Check if user owns this program
+    // Check if user owns this program or has admin access
     final programDoc = await _firestore
         .collection(_programsCollection)
         .doc(programId)
@@ -323,7 +408,42 @@ class FirebaseProgramRepository implements ProgramRepository {
       ...programDoc.data()!,
     });
 
-    if (program.createdBy != userId) {
+    // Check if user is authorized to delete this program
+    bool canDelete = false;
+    
+    // User owns the program
+    if (program.createdBy == userId) {
+      canDelete = true;
+    } else {
+      // Check if user is admin or has admin_programs access
+      try {
+        final userDoc = await _firestore
+            .collection('users')
+            .doc(userId)
+            .get();
+        if (userDoc.exists) {
+          final userData = userDoc.data()!;
+          final isAdmin = userData['role'] == 'admin' || userData['is_admin'] == true;
+          
+          if (isAdmin) {
+            canDelete = true;
+          } else {
+            // Check for admin_programs module access
+            final subscription = userData['subscription'] as Map<String, dynamic>?;
+            if (subscription != null && subscription['moduleAccess'] is Map) {
+              final moduleAccess = subscription['moduleAccess'] as Map<String, dynamic>;
+              if (moduleAccess['admin_programs'] == true) {
+                canDelete = true;
+              }
+            }
+          }
+        }
+      } catch (e) {
+        print('Error checking user permissions: $e');
+      }
+    }
+
+    if (!canDelete) {
       throw Exception('Not authorized to delete this program');
     }
 
@@ -335,13 +455,15 @@ class FirebaseProgramRepository implements ProgramRepository {
         .doc(programId);
     batch.delete(programRef);
 
-    // Remove from user's programs collection
-    final userProgramRef = _firestore
-        .collection(_userProgramsCollection)
-        .doc(userId)
-        .collection('programs')
-        .doc(programId);
-    batch.delete(userProgramRef);
+    // Remove from user's programs collection if it exists
+    if (program.createdBy != null) {
+      final userProgramRef = _firestore
+          .collection(_userProgramsCollection)
+          .doc(program.createdBy!)
+          .collection('programs')
+          .doc(programId);
+      batch.delete(userProgramRef);
+    }
 
     await batch.commit();
   }
@@ -944,36 +1066,63 @@ class FirebaseProgramRepository implements ProgramRepository {
     }
 
     try {
-      final snapshot = await _firestore
-          .collection(_programsCollection)
-          .where('favorite', isEqualTo: true)
+      // Get user's favorite program IDs
+      final favoritesSnapshot = await _firestore
+          .collection('user_favorites')
+          .where('userId', isEqualTo: userId)
           .get();
       
-      List<Program> programs = _mapSnapshotToPrograms(snapshot);
+      final favoriteIds = favoritesSnapshot.docs
+          .map((doc) => doc.data()['programId'] as String)
+          .toList();
 
-      // Filter to only show programs user can see (their own or public ones)
-      programs = programs.where((program) =>
-          program.createdBy == userId,).toList();
+      if (favoriteIds.isEmpty) {
+        return [];
+      }
+
+      // Get the actual programs
+      final programs = <Program>[];
+      for (final programId in favoriteIds) {
+        try {
+          final programDoc = await _firestore
+              .collection(_programsCollection)
+              .doc(programId)
+              .get();
+          
+          if (programDoc.exists) {
+            final program = Program.fromJson({
+              'id': programDoc.id,
+              ...programDoc.data()!,
+            });
+            programs.add(program);
+          }
+        } catch (e) {
+          // Skip programs that can't be loaded
+          continue;
+        }
+      }
 
       // Apply filters in memory to avoid complex indexes
+      var filteredPrograms = programs;
+      
       if (category != null && category.isNotEmpty) {
-        programs = programs.where((p) => p.category == category).toList();
+        filteredPrograms = filteredPrograms.where((p) => p.category == category).toList();
       }
 
       if (level != null && level.isNotEmpty) {
-        programs = programs.where((p) => p.level == level).toList();
+        filteredPrograms = filteredPrograms.where((p) => p.level == level).toList();
       }
 
       if (query != null && query.isNotEmpty) {
         final queryLower = query.toLowerCase();
-        programs = programs.where((program) => 
+        filteredPrograms = filteredPrograms.where((program) =>
             program.name.toLowerCase().contains(queryLower),).toList();
       }
 
       // Sort by createdAt
-      programs.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+      filteredPrograms.sort((a, b) => b.createdAt.compareTo(a.createdAt));
 
-      return programs;
+      return filteredPrograms;
     } catch (error) {
       developer.log(
         'Failed to fetch favorite programs',
@@ -992,26 +1141,23 @@ class FirebaseProgramRepository implements ProgramRepository {
     }
 
     try {
-      final programDoc = await _firestore
-          .collection(_programsCollection)
-          .doc(programId)
-          .get();
+      // Check if user has a favorites document, create if not
+      final favoritesRef = _firestore
+          .collection('user_favorites')
+          .doc('${userId}_$programId');
 
-      if (!programDoc.exists) {
-        throw Exception('Program not found');
-      }
-
-      final program = Program.fromJson({
-        'id': programDoc.id,
-        ...programDoc.data()!,
-      });
-
-      // Users can only favorite their own programs
-      if (program.createdBy == userId) {
-        await _firestore
-            .collection(_programsCollection)
-            .doc(programId)
-            .update({'favorite': !program.favorite});
+      final favoritesDoc = await favoritesRef.get();
+      
+      if (favoritesDoc.exists) {
+        // Remove from favorites
+        await favoritesRef.delete();
+      } else {
+        // Add to favorites
+        await favoritesRef.set({
+          'userId': userId,
+          'programId': programId,
+          'createdAt': DateTime.now().toIso8601String(),
+        });
       }
     } catch (error) {
       throw Exception('Failed to toggle favorite: $error');
@@ -1020,18 +1166,16 @@ class FirebaseProgramRepository implements ProgramRepository {
 
   @override
   Future<bool> isFavorite(String programId) async {
+    final userId = _currentUserId;
+    if (userId == null) return false;
+
     try {
-      final programDoc = await _firestore
-          .collection(_programsCollection)
-          .doc(programId)
+      final favoritesDoc = await _firestore
+          .collection('user_favorites')
+          .doc('${userId}_$programId')
           .get();
 
-      if (!programDoc.exists) {
-        return false;
-      }
-
-      final data = programDoc.data()!;
-      return data['favorite'] as bool? ?? false;
+      return favoritesDoc.exists;
     } catch (error) {
       return false;
     }

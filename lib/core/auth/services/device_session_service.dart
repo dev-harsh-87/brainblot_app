@@ -227,18 +227,43 @@ class DeviceSessionService {
   }
 
   /// Listen for logout notifications for current device
-  Stream<DocumentSnapshot> listenForLogoutNotifications() {
+  Stream<DocumentSnapshot> listenForLogoutNotifications() async* {
     final userId = _auth.currentUser?.uid;
     if (userId == null) {
-      return const Stream.empty();
+      return;
     }
 
-    return _firestore
+    // Get current device ID to filter notifications
+    final deviceInfo = await getDeviceInfo();
+    final currentDeviceId = deviceInfo['deviceId'] as String;
+
+    // Only listen for notifications meant for this specific device
+    // and created after we started listening (to avoid stale notifications)
+    final listenStartTime = Timestamp.now();
+
+    await for (final snapshot in _firestore
         .collection('logoutNotifications')
         .where('userId', isEqualTo: userId)
+        .where('deviceId', isEqualTo: currentDeviceId)
         .where('processed', isEqualTo: false)
-        .snapshots()
-        .map((snapshot) => snapshot.docs.isNotEmpty ? snapshot.docs.first : throw StateError('No notifications'));
+        .snapshots()) {
+      
+      if (snapshot.docs.isNotEmpty) {
+        // Only yield notifications created after we started listening
+        for (final doc in snapshot.docs) {
+          final data = doc.data();
+          final notificationTime = data['timestamp'] as Timestamp?;
+          
+          if (notificationTime != null &&
+              notificationTime.compareTo(listenStartTime) >= 0) {
+            yield doc;
+            
+            // Mark as processed immediately
+            await markNotificationProcessed(doc.id);
+          }
+        }
+      }
+    }
   }
 
   /// Mark logout notification as processed

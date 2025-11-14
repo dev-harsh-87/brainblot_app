@@ -109,8 +109,20 @@ class UserManagementService {
         'createdAt': FieldValue.serverTimestamp(),
       };
 
-      // Save to Firestore
-      await _firestore.collection('users').doc(firebaseUser.uid).set(userData);
+      // Save to Firestore with error handling
+      try {
+        await _firestore.collection('users').doc(firebaseUser.uid).set(userData);
+        print('✅ User document created successfully in Firestore');
+      } catch (firestoreError) {
+        print('❌ Failed to create user document in Firestore: $firestoreError');
+        // Clean up Firebase Auth user if Firestore fails
+        try {
+          await firebaseUser.delete();
+        } catch (cleanupError) {
+          print('⚠️ Failed to cleanup Firebase Auth user: $cleanupError');
+        }
+        throw Exception('Failed to create user profile in Firestore: $firestoreError');
+      }
 
       // Note: Admin session restoration would require admin password
       // For security reasons, admin password should be passed as parameter

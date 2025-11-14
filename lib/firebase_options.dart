@@ -50,20 +50,19 @@ class DefaultFirebaseOptions {
   }
 
   static const FirebaseOptions android = FirebaseOptions(
-    apiKey: 'AIzaSyAbuoRosy4Zn4c8Y5Xmmej31DWu1417ACY',
-    appId: '1:419204986983:android:f1df26bf9f7ffcfcef3cc2',
-    messagingSenderId: '419204986983',
-    projectId: 'brain-app-18086',
-    storageBucket: 'brain-app-18086.firebasestorage.app',
+    apiKey: 'AIzaSyBMPgMwETvqr4ff-W5yNSCKzODbQ-I_X_8',
+    appId: '1:83475172268:android:657d6700439d924c47c809',
+    messagingSenderId: '83475172268',
+    projectId: 'spark-ab4b3',
+    storageBucket: 'spark-ab4b3.firebasestorage.app',
   );
 
   static const FirebaseOptions ios = FirebaseOptions(
-    apiKey: 'AIzaSyC-oFbVlTYy5Il-7_FVeXsMYBxFQc13dOs',
-    appId: '1:419204986983:ios:878d5eecb97fd94def3cc2',
-    messagingSenderId: '419204986983',
-    projectId: 'brain-app-18086',
-    storageBucket: 'brain-app-18086.firebasestorage.app',
-    iosClientId: '419204986983-rl9cel8fkecnpjc146t0vtnsekie26f0.apps.googleusercontent.com',
+    apiKey: 'AIzaSyADQZaK5Zbof9Xv3nQFSHrSR4oRv6KOpPc',
+    appId: '1:83475172268:ios:70e3b276c712712547c809',
+    messagingSenderId: '83475172268',
+    projectId: 'spark-ab4b3',
+    storageBucket: 'spark-ab4b3.firebasestorage.app',
     iosBundleId: 'com.tbg.sparkApp',
   );
 }

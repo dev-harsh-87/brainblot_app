@@ -13,8 +13,8 @@ import 'package:spark_app/features/programs/services/program_progress_service.da
 import 'package:spark_app/features/programs/ui/program_creation_dialog.dart';
 import 'package:spark_app/features/programs/ui/program_day_screen.dart';
 import 'package:spark_app/features/programs/ui/program_details_screen.dart';
+import 'package:spark_app/features/programs/ui/program_stats_screen.dart';
 import 'package:spark_app/features/sharing/services/sharing_service.dart';
-import 'package:spark_app/features/sharing/ui/privacy_control_widget.dart';
 import 'package:spark_app/features/sharing/ui/sharing_screen.dart';
 import 'package:spark_app/core/services/auto_refresh_service.dart';
 import 'package:spark_app/core/widgets/confirmation_dialog.dart';
@@ -31,12 +31,12 @@ class _ProgramsScreenState extends State<ProgramsScreen>
     with TickerProviderStateMixin, AutoRefreshMixin {
   late TabController _tabController;
   late AnimationController _headerAnimationController;
-  late Animation<double> _headerAnimation;
   late SharingService _sharingService;
   String _selectedCategory = '';
   String _selectedLevel = '';
   List<DrillCategory> _availableCategories = [];
   final Map<String, bool> _ownershipCache = {};
+  final TextEditingController _searchController = TextEditingController();
 
   @override
   void initState() {
@@ -46,10 +46,6 @@ class _ProgramsScreenState extends State<ProgramsScreen>
     _headerAnimationController = AnimationController(
       duration: const Duration(milliseconds: 1000),
       vsync: this,
-    );
-    _headerAnimation = CurvedAnimation(
-      parent: _headerAnimationController,
-      curve: Curves.easeOutCubic,
     );
     _headerAnimationController.forward();
 
@@ -89,6 +85,7 @@ class _ProgramsScreenState extends State<ProgramsScreen>
   void dispose() {
     _tabController.dispose();
     _headerAnimationController.dispose();
+    _searchController.dispose();
     super.dispose();
   }
 
@@ -210,6 +207,10 @@ class _ProgramsScreenState extends State<ProgramsScreen>
           ),
         ),
       ),
+      actions: [
+        _buildFilterButton(colorScheme),
+        const SizedBox(width: 8),
+      ],
     );
   }
 
@@ -336,6 +337,47 @@ class _ProgramsScreenState extends State<ProgramsScreen>
         padding: const EdgeInsets.all(16),
         child: Column(
           children: [
+            // Search Bar
+            Container(
+              decoration: BoxDecoration(
+                color: colorScheme.surface,
+                borderRadius: BorderRadius.circular(16),
+                boxShadow: [
+                  BoxShadow(
+                    color: colorScheme.shadow.withOpacity(0.08),
+                    blurRadius: 12,
+                    offset: const Offset(0, 3),
+                  ),
+                ],
+                border: Border.all(
+                  color: colorScheme.outline.withOpacity(0.08),
+                ),
+              ),
+              child: TextField(
+                controller: _searchController,
+                decoration: InputDecoration(
+                  hintText: 'Search programs...',
+                  prefixIcon: Icon(Icons.search, color: colorScheme.primary),
+                  suffixIcon: _searchController.text.isNotEmpty
+                      ? IconButton(
+                          icon: Icon(Icons.clear, color: colorScheme.onSurface.withOpacity(0.6)),
+                          onPressed: () {
+                            _searchController.clear();
+                            context.read<ProgramsBloc>().add(const ProgramsQueryChanged(''));
+                          },
+                        )
+                      : null,
+                  border: InputBorder.none,
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+                ),
+                onChanged: (query) {
+                  setState(() {});
+                  context.read<ProgramsBloc>().add(ProgramsQueryChanged(query));
+                },
+              ),
+            ),
+            const SizedBox(height: 16),
+            
             // Filter Tabs
             Container(
               decoration: BoxDecoration(
@@ -364,184 +406,237 @@ class _ProgramsScreenState extends State<ProgramsScreen>
                 ],
               ),
             ),
-            const SizedBox(height: 16),
-
-            // Filter Chips
-            BlocBuilder<ProgramsBloc, ProgramsState>(
-              builder: (context, state) {
-                final levels =
-                    state.programs.map((p) => p.level).toSet().toList()..sort();
-                final filteredPrograms = _applyFilters(state.programs);
-
-                return Column(
-                  children: [
-                    SingleChildScrollView(
-                      scrollDirection: Axis.horizontal,
-                      child: Row(
-                        children: [
-                          _buildEnhancedFilterChip(
-                              'Category',
-                              _selectedCategory.isEmpty
-                                  ? 'All'
-                                  : _formatCategoryName(_selectedCategory),
-                              () => _showCategoryFilter(),),
-                          const SizedBox(width: 8),
-                          _buildEnhancedFilterChip(
-                              'Level',
-                              _selectedLevel.isEmpty ? 'All' : _selectedLevel,
-                              () => _showLevelFilter(levels),),
-                          const SizedBox(width: 8),
-                          if (_selectedCategory.isNotEmpty ||
-                              _selectedLevel.isNotEmpty)
-                            _buildClearFiltersButton(),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Text(
-                          'Showing ${filteredPrograms.length} of ${state.programs.length} programs',
-                          style: theme.textTheme.bodySmall?.copyWith(
-                            color: colorScheme.onSurface.withOpacity(0.6),
-                          ),
-                        ),
-                        if (_selectedCategory.isNotEmpty ||
-                            _selectedLevel.isNotEmpty)
-                          Text(
-                            'Filtered',
-                            style: theme.textTheme.bodySmall?.copyWith(
-                              color: colorScheme.primary,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                      ],
-                    ),
-                  ],
-                );
-              },
-            ),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildEnhancedFilterChip(
-      String label, String value, VoidCallback onTap,) {
+  Widget _buildFilterButton(ColorScheme colorScheme) {
+    return IconButton(
+      onPressed: () {
+        // Show filter options
+        _showFilterOptions();
+      },
+      icon: Icon(
+        Icons.filter_list,
+        color: colorScheme.onPrimary,
+      ),
+      tooltip: 'Filter Programs',
+    );
+  }
+
+  void _showFilterOptions() {
+    // Get the current state to extract levels before showing modal
+    final currentState = context.read<ProgramsBloc>().state;
+    final levels = currentState.programs.map((p) => p.level).toSet().toList()..sort();
+    
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (modalContext) {
+        final theme = Theme.of(modalContext);
+        final colorScheme = theme.colorScheme;
+        
+        return Container(
+          decoration: BoxDecoration(
+            color: colorScheme.surface,
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+            boxShadow: [
+              BoxShadow(
+                color: colorScheme.shadow.withOpacity(0.15),
+                blurRadius: 20,
+                offset: const Offset(0, -5),
+              ),
+            ],
+          ),
+          child: SafeArea(
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(24, 16, 24, 24),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Handle bar
+                  Center(
+                    child: Container(
+                      width: 40,
+                      height: 4,
+                      decoration: BoxDecoration(
+                        color: colorScheme.onSurface.withOpacity(0.2),
+                        borderRadius: BorderRadius.circular(2),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+                  
+                  // Header
+                  Row(
+                    children: [
+                      Icon(
+                        Icons.filter_list,
+                        color: colorScheme.primary,
+                        size: 28,
+                      ),
+                      const SizedBox(width: 12),
+                      Text(
+                        'Filter Programs',
+                        style: theme.textTheme.headlineSmall?.copyWith(
+                          fontWeight: FontWeight.bold,
+                          color: colorScheme.onSurface,
+                        ),
+                      ),
+                      const Spacer(),
+                      if (_selectedCategory.isNotEmpty || _selectedLevel.isNotEmpty)
+                        TextButton(
+                          onPressed: () {
+                            setState(() {
+                              _selectedCategory = '';
+                              _selectedLevel = '';
+                            });
+                            Navigator.pop(modalContext);
+                          },
+                          child: Text(
+                            'Clear All',
+                            style: TextStyle(
+                              color: colorScheme.error,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
+                  const SizedBox(height: 24),
+                  
+                  // Category Section
+                  Text(
+                    'Category',
+                    style: theme.textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.w600,
+                      color: colorScheme.onSurface,
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: [
+                      _buildFilterChip(
+                        modalContext,
+                        'All',
+                        _selectedCategory.isEmpty,
+                        () {
+                          setState(() {
+                            _selectedCategory = '';
+                          });
+                          Navigator.pop(modalContext);
+                        },
+                      ),
+                      ..._availableCategories.map((category) => _buildFilterChip(
+                        modalContext,
+                        _formatCategoryName(category.name),
+                        _selectedCategory == category.name,
+                        () {
+                          setState(() {
+                            _selectedCategory = _selectedCategory == category.name ? '' : category.name;
+                          });
+                          Navigator.pop(modalContext);
+                        },
+                      )),
+                    ],
+                  ),
+                  const SizedBox(height: 24),
+                  
+                  // Level Section
+                  Text(
+                    'Level',
+                    style: theme.textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.w600,
+                      color: colorScheme.onSurface,
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: [
+                      _buildFilterChip(
+                        modalContext,
+                        'All',
+                        _selectedLevel.isEmpty,
+                        () {
+                          setState(() {
+                            _selectedLevel = '';
+                          });
+                          Navigator.pop(modalContext);
+                        },
+                      ),
+                      ...levels.map((level) => _buildFilterChip(
+                        modalContext,
+                        level,
+                        _selectedLevel == level,
+                        () {
+                          setState(() {
+                            _selectedLevel = _selectedLevel == level ? '' : level;
+                          });
+                          Navigator.pop(modalContext);
+                        },
+                      )),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildFilterChip(BuildContext context, String label, bool isSelected, VoidCallback onTap) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
-    final isActive = (label == 'Category' && _selectedCategory.isNotEmpty) ||
-        (label == 'Level' && _selectedLevel.isNotEmpty);
-
+    
     return GestureDetector(
       onTap: onTap,
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 200),
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
         decoration: BoxDecoration(
-          gradient: isActive
-              ? LinearGradient(
-                  colors: [
-                    colorScheme.primary.withOpacity(0.15),
-                    colorScheme.primary.withOpacity(0.05),
-                  ],
-                )
-              : null,
-          color: isActive ? null : colorScheme.surface,
+          color: isSelected
+              ? colorScheme.primary
+              : colorScheme.surfaceContainerHighest,
           borderRadius: BorderRadius.circular(20),
           border: Border.all(
-            color: isActive
-                ? colorScheme.primary.withOpacity(0.3)
+            color: isSelected
+                ? colorScheme.primary
                 : colorScheme.outline.withOpacity(0.2),
-            width: isActive ? 1.5 : 1,
+            width: isSelected ? 2 : 1,
           ),
-          boxShadow: isActive
-              ? [
-                  BoxShadow(
-                    color: colorScheme.primary.withOpacity(0.1),
-                    blurRadius: 8,
-                    offset: const Offset(0, 2),
-                  ),
-                ]
-              : null,
+          boxShadow: isSelected ? [
+            BoxShadow(
+              color: colorScheme.primary.withOpacity(0.2),
+              blurRadius: 8,
+              offset: const Offset(0, 2),
+            ),
+          ] : null,
         ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            if (isActive)
-              Padding(
-                padding: const EdgeInsets.only(right: 6),
-                child: Icon(
-                  Icons.filter_alt,
-                  size: 16,
-                  color: colorScheme.primary,
-                ),
-              ),
-            Text(
-              '$label: $value',
-              style: theme.textTheme.bodySmall?.copyWith(
-                color: isActive ? colorScheme.primary : colorScheme.onSurface,
-                fontWeight: isActive ? FontWeight.w600 : FontWeight.w500,
-              ),
-            ),
-            const SizedBox(width: 4),
-            Icon(
-              Icons.keyboard_arrow_down,
-              size: 16,
-              color: isActive
-                  ? colorScheme.primary
-                  : colorScheme.onSurface.withOpacity(0.6),
-            ),
-          ],
+        child: Text(
+          label,
+          style: theme.textTheme.bodyMedium?.copyWith(
+            color: isSelected
+                ? colorScheme.onPrimary
+                : colorScheme.onSurface,
+            fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
+          ),
         ),
       ),
     );
-  }
-
-  Widget _buildClearFiltersButton() {
-    final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
-
-    return GestureDetector(
-      onTap: _clearAllFilters,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-        decoration: BoxDecoration(
-          color: colorScheme.errorContainer,
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(
-            color: colorScheme.error.withOpacity(0.3),
-          ),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(
-              Icons.clear,
-              size: 14,
-              color: colorScheme.onErrorContainer,
-            ),
-            const SizedBox(width: 4),
-            Text(
-              'Clear',
-              style: theme.textTheme.bodySmall?.copyWith(
-                color: colorScheme.onErrorContainer,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  void _clearAllFilters() {
-    setState(() {
-      _selectedCategory = '';
-      _selectedLevel = '';
-    });
   }
 
   String _formatCategoryName(String category) {
@@ -593,7 +688,14 @@ class _ProgramsScreenState extends State<ProgramsScreen>
     );
   }
 
+  // ENHANCED ACTIVE TAB - This is the main improvement
   Widget _buildActiveTab(ProgramsState state) {
+    // Handle loading state with professional loading UI
+    if (state.status == ProgramsStatus.loading) {
+      return _buildActiveTabLoadingState();
+    }
+
+    // Handle no active program
     if (state.active == null) {
       return SingleChildScrollView(
         physics: const AlwaysScrollableScrollPhysics(),
@@ -604,25 +706,27 @@ class _ProgramsScreenState extends State<ProgramsScreen>
       );
     }
 
-    // Find the active program
-    final matchingPrograms =
-        state.programs.where((p) => p.id == state.active!.programId);
-    final Program? activeProgram = matchingPrograms.isNotEmpty
-        ? matchingPrograms.first
-        : (state.programs.isNotEmpty ? state.programs.first : null);
+    // Find the active program with better error handling
+    final Program? activeProgram = _findActiveProgramSafely(state);
 
-    // If no active program found, show empty state
+    // If no active program found, show error state with recovery options
     if (activeProgram == null) {
-      return RefreshIndicator(
-        onRefresh: () async {
-          context.read<ProgramsBloc>().add(const ProgramsRefreshRequested());
-        },
-        child: SingleChildScrollView(
-          physics: const AlwaysScrollableScrollPhysics(),
-          child: SizedBox(
-            height: MediaQuery.of(context).size.height * 0.6,
-            child: _buildEmptyActiveState(),
-          ),
+      return SingleChildScrollView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        child: SizedBox(
+          height: MediaQuery.of(context).size.height * 0.6,
+          child: _buildActiveProgramNotFoundState(state.active!),
+        ),
+      );
+    }
+
+    // Validate active program data
+    if (!_isActiveProgramValid(activeProgram, state.active!)) {
+      return SingleChildScrollView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        child: SizedBox(
+          height: MediaQuery.of(context).size.height * 0.6,
+          child: _buildInvalidActiveProgramState(activeProgram, state.active!),
         ),
       );
     }
@@ -633,63 +737,287 @@ class _ProgramsScreenState extends State<ProgramsScreen>
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _buildActiveProgramCard(activeProgram, state.active!),
+          _buildEnhancedActiveProgramCard(activeProgram, state.active!),
           const SizedBox(height: 24),
-          _buildProgressSection(activeProgram, state.active!),
+          _buildEnhancedProgressSection(activeProgram, state.active!),
           const SizedBox(height: 24),
-          _buildTodaySection(activeProgram, state.active!),
+          _buildEnhancedTodaySection(activeProgram, state.active!),
+          const SizedBox(height: 24),
+          _buildQuickActionsSection(activeProgram, state.active!),
         ],
       ),
     );
   }
 
-  Widget _buildBrowseTab(ProgramsState state) {
-    final filteredPrograms = _applyFilters(state.programs);
+  // Enhanced helper methods for active program tab
+  Widget _buildActiveTabLoadingState() {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
 
-    if (filteredPrograms.isEmpty) {
-      return SingleChildScrollView(
-        physics: const AlwaysScrollableScrollPhysics(),
-        child: SizedBox(
-          height: MediaQuery.of(context).size.height * 0.6,
-          child: _buildEmptyBrowseState(),
-        ),
-      );
-    }
-
-    return ListView.separated(
-      physics: const AlwaysScrollableScrollPhysics(),
-      padding: const EdgeInsets.all(16),
-      itemCount: filteredPrograms.length,
-      separatorBuilder: (context, index) => const SizedBox(height: 16),
-      itemBuilder: (context, index) => _buildProgramCard(
-        filteredPrograms[index],
-        isActive: state.active?.programId == filteredPrograms[index].id,
-        state: state,
-      ),
-    );
-  }
-
-  Widget _buildCompletedTab(ProgramsState state) {
     return SingleChildScrollView(
       physics: const AlwaysScrollableScrollPhysics(),
-      child: SizedBox(
-        height: MediaQuery.of(context).size.height * 0.6,
-        child: _buildEmptyCompletedState(),
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        children: [
+          // Animated loading card
+          Container(
+            height: 200,
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(16),
+              gradient: LinearGradient(
+                colors: [
+                  colorScheme.primaryContainer.withOpacity(0.3),
+                  colorScheme.secondaryContainer.withOpacity(0.2),
+                ],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+            ),
+            child: Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  CircularProgressIndicator(
+                    color: colorScheme.primary,
+                    strokeWidth: 3,
+                  ),
+                  const SizedBox(height: 16),
+                  Text(
+                    'Loading your active program...',
+                    style: theme.textTheme.bodyLarge?.copyWith(
+                      color: colorScheme.onSurface.withOpacity(0.7),
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(height: 24),
+          // Loading progress section
+          Container(
+            height: 120,
+            decoration: BoxDecoration(
+              color: colorScheme.surface,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(
+                color: colorScheme.outline.withOpacity(0.1),
+              ),
+            ),
+            child: Center(
+              child: CircularProgressIndicator(
+                color: colorScheme.primary.withOpacity(0.5),
+                strokeWidth: 2,
+              ),
+            ),
+          ),
+          const SizedBox(height: 24),
+          // Loading today section
+          Container(
+            height: 100,
+            decoration: BoxDecoration(
+              color: colorScheme.surface,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(
+                color: colorScheme.outline.withOpacity(0.1),
+              ),
+            ),
+            child: Center(
+              child: CircularProgressIndicator(
+                color: colorScheme.primary.withOpacity(0.3),
+                strokeWidth: 2,
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
 
-  List<Program> _applyFilters(List<Program> programs) {
-    return programs.where((program) {
-      if (_selectedCategory.isNotEmpty &&
-          program.category != _selectedCategory) {
+  Program? _findActiveProgramSafely(ProgramsState state) {
+    if (state.active == null || state.programs.isEmpty) {
+      return null;
+    }
+
+    try {
+      // First, try to find exact match
+      final exactMatch = state.programs.where((p) => p.id == state.active!.programId).firstOrNull;
+      if (exactMatch != null) {
+        return exactMatch;
+      }
+
+      // If no exact match, log the issue and return null
+      print('⚠️ Active program with ID ${state.active!.programId} not found in programs list');
+      return null;
+    } catch (e) {
+      print('❌ Error finding active program: $e');
+      return null;
+    }
+  }
+
+  bool _isActiveProgramValid(Program program, ActiveProgram active) {
+    try {
+      // Check if current day is within program duration
+      if (active.currentDay < 1 || active.currentDay > program.durationDays) {
         return false;
       }
-      if (_selectedLevel.isNotEmpty && program.level != _selectedLevel) {
+
+      // Check if program has valid structure
+      if (program.days.isEmpty && program.dayWiseDrillIds.isEmpty) {
         return false;
       }
+
+      // Check if current day exists in program structure
+      if (program.days.isNotEmpty) {
+        // Old format - check if day exists
+        final dayExists = program.days.any((day) => day.dayNumber == active.currentDay);
+        return dayExists;
+      } else if (program.dayWiseDrillIds.isNotEmpty) {
+        // New format - day might not exist (rest day), which is valid
+        return true;
+      }
+
       return true;
-    }).toList();
+    } catch (e) {
+      print('❌ Error validating active program: $e');
+      return false;
+    }
+  }
+
+  Widget _buildActiveProgramNotFoundState(ActiveProgram active) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(32),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Container(
+              width: 120,
+              height: 120,
+              decoration: BoxDecoration(
+                color: colorScheme.errorContainer,
+                shape: BoxShape.circle,
+              ),
+              child: Icon(
+                Icons.error_outline,
+                size: 60,
+                color: colorScheme.onErrorContainer,
+              ),
+            ),
+            const SizedBox(height: 24),
+            Text(
+              'Active Program Not Found',
+              style: theme.textTheme.headlineSmall?.copyWith(
+                color: colorScheme.onSurface,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'The program you were following (ID: ${active.programId}) could not be found. It may have been deleted or you may have lost access to it.',
+              style: theme.textTheme.bodyMedium?.copyWith(
+                color: colorScheme.onSurface.withOpacity(0.7),
+              ),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 32),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                OutlinedButton.icon(
+                  onPressed: () {
+                    _tabController.animateTo(1); // Switch to Browse tab
+                  },
+                  icon: const Icon(Icons.explore),
+                  label: const Text('Browse Programs'),
+                ),
+                const SizedBox(width: 16),
+                FilledButton.icon(
+                  onPressed: () {
+                    context.read<ProgramsBloc>().add(const ProgramsRefreshRequested());
+                  },
+                  icon: const Icon(Icons.refresh),
+                  label: const Text('Refresh'),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildInvalidActiveProgramState(Program program, ActiveProgram active) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(32),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Container(
+              width: 120,
+              height: 120,
+              decoration: BoxDecoration(
+                color: colorScheme.secondaryContainer,
+                shape: BoxShape.circle,
+              ),
+              child: Icon(
+                Icons.warning_outlined,
+                size: 60,
+                color: colorScheme.onSecondaryContainer,
+              ),
+            ),
+            const SizedBox(height: 24),
+            Text(
+              'Program Data Issue',
+              style: theme.textTheme.headlineSmall?.copyWith(
+                color: colorScheme.onSurface,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'There\'s an issue with your active program "${program.name}". You\'re on day ${active.currentDay} but the program structure seems incomplete.',
+              style: theme.textTheme.bodyMedium?.copyWith(
+                color: colorScheme.onSurface.withOpacity(0.7),
+              ),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 32),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                OutlinedButton.icon(
+                  onPressed: () {
+                    Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (context) => ProgramDetailsScreen(program: program),
+                      ),
+                    );
+                  },
+                  icon: const Icon(Icons.info_outline),
+                  label: const Text('View Details'),
+                ),
+                const SizedBox(width: 16),
+                FilledButton.icon(
+                  onPressed: () {
+                    _tabController.animateTo(1); // Switch to Browse tab
+                  },
+                  icon: const Icon(Icons.explore),
+                  label: const Text('Choose New Program'),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   Widget _buildEmptyActiveState() {
@@ -706,38 +1034,52 @@ class _ProgramsScreenState extends State<ProgramsScreen>
               width: 120,
               height: 120,
               decoration: BoxDecoration(
-                color: colorScheme.surfaceContainerHighest,
+                color: colorScheme.primaryContainer,
                 shape: BoxShape.circle,
               ),
               child: Icon(
-                Icons.play_circle_outline,
+                Icons.psychology_outlined,
                 size: 60,
-                color: colorScheme.onSurface.withOpacity(0.3),
+                color: colorScheme.onPrimaryContainer,
               ),
             ),
             const SizedBox(height: 24),
             Text(
               'No Active Program',
               style: theme.textTheme.headlineSmall?.copyWith(
-                color: colorScheme.onSurface.withOpacity(0.7),
+                color: colorScheme.onSurface,
                 fontWeight: FontWeight.w600,
               ),
             ),
             const SizedBox(height: 8),
             Text(
-              'Browse and activate a training program to get started',
+              'Start your training journey by selecting a program from the Browse tab or create your own custom program.',
               style: theme.textTheme.bodyMedium?.copyWith(
-                color: colorScheme.onSurface.withOpacity(0.5),
+                color: colorScheme.onSurface.withOpacity(0.7),
               ),
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 32),
-            FilledButton.icon(
-              onPressed: () {
-                _tabController.animateTo(1);
-              },
-              icon: const Icon(Icons.explore),
-              label: const Text('Browse Programs'),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                OutlinedButton.icon(
+                  onPressed: () {
+                    _tabController.animateTo(1); // Switch to Browse tab
+                  },
+                  icon: const Icon(Icons.explore),
+                  label: const Text('Browse Programs'),
+                ),
+                const SizedBox(width: 16),
+                FilledButton.icon(
+                  onPressed: () {
+                    HapticFeedback.mediumImpact();
+                    _showCreateProgramScreen();
+                  },
+                  icon: const Icon(Icons.add),
+                  label: const Text('Create Program'),
+                ),
+              ],
             ),
           ],
         ),
@@ -745,103 +1087,18 @@ class _ProgramsScreenState extends State<ProgramsScreen>
     );
   }
 
-  Widget _buildEmptyBrowseState() {
-    final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
+  // Enhanced UI components for active program tab
 
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(32),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Container(
-              width: 80,
-              height: 80,
-              decoration: BoxDecoration(
-                color: colorScheme.surfaceContainerHighest,
-                shape: BoxShape.circle,
-              ),
-              child: Icon(
-                Icons.search_off,
-                size: 40,
-                color: colorScheme.onSurface.withOpacity(0.3),
-              ),
-            ),
-            const SizedBox(height: 16),
-            Text(
-              'No programs found',
-              style: theme.textTheme.titleMedium?.copyWith(
-                color: colorScheme.onSurface.withOpacity(0.7),
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              'Try adjusting your filters or create a new program',
-              style: theme.textTheme.bodyMedium?.copyWith(
-                color: colorScheme.onSurface.withOpacity(0.5),
-              ),
-              textAlign: TextAlign.center,
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildEmptyCompletedState() {
-    final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
-
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(32),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Container(
-              width: 100,
-              height: 100,
-              decoration: BoxDecoration(
-                color: colorScheme.surfaceContainerHighest,
-                shape: BoxShape.circle,
-              ),
-              child: Icon(
-                Icons.emoji_events_outlined,
-                size: 50,
-                color: colorScheme.onSurface.withOpacity(0.3),
-              ),
-            ),
-            const SizedBox(height: 20),
-            Text(
-              'No Completed Programs',
-              style: theme.textTheme.titleLarge?.copyWith(
-                color: colorScheme.onSurface.withOpacity(0.7),
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              'Complete your first program to see it here',
-              style: theme.textTheme.bodyMedium?.copyWith(
-                color: colorScheme.onSurface.withOpacity(0.5),
-              ),
-              textAlign: TextAlign.center,
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildActiveProgramCard(Program program, ActiveProgram active) {
+  Widget _buildEnhancedActiveProgramCard(Program program, ActiveProgram active) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
     final progress = active.currentDay / program.durationDays;
+    final daysCompleted = active.currentDay - 1;
+    final daysRemaining = program.durationDays - active.currentDay + 1;
 
     return Card(
-      elevation: 4,
+      elevation: 8,
+      shadowColor: colorScheme.primary.withOpacity(0.2),
       child: Container(
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(12),
@@ -855,41 +1112,86 @@ class _ProgramsScreenState extends State<ProgramsScreen>
           ),
         ),
         child: Padding(
-          padding: const EdgeInsets.all(20),
+          padding: const EdgeInsets.all(24),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              // Header with program info
               Row(
                 children: [
                   Container(
-                    padding: const EdgeInsets.all(8),
+                    padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(
                       color: colorScheme.primary,
-                      borderRadius: BorderRadius.circular(8),
+                      borderRadius: BorderRadius.circular(12),
+                      boxShadow: [
+                        BoxShadow(
+                          color: colorScheme.primary.withOpacity(0.3),
+                          blurRadius: 8,
+                          offset: const Offset(0, 4),
+                        ),
+                      ],
                     ),
                     child: Icon(
                       Icons.psychology,
                       color: colorScheme.onPrimary,
-                      size: 24,
+                      size: 28,
                     ),
                   ),
-                  const SizedBox(width: 12),
+                  const SizedBox(width: 16),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(
-                          program.name,
-                          style: theme.textTheme.titleLarge?.copyWith(
-                            fontWeight: FontWeight.bold,
-                            color: colorScheme.onPrimaryContainer,
-                          ),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: Text(
+                                program.name,
+                                style: theme.textTheme.titleLarge?.copyWith(
+                                  fontWeight: FontWeight.bold,
+                                  color: colorScheme.onPrimaryContainer,
+                                ),
+                              ),
+                            ),
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 12,
+                                vertical: 6,
+                              ),
+                              decoration: BoxDecoration(
+                                color: colorScheme.primary,
+                                borderRadius: BorderRadius.circular(20),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(
+                                    Icons.play_circle_fill,
+                                    color: colorScheme.onPrimary,
+                                    size: 16,
+                                  ),
+                                  const SizedBox(width: 4),
+                                  Text(
+                                    'ACTIVE',
+                                    style: TextStyle(
+                                      color: colorScheme.onPrimary,
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.bold,
+                                      letterSpacing: 0.5,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
                         ),
+                        const SizedBox(height: 4),
                         Text(
                           '${program.category} • ${program.level}',
                           style: theme.textTheme.bodyMedium?.copyWith(
-                            color:
-                                colorScheme.onPrimaryContainer.withOpacity(0.7),
+                            color: colorScheme.onPrimaryContainer.withOpacity(0.8),
+                            fontWeight: FontWeight.w500,
                           ),
                         ),
                       ],
@@ -897,51 +1199,55 @@ class _ProgramsScreenState extends State<ProgramsScreen>
                   ),
                 ],
               ),
-              const SizedBox(height: 16),
-              Text(
-                'Day ${active.currentDay} of ${program.durationDays}',
-                style: theme.textTheme.bodyLarge?.copyWith(
-                  fontWeight: FontWeight.w600,
-                  color: colorScheme.onPrimaryContainer,
-                ),
-              ),
-              const SizedBox(height: 8),
-              LinearProgressIndicator(
-                value: progress,
-                backgroundColor:
-                    colorScheme.onPrimaryContainer.withOpacity(0.2),
-                valueColor: AlwaysStoppedAnimation<Color>(colorScheme.primary),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                '${(progress * 100).round()}% Complete',
-                style: theme.textTheme.bodySmall?.copyWith(
-                  color: colorScheme.onPrimaryContainer.withOpacity(0.8),
-                ),
-              ),
-              const SizedBox(height: 16),
+              const SizedBox(height: 24),
+              
+              // Progress section
               Row(
                 children: [
                   Expanded(
-                    child: ElevatedButton.icon(
-                      onPressed: () =>
-                          _navigateToProgramDay(program, active.currentDay),
-                      icon: const Icon(Icons.play_arrow),
-                      label: Text('Day ${active.currentDay}'),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: colorScheme.primary,
-                        foregroundColor: colorScheme.onPrimary,
-                      ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Day ${active.currentDay} of ${program.durationDays}',
+                          style: theme.textTheme.titleMedium?.copyWith(
+                            fontWeight: FontWeight.bold,
+                            color: colorScheme.onPrimaryContainer,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        LinearProgressIndicator(
+                          value: progress,
+                          backgroundColor: colorScheme.onPrimaryContainer.withOpacity(0.2),
+                          valueColor: AlwaysStoppedAnimation<Color>(colorScheme.primary),
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          '${(progress * 100).toInt()}% Complete',
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color: colorScheme.onPrimaryContainer.withOpacity(0.7),
+                          ),
+                        ),
+                      ],
                     ),
                   ),
-                  const SizedBox(width: 12),
-                  ElevatedButton(
-                    onPressed: () => _showProgramDaysOverview(program, active),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: colorScheme.secondary,
-                      foregroundColor: colorScheme.onSecondary,
-                    ),
-                    child: const Icon(Icons.calendar_view_day),
+                  const SizedBox(width: 24),
+                  Column(
+                    children: [
+                      _buildStatCard(
+                        'Completed',
+                        '$daysCompleted',
+                        Icons.check_circle,
+                        Colors.green,
+                      ),
+                      const SizedBox(height: 8),
+                      _buildStatCard(
+                        'Remaining',
+                        '$daysRemaining',
+                        Icons.schedule,
+                        Colors.orange,
+                      ),
+                    ],
                   ),
                 ],
               ),
@@ -952,9 +1258,10 @@ class _ProgramsScreenState extends State<ProgramsScreen>
     );
   }
 
-  Widget _buildProgressSection(Program program, ActiveProgram active) {
+  Widget _buildEnhancedProgressSection(Program program, ActiveProgram active) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
+    final progress = active.currentDay / program.durationDays;
 
     return Card(
       child: Padding(
@@ -972,21 +1279,38 @@ class _ProgramsScreenState extends State<ProgramsScreen>
             Row(
               children: [
                 Expanded(
-                  child: _buildStatCard(
-                    'Days Completed',
-                    '${active.currentDay - 1}',
-                    Icons.check_circle,
-                    colorScheme.primary,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Overall Progress',
+                        style: theme.textTheme.bodyMedium?.copyWith(
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      LinearProgressIndicator(
+                        value: progress,
+                        backgroundColor: colorScheme.surfaceContainerHighest,
+                        valueColor: AlwaysStoppedAnimation<Color>(colorScheme.primary),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        '${(progress * 100).toInt()}% Complete',
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: colorScheme.onSurface.withOpacity(0.7),
+                        ),
+                      ),
+                    ],
                   ),
                 ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: _buildStatCard(
-                    'Days Remaining',
-                    '${program.durationDays - active.currentDay + 1}',
-                    Icons.schedule,
-                    colorScheme.secondary,
-                  ),
+                const SizedBox(width: 16),
+                FilledButton.icon(
+                  onPressed: () {
+                    _showProgramDaysOverview(program, active);
+                  },
+                  icon: const Icon(Icons.calendar_view_day),
+                  label: const Text('View Schedule'),
                 ),
               ],
             ),
@@ -996,28 +1320,21 @@ class _ProgramsScreenState extends State<ProgramsScreen>
     );
   }
 
-  Widget _buildTodaySection(Program program, ActiveProgram active) {
+  Widget _buildEnhancedTodaySection(Program program, ActiveProgram active) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
-
-    // Handle both old format (days list) and new format (dayWiseDrillIds)
+    
+    // Find today's training
     ProgramDay? todayDay;
     String? todayDrillId;
     int drillCount = 0;
 
+    // Check old format first
     if (program.days.isNotEmpty) {
-      // Old format: use days list
-      try {
-        todayDay = program.days.firstWhere(
-          (day) => day.dayNumber == active.currentDay,
-        );
-      } catch (e) {
-        // Day not found, use fallback
-        todayDay = ProgramDay(
-          dayNumber: active.currentDay,
-          title: 'Day ${active.currentDay}',
-          description: 'Training day',
-        );
+      todayDay = program.days.where((day) => day.dayNumber == active.currentDay).firstOrNull;
+      if (todayDay != null && todayDay.drillId != null) {
+        todayDrillId = todayDay.drillId;
+        drillCount = 1;
       }
     } else if (program.dayWiseDrillIds.isNotEmpty) {
       // New enhanced format: use dayWiseDrillIds
@@ -1050,7 +1367,7 @@ class _ProgramsScreenState extends State<ProgramsScreen>
       );
     }
 
-    final hasDrill = todayDay.drillId != null && todayDay.drillId!.isNotEmpty;
+    final hasDrill = todayDay?.drillId != null && todayDay!.drillId!.isNotEmpty;
 
     return Card(
       child: Padding(
@@ -1082,21 +1399,77 @@ class _ProgramsScreenState extends State<ProgramsScreen>
                 ),
               ),
               title: Text(
-                todayDay.title,
+                todayDay?.title ?? 'Day ${active.currentDay}',
                 style: theme.textTheme.titleSmall?.copyWith(
                   fontWeight: FontWeight.w600,
                 ),
               ),
-              subtitle: Text(todayDay.description),
+              subtitle: Text(todayDay?.description ?? 'No training scheduled'),
               trailing: hasDrill
                   ? FilledButton(
                       onPressed: () {
                         HapticFeedback.lightImpact();
-                        _startTodayTraining(todayDay!);
+                        if (todayDay != null) {
+                          _startTodayTraining(todayDay);
+                        }
                       },
                       child: const Text('Start'),
                     )
                   : null,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildQuickActionsSection(Program program, ActiveProgram active) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Quick Actions',
+              style: theme.textTheme.titleMedium?.copyWith(
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            const SizedBox(height: 16),
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: () {
+                      Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (context) => ProgramDetailsScreen(program: program),
+                        ),
+                      );
+                    },
+                    icon: const Icon(Icons.info_outline),
+                    label: const Text('View Details'),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: () {
+                      Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (context) => const ProgramStatsScreen(),
+                        ),
+                      );
+                    },
+                    icon: const Icon(Icons.analytics_outlined),
+                    label: const Text('View Stats'),
+                  ),
+                ),
+              ],
             ),
           ],
         ),
@@ -1862,10 +2235,19 @@ void _showProgramDaysOverview(Program program, ActiveProgram active) {
         final drill = await drillService.getDrillById(day.drillId!);
 
         if (drill != null && mounted) {
-          // Navigate to drill runner with program context
-          final programs = context.read<ProgramsBloc>().state.programs;
-          final program =
-              programs.where((p) => p.days.contains(day)).firstOrNull;
+          // Get the active program from the current state
+          final state = context.read<ProgramsBloc>().state;
+          final activeProgram = state.active;
+          
+          if (activeProgram == null) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('No active program found')),
+            );
+            return;
+          }
+
+          // Find the program by active program ID
+          final program = state.programs.where((p) => p.id == activeProgram.programId).firstOrNull;
 
           if (program == null) {
             ScaffoldMessenger.of(context).showSnackBar(
@@ -1873,11 +2255,13 @@ void _showProgramDaysOverview(Program program, ActiveProgram active) {
             );
             return;
           }
+
+          // Navigate to drill runner with program context
           context.push('/drill-runner', extra: {
             'drill': drill,
             'programId': program.id,
             'programDayNumber': day.dayNumber,
-          },);
+          });
         } else {
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
@@ -1900,8 +2284,18 @@ void _showProgramDaysOverview(Program program, ActiveProgram active) {
       }
     } else {
       // No drill assigned, navigate to program day screen
-      final programs = context.read<ProgramsBloc>().state.programs;
-      final program = programs.where((p) => p.days.contains(day)).firstOrNull;
+      final state = context.read<ProgramsBloc>().state;
+      final activeProgram = state.active;
+      
+      if (activeProgram == null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('No active program found')),
+        );
+        return;
+      }
+
+      // Find the program by active program ID
+      final program = state.programs.where((p) => p.id == activeProgram.programId).firstOrNull;
 
       if (program != null) {
         _navigateToProgramDay(
@@ -1965,6 +2359,167 @@ void _showProgramDaysOverview(Program program, ActiveProgram active) {
     } catch (e) {
       return false;
     }
+  }
+
+  // Browse Tab - Shows all available programs
+  Widget _buildBrowseTab(ProgramsState state) {
+    final filteredPrograms = _getFilteredPrograms(state);
+    
+    if (filteredPrograms.isEmpty) {
+      return _buildEmptyBrowseState();
+    }
+
+    return ListView.builder(
+      padding: const EdgeInsets.all(16),
+      itemCount: filteredPrograms.length,
+      itemBuilder: (context, index) {
+        final program = filteredPrograms[index];
+        final isActive = state.active?.programId == program.id;
+        return _buildProgramCard(
+          program,
+          isActive: isActive,
+          state: state,
+        );
+      },
+    );
+  }
+
+  // Completed Tab - Shows completed programs
+  Widget _buildCompletedTab(ProgramsState state) {
+    // For now, show empty state as we don't have completed programs tracking
+    return _buildEmptyCompletedState();
+  }
+
+  Widget _buildEmptyBrowseState() {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(32),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Container(
+              width: 120,
+              height: 120,
+              decoration: BoxDecoration(
+                color: colorScheme.secondaryContainer,
+                shape: BoxShape.circle,
+              ),
+              child: Icon(
+                Icons.search_off,
+                size: 60,
+                color: colorScheme.onSecondaryContainer,
+              ),
+            ),
+            const SizedBox(height: 24),
+            Text(
+              'No Programs Found',
+              style: theme.textTheme.headlineSmall?.copyWith(
+                color: colorScheme.onSurface,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Try adjusting your filters or create a new program to get started.',
+              style: theme.textTheme.bodyMedium?.copyWith(
+                color: colorScheme.onSurface.withOpacity(0.7),
+              ),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 32),
+            FilledButton.icon(
+              onPressed: () {
+                HapticFeedback.mediumImpact();
+                _showCreateProgramScreen();
+              },
+              icon: const Icon(Icons.add),
+              label: const Text('Create Program'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildEmptyCompletedState() {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(32),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Container(
+              width: 120,
+              height: 120,
+              decoration: BoxDecoration(
+                color: colorScheme.tertiaryContainer,
+                shape: BoxShape.circle,
+              ),
+              child: Icon(
+                Icons.emoji_events_outlined,
+                size: 60,
+                color: colorScheme.onTertiaryContainer,
+              ),
+            ),
+            const SizedBox(height: 24),
+            Text(
+              'No Completed Programs',
+              style: theme.textTheme.headlineSmall?.copyWith(
+                color: colorScheme.onSurface,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Complete your first program to see your achievements here.',
+              style: theme.textTheme.bodyMedium?.copyWith(
+                color: colorScheme.onSurface.withOpacity(0.7),
+              ),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 32),
+            OutlinedButton.icon(
+              onPressed: () {
+                _tabController.animateTo(1); // Switch to Browse tab
+              },
+              icon: const Icon(Icons.explore),
+              label: const Text('Browse Programs'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  List<Program> _getFilteredPrograms(ProgramsState state) {
+    var programs = state.programs;
+
+    // Apply search filter
+    if (state.searchQuery.isNotEmpty) {
+      programs = programs.where((program) {
+        return program.name.toLowerCase().contains(state.searchQuery.toLowerCase()) ||
+               program.category.toLowerCase().contains(state.searchQuery.toLowerCase()) ||
+               program.level.toLowerCase().contains(state.searchQuery.toLowerCase());
+      }).toList();
+    }
+
+    // Apply category filter
+    if (_selectedCategory.isNotEmpty) {
+      programs = programs.where((program) => program.category == _selectedCategory).toList();
+    }
+
+    // Apply level filter
+    if (_selectedLevel.isNotEmpty) {
+      programs = programs.where((program) => program.level == _selectedLevel).toList();
+    }
+
+    return programs;
   }
 }
 

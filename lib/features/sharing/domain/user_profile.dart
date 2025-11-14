@@ -5,6 +5,8 @@ class UserProfile {
   final String? photoUrl;
   final DateTime createdAt;
   final DateTime lastActiveAt;
+  final String role; // 'admin', 'coach', or 'user'
+  final bool isAdmin; // Convenience getter for admin status
 
   const UserProfile({
     required this.id,
@@ -13,7 +15,8 @@ class UserProfile {
     this.photoUrl,
     required this.createdAt,
     required this.lastActiveAt,
-  });
+    this.role = 'user',
+  }) : isAdmin = role == 'admin';
 
   factory UserProfile.fromJson(Map<String, dynamic> json) {
     // Handle Firestore Timestamps or String dates
@@ -37,6 +40,7 @@ class UserProfile {
       photoUrl: json['photoUrl'] as String? ?? json['profileImageUrl'] as String?,
       createdAt: parseDate(json['createdAt']),
       lastActiveAt: parseDate(json['lastActiveAt']),
+      role: json['role'] as String? ?? 'user',
     );
   }
 
@@ -47,6 +51,8 @@ class UserProfile {
     'photoUrl': photoUrl,
     'createdAt': createdAt.toIso8601String(),
     'lastActiveAt': lastActiveAt.toIso8601String(),
+    'role': role,
+    'is_admin': isAdmin,
   };
 
   UserProfile copyWith({
@@ -56,6 +62,7 @@ class UserProfile {
     String? photoUrl,
     DateTime? createdAt,
     DateTime? lastActiveAt,
+    String? role,
   }) {
     return UserProfile(
       id: id ?? this.id,
@@ -64,6 +71,7 @@ class UserProfile {
       photoUrl: photoUrl ?? this.photoUrl,
       createdAt: createdAt ?? this.createdAt,
       lastActiveAt: lastActiveAt ?? this.lastActiveAt,
+      role: role ?? this.role,
     );
   }
 }

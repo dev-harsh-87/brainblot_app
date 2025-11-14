@@ -69,8 +69,9 @@ class SessionManagementService {
       return;
     }
 
-    // User logged in - establish session WITHOUT device registration
+    // CRITICAL: User logged in - establish session WITHOUT device registration
     // Device registration will happen after conflict check in AuthBloc
+    // This prevents premature session creation before conflict resolution
     await _establishSession(firebaseUser, skipDeviceRegistration: true);
   }
 
@@ -113,8 +114,13 @@ class SessionManagementService {
       try {
         _logoutSubscription = _deviceSessionService.listenForLogoutNotifications().listen(
           (notification) async {
-            AppLogger.info('Received logout notification from another device');
-            await _handleForceLogout();
+            // Only process logout if we still have an active session
+            if (_currentSession != null && firebaseUser.uid == _currentSession!.id) {
+              AppLogger.info('Received valid logout notification from another device');
+              await _handleForceLogout();
+            } else {
+              AppLogger.debug('Ignoring stale logout notification');
+            }
           },
           onError: (error) {
             // Silent fail - notification system is not critical
@@ -126,15 +132,21 @@ class SessionManagementService {
         // Continue - this is not critical for session establishment
       }
       
-      // First ensure user profile exists
+      // CRITICAL: First ensure user profile exists
       await _ensureUserProfileExists(firebaseUser);
+      
+      // Wait for profile to be fully created/updated
+      await Future.delayed(const Duration(milliseconds: 200));
       
       // CRITICAL: Sync subscription BEFORE listening to snapshots
       // This ensures the user gets the correct moduleAccess from their plan
       AppLogger.debug('Syncing subscription before establishing session');
       try {
         await _subscriptionSync.syncUserOnLogin(firebaseUser.uid);
-        AppLogger.info('Subscription synced');
+        AppLogger.info('Subscription synced successfully');
+        
+        // Wait a bit more to ensure Firestore document is updated
+        await Future.delayed(const Duration(milliseconds: 300));
       } catch (e) {
         AppLogger.error('Subscription sync failed', error: e);
         // Continue - user can still use the app with default permissions
@@ -341,10 +353,23 @@ class SessionManagementService {
   /// Sign out and clear session
   Future<void> signOut() async {
     try {
+      // CRITICAL: Sign out from Firebase Auth
       await _auth.signOut();
+      
+      // Wait for auth state to propagate
+      await Future.delayed(const Duration(milliseconds: 100));
+      
       // _clearSession will be called automatically via auth state changes
+      // But we ensure state is cleared even if listener fails
+      if (_currentSession != null) {
+        await _clearSession();
+      }
+      
+      AppLogger.success('Sign out completed', tag: 'SessionManagement');
     } catch (e) {
-      AppLogger.error('Sign out error', error: e);
+      AppLogger.error('Sign out error', error: e, tag: 'SessionManagement');
+      // Force clear session even on error
+      await _clearSession();
       rethrow;
     }
   }
@@ -550,7 +575,7 @@ class SessionManagementService {
     
     const adminEmails = [
       'admin@spark.com',
-      'admin@brianblot.com',  // Fixed spelling - user's actual admin email
+      'admin@gmail.com',  // Fixed spelling - user's actual admin email
       
     ];
     

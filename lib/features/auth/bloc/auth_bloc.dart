@@ -63,28 +63,53 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
     try {
       final cred = await _repo.signInWithEmailPassword(email: event.email, password: event.password);
       
-      // Wait a moment for auth state to settle
-      await Future.delayed(const Duration(milliseconds: 100));
+      // CRITICAL: Ensure user is set before checking sessions
+      if (cred.user == null) {
+        throw Exception('Authentication failed - no user returned');
+      }
+      
+      // CRITICAL: Wait for auth state to fully settle before checking sessions
+      await Future.delayed(const Duration(milliseconds: 500));
       
       // Check for existing sessions before completing login
-      final existingSessions = await _multiDeviceService.getActiveSessions();
-      final otherSessions = existingSessions.where((session) => !session.isCurrentDevice).toList();
-      
-      if (otherSessions.isNotEmpty) {
-        // There are other active sessions, show device conflict
-        emit(state.copyWith(
-          status: AuthStatus.deviceConflict,
-          user: cred.user,
-          existingSessions: otherSessions.map((s) => s.toFirestore()).toList(),
-        ),);
-      } else {
-        // No conflicts, register device session without forcing logout
-        await _sessionService!.registerCurrentDeviceSession();
-        emit(state.copyWith(status: AuthStatus.authenticated, user: cred.user));
+      try {
+        final existingSessions = await _multiDeviceService.getActiveSessions();
+        AppLogger.debug('Total sessions found: ${existingSessions.length}', tag: 'Auth');
+        
+        // Filter for sessions that are NOT the current device
+        final otherSessions = existingSessions.where((session) => !session.isCurrentDevice).toList();
+        AppLogger.debug('Other device sessions: ${otherSessions.length}', tag: 'Auth');
+        
+        if (otherSessions.isNotEmpty) {
+          // Log details of other sessions for debugging
+          for (final session in otherSessions) {
+            AppLogger.debug('Other session - Device: ${session.deviceName}, Platform: ${session.platform}, Last Active: ${session.formattedLastActive}', tag: 'Auth');
+          }
+          
+          // There are other active sessions, show device conflict
+          AppLogger.warning('Device conflict detected: ${otherSessions.length} other sessions found', tag: 'Auth');
+          emit(state.copyWith(
+            status: AuthStatus.deviceConflict,
+            user: cred.user,
+            existingSessions: otherSessions.map((s) => s.toFirestore()).toList(),
+          ));
+          return; // CRITICAL: Stop here to prevent auth state listener from overriding
+        }
+        
+        AppLogger.info('No device conflicts found, proceeding with login', tag: 'Auth');
+      } catch (e) {
+        AppLogger.error('Failed to check active sessions', error: e, tag: 'Auth');
+        // Continue with login even if session check fails
       }
+      
+      // No conflicts, register device session without forcing logout
+      await _sessionService!.registerCurrentDeviceSession();
+      emit(state.copyWith(status: AuthStatus.authenticated, user: cred.user));
     } on FirebaseAuthException catch (e) {
+      AppLogger.error('Login failed', error: e, tag: 'Auth');
       emit(state.copyWith(status: AuthStatus.failure, error: e.message ?? 'Authentication failed'));
     } catch (e) {
+      AppLogger.error('Login error', error: e, tag: 'Auth');
       emit(state.copyWith(status: AuthStatus.failure, error: e.toString()));
     }
   }
@@ -106,19 +131,31 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
   Future<void> _onLogout(AuthLogoutRequested event, Emitter<AuthState> emit) async {
     emit(state.copyWith(status: AuthStatus.loading));
     try {
-      // Always use session service for logout (handles cleanup automatically)
+      // CRITICAL: Always use session service for logout (handles cleanup automatically)
       await _sessionService!.signOut();
       
-      // Clear state completely
+      // Wait for auth state to settle
+      await Future.delayed(const Duration(milliseconds: 200));
+      
+      // Clear state completely - this ensures clean logout
       emit(const AuthState.initial());
       
       AppLogger.success('Logout successful - session and credentials cleared', tag: 'Auth');
     } catch (e) {
-      emit(state.copyWith(status: AuthStatus.failure, error: 'Logout failed: ${e.toString()}'));
+      AppLogger.error('Logout failed', error: e, tag: 'Auth');
+      // Even if logout fails, clear local state
+      emit(const AuthState.initial());
     }
   }
   
   void _onUserChanged(AuthUserChanged event, Emitter<AuthState> emit) {
+    // CRITICAL: Don't override deviceConflict state
+    // This prevents race condition where auth listener overrides conflict dialog
+    if (state.status == AuthStatus.deviceConflict) {
+      AppLogger.debug('Skipping user changed - device conflict in progress', tag: 'Auth');
+      return;
+    }
+    
     if (event.user != null) {
       emit(state.copyWith(status: AuthStatus.authenticated, user: event.user));
     } else {

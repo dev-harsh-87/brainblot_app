@@ -2,314 +2,548 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
     
-    // ========================================
-    // HELPER FUNCTIONS
-    // ========================================
-    
-    // Check if user is authenticated
+    // Helper functions
     function isAuthenticated() {
       return request.auth != null;
     }
     
-    // Get user data
+    function isOwner(userId) {
+      return request.auth.uid == userId;
+    }
+    
     function getUserData() {
       return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
     }
     
-    // Check if user has a specific role
-    function hasRole(role) {
-      return isAuthenticated() && getUserData().role == role;
-    }
-    
-    // Check if user is admin
     function isAdmin() {
-      return isAuthenticated() && getUserData().role == 'admin';
+      return isAuthenticated() &&
+             exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+             (getUserData().role == 'admin' || getUserData().is_admin == true);
     }
     
-    // Check if user is premium or higher
-    function isPremiumUser() {
-      return isAuthenticated() && getUserData().role in ['premium', 'admin'];
+    function isCoach() {
+      return isAuthenticated() &&
+             exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+             getUserData().role == 'coach';
     }
     
-    // Check if user owns the resource
-    function isOwner(userId) {
-      return isAuthenticated() && request.auth.uid == userId;
+    function hasModuleAccess(module) {
+      return isAuthenticated() &&
+             exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+             'subscription' in getUserData() &&
+             'moduleAccess' in getUserData().subscription &&
+             module in getUserData().subscription.moduleAccess &&
+             getUserData().subscription.moduleAccess[module] == true;
     }
     
-    // Check if user has a specific subscription plan
-    function hasSubscriptionPlan(plan) {
-      return isAuthenticated() && getUserData().subscription.plan == plan;
-    }
-    
-    // Check if user has access to a module based on subscription
-    function hasModuleAccess(moduleName) {
-      let subscription = getUserData().subscription;
+    function isActiveUser() {
       return isAuthenticated() && (
-        subscription.plan == 'premium' ||
-        subscription.plan == 'pro' ||
-        moduleName in subscription.features
+        !exists(/databases/$(database)/documents/users/$(request.auth.uid)) ||
+        !('status' in getUserData()) ||
+        getUserData().status == 'active'
       );
     }
     
-    // Check if user can modify role (only admins)
-    function canModifyRole() {
-      return isAdmin() &&
-             (!request.resource.data.keys().hasAny(['role']) ||
-              request.resource.data.role != 'admin');
-    }
-    
-    // ========================================
-    // USERS COLLECTION
-    // ========================================
-    
+    // Users collection
     match /users/{userId} {
-      // Anyone can read their own profile
-      // Admins can read all profiles
-      allow read: if isOwner(userId) || isAdmin();
+      // Allow unauthenticated read to check if admin exists during app startup
+      allow read: if (!isAuthenticated() && resource.data.role == 'admin') ||
+                    (isAuthenticated() && (
+                      isOwner(userId) ||
+                      isAdmin() ||
+                      (isCoach() && hasModuleAccess('user_management'))
+                    ));
       
-      // Users can create their own profile (during registration)
-      allow create: if isOwner(userId) && 
-                       request.resource.data.role == 'user'; // Default role
+      // Allow unauthenticated list queries to find admin users during startup
+      allow list: if !isAuthenticated();
       
-      // Users can update their own profile (except role and subscription)
-      // Admins can update any profile
-      allow update: if (isOwner(userId) && 
-                        !request.resource.data.diff(resource.data).affectedKeys().hasAny(['role', 'subscription'])) ||
-                       (isAdmin() && canModifyRole());
+      // Allow unauthenticated user creation for admin setup
+      // Allow authenticated admins to create users for other people
+      allow create: if (isAuthenticated() && isOwner(userId)) ||
+                      (!isAuthenticated() && resource.data.role == 'admin') ||
+                      (isAuthenticated() && isAdmin());
       
-      // Only admins can delete users
+      allow update: if isAuthenticated() && (
+        isOwner(userId) ||
+        isAdmin() ||
+        (isCoach() && hasModuleAccess('user_management'))
+      );
+      
       allow delete: if isAdmin();
     }
     
-    // ========================================
-    // SUBSCRIPTION PLANS COLLECTION
-    // ========================================
+    // Drills collection
+    match /drills/{drillId} {
+      allow read, list: if isAuthenticated() && (
+        // Admin can see all drills
+        isAdmin() ||
+        // Own drills
+        resource.data.createdBy == request.auth.uid ||
+        // Public drills
+        resource.data.visibility == 'public' ||
+        // Shared drills
+        request.auth.uid in resource.data.sharedWith ||
+        // Allow basic access for active users
+        isActiveUser()
+      );
+      
+      allow create: if isAuthenticated() && (
+        // Own drills
+        (request.auth.uid == resource.data.createdBy &&
+         resource.data.status == 'active') ||
+        // Admin can create any drill
+        isAdmin()
+      );
+      
+      allow update: if isAuthenticated() && (
+        // Own drills
+        resource.data.createdBy == request.auth.uid ||
+        // Admin can edit all
+        isAdmin()
+      );
+      
+      allow delete: if isAuthenticated() && (
+        resource.data.createdBy == request.auth.uid ||
+        isAdmin()
+      );
+    }
     
+    // Programs collection
+    match /programs/{programId} {
+      allow read, list: if isAuthenticated() && (
+        // Own programs
+        resource.data.createdBy == request.auth.uid ||
+        // Public programs
+        resource.data.visibility == 'public' ||
+        // Shared programs
+        request.auth.uid in resource.data.sharedWith ||
+        // Admin can see all
+        isAdmin() ||
+        // Users with admin_programs access can see admin programs
+        (hasModuleAccess('admin_programs') &&
+         ('createdByRole' in resource.data && resource.data.createdByRole == 'admin')) ||
+        // Users with admin_programs access can see programs marked as admin
+        (hasModuleAccess('admin_programs') &&
+         ('is_admin' in resource.data && resource.data.is_admin == true)) ||
+        // Allow basic access for active users
+        isActiveUser()
+      );
+      
+      allow create: if isAuthenticated() && (
+        (request.auth.uid == request.resource.data.createdBy &&
+         request.resource.data.status == 'active') ||
+        // Admin can create any program
+        isAdmin() ||
+        // Users with admin_programs access can create admin programs
+        (hasModuleAccess('admin_programs') &&
+         request.resource.data.is_admin == true)
+      );
+      
+      allow update: if isAuthenticated() && (
+        resource.data.createdBy == request.auth.uid ||
+        isAdmin() ||
+        // Users with admin_programs access can update admin programs
+        (hasModuleAccess('admin_programs') &&
+         ('is_admin' in resource.data && resource.data.is_admin == true))
+      );
+      
+      allow delete: if isAuthenticated() && (
+        resource.data.createdBy == request.auth.uid ||
+        isAdmin() ||
+        // Users with admin_programs access can delete admin programs
+        (hasModuleAccess('admin_programs') &&
+         ('is_admin' in resource.data && resource.data.is_admin == true))
+      );
+    }
+    
+    // User activities collection
+    match /user_activities/{activityId} {
+      allow read, list: if isAuthenticated() && (
+        resource.data.userId == request.auth.uid ||
+        isAdmin() ||
+        (isCoach() && hasModuleAccess('analytics'))
+      );
+      
+      allow create: if isAuthenticated() &&
+                      request.auth.uid == resource.data.userId;
+      
+      allow update: if isAuthenticated() &&
+                      resource.data.userId == request.auth.uid;
+      
+      allow delete: if isAuthenticated() && (
+        resource.data.userId == request.auth.uid ||
+        isAdmin()
+      );
+    }
+    
+    // User favorites collection
+    match /user_favorites/{favoriteId} {
+      allow read, list: if isAuthenticated() && (
+        resource.data.userId == request.auth.uid ||
+        isAdmin()
+      );
+      
+      allow create: if isAuthenticated() &&
+                      request.auth.uid == request.resource.data.userId;
+      
+      allow update: if isAuthenticated() && (
+        resource.data.userId == request.auth.uid ||
+        isAdmin()
+      );
+      
+      allow delete: if isAuthenticated() && (
+        resource.data.userId == request.auth.uid ||
+        isAdmin()
+      );
+    }
+    
+    // Categories collection (read-only for most users)
+    match /categories/{categoryId} {
+      allow read, list: if isAuthenticated();
+      
+      allow write: if isAdmin();
+    }
+    
+    // Drill categories collection
+    match /drill_categories/{categoryId} {
+      // Allow authenticated users to read categories
+      allow read, list: if isAuthenticated();
+      
+      // Allow admins to perform all operations
+      allow write: if isAdmin();
+    }
+    
+    // Subscription plans collection (read-only for most users)
     match /subscription_plans/{planId} {
-      // Anyone authenticated can read active plans
+      // Allow unauthenticated read for initial app setup
+      allow read: if true;
+      
+      // Allow unauthenticated write for initial app setup (admin creation)
+      allow write: if isAdmin() || !isAuthenticated();
+    }
+    
+    // Sessions collection
+    match /sessions/{sessionId} {
+      allow read, list: if isAuthenticated() && (
+        resource.data.userId == request.auth.uid ||
+        isAdmin()
+      );
+      
+      allow create: if isAuthenticated() &&
+                      request.auth.uid == resource.data.userId;
+      
+      allow update: if isAuthenticated() &&
+                      resource.data.userId == request.auth.uid;
+      
+      allow delete: if isAuthenticated() && (
+        resource.data.userId == request.auth.uid ||
+        isAdmin()
+      );
+    }
+    
+    // Device sessions collection
+    match /deviceSessions/{sessionId} {
+      allow read, list: if isAuthenticated() && (
+        resource.data.userId == request.auth.uid ||
+        isAdmin()
+      );
+      
+      allow write: if isAuthenticated() && (
+        resource.data.userId == request.auth.uid ||
+        isAdmin()
+      );
+    }
+    
+    // User sessions collection
+    match /userSessions/{userId} {
+      allow read, list: if isAuthenticated() && (
+        isOwner(userId) ||
+        isAdmin()
+      );
+      
+      allow write: if isAuthenticated() && (
+        isOwner(userId) ||
+        isAdmin()
+      );
+      
+      // Nested sessions subcollection
+      match /sessions/{sessionId} {
+        allow read, list: if isAuthenticated() && (
+          isOwner(userId) ||
+          isAdmin()
+        );
+        
+        allow write: if isAuthenticated() && (
+          isOwner(userId) ||
+          isAdmin()
+        );
+      }
+    }
+    
+    // User sessions collection (with underscore - for session repository)
+    match /user_sessions/{userId} {
+      allow read, list: if isAuthenticated() && (
+        isOwner(userId) ||
+        isAdmin()
+      );
+      
+      allow write: if isAuthenticated() && (
+        isOwner(userId) ||
+        isAdmin()
+      );
+      
+      // Nested sessions subcollection
+      match /sessions/{sessionId} {
+        allow read, list: if isAuthenticated() && (
+          isOwner(userId) ||
+          isAdmin()
+        );
+        
+        allow write: if isAuthenticated() && (
+          isOwner(userId) ||
+          isAdmin()
+        );
+      }
+    }
+    
+    // Logout notifications collection
+    match /logoutNotifications/{notificationId} {
+      allow read, list: if isAuthenticated() && (
+        resource.data.userId == request.auth.uid ||
+        isAdmin()
+      );
+      
+      allow write: if isAuthenticated() && (
+        resource.data.userId == request.auth.uid ||
+        isAdmin()
+      );
+    }
+    
+    // Active programs collection
+    match /active_programs/{userId} {
+      allow read, list: if isAuthenticated() && (
+        isOwner(userId) ||
+        isAdmin()
+      );
+      
+      allow write: if isAuthenticated() && (
+        isOwner(userId) ||
+        isAdmin()
+      );
+    }
+    
+    // Program progress collection
+    match /program_progress/{progressId} {
+      allow read, list: if isAuthenticated() && (
+        resource.data.userId == request.auth.uid ||
+        isAdmin()
+      );
+      
+      allow write: if isAuthenticated() && (
+        resource.data.userId == request.auth.uid ||
+        isAdmin()
+      );
+      
+      // Nested completions subcollection
+      match /completions/{completionId} {
+        allow read, list: if isAuthenticated() && (
+          resource.data.userId == request.auth.uid ||
+          isAdmin()
+        );
+        
+        allow write: if isAuthenticated() && (
+          resource.data.userId == request.auth.uid ||
+          isAdmin()
+        );
+      }
+    }
+    
+    // User programs collection (nested under users)
+    match /user_programs/{userId} {
+      allow read, list: if isAuthenticated() && (
+        isOwner(userId) ||
+        isAdmin()
+      );
+      
+      allow write: if isAuthenticated() && (
+        isOwner(userId) ||
+        isAdmin()
+      );
+      
+      // Nested programs subcollection
+      match /programs/{programId} {
+        allow read, list: if isAuthenticated() && (
+          isOwner(userId) ||
+          isAdmin()
+        );
+        
+        allow write: if isAuthenticated() && (
+          isOwner(userId) ||
+          isAdmin()
+        );
+      }
+    }
+    
+    // User drills collection (nested under users)
+    match /users/{userId}/drills/{drillId} {
+      allow read, list: if isAuthenticated() && (
+        isOwner(userId) ||
+        isAdmin()
+      );
+      
+      allow write: if isAuthenticated() && (
+        isOwner(userId) ||
+        isAdmin()
+      );
+    }
+    
+    // User programs collection (nested under users)
+    match /users/{userId}/programs/{programId} {
+      allow read, list: if isAuthenticated() && (
+        isOwner(userId) ||
+        isAdmin()
+      );
+      
+      allow write: if isAuthenticated() && (
+        isOwner(userId) ||
+        isAdmin()
+      );
+    }
+    
+    // User sessions collection (nested under users)
+    match /users/{userId}/sessions/{sessionId} {
+      allow read, list: if isAuthenticated() && (
+        isOwner(userId) ||
+        isAdmin()
+      );
+      
+      allow write: if isAuthenticated() && (
+        isOwner(userId) ||
+        isAdmin()
+      );
+    }
+    
+    // Invitations collection
+    match /invitations/{invitationId} {
+      allow read, list: if isAuthenticated() && (
+        resource.data.fromUserId == request.auth.uid ||
+        resource.data.toUserId == request.auth.uid ||
+        isAdmin()
+      );
+      
+      allow create: if isAuthenticated() &&
+                      request.auth.uid == resource.data.fromUserId;
+      
+      allow update: if isAuthenticated() && (
+        resource.data.fromUserId == request.auth.uid ||
+        resource.data.toUserId == request.auth.uid ||
+        isAdmin()
+      );
+      
+      allow delete: if isAuthenticated() && (
+        resource.data.fromUserId == request.auth.uid ||
+        isAdmin()
+      );
+    }
+    
+    // Subscription requests collection
+    match /subscription_requests/{requestId} {
+      allow read, list: if isAuthenticated() && (
+        resource.data.userId == request.auth.uid ||
+        isAdmin()
+      );
+      
+      allow create: if isAuthenticated() &&
+                      request.auth.uid == resource.data.userId;
+      
+      allow update: if isAdmin();
+      
+      allow delete: if isAdmin();
+    }
+    
+    // Notifications collection
+    match /notifications/{notificationId} {
+      allow read, list: if isAuthenticated() && (
+        resource.data.userId == request.auth.uid ||
+        isAdmin()
+      );
+      
+      allow create: if isAuthenticated();
+      
+      allow update: if isAuthenticated() && (
+        resource.data.userId == request.auth.uid ||
+        isAdmin()
+      );
+      
+      allow delete: if isAuthenticated() && (
+        resource.data.userId == request.auth.uid ||
+        isAdmin()
+      );
+    }
+    
+    // Analytics collection
+    match /analytics/{analyticsId} {
+      allow read, list: if isAdmin();
+      
+      allow create: if isAuthenticated();
+      
+      allow update: if isAdmin();
+      
+      allow delete: if isAdmin();
+    }
+    
+    // System collection
+    match /system/{systemId} {
       allow read: if isAuthenticated();
       
-      // Only admins can create, update, or delete plans
-      allow create, update, delete: if isAdmin();
+      allow write: if isAdmin();
+      
+      // Nested errors subcollection
+      match /errors/{errorId} {
+        allow read, list: if isAdmin();
+        
+        allow write: if isAdmin();
+      }
     }
     
-    // ========================================
-    // DRILLS COLLECTION
-    // ========================================
-    
-    match /drills/{drillId} {
-      // Users can only read their own drills
-      // Admins can read all drills
-      allow read: if isAuthenticated() && (
-        resource.data.createdBy == request.auth.uid ||
-        isAdmin()
-      );
+    // Deleted users collection
+    match /deleted_users/{userId} {
+      allow read, list: if isAdmin();
       
-      // Users can create drills if they have access to the drills module
-      allow create: if isAuthenticated() &&
-                       hasModuleAccess('drills') &&
-                       request.resource.data.createdBy == request.auth.uid;
-      
-      // Users can update their own drills
-      // Admins can update any drill
-      allow update: if isAuthenticated() && (
-        resource.data.createdBy == request.auth.uid ||
-        isAdmin()
-      );
-      
-      // Users can delete their own drills
-      // Admins can delete any drill
-      allow delete: if isAuthenticated() && (
-        resource.data.createdBy == request.auth.uid ||
-        isAdmin()
-      );
+      allow write: if isAdmin();
     }
     
-    // ========================================
-    // PROGRAMS COLLECTION
-    // ========================================
-    
-    match /programs/{programId} {
-      // Users can only read their own programs
-      // Admins can read all programs
-      allow read: if isAuthenticated() && (
-        resource.data.createdBy == request.auth.uid ||
-        isAdmin()
-      );
+    // Pending auth users collection
+    match /pending_auth_users/{userId} {
+      allow read, list: if isAdmin();
       
-      // Users can create programs if they have access to the programs module
-      allow create: if isAuthenticated() &&
-                       hasModuleAccess('programs') &&
-                       request.resource.data.createdBy == request.auth.uid;
-      
-      // Users can update their own programs
-      // Admins can update any program
-      allow update: if isAuthenticated() && (
-        resource.data.createdBy == request.auth.uid ||
-        isAdmin()
-      );
-      
-      // Users can delete their own programs
-      // Admins can delete any program
-      allow delete: if isAuthenticated() && (
-        resource.data.createdBy == request.auth.uid ||
-        isAdmin()
-      );
+      allow write: if isAdmin();
     }
     
-    // ========================================
-    // SESSIONS COLLECTION (Drill Results)
-    // ========================================
-    
-    match /sessions/{sessionId} {
-      // Users can only read their own sessions
-      // Admins can read all sessions
-      allow read: if isAuthenticated() && (
-        resource.data.userId == request.auth.uid ||
-        isAdmin()
-      );
+    // User audit log collection
+    match /user_audit_log/{logId} {
+      allow read, list: if isAdmin();
       
-      // Users can create their own sessions
-      allow create: if isAuthenticated() && 
-                       request.resource.data.userId == request.auth.uid;
+      allow create: if isAuthenticated();
       
-      // Users can update their own sessions
-      allow update: if isAuthenticated() && 
-                       resource.data.userId == request.auth.uid;
+      allow update: if isAdmin();
       
-      // Users can delete their own sessions
-      // Admins can delete any session
-      allow delete: if isAuthenticated() && (
-        resource.data.userId == request.auth.uid ||
-        isAdmin()
-      );
-    }
-    
-    // ========================================
-    // PROGRAM PROGRESS COLLECTION
-    // ========================================
-    
-    match /program_progress/{progressId} {
-      // Users can only read their own progress
-      // Admins can read all progress
-      allow read: if isAuthenticated() && (
-        resource.data.userId == request.auth.uid ||
-        isAdmin()
-      );
-      
-      // Users can create their own progress
-      allow create: if isAuthenticated() && 
-                       request.resource.data.userId == request.auth.uid;
-      
-      // Users can update their own progress
-      allow update: if isAuthenticated() && 
-                       resource.data.userId == request.auth.uid;
-      
-      // Users can delete their own progress
-      allow delete: if isAuthenticated() && 
-                       resource.data.userId == request.auth.uid;
-    }
-    
-    // ========================================
-    // STATS COLLECTION
-    // ========================================
-    
-    match /stats/{userId} {
-      // Users can only read their own stats
-      // Admins can read all stats
-      allow read: if isOwner(userId) || isAdmin();
-      
-      // Users can update their own stats
-      allow create, update: if isOwner(userId);
-      
-      // Only admins can delete stats
       allow delete: if isAdmin();
     }
     
-    // ========================================
-    // MULTIPLAYER SESSIONS COLLECTION
-    // ========================================
-    
-    match /multiplayer_sessions/{sessionId} {
-      // Users can read sessions they're part of
-      // Admins can read all sessions
-      allow read: if isAuthenticated() && (
-        request.auth.uid in resource.data.participants ||
+    // Plan requests collection
+    match /plan_requests/{requestId} {
+      allow read, list: if isAuthenticated() && (
+        resource.data.userId == request.auth.uid ||
         isAdmin()
       );
       
-      // Users can create multiplayer sessions
-      allow create: if isAuthenticated() && 
-                       hasModuleAccess('multiplayer') &&
-                       request.auth.uid == request.resource.data.hostId;
+      allow create: if isAuthenticated() &&
+                      request.auth.uid == resource.data.userId;
       
-      // Host or admins can update sessions
-      allow update: if isAuthenticated() && (
-        resource.data.hostId == request.auth.uid ||
-        isAdmin()
-      );
+      allow update: if isAdmin();
       
-      // Host or admins can delete sessions
-      allow delete: if isAuthenticated() && (
-        resource.data.hostId == request.auth.uid ||
-        isAdmin()
-      );
-    }
-    
-    // ========================================
-    // SHARED CONTENT COLLECTION
-    // ========================================
-    
-    match /shared_content/{contentId} {
-      // Anyone authenticated can read public shared content
-      allow read: if isAuthenticated() && resource.data.isPublic == true;
-      
-      // Users with premium or higher can share content
-      allow create: if isPremiumUser() &&
-                       request.resource.data.sharedBy == request.auth.uid;
-      
-      // Owners can update their shared content
-      allow update: if isAuthenticated() && 
-                       resource.data.sharedBy == request.auth.uid;
-      
-      // Owners or admins can delete shared content
-      allow delete: if isAuthenticated() && (
-        resource.data.sharedBy == request.auth.uid ||
-        isAdmin()
-      );
-    }
-    
-    // ========================================
-    // ADMIN LOGS COLLECTION (Optional)
-    // ========================================
-    
-    match /admin_logs/{logId} {
-      // Only admins can read logs
-      allow read: if isAdmin();
-      
-      // Only system can create logs (through server-side code)
-      allow create: if false;
-      
-      // No updates or deletes allowed
-      allow update, delete: if false;
-    }
-    
-    // ========================================
-    // SETTINGS COLLECTION
-    // ========================================
-    
-    match /settings/{userId} {
-      // Users can only access their own settings
-      allow read, write: if isOwner(userId);
-    }
-    
-    // ========================================
-    // DEFAULT DENY
-    // ========================================
-    
-    // Deny all other access by default
-    match /{document=**} {
-      allow read, write: if false;
+      allow delete: if isAdmin();
     }
   }
 }

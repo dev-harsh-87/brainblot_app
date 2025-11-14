@@ -29,7 +29,8 @@ class MultiDeviceSessionService {
     try {
       final userId = _auth.currentUser?.uid;
       if (userId == null) {
-        throw Exception('User must be authenticated to get active sessions');
+        AppLogger.warning('User not authenticated when checking sessions', tag: 'MultiDeviceSession');
+        return [];
       }
 
       // Get current device info to identify current session
@@ -134,7 +135,7 @@ class MultiDeviceSessionService {
     }
   }
 
-  /// Logout from all other devices (keep current device)
+  /// Logout from all other devices (keep current device) - Optimized batch operation
   Future<void> logoutFromAllOtherDevices() async {
     try {
       final userId = _auth.currentUser?.uid;
@@ -146,19 +147,71 @@ class MultiDeviceSessionService {
       final currentDeviceInfo = await _deviceSessionService.getDeviceInfo();
       final currentDeviceId = currentDeviceInfo['deviceId'] as String;
 
-      // Get all active sessions except current device
-      final sessions = await getActiveSessions();
-      final otherSessions = sessions.where((session) => 
-          session.deviceId != currentDeviceId,).toList();
+      AppLogger.info('Starting batch logout from all other devices', tag: 'MultiDeviceSession');
 
-      // Logout from each other device
-      for (final session in otherSessions) {
-        await logoutFromDevice(session.deviceId);
+      // Get all active sessions except current device in a single query
+      final otherSessionsQuery = await _firestore
+          .collection(_deviceSessionsCollection)
+          .where('userId', isEqualTo: userId)
+          .where('isActive', isEqualTo: true)
+          .get();
+
+      final otherSessions = otherSessionsQuery.docs
+          .where((doc) => doc.data()['deviceId'] != currentDeviceId)
+          .toList();
+
+      if (otherSessions.isEmpty) {
+        AppLogger.info('No other devices to logout from', tag: 'MultiDeviceSession');
+        return;
       }
 
-      print('✅ Successfully logged out from ${otherSessions.length} other devices');
+      // Prepare batch operations for better performance
+      final batch = _firestore.batch();
+      final logoutNotifications = <Map<String, dynamic>>[];
+
+      // Process each session for batch operations
+      for (final sessionDoc in otherSessions) {
+        final sessionData = sessionDoc.data();
+        final deviceId = sessionData['deviceId'] as String;
+        final fcmToken = sessionData['fcmToken'] as String?;
+
+        // Add to batch delete
+        batch.delete(sessionDoc.reference);
+
+        // Prepare logout notification if FCM token exists
+        if (fcmToken != null) {
+          logoutNotifications.add({
+            'fcmToken': fcmToken,
+            'userId': userId,
+            'deviceId': deviceId,
+            'message': 'You have been logged out because your account was accessed from another device.',
+            'timestamp': FieldValue.serverTimestamp(),
+            'processed': false,
+          });
+        }
+
+        AppLogger.debug('Prepared logout for device: $deviceId', tag: 'MultiDeviceSession');
+      }
+
+      // Execute batch delete operations
+      await batch.commit();
+      AppLogger.info('Batch deleted ${otherSessions.length} device sessions', tag: 'MultiDeviceSession');
+
+      // Send logout notifications in parallel for better performance
+      if (logoutNotifications.isNotEmpty) {
+        final notificationFutures = logoutNotifications.map((notification) =>
+            _firestore.collection(_logoutNotificationsCollection).add(notification));
+        
+        await Future.wait(notificationFutures);
+        AppLogger.info('Sent ${logoutNotifications.length} logout notifications', tag: 'MultiDeviceSession');
+      }
+
+      // Clean up user session if needed (check if any of the deleted sessions was the active one)
+      await _cleanupUserSessionIfNeeded(userId, otherSessions);
+
+      AppLogger.info('Successfully logged out from ${otherSessions.length} other devices', tag: 'MultiDeviceSession');
     } catch (e) {
-      print('❌ Failed to logout from all other devices: $e');
+      AppLogger.error('Failed to logout from all other devices', error: e, tag: 'MultiDeviceSession');
       rethrow;
     }
   }
@@ -232,6 +285,42 @@ class MultiDeviceSessionService {
       print('✅ Device session removed: $deviceId');
     } catch (e) {
       print('⚠️ Failed to remove device session: $e');
+    }
+  
+  }
+
+  /// Clean up user session if any of the deleted sessions was the active one
+  Future<void> _cleanupUserSessionIfNeeded(String userId, List<QueryDocumentSnapshot> deletedSessions) async {
+    try {
+      final userSessionDoc = await _firestore
+          .collection(_userSessionsCollection)
+          .doc(userId)
+          .get();
+      
+      if (!userSessionDoc.exists) return;
+      
+      final userData = userSessionDoc.data()!;
+      final activeDeviceId = userData['deviceId'] as String?;
+      
+      if (activeDeviceId == null) return;
+      
+      // Check if the active device was among the deleted sessions
+      final wasActiveDeviceDeleted = deletedSessions.any((doc) {
+        final data = doc.data() as Map<String, dynamic>?;
+        return data != null && data['deviceId'] == activeDeviceId;
+      });
+      
+      if (wasActiveDeviceDeleted) {
+        await _firestore
+            .collection(_userSessionsCollection)
+            .doc(userId)
+            .delete();
+        
+        AppLogger.info('Cleaned up user session for deleted active device: $activeDeviceId', tag: 'MultiDeviceSession');
+      }
+    } catch (e) {
+      AppLogger.warning('Failed to cleanup user session: $e', tag: 'MultiDeviceSession');
+      // Don't rethrow as this is cleanup operation
     }
   }
 

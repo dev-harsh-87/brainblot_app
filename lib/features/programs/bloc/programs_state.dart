@@ -20,16 +20,18 @@ class ProgramsState extends Equatable {
   final bool isRefreshing;
   final DateTime? lastUpdated;
   final String? selectedCategory;
+  final String searchQuery;
   final Program? programBeingModified;
 
   const ProgramsState({
-    required this.status, 
-    required this.programs, 
+    required this.status,
+    required this.programs,
     this.active,
     this.errorMessage,
     this.isRefreshing = false,
     this.lastUpdated,
     this.selectedCategory,
+    this.searchQuery = '',
     this.programBeingModified,
   });
   
@@ -42,13 +44,14 @@ class ProgramsState extends Equatable {
   );
 
   ProgramsState copyWith({
-    ProgramsStatus? status, 
-    List<Program>? programs, 
+    ProgramsStatus? status,
+    List<Program>? programs,
     ActiveProgram? active,
     String? errorMessage,
     bool? isRefreshing,
     DateTime? lastUpdated,
     String? selectedCategory,
+    String? searchQuery,
     Program? programBeingModified,
   }) => ProgramsState(
         status: status ?? this.status,
@@ -58,6 +61,7 @@ class ProgramsState extends Equatable {
         isRefreshing: isRefreshing ?? this.isRefreshing,
         lastUpdated: lastUpdated ?? this.lastUpdated,
         selectedCategory: selectedCategory ?? this.selectedCategory,
+        searchQuery: searchQuery ?? this.searchQuery,
         programBeingModified: programBeingModified ?? this.programBeingModified,
       );
 
@@ -83,13 +87,14 @@ class ProgramsState extends Equatable {
 
   @override
   List<Object?> get props => [
-    status, 
-    programs, 
-    active, 
-    errorMessage, 
-    isRefreshing, 
+    status,
+    programs,
+    active,
+    errorMessage,
+    isRefreshing,
     lastUpdated,
     selectedCategory,
+    searchQuery,
     programBeingModified,
   ];
 }

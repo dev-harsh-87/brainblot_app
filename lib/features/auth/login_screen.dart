@@ -414,20 +414,29 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
               );
             }).toList();
             
-            showDialog(
-              context: context,
-              barrierDismissible: false,
-              builder: (context) => DeviceConflictDialog(
-                existingSessions: sessions,
-                onContinue: () {
-                  context.read<AuthBloc>().add(const AuthContinueWithCurrentDevice());
-                },
-                onCancel: () {
-                  // User cancelled login, reset auth state
-                  context.read<AuthBloc>().add(const AuthLogoutRequested());
-                },
-              ),
-            );
+            // Use WidgetsBinding to ensure dialog shows after current frame
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              if (context.mounted) {
+                showDialog(
+                  context: context,
+                  barrierDismissible: false,
+                  builder: (dialogContext) => DeviceConflictDialog(
+                    existingSessions: sessions,
+                    onContinue: () {
+                      if (context.mounted) {
+                        context.read<AuthBloc>().add(const AuthContinueWithCurrentDevice());
+                      }
+                    },
+                    onCancel: () {
+                      if (context.mounted) {
+                        // User cancelled login, perform complete logout
+                        context.read<AuthBloc>().add(const AuthLogoutRequested());
+                      }
+                    },
+                  ),
+                );
+              }
+            });
           }
           if (state.status == AuthStatus.failure && state.error != null) {
             HapticFeedback.heavyImpact();

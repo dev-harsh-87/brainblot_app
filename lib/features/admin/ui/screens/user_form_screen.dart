@@ -602,19 +602,32 @@ class _UserFormScreenState extends State<UserFormScreen> {
   }
 
   Future<void> _createUser(SubscriptionPlan plan) async {
-    await _userManagementService.createUser(
-      email: _emailController.text.trim(),
-      password: _passwordController.text,
-      displayName: _displayNameController.text.trim(),
-      role: _selectedRole,
-      subscriptionData: {
-        'plan': plan.name.toLowerCase(),
-        'planId': plan.id,
-        'status': 'active',
-        'moduleAccess': plan.moduleAccess,
-        'expiresAt': null,
-      },
-    );
+    print('🔄 Starting user creation process...');
+    print('📧 Email: ${_emailController.text.trim()}');
+    print('👤 Display Name: ${_displayNameController.text.trim()}');
+    print('🔐 Role: ${_selectedRole.value}');
+    print('📦 Plan: ${plan.name}');
+    
+    try {
+      final user = await _userManagementService.createUser(
+        email: _emailController.text.trim(),
+        password: _passwordController.text,
+        displayName: _displayNameController.text.trim(),
+        role: _selectedRole,
+        subscriptionData: {
+          'plan': plan.name.toLowerCase(),
+          'planId': plan.id,
+          'status': 'active',
+          'moduleAccess': plan.moduleAccess,
+          'expiresAt': null,
+        },
+      );
+      print('✅ User creation completed successfully');
+      print('🆔 Created user ID: ${user.id}');
+    } catch (e) {
+      print('❌ User creation failed: $e');
+      rethrow;
+    }
   }
 
   Future<void> _updateUser(SubscriptionPlan plan) async {

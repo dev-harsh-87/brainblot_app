@@ -12,6 +12,8 @@ import 'package:spark_app/core/widgets/confirmation_dialog.dart';
 import 'package:spark_app/core/ui/edge_to_edge.dart';
 import 'package:spark_app/core/auth/services/session_management_service.dart';
 import 'package:spark_app/core/auth/services/subscription_permission_service.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -96,8 +98,81 @@ class _DrillLibraryScreenState extends State<DrillLibraryScreen>
       final sessionService = getIt<SessionManagementService>();
       final subscriptionService = getIt<SubscriptionPermissionService>();
       
-      final isAdmin = sessionService.isAdmin();
-      final hasDrillAccess = await subscriptionService.hasModuleAccess('admin_drills');
+      // Wait a bit for session to be fully established
+      await Future.delayed(const Duration(milliseconds: 500));
+      
+      // Debug session state
+      final currentSession = sessionService.getCurrentSession();
+      print('🔍 Current session: ${currentSession?.email}, role: ${currentSession?.role.value}');
+      print('🔍 Session isLoggedIn: ${sessionService.isLoggedIn()}');
+      
+      // Check if user is admin first with retry mechanism
+      bool isAdmin = sessionService.isAdmin();
+      print('🔍 sessionService.isAdmin() returned: $isAdmin');
+      
+      // If not admin initially, retry a few times as session might still be loading
+      if (!isAdmin) {
+        for (int i = 0; i < 3; i++) {
+          await Future.delayed(const Duration(milliseconds: 500));
+          final retrySession = sessionService.getCurrentSession();
+          isAdmin = sessionService.isAdmin();
+          print('🔍 Retry $i: session=${retrySession?.email}, role=${retrySession?.role.value}, isAdmin=$isAdmin');
+          if (isAdmin) break;
+        }
+      }
+      
+      // If still not admin, try direct Firestore check as fallback
+      if (!isAdmin) {
+        try {
+          final user = FirebaseAuth.instance.currentUser;
+          if (user != null) {
+            final userDoc = await FirebaseFirestore.instance
+                .collection('users')
+                .doc(user.uid)
+                .get();
+            
+            if (userDoc.exists) {
+              final userData = userDoc.data()!;
+              final role = userData['role'] as String?;
+              isAdmin = role == 'admin';
+              print('🔍 Direct Firestore check: role=$role, isAdmin=$isAdmin');
+            }
+          }
+        } catch (e) {
+          print('🔍 Error in direct Firestore check: $e');
+        }
+      }
+      
+      // For non-admin users, wait for subscription sync to complete
+      bool hasDrillAccess = false;
+      if (!isAdmin) {
+        print('🔍 User is not admin, checking drill access...');
+        // Retry mechanism for subscription access check
+        int retryCount = 0;
+        const maxRetries = 3;
+        
+        while (retryCount < maxRetries) {
+          try {
+            hasDrillAccess = await subscriptionService.hasModuleAccess('admin_drills');
+            print('🔍 hasModuleAccess(admin_drills) returned: $hasDrillAccess');
+            break; // Success, exit retry loop
+          } catch (e) {
+            retryCount++;
+            print('🔍 Error checking admin_drills access (attempt $retryCount): $e');
+            if (retryCount >= maxRetries) {
+              print('Failed to check admin_drills access after $maxRetries attempts: $e');
+              hasDrillAccess = false;
+            } else {
+              // Wait before retry with exponential backoff
+              await Future.delayed(Duration(milliseconds: 300 * retryCount));
+            }
+          }
+        }
+      } else {
+        print('🔍 User is admin, skipping drill access check');
+      }
+      
+      print('🔍 Final results: isAdmin=$isAdmin, hasDrillAccess=$hasDrillAccess');
       
       setState(() {
         _isAdmin = isAdmin;
@@ -110,16 +185,16 @@ class _DrillLibraryScreenState extends State<DrillLibraryScreen>
       _tabController.dispose();
       
       // Tab configuration:
-      // Admin: 2 tabs (My Drills, Favorites)
+      // Admin: 3 tabs (My Drills, Admin Drills, Favorites) - admins can see all admin drills
       // User with drill access: 3 tabs (My Drills, Admin Drills, Favorites)
       // User without drill access: 2 tabs (My Drills, Favorites)
       int tabLength;
-      if (isAdmin) {
-        tabLength = 2; // My Drills, Favorites
-      } else if (hasDrillAccess) {
+      if (isAdmin || hasDrillAccess) {
         tabLength = 3; // My Drills, Admin Drills, Favorites
+        print('🔍 Setting tabLength to 3 (isAdmin=$isAdmin, hasDrillAccess=$hasDrillAccess)');
       } else {
         tabLength = 2; // My Drills, Favorites (no Admin Drills)
+        print('🔍 Setting tabLength to 2 (isAdmin=$isAdmin, hasDrillAccess=$hasDrillAccess)');
       }
       
       _tabController = TabController(
@@ -151,20 +226,12 @@ class _DrillLibraryScreenState extends State<DrillLibraryScreen>
     if (!_tabController.indexIsChanging) return;
 
     // Tab mapping based on role and access:
-    // Admin: 0=My Drills, 1=Favorites
-    // User with drill access: 0=My Drills, 1=Admin Drills, 2=Favorites
+    // Admin or User with drill access: 0=My Drills, 1=Admin Drills, 2=Favorites
     // User without drill access: 0=My Drills, 1=Favorites
     DrillLibraryView view;
     
-    if (_isAdmin) {
-      // Admin tabs: My Drills, Favorites
-      view = switch (_tabController.index) {
-        0 => DrillLibraryView.custom, // My Drills
-        1 => DrillLibraryView.favorites, // Favorites
-        _ => DrillLibraryView.custom,
-      };
-    } else if (_hasDrillAccess) {
-      // User with drill access: My Drills, Admin Drills, Favorites
+    if (_isAdmin || _hasDrillAccess) {
+      // Admin or User with drill access: My Drills, Admin Drills, Favorites
       view = switch (_tabController.index) {
         0 => DrillLibraryView.custom, // My Drills
         1 => DrillLibraryView.all, // Admin Drills
@@ -203,14 +270,10 @@ class _DrillLibraryScreenState extends State<DrillLibraryScreen>
   }
 
   List<Widget> _buildTabs() {
-    if (_isAdmin) {
-      // Admin: My Drills, Favorites
-      return const [
-        Tab(text: 'My Drills'),
-        Tab(text: 'Favorites'),
-      ];
-    } else if (_hasDrillAccess) {
-      // User with drill access: My Drills, Admin Drills, Favorites
+    print('🔍 _buildTabs called: _isAdmin=$_isAdmin, _hasDrillAccess=$_hasDrillAccess');
+    if (_isAdmin || _hasDrillAccess) {
+      // Admin or User with drill access: My Drills, Admin Drills, Favorites
+      print('🔍 Building 3 tabs (My Drills, Admin Drills, Favorites)');
       return const [
         Tab(text: 'My Drills'),
         Tab(text: 'Admin Drills'),
@@ -218,6 +281,7 @@ class _DrillLibraryScreenState extends State<DrillLibraryScreen>
       ];
     } else {
       // User without drill access: My Drills, Favorites (no Admin Drills)
+      print('🔍 Building 2 tabs (My Drills, Favorites)');
       return const [
         Tab(text: 'My Drills'),
         Tab(text: 'Favorites'),
@@ -226,14 +290,8 @@ class _DrillLibraryScreenState extends State<DrillLibraryScreen>
   }
 
   List<Widget> _buildTabViews(DrillLibraryState state) {
-    if (_isAdmin) {
-      // Admin: My Drills, Favorites
-      return [
-        _buildMyDrillsViewWithRefresh(state), // My drills only
-        _buildFavoriteDrillsViewWithRefresh(state), // Favorites
-      ];
-    } else if (_hasDrillAccess) {
-      // User with drill access: My Drills, Admin Drills, Favorites
+    if (_isAdmin || _hasDrillAccess) {
+      // Admin or User with drill access: My Drills, Admin Drills, Favorites
       return [
         _buildMyDrillsViewWithRefresh(state), // My drills only
         _buildAdminDrillsViewWithRefresh(state), // Admin drills only
@@ -732,20 +790,25 @@ Widget _buildCompactStatChip(IconData icon, String text, Color color) {
                           ),
                           GestureDetector(
                             onTap: () => _toggleFavorite(drill),
-                            child: Container(
-                              padding: const EdgeInsets.all(6),
-                              decoration: BoxDecoration(
-
-                                color: drill.favorite
-                                    ? Colors.red.withOpacity(0.1)
-                                    : colorScheme.surfaceContainerHighest,
-                                borderRadius: BorderRadius.circular(8),
-                              ),
-                              child: Icon(
-                                drill.favorite ? Icons.favorite : Icons.favorite_border,
-                                color: drill.favorite ? Colors.red : colorScheme.onSurface.withOpacity(0.6),
-                                size: 16,
-                              ),
+                            child: FutureBuilder<bool>(
+                              future: _drillRepository.isFavorite(drill.id),
+                              builder: (context, snapshot) {
+                                final isFavorite = snapshot.data ?? false;
+                                return Container(
+                                  padding: const EdgeInsets.all(6),
+                                  decoration: BoxDecoration(
+                                    color: isFavorite
+                                        ? Colors.red.withOpacity(0.1)
+                                        : colorScheme.surfaceContainerHighest,
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                  child: Icon(
+                                    isFavorite ? Icons.favorite : Icons.favorite_border,
+                                    color: isFavorite ? Colors.red : colorScheme.onSurface.withOpacity(0.6),
+                                    size: 16,
+                                  ),
+                                );
+                              },
                             ),
                           ),
                         ],
@@ -1000,7 +1063,7 @@ Widget _buildCompactStatChip(IconData icon, String text, Color color) {
 
   Widget _buildAdminDrillsView() {
     return FutureBuilder<bool>(
-      future: getIt<SubscriptionPermissionService>().hasModuleAccess('drills'),
+      future: getIt<SubscriptionPermissionService>().hasModuleAccess('admin_drills'),
       builder: (context, moduleAccessSnapshot) {
         if (moduleAccessSnapshot.connectionState == ConnectionState.waiting) {
           return const Center(child: CircularProgressIndicator());
@@ -1012,10 +1075,20 @@ Widget _buildCompactStatChip(IconData icon, String text, Color color) {
           return _buildNoAccessState();
         }
 
-        return BlocBuilder<DrillLibraryBloc, DrillLibraryState>(
-          builder: (context, state) {
-            // Filter drills based on current view and filters - admin drills only
-            final adminDrills = state.items.where((drill) => drill.isPreset).toList();
+        return FutureBuilder<List<Drill>>(
+          future: _drillRepository.fetchAdminDrills(),
+          builder: (context, adminDrillsSnapshot) {
+            if (adminDrillsSnapshot.connectionState == ConnectionState.waiting) {
+              return const Center(child: CircularProgressIndicator());
+            }
+
+            if (adminDrillsSnapshot.hasError) {
+              return Center(
+                child: Text('Error loading admin drills: ${adminDrillsSnapshot.error}'),
+              );
+            }
+
+            final adminDrills = adminDrillsSnapshot.data ?? [];
             
             if (adminDrills.isEmpty) {
               return _buildEmptyAdminDrillsState();
@@ -1190,8 +1263,14 @@ Widget _buildCompactStatChip(IconData icon, String text, Color color) {
 
  
   Future<void> _toggleFavorite(Drill drill) async {
+    print('🔷 Spark ⭐ Toggling favorite for drill: ${drill.id}');
     try {
+      // Get current favorite status from repository (not from drill.favorite)
+      final currentlyFavorite = await _drillRepository.isFavorite(drill.id);
+      print('🔷 Spark 📊 Current favorite status: $currentlyFavorite');
+      
       await _drillRepository.toggleFavorite(drill.id);
+      print('🔷 Spark ✅ Successfully toggled favorite for drill: ${drill.id}');
       
       HapticFeedback.lightImpact();
       ScaffoldMessenger.of(context).showSnackBar(
@@ -1199,13 +1278,13 @@ Widget _buildCompactStatChip(IconData icon, String text, Color color) {
           content: Row(
             children: [
               Icon(
-                drill.favorite ? Icons.favorite_border : Icons.favorite,
+                currentlyFavorite ? Icons.favorite_border : Icons.favorite,
                 color: Colors.white,
                 size: 20,
               ),
               const SizedBox(width: 8),
-              Text(drill.favorite 
-                  ? 'Removed from favorites' 
+              Text(currentlyFavorite
+                  ? 'Removed from favorites'
                   : 'Added to favorites',),
             ],
           ),
@@ -1217,6 +1296,7 @@ Widget _buildCompactStatChip(IconData icon, String text, Color color) {
       // Refresh the drills list to show updated favorite status
       context.read<DrillLibraryBloc>().add(const DrillLibraryRefreshRequested());
     } catch (e) {
+      print('🔷 Spark ❌ Error toggling favorite for drill: ${drill.id}, error: $e');
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('Failed to update favorite: $e'),

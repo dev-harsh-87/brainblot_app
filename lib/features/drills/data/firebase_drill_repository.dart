@@ -7,8 +7,8 @@ import 'package:spark_app/features/drills/data/drill_repository.dart';
 import 'package:spark_app/core/utils/app_logger.dart';
 import 'package:uuid/uuid.dart';
 
-/// Professional Firebase implementation of DrillRepository
-/// Follows the new Firestore schema with proper error handling and performance optimization
+/// Firebase implementation using the new clean database structure
+/// No duplicate collections, uses tags and proper role-based filtering
 class FirebaseDrillRepository implements DrillRepository {
   final FirebaseFirestore _firestore;
   final FirebaseAuth _auth;
@@ -17,7 +17,7 @@ class FirebaseDrillRepository implements DrillRepository {
   // Collection names following the new schema
   static const String _drillsCollection = 'drills';
   static const String _userFavoritesCollection = 'user_favorites';
-  static const String _userDrillsCollection = 'user_drills';
+  static const String _usersCollection = 'users';
 
   FirebaseDrillRepository({
     FirebaseFirestore? firestore,
@@ -34,34 +34,21 @@ class FirebaseDrillRepository implements DrillRepository {
       return Stream.value([]);
     }
 
-    // Watch user's own drills
     return _firestore
         .collection(_drillsCollection)
-        .where('createdBy', isEqualTo: userId)
+        .where('status', isEqualTo: 'active')
         .snapshots()
         .asyncMap((snapshot) async {
           try {
-            // Get user's own drills
-            final myDrills = _mapSnapshotToDrills(snapshot);
+            final allDrills = _mapSnapshotToDrills(snapshot);
             
-            // Get shared drills for current user
-            final sharedDrills = await _getSharedDrills(userId);
-            
-            // Combine and remove duplicates by ID
-            final seenIds = <String>{};
-            final allDrills = <Drill>[];
-            
-            for (final drill in [...myDrills, ...sharedDrills]) {
-              if (!seenIds.contains(drill.id)) {
-                seenIds.add(drill.id);
-                allDrills.add(drill);
-              }
-            }
+            // Filter drills based on user access
+            final accessibleDrills = await _filterAccessibleDrills(allDrills, userId);
             
             // Sort by createdAt (newest first)
-            allDrills.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+            accessibleDrills.sort((a, b) => b.createdAt.compareTo(a.createdAt));
             
-            return allDrills;
+            return accessibleDrills;
           } catch (error) {
             AppLogger.error('Error in watchAll', error: error);
             return <Drill>[];
@@ -69,33 +56,24 @@ class FirebaseDrillRepository implements DrillRepository {
         });
   }
 
-  // Helper method to get drills shared with the current user
-  Future<List<Drill>> _getSharedDrills(String userId) async {
-    try {
-      final sharedDrills = await _firestore
-          .collection(_drillsCollection)
-          .where('sharedWith', arrayContains: userId)
-          .get();
-          
-      return _mapSnapshotToDrills(sharedDrills);
-    } catch (e) {
-      AppLogger.error('Error fetching shared drills', error: e);
-      return [];
-    }
-  }
-
   @override
   Stream<List<Drill>> watchByCategory(String category) {
+    final userId = _currentUserId;
+    if (userId == null) {
+      return Stream.value([]);
+    }
+
     return _firestore
         .collection(_drillsCollection)
         .where('category', isEqualTo: category)
+        .where('status', isEqualTo: 'active')
         .snapshots()
-        .map((snapshot) {
+        .asyncMap((snapshot) async {
           try {
             final drills = _mapSnapshotToDrills(snapshot);
-            // Sort by createdAt in memory
-            drills.sort((a, b) => b.createdAt.compareTo(a.createdAt));
-            return drills;
+            final accessibleDrills = await _filterAccessibleDrills(drills, userId);
+            accessibleDrills.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+            return accessibleDrills;
           } catch (error) {
             AppLogger.error('Error watching drills by category', error: error);
             return <Drill>[];
@@ -105,16 +83,22 @@ class FirebaseDrillRepository implements DrillRepository {
 
   @override
   Stream<List<Drill>> watchByDifficulty(Difficulty difficulty) {
+    final userId = _currentUserId;
+    if (userId == null) {
+      return Stream.value([]);
+    }
+
     return _firestore
         .collection(_drillsCollection)
         .where('difficulty', isEqualTo: difficulty.name)
+        .where('status', isEqualTo: 'active')
         .snapshots()
-        .map((snapshot) {
+        .asyncMap((snapshot) async {
           try {
             final drills = _mapSnapshotToDrills(snapshot);
-            // Sort by createdAt in memory
-            drills.sort((a, b) => b.createdAt.compareTo(a.createdAt));
-            return drills;
+            final accessibleDrills = await _filterAccessibleDrills(drills, userId);
+            accessibleDrills.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+            return accessibleDrills;
           } catch (error) {
             AppLogger.error('Error watching drills by difficulty', error: error);
             return <Drill>[];
@@ -130,18 +114,36 @@ class FirebaseDrillRepository implements DrillRepository {
     }
 
     return _firestore
-        .collection(_drillsCollection)
-        .where('favorite', isEqualTo: true)
+        .collection(_userFavoritesCollection)
+        .where('userId', isEqualTo: userId)
+        .where('entityType', isEqualTo: 'drill')
         .snapshots()
-        .map((snapshot) {
+        .asyncMap((favSnapshot) async {
           try {
-            final drills = _mapSnapshotToDrills(snapshot);
-            // Filter to only show user's own drills
-            final filtered = drills.where((drill) =>
-                drill.createdBy == userId,).toList();
-            // Sort by createdAt in memory
-            filtered.sort((a, b) => b.createdAt.compareTo(a.createdAt));
-            return filtered;
+            final favoriteIds = favSnapshot.docs
+                .map((doc) => doc.data()['entityId'] as String)
+                .toList();
+
+            if (favoriteIds.isEmpty) {
+              return <Drill>[];
+            }
+
+            // Get favorite drills in batches (Firestore 'in' query limit is 10)
+            final drills = <Drill>[];
+            for (int i = 0; i < favoriteIds.length; i += 10) {
+              final batch = favoriteIds.skip(i).take(10).toList();
+              final drillSnapshot = await _firestore
+                  .collection(_drillsCollection)
+                  .where(FieldPath.documentId, whereIn: batch)
+                  .where('status', isEqualTo: 'active')
+                  .get();
+              
+              drills.addAll(_mapSnapshotToDrills(drillSnapshot));
+            }
+
+            // Sort by createdAt
+            drills.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+            return drills;
           } catch (error) {
             AppLogger.error('Error watching favorite drills', error: error);
             return <Drill>[];
@@ -155,43 +157,34 @@ class FirebaseDrillRepository implements DrillRepository {
       final userId = _currentUserId;
       if (userId == null) return [];
 
-      // Get user's own drills
-      final myDrillsSnapshot = await _firestore
+      Query drillQuery = _firestore
           .collection(_drillsCollection)
-          .where('createdBy', isEqualTo: userId)
-          .get();
-      final List<Drill> myDrills = _mapSnapshotToDrills(myDrillsSnapshot);
+          .where('status', isEqualTo: 'active');
 
-      // Get drills shared with the user
-      final sharedDrills = await _getSharedDrills(userId);
-
-      // Combine user's drills + shared drills, removing duplicates by ID
-      final seenIds = <String>{};
-      final allDrills = <Drill>[];
-      
-      for (final drill in [...myDrills, ...sharedDrills]) {
-        if (!seenIds.contains(drill.id)) {
-          seenIds.add(drill.id);
-          allDrills.add(drill);
-        }
-      }
-      
-      // Apply filters in memory
-      var filteredDrills = allDrills;
-      
+      // Apply category filter
       if (category != null && category.isNotEmpty) {
-        filteredDrills = filteredDrills.where((drill) => drill.category == category).toList();
+        drillQuery = drillQuery.where('category', isEqualTo: category);
       }
-      
+
+      // Apply difficulty filter
       if (difficulty != null) {
-        filteredDrills = filteredDrills.where((drill) => drill.difficulty == difficulty).toList();
+        drillQuery = drillQuery.where('difficulty', isEqualTo: difficulty.name);
       }
+
+      final snapshot = await drillQuery.get();
+      final allDrills = _mapSnapshotToDrills(snapshot);
       
+      // Filter by access permissions
+      final accessibleDrills = await _filterAccessibleDrills(allDrills, userId);
+      
+      // Apply search query filter in memory
+      var filteredDrills = accessibleDrills;
       if (query != null && query.isNotEmpty) {
         final queryLower = query.toLowerCase();
         filteredDrills = filteredDrills.where((drill) => 
           drill.name.toLowerCase().contains(queryLower) ||
-          (drill.category.toLowerCase().contains(queryLower) ?? false),
+          drill.category.toLowerCase().contains(queryLower) ||
+          drill.tags.any((tag) => tag.toLowerCase().contains(queryLower))
         ).toList();
       }
       
@@ -202,6 +195,181 @@ class FirebaseDrillRepository implements DrillRepository {
     } catch (error) {
       AppLogger.error('Error fetching all drills', error: error);
       throw Exception('Failed to fetch drills: $error');
+    }
+  }
+
+  @override
+  Future<List<Drill>> fetchMyDrills({String? query, String? category, Difficulty? difficulty}) async {
+    final userId = _currentUserId;
+    if (userId == null) return [];
+
+    try {
+      Query drillQuery = _firestore
+          .collection(_drillsCollection)
+          .where('createdBy', isEqualTo: userId)
+          .where('status', isEqualTo: 'active');
+
+      if (category != null && category.isNotEmpty) {
+        drillQuery = drillQuery.where('category', isEqualTo: category);
+      }
+
+      if (difficulty != null) {
+        drillQuery = drillQuery.where('difficulty', isEqualTo: difficulty.name);
+      }
+
+      final snapshot = await drillQuery.get();
+      List<Drill> drills = _mapSnapshotToDrills(snapshot);
+
+      // Apply search query filter in memory
+      if (query != null && query.isNotEmpty) {
+        final queryLower = query.toLowerCase();
+        drills = drills.where((drill) => 
+          drill.name.toLowerCase().contains(queryLower) ||
+          drill.tags.any((tag) => tag.toLowerCase().contains(queryLower))
+        ).toList();
+      }
+
+      drills.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+      return drills;
+    } catch (error) {
+      AppLogger.error('Error fetching my drills', error: error);
+      throw Exception('Failed to fetch my drills: $error');
+    }
+  }
+
+  @override
+  Future<List<Drill>> fetchAdminDrills({String? query, String? category, Difficulty? difficulty}) async {
+    try {
+      Query drillQuery = _firestore
+          .collection(_drillsCollection)
+          .where('createdByRole', isEqualTo: 'admin')
+          .where('status', isEqualTo: 'active');
+
+      if (category != null && category.isNotEmpty) {
+        drillQuery = drillQuery.where('category', isEqualTo: category);
+      }
+
+      if (difficulty != null) {
+        drillQuery = drillQuery.where('difficulty', isEqualTo: difficulty.name);
+      }
+
+      final snapshot = await drillQuery.get();
+      List<Drill> drills = _mapSnapshotToDrills(snapshot);
+
+      // Apply search query filter in memory
+      if (query != null && query.isNotEmpty) {
+        final queryLower = query.toLowerCase();
+        drills = drills.where((drill) =>
+          drill.name.toLowerCase().contains(queryLower) ||
+          drill.tags.any((tag) => tag.toLowerCase().contains(queryLower))
+        ).toList();
+      }
+
+      drills.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+      return drills;
+    } catch (error) {
+      AppLogger.error('Error fetching admin drills', error: error);
+      throw Exception('Failed to fetch admin drills: $error');
+    }
+  }
+
+  @override
+  Future<List<Drill>> fetchPublicDrills({String? query, String? category, Difficulty? difficulty}) async {
+    try {
+      Query drillQuery = _firestore
+          .collection(_drillsCollection)
+          .where('visibility', isEqualTo: 'public')
+          .where('status', isEqualTo: 'active');
+
+      if (category != null && category.isNotEmpty) {
+        drillQuery = drillQuery.where('category', isEqualTo: category);
+      }
+
+      if (difficulty != null) {
+        drillQuery = drillQuery.where('difficulty', isEqualTo: difficulty.name);
+      }
+
+      final snapshot = await drillQuery.get();
+      List<Drill> drills = _mapSnapshotToDrills(snapshot);
+
+      // Filter out current user's drills
+      final userId = _currentUserId;
+      if (userId != null) {
+        drills = drills.where((drill) => drill.createdBy != userId).toList();
+      }
+
+      // Apply search query filter in memory
+      if (query != null && query.isNotEmpty) {
+        final queryLower = query.toLowerCase();
+        drills = drills.where((drill) =>
+          drill.name.toLowerCase().contains(queryLower) ||
+          drill.tags.any((tag) => tag.toLowerCase().contains(queryLower))
+        ).toList();
+      }
+
+      drills.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+      return drills;
+    } catch (error) {
+      AppLogger.error('Error fetching public drills', error: error);
+      throw Exception('Failed to fetch public drills: $error');
+    }
+  }
+
+  @override
+  Future<List<Drill>> fetchFavoriteDrills({String? query, String? category, Difficulty? difficulty}) async {
+    final userId = _currentUserId;
+    if (userId == null) return [];
+
+    try {
+      // Get user's favorite drill IDs
+      final favSnapshot = await _firestore
+          .collection(_userFavoritesCollection)
+          .where('userId', isEqualTo: userId)
+          .where('entityType', isEqualTo: 'drill')
+          .get();
+
+      final favoriteIds = favSnapshot.docs
+          .map((doc) => doc.data()['entityId'] as String)
+          .toList();
+
+      if (favoriteIds.isEmpty) return [];
+
+      // Get favorite drills in batches
+      final drills = <Drill>[];
+      for (int i = 0; i < favoriteIds.length; i += 10) {
+        final batch = favoriteIds.skip(i).take(10).toList();
+        Query drillQuery = _firestore
+            .collection(_drillsCollection)
+            .where(FieldPath.documentId, whereIn: batch)
+            .where('status', isEqualTo: 'active');
+
+        if (category != null && category.isNotEmpty) {
+          drillQuery = drillQuery.where('category', isEqualTo: category);
+        }
+
+        if (difficulty != null) {
+          drillQuery = drillQuery.where('difficulty', isEqualTo: difficulty.name);
+        }
+
+        final snapshot = await drillQuery.get();
+        drills.addAll(_mapSnapshotToDrills(snapshot));
+      }
+
+      // Apply search query filter in memory
+      var filteredDrills = drills;
+      if (query != null && query.isNotEmpty) {
+        final queryLower = query.toLowerCase();
+        filteredDrills = drills.where((drill) => 
+          drill.name.toLowerCase().contains(queryLower) ||
+          drill.tags.any((tag) => tag.toLowerCase().contains(queryLower))
+        ).toList();
+      }
+
+      filteredDrills.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+      return filteredDrills;
+    } catch (error) {
+      AppLogger.error('Error fetching favorite drills', error: error);
+      throw Exception('Failed to fetch favorite drills: $error');
     }
   }
 
@@ -217,26 +385,15 @@ class FirebaseDrillRepository implements DrillRepository {
           .get();
 
       if (!doc.exists || doc.data() == null) {
-        return null; // Document doesn't exist or has no data
+        return null;
       }
 
-      final data = doc.data()!; // Safe to use ! here as we checked data() != null
-      final List<String> sharedWith = (data['sharedWith'] as List<dynamic>?)
-              ?.whereType<String>()
-              .where((s) => s.isNotEmpty)
-              .toList() ?? 
-          <String>[];
-      final createdBy = data['createdBy'] as String?;
+      final drill = _mapDocumentToDrill(doc);
+      if (drill == null) return null;
 
-      // Check if user has access (is owner, is public, or is in sharedWith)
-      final hasAccess = createdBy == userId ||
-                       sharedWith.contains(userId);
-
-      if (!hasAccess) {
-        return null; // User doesn't have access to this drill
-      }
-
-      return _mapDocumentToDrill(doc);
+      // Check if user has access
+      final hasAccess = await _hasAccessToDrill(drill, userId);
+      return hasAccess ? drill : null;
     } catch (error) {
       AppLogger.error('Error fetching drill by ID', error: error);
       throw Exception('Failed to fetch drill: $error');
@@ -251,50 +408,28 @@ class FirebaseDrillRepository implements DrillRepository {
     }
 
     try {
-      final drillWithMetadata = _addMetadataToDrill(drill, userId);
+      // Get user data to determine role
+      final userDoc = await _firestore.collection(_usersCollection).doc(userId).get();
+      final userData = userDoc.data();
+      final userRole = userData?['role'] as String? ?? 'user';
+
+      final drillWithMetadata = _addMetadataToDrill(drill, userId, userRole);
       final drillData = _drillToFirestoreData(drillWithMetadata);
 
-      final batch = _firestore.batch();
-
-      // Add to global drills collection
-      final drillRef = _firestore
+      await _firestore
           .collection(_drillsCollection)
-          .doc(drillWithMetadata.id);
-      batch.set(drillRef, drillData, SetOptions(merge: true));
+          .doc(drillWithMetadata.id)
+          .set(drillData, SetOptions(merge: true));
 
-      // Add to user's drills collection if it's a user-created drill (not preset)
-      if (!drillWithMetadata.isPreset) {
-        final userDrillRef = _firestore
-            .collection(_userDrillsCollection)
-            .doc(userId)
-            .collection('drills')
-            .doc(drillWithMetadata.id);
-        batch.set(
-          userDrillRef, 
-          {
-            'drillId': drillWithMetadata.id,
-            'createdAt': FieldValue.serverTimestamp(),
-            'isCustom': true,
-          },
-          SetOptions(merge: true),
-        );
-      }
-
-      await batch.commit();
       return drillWithMetadata;
     } catch (error) {
+      AppLogger.error('Error upserting drill', error: error);
       throw Exception('Failed to upsert drill: $error');
     }
   }
 
   @override
   Future<Drill> create(Drill drill) async {
-    final userId = _currentUserId;
-    if (userId == null) {
-      throw Exception('User must be authenticated to create drills');
-    }
-    
-    // Delegate to upsert since they share the same logic
     return await upsert(drill);
   }
 
@@ -306,7 +441,7 @@ class FirebaseDrillRepository implements DrillRepository {
     }
 
     try {
-      // Check if user owns this drill
+      // Check if user owns this drill or is admin
       final existingDoc = await _firestore
           .collection(_drillsCollection)
           .doc(drill.id)
@@ -317,7 +452,10 @@ class FirebaseDrillRepository implements DrillRepository {
       }
 
       final existingData = existingDoc.data()!;
-      if (existingData['createdBy'] != userId && existingData['isPreset'] == true) {
+      final isOwner = existingData['createdBy'] == userId;
+      final isAdmin = await _isUserAdmin(userId);
+
+      if (!isOwner && !isAdmin) {
         throw Exception('Not authorized to update this drill');
       }
 
@@ -328,10 +466,8 @@ class FirebaseDrillRepository implements DrillRepository {
           .collection(_drillsCollection)
           .doc(drill.id)
           .update(updatedData);
-
-      // Drill updated successfully
     } catch (error) {
-      print('Error updating drill: $error');
+      AppLogger.error('Error updating drill', error: error);
       throw Exception('Failed to update drill: $error');
     }
   }
@@ -344,7 +480,6 @@ class FirebaseDrillRepository implements DrillRepository {
     }
 
     try {
-      // Check if user owns this drill
       final doc = await _firestore
           .collection(_drillsCollection)
           .doc(id)
@@ -355,35 +490,36 @@ class FirebaseDrillRepository implements DrillRepository {
       }
 
       final data = doc.data()!;
-      if (data['createdBy'] != userId) {
+      final isOwner = data['createdBy'] == userId;
+      final isAdmin = await _isUserAdmin(userId);
+
+      if (!isOwner && !isAdmin) {
         throw Exception('Not authorized to delete this drill');
       }
 
-      if (data['isPreset'] == true) {
-        throw Exception('Cannot delete preset drills');
-      }
+      // Soft delete by updating status
+      await _firestore
+          .collection(_drillsCollection)
+          .doc(id)
+          .update({
+            'status': 'archived',
+            'updatedAt': FieldValue.serverTimestamp(),
+          });
+
+      // Remove from favorites
+      final favSnapshot = await _firestore
+          .collection(_userFavoritesCollection)
+          .where('entityId', isEqualTo: id)
+          .where('entityType', isEqualTo: 'drill')
+          .get();
 
       final batch = _firestore.batch();
-
-      // Remove from global drills collection
-      final drillRef = _firestore
-          .collection(_drillsCollection)
-          .doc(id);
-      batch.delete(drillRef);
-
-      // Remove from user's drills collection
-      final userDrillRef = _firestore
-          .collection(_userDrillsCollection)
-          .doc(userId)
-          .collection('drills')
-          .doc(id);
-      batch.delete(userDrillRef);
-
+      for (final doc in favSnapshot.docs) {
+        batch.delete(doc.reference);
+      }
       await batch.commit();
-
-      // Drill deleted successfully
     } catch (error) {
-      print('Error deleting drill: $error');
+      AppLogger.error('Error deleting drill', error: error);
       throw Exception('Failed to delete drill: $error');
     }
   }
@@ -391,67 +527,138 @@ class FirebaseDrillRepository implements DrillRepository {
   @override
   Future<void> toggleFavorite(String drillId) async {
     final userId = _currentUserId;
+    print('🔷 Spark 🔧 toggleFavorite called: drillId=$drillId, userId=$userId');
+    
     if (userId == null) {
+      print('🔷 Spark ❌ User not authenticated');
       throw Exception('User must be authenticated to manage favorites');
     }
 
     try {
-      final drillDoc = await _firestore
-          .collection(_drillsCollection)
-          .doc(drillId)
+      print('🔷 Spark 🔍 Checking existing favorites...');
+      // Check if already favorited
+      final existingFav = await _firestore
+          .collection(_userFavoritesCollection)
+          .where('userId', isEqualTo: userId)
+          .where('entityId', isEqualTo: drillId)
+          .where('entityType', isEqualTo: 'drill')
           .get();
 
-      if (!drillDoc.exists) {
-        throw Exception('Drill not found');
-      }
+      print('🔷 Spark 📊 Found ${existingFav.docs.length} existing favorites');
 
-      final drill = _firestoreDataToDrill(drillDoc.id, drillDoc.data()!);
-      
-      // Users can only favorite their own drills
-      if (drill.createdBy == userId) {
-        await _firestore
-            .collection(_drillsCollection)
-            .doc(drillId)
-            .update({'favorite': !drill.favorite});
+      if (existingFav.docs.isNotEmpty) {
+        // Remove from favorites
+        print('🔷 Spark 🗑️ Removing from favorites...');
+        await existingFav.docs.first.reference.delete();
+        print('🔷 Spark ✅ Successfully removed from favorites');
+      } else {
+        // Add to favorites
+        print('🔷 Spark ➕ Adding to favorites...');
+        final docRef = await _firestore
+            .collection(_userFavoritesCollection)
+            .add({
+              'userId': userId,
+              'entityId': drillId,
+              'entityType': 'drill',
+              'createdAt': FieldValue.serverTimestamp(),
+            });
+        print('🔷 Spark ✅ Successfully added to favorites with ID: ${docRef.id}');
       }
-
-      // Favorite toggled for drill
     } catch (error) {
-      print('Error toggling favorite: $error');
+      print('🔷 Spark ❌ Error in toggleFavorite: $error');
+      AppLogger.error('Error toggling favorite', error: error);
       throw Exception('Failed to toggle favorite: $error');
     }
   }
 
   @override
   Future<bool> isFavorite(String drillId) async {
+    final userId = _currentUserId;
+    print('🔷 Spark 🔍 isFavorite called: drillId=$drillId, userId=$userId');
+    
+    if (userId == null) {
+      print('🔷 Spark ❌ User not authenticated for isFavorite');
+      return false;
+    }
+
     try {
-      final drillDoc = await _firestore
-          .collection(_drillsCollection)
-          .doc(drillId)
+      final favSnapshot = await _firestore
+          .collection(_userFavoritesCollection)
+          .where('userId', isEqualTo: userId)
+          .where('entityId', isEqualTo: drillId)
+          .where('entityType', isEqualTo: 'drill')
           .get();
 
-      if (!drillDoc.exists) {
-        return false;
-      }
-
-      final data = drillDoc.data()!;
-      return data['favorite'] as bool? ?? false;
+      final isFavorite = favSnapshot.docs.isNotEmpty;
+      print('🔷 Spark 📊 isFavorite result: $isFavorite (found ${favSnapshot.docs.length} docs)');
+      return isFavorite;
     } catch (error) {
-      print('Error checking favorite status: $error');
+      print('🔷 Spark ❌ Error in isFavorite: $error');
+      AppLogger.error('Error checking favorite status', error: error);
       return false;
     }
   }
 
-  /// REMOVED: No longer seeding default/preset drills
-  /// Users must create their own drills
-  @Deprecated('Preset drills removed - users create their own content')
-  Future<void> seedDefaultDrills() async {
-    // No longer creating preset drills
-    // Users will create their own drills from scratch
-    print('ℹ️ Preset drills feature removed - users create their own content');
+  // Helper methods
+
+  Future<List<Drill>> _filterAccessibleDrills(List<Drill> drills, String userId) async {
+    final isAdmin = await _isUserAdmin(userId);
+
+    return drills.where((drill) {
+      // Admin can see all drills
+      if (isAdmin) return true;
+      
+      // Own drills
+      if (drill.createdBy == userId) return true;
+      
+      // Public drills
+      if (drill.visibility == 'public') return true;
+      
+      // Shared drills
+      if (drill.sharedWith.contains(userId)) return true;
+      
+      return false;
+    }).toList();
   }
 
-  // Helper methods
+  Future<bool> _hasAccessToDrill(Drill drill, String userId) async {
+    // Admin can see all drills
+    if (await _isUserAdmin(userId)) return true;
+    
+    // Own drill
+    if (drill.createdBy == userId) return true;
+    
+    // Public drill
+    if (drill.visibility == 'public') return true;
+    
+    // Shared drill
+    if (drill.sharedWith.contains(userId)) return true;
+    
+    return false;
+  }
+
+  Future<bool> _isUserAdmin(String userId) async {
+    try {
+      final userDoc = await _firestore.collection(_usersCollection).doc(userId).get();
+      final userData = userDoc.data();
+      return userData?['role'] == 'admin' || userData?['is_admin'] == true;
+    } catch (e) {
+      return false;
+    }
+  }
+
+  Future<bool> _hasModuleAccess(String userId, String module) async {
+    try {
+      final userDoc = await _firestore.collection(_usersCollection).doc(userId).get();
+      final userData = userDoc.data();
+      final subscription = userData?['subscription'] as Map<String, dynamic>?;
+      final moduleAccess = subscription?['moduleAccess'] as Map<String, dynamic>?;
+      return moduleAccess?.containsKey(module) ?? false;
+    } catch (e) {
+      AppLogger.error('Error checking module access for $module', error: e);
+      return false;
+    }
+  }
 
   List<Drill> _mapSnapshotToDrills(QuerySnapshot snapshot) {
     return snapshot.docs
@@ -470,35 +677,40 @@ class FirebaseDrillRepository implements DrillRepository {
       final data = doc.data() as Map<String, dynamic>;
       return _firestoreDataToDrill(doc.id, data);
     } catch (error) {
-      print('Error mapping document to drill: $error');
+      AppLogger.error('Error mapping document to drill', error: error);
       return null;
     }
   }
 
-  Drill _addMetadataToDrill(Drill drill, String userId) {
+  Drill _addMetadataToDrill(Drill drill, String userId, String userRole) {
     return drill.copyWith(
       id: drill.id.isEmpty ? _uuid.v4() : drill.id,
       createdBy: drill.createdBy ?? userId,
-      isPreset: false, // All user-created drills are NOT presets
+      createdByRole: userRole,
+      visibility: drill.visibility.isEmpty ? 'private' : drill.visibility,
+      status: 'active',
     );
   }
 
   Map<String, dynamic> _drillToFirestoreData(Drill drill) {
     final data = drill.toMap();
     
-    // Ensure required Firestore fields are set correctly
+    // Ensure required fields are set
     data['createdBy'] = drill.createdBy ?? _currentUserId;
-    data['isPreset'] = false; // No more preset drills
-    data['sharedWith'] = drill.sharedWith.isNotEmpty ? drill.sharedWith : [];
-    data['favorite'] = drill.favorite;
+    data['createdByRole'] = drill.createdByRole;
+    data['visibility'] = drill.visibility.isEmpty ? 'private' : drill.visibility;
+    data['status'] = drill.status.isEmpty ? 'active' : drill.status;
+    data['sharedWith'] = drill.sharedWith;
+    data['tags'] = drill.tags;
+    
+    // Add admin status based on creator's role
+    data['is_admin'] = drill.createdByRole == 'admin';
     
     // Use serverTimestamp for createdAt only if it's a new drill
-    // For updates, preserve the original createdAt
     if (!data.containsKey('createdAt') || data['createdAt'] == null) {
       data['createdAt'] = FieldValue.serverTimestamp();
     }
     data['updatedAt'] = FieldValue.serverTimestamp();
-    data['version'] = 1;
     
     // Add analytics fields if not present
     if (!data.containsKey('analytics')) {
@@ -506,16 +718,7 @@ class FirebaseDrillRepository implements DrillRepository {
         'totalPlays': 0,
         'averageRating': 0.0,
         'totalRatings': 0,
-      };
-    }
-
-    // Add metadata if not present
-    if (!data.containsKey('metadata')) {
-      data['metadata'] = {
-        'instructions': 'Follow the on-screen prompts and react as quickly as possible.',
-        'tips': ['Stay focused', 'React quickly', 'Maintain accuracy'],
-        'equipment': ['Mobile device or computer'],
-        'targetSkills': ['Reaction time', 'Visual processing', 'Hand-eye coordination'],
+        'totalFavorites': 0,
       };
     }
 
@@ -524,7 +727,6 @@ class FirebaseDrillRepository implements DrillRepository {
 
   Drill _firestoreDataToDrill(String id, Map<String, dynamic> data) {
     // Convert Firestore data back to Drill object
-    // Handle createdAt field - could be Timestamp or null
     DateTime createdAt = DateTime.now();
     if (data['createdAt'] != null) {
       if (data['createdAt'] is Timestamp) {
@@ -537,230 +739,70 @@ class FirebaseDrillRepository implements DrillRepository {
     return Drill(
       id: id,
       name: data['name'] as String,
+      description: data['description'] as String? ?? '',
       category: data['category'] as String,
       difficulty: Difficulty.values.firstWhere(
         (d) => d.name == data['difficulty'],
         orElse: () => Difficulty.beginner,
       ),
-      durationSec: data['durationSec'] as int,
-      restSec: data['restSec'] as int,
-      sets: (data['sets'] as int?) ?? 1, // Add missing sets field with fallback
-      reps: data['reps'] as int,
-      stimulusTypes: (data['stimulusTypes'] as List)
+      type: data['type'] as String? ?? 'reaction',
+      tags: List<String>.from((data['tags'] as List<dynamic>?)?.cast<String>() ?? <String>[]),
+      createdBy: data['createdBy'] as String?,
+      createdByRole: data['createdByRole'] as String? ?? 'user',
+      visibility: data['visibility'] as String? ?? 'private',
+      sharedWith: List<String>.from((data['sharedWith'] as List<dynamic>?)?.cast<String>() ?? <String>[]),
+      status: data['status'] as String? ?? 'active',
+      
+      // Configuration
+      durationSec: data['configuration']?['durationSec'] as int? ?? data['durationSec'] as int? ?? 30,
+      restSec: data['configuration']?['restSec'] as int? ?? data['restSec'] as int? ?? 10,
+      sets: data['configuration']?['sets'] as int? ?? data['sets'] as int? ?? 1,
+      reps: data['configuration']?['reps'] as int? ?? data['reps'] as int? ?? 10,
+      stimulusTypes: (data['configuration']?['stimulusTypes'] as List? ?? data['stimulusTypes'] as List? ?? ['color'])
           .map((e) => StimulusType.values.firstWhere(
                 (s) => s.name == e,
                 orElse: () => StimulusType.color,
-              ),)
+              ))
           .toList(),
-      numberOfStimuli: data['numberOfStimuli'] as int,
-      zones: (data['zones'] as List)
+      numberOfStimuli: data['configuration']?['numberOfStimuli'] as int? ?? data['numberOfStimuli'] as int? ?? 4,
+      zones: (data['configuration']?['zones'] as List? ?? data['zones'] as List? ?? ['center'])
           .map((e) => ReactionZone.values.firstWhere(
                 (z) => z.name == e,
                 orElse: () => ReactionZone.center,
-              ),)
+              ))
           .toList(),
-      colors: (data['colors'] as List)
+      colors: (data['configuration']?['colors'] as List? ?? data['colors'] as List? ?? ['#FF0000'])
           .map((hex) => Color(int.parse(
                 (hex as String).replaceFirst('#', ''),
                 radix: 16,
-              ),),)
+              )))
           .toList(),
-      presentationMode: data['presentationMode'] != null
+      presentationMode: data['configuration']?['presentationMode'] != null
           ? PresentationMode.values.firstWhere(
-              (p) => p.name == data['presentationMode'],
+              (p) => p.name == data['configuration']['presentationMode'],
               orElse: () => PresentationMode.visual,
             )
-          : PresentationMode.visual,
-      favorite: data['favorite'] as bool? ?? false,
-      isPreset: data['isPreset'] as bool? ?? false,
-      createdBy: data['createdBy'] as String?,
-      sharedWith: List<String>.from((data['sharedWith'] as List<dynamic>?)?.cast<String>() ?? <String>[]),
+          : data['presentationMode'] != null
+              ? PresentationMode.values.firstWhere(
+                  (p) => p.name == data['presentationMode'],
+                  orElse: () => PresentationMode.visual,
+                )
+              : PresentationMode.visual,
+      
+      // Media
+      videoUrl: data['media']?['videoUrl'] as String? ?? data['videoUrl'] as String?,
+      stepImageUrl: data['media']?['stepImageUrl'] as String? ?? data['stepImageUrl'] as String?,
+      
+      // Legacy fields for compatibility
+      favorite: false, // Will be determined by user_favorites collection
+      isPreset: false, // No longer used
       createdAt: createdAt,
-      videoUrl: data['videoUrl'] as String?,
-      stepImageUrl: data['stepImageUrl'] as String?,
     );
   }
 
-  /// REMOVED: No longer creating default drills
-  @Deprecated('Preset drills removed - users create their own content')
-  List<Drill> _createDefaultDrills() {
-    // No longer creating default drills
-    return [];
-  }
-
-  @override
-  Future<List<Drill>> fetchMyDrills({String? query, String? category, Difficulty? difficulty}) async {
-    final userId = _currentUserId;
-    if (userId == null) {
-      return [];
-    }
-
-    try {
-      final snapshot = await _firestore
-          .collection(_drillsCollection)
-          .where('createdBy', isEqualTo: userId)
-          .get();
-      
-      List<Drill> drills = _mapSnapshotToDrills(snapshot);
-
-      // Apply filters in memory to avoid complex Firestore indexes
-      if (category != null && category.isNotEmpty) {
-        drills = drills.where((drill) => drill.category == category).toList();
-      }
-
-      if (difficulty != null) {
-        drills = drills.where((drill) => drill.difficulty == difficulty).toList();
-      }
-
-      if (query != null && query.isNotEmpty) {
-        final queryLower = query.toLowerCase();
-        drills = drills.where((drill) => 
-            drill.name.toLowerCase().contains(queryLower),).toList();
-      }
-
-      // Sort by createdAt
-      drills.sort((a, b) => b.createdAt.compareTo(a.createdAt));
-
-      return drills;
-    } catch (error) {
-      print('Error fetching my drills: $error');
-      throw Exception('Failed to fetch my drills: $error');
-    }
-  }
-
-  @override
-  Future<List<Drill>> fetchPublicDrills({String? query, String? category, Difficulty? difficulty}) async {
-    final userId = _currentUserId;
-    
-    try {
-      // Start with just public drills to avoid complex index
-      final snapshot = await _firestore
-          .collection(_drillsCollection)
-          .get();
-      
-      List<Drill> drills = _mapSnapshotToDrills(snapshot);
-
-      // Apply all filters in memory to avoid complex indexes
-      if (category != null && category.isNotEmpty) {
-        drills = drills.where((drill) => drill.category == category).toList();
-      }
-
-      if (difficulty != null) {
-        drills = drills.where((drill) => drill.difficulty == difficulty).toList();
-      }
-
-      // Filter out current user's drills
-      if (userId != null) {
-        drills = drills.where((drill) => drill.createdBy != userId).toList();
-      }
-
-      if (query != null && query.isNotEmpty) {
-        final queryLower = query.toLowerCase();
-        drills = drills.where((drill) =>
-            drill.name.toLowerCase().contains(queryLower),).toList();
-      }
-
-      // Sort by createdAt
-      drills.sort((a, b) => b.createdAt.compareTo(a.createdAt));
-
-      return drills;
-    } catch (error) {
-      print('Error fetching public drills: $error');
-      throw Exception('Failed to fetch public drills: $error');
-    }
-  }
-
-  @override
-  Future<List<Drill>> fetchAdminDrills({String? query, String? category, Difficulty? difficulty}) async {
-    try {
-      // First, get all users with admin role
-      final usersSnapshot = await _firestore
-          .collection('users')
-          .where('role', isEqualTo: 'admin')
-          .get();
-      
-      final adminUserIds = usersSnapshot.docs.map((doc) => doc.id).toList();
-      
-      if (adminUserIds.isEmpty) {
-        return [];
-      }
-      
-      // Fetch drills created by admin users
-      final snapshot = await _firestore
-          .collection(_drillsCollection)
-          .get();
-      
-      List<Drill> drills = _mapSnapshotToDrills(snapshot);
-
-      // Filter to only include drills created by admin users
-      drills = drills.where((drill) => adminUserIds.contains(drill.createdBy)).toList();
-
-      // Apply filters in memory
-      if (category != null && category.isNotEmpty) {
-        drills = drills.where((drill) => drill.category == category).toList();
-      }
-
-      if (difficulty != null) {
-        drills = drills.where((drill) => drill.difficulty == difficulty).toList();
-      }
-
-      if (query != null && query.isNotEmpty) {
-        final queryLower = query.toLowerCase();
-        drills = drills.where((drill) =>
-            drill.name.toLowerCase().contains(queryLower),).toList();
-      }
-
-      // Sort by createdAt
-      drills.sort((a, b) => b.createdAt.compareTo(a.createdAt));
-
-      return drills;
-    } catch (error) {
-      print('Error fetching admin drills: $error');
-      throw Exception('Failed to fetch admin drills: $error');
-    }
-  }
-
-  @override
-  Future<List<Drill>> fetchFavoriteDrills({String? query, String? category, Difficulty? difficulty}) async {
-    final userId = _currentUserId;
-    if (userId == null) {
-      return [];
-    }
-
-    try {
-      final snapshot = await _firestore
-          .collection(_drillsCollection)
-          .where('favorite', isEqualTo: true)
-          .get();
-      
-      List<Drill> drills = _mapSnapshotToDrills(snapshot);
-
-      // Filter to only show drills user can see (their own or public ones)
-      drills = drills.where((drill) =>
-          drill.createdBy == userId,).toList();
-
-      // Apply filters in memory to avoid complex indexes
-      if (category != null && category.isNotEmpty) {
-        drills = drills.where((drill) => drill.category == category).toList();
-      }
-
-      if (difficulty != null) {
-        drills = drills.where((drill) => drill.difficulty == difficulty).toList();
-      }
-
-      if (query != null && query.isNotEmpty) {
-        final queryLower = query.toLowerCase();
-        drills = drills.where((drill) => 
-            drill.name.toLowerCase().contains(queryLower),).toList();
-      }
-
-      // Sort by createdAt
-      drills.sort((a, b) => b.createdAt.compareTo(a.createdAt));
-
-      return drills;
-    } catch (error) {
-      print('Error fetching favorite drills: $error');
-      throw Exception('Failed to fetch favorite drills: $error');
-    }
+  @Deprecated('No longer creating preset drills')
+  Future<void> seedDefaultDrills() async {
+    // No longer creating preset drills
+    AppLogger.info('Preset drills feature removed - users create their own content');
   }
 }

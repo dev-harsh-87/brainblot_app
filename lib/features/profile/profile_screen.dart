@@ -18,6 +18,7 @@ import 'package:spark_app/features/settings/ui/settings_screen.dart';
 import 'package:spark_app/features/auth/ui/device_sessions_screen.dart';
 import 'package:spark_app/core/ui/edge_to_edge.dart';
 import 'package:spark_app/core/services/auto_refresh_service.dart';
+import 'package:spark_app/core/utils/app_logger.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -37,7 +38,9 @@ class _ProfileScreenState extends State<ProfileScreen> with AutoRefreshMixin {
   void initState() {
     super.initState();
     _profileService = getIt<ProfileService>();
-    _loadUserData();
+    
+    // Add a small delay to ensure auth state is fully settled
+    Future.delayed(const Duration(milliseconds: 300), _loadUserData);
     
     // Setup auto-refresh listeners
     listenToMultipleAutoRefresh({
@@ -48,6 +51,16 @@ class _ProfileScreenState extends State<ProfileScreen> with AutoRefreshMixin {
   }
 
   Future<void> _loadUserData() async {
+    // Check if user is authenticated before loading
+    if (_profileService.currentUserId == null) {
+      AppLogger.warning('Cannot load profile data - user not authenticated', tag: 'ProfileScreen');
+      setState(() {
+        _isLoading = false;
+        _error = 'User not authenticated';
+      });
+      return;
+    }
+
     setState(() {
       _isLoading = true;
       _error = null;
@@ -57,16 +70,21 @@ class _ProfileScreenState extends State<ProfileScreen> with AutoRefreshMixin {
       final profile = await _profileService.getCurrentUserProfile();
       final stats = await _profileService.getUserStats();
       
-      setState(() {
-        _userProfile = profile;
-        _userStats = stats;
-        _isLoading = false;
-      });
+      if (mounted) {
+        setState(() {
+          _userProfile = profile;
+          _userStats = stats;
+          _isLoading = false;
+        });
+      }
     } catch (e) {
-      setState(() {
-        _error = e.toString();
-        _isLoading = false;
-      });
+      AppLogger.error('Failed to load profile data', error: e, tag: 'ProfileScreen');
+      if (mounted) {
+        setState(() {
+          _error = e.toString();
+          _isLoading = false;
+        });
+      }
     }
   }
 

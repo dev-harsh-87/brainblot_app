@@ -10,8 +10,8 @@ class DatabaseInitializationService {
   final FirebaseAuth _auth;
   final SubscriptionPlanRepository _planRepository;
 
-  static const String _defaultAdminEmail = 'admin@brianblot.com';
-  static const String _defaultAdminPassword = 'Admin@123456';
+  static const String _defaultAdminEmail = 'admin@gmail.com';
+  static const String _defaultAdminPassword = 'Admin@1234';
 
   DatabaseInitializationService({
     FirebaseFirestore? firestore,

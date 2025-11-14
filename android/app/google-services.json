@@ -1,36 +1,26 @@
 {
   "project_info": {
-    "project_number": "419204986983",
-    "project_id": "brain-app-18086",
-    "storage_bucket": "brain-app-18086.firebasestorage.app"
+    "project_number": "83475172268",
+    "project_id": "spark-ab4b3",
+    "storage_bucket": "spark-ab4b3.firebasestorage.app"
   },
   "client": [
     {
       "client_info": {
-        "mobilesdk_app_id": "1:419204986983:android:f1df26bf9f7ffcfcef3cc2",
+        "mobilesdk_app_id": "1:83475172268:android:657d6700439d924c47c809",
         "android_client_info": {
           "package_name": "com.tbg.spark_app"
         }
       },
-      "oauth_client": [
-        {
-          "client_id": "419204986983-sg1gojgbes0foe75ted6csrkk5h13bd0.apps.googleusercontent.com",
-          "client_type": 3
-        }
-      ],
+      "oauth_client": [],
       "api_key": [
         {
-          "current_key": "AIzaSyAbuoRosy4Zn4c8Y5Xmmej31DWu1417ACY"
+          "current_key": "AIzaSyBMPgMwETvqr4ff-W5yNSCKzODbQ-I_X_8"
         }
       ],
       "services": {
         "appinvite_service": {
-          "other_platform_oauth_client": [
-            {
-              "client_id": "419204986983-sg1gojgbes0foe75ted6csrkk5h13bd0.apps.googleusercontent.com",
-              "client_type": 3
-            }
-          ]
+          "other_platform_oauth_client": []
         }
       }
     }

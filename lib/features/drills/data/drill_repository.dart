@@ -6,6 +6,7 @@ import 'package:uuid/uuid.dart';
 
 abstract class DrillRepository {
   Stream<List<Drill>> watchAll();
+  Stream<List<Drill>> watchFavorites();
   Future<List<Drill>> fetchAll({String? query, String? category, Difficulty? difficulty});
   Future<List<Drill>> fetchMyDrills({String? query, String? category, Difficulty? difficulty});
   Future<List<Drill>> fetchPublicDrills({String? query, String? category, Difficulty? difficulty});
@@ -96,6 +97,19 @@ class InMemoryDrillRepository implements DrillRepository {
 
   @override
   Stream<List<Drill>> watchAll() => _controller.stream;
+
+  @override
+  Stream<List<Drill>> watchFavorites() {
+    final currentUserId = FirebaseAuth.instance.currentUser?.uid;
+    if (currentUserId == null) {
+      return Stream.value([]);
+    }
+
+    // Return favorite drills that user can see (their own or public ones)
+    return _controller.stream.map((drills) => drills.where((drill) =>
+        drill.favorite &&
+        drill.createdBy == currentUserId).toList());
+  }
 
   @override
   Future<void> toggleFavorite(String drillId) async {

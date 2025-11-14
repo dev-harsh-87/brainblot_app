@@ -8,12 +8,6 @@ enum ActivityType {
   planCreated,
   planUpdated,
   planDeleted,
-  drillCreated,
-  drillUpdated,
-  drillDeleted,
-  programCreated,
-  programUpdated,
-  programDeleted,
   planRequest,
 }
 
@@ -102,67 +96,6 @@ class _ComprehensiveActivityScreenState extends State<ComprehensiveActivityScree
         }
       }
 
-      // Load drills (from all users)
-      try {
-        final usersWithDrills = await _firestore.collection('users').get();
-        for (var userDoc in usersWithDrills.docs) {
-          final drillsSnapshot = await _firestore
-              .collection('users')
-              .doc(userDoc.id)
-              .collection('drills')
-              .orderBy('createdAt', descending: true)
-              .limit(20)
-              .get();
-
-          for (var drillDoc in drillsSnapshot.docs) {
-            final data = drillDoc.data();
-            final createdAt = _parseTimestamp(data['createdAt']);
-            if (createdAt != null) {
-              activities.add(ActivityItem(
-                id: drillDoc.id,
-                type: ActivityType.drillCreated,
-                title: 'Drill created',
-                subtitle: data['name'] as String? ?? 'Unknown',
-                timestamp: createdAt.toDate(),
-                data: {...data, 'userId': userDoc.id},
-              ),);
-            }
-          }
-        }
-      } catch (e) {
-        debugPrint('Error loading drills: $e');
-      }
-
-      // Load programs (from all users)
-      try {
-        final usersWithPrograms = await _firestore.collection('users').get();
-        for (var userDoc in usersWithPrograms.docs) {
-          final programsSnapshot = await _firestore
-              .collection('users')
-              .doc(userDoc.id)
-              .collection('programs')
-              .orderBy('createdAt', descending: true)
-              .limit(20)
-              .get();
-
-          for (var programDoc in programsSnapshot.docs) {
-            final data = programDoc.data();
-            final createdAt = _parseTimestamp(data['createdAt']);
-            if (createdAt != null) {
-              activities.add(ActivityItem(
-                id: programDoc.id,
-                type: ActivityType.programCreated,
-                title: 'Program created',
-                subtitle: data['name'] as String? ?? 'Unknown',
-                timestamp: createdAt.toDate(),
-                data: {...data, 'userId': userDoc.id},
-              ),);
-            }
-          }
-        }
-      } catch (e) {
-        debugPrint('Error loading programs: $e');
-      }
 
       // Load plan requests
       try {
@@ -242,10 +175,7 @@ class _ComprehensiveActivityScreenState extends State<ComprehensiveActivityScree
             _buildFilterChip('Users', 'users', Icons.person),
             const SizedBox(width: 8),
             _buildFilterChip('Plans', 'plans', Icons.card_membership),
-            const SizedBox(width: 8),
-            _buildFilterChip('Drills', 'drills', Icons.sports_tennis),
-            const SizedBox(width: 8),
-            _buildFilterChip('Programs', 'programs', Icons.calendar_today),
+      
             const SizedBox(width: 8),
             _buildFilterChip('Requests', 'requests', Icons.receipt_long),
           ],
@@ -325,18 +255,6 @@ class _ComprehensiveActivityScreenState extends State<ComprehensiveActivityScree
           a.type == ActivityType.planCreated || 
           a.type == ActivityType.planUpdated ||
           a.type == ActivityType.planDeleted,
-        ).toList();
-      case 'drills':
-        return _activities.where((a) => 
-          a.type == ActivityType.drillCreated || 
-          a.type == ActivityType.drillUpdated ||
-          a.type == ActivityType.drillDeleted,
-        ).toList();
-      case 'programs':
-        return _activities.where((a) => 
-          a.type == ActivityType.programCreated || 
-          a.type == ActivityType.programUpdated ||
-          a.type == ActivityType.programDeleted,
         ).toList();
       case 'requests':
         return _activities.where((a) => a.type == ActivityType.planRequest).toList();
@@ -452,22 +370,6 @@ class _ComprehensiveActivityScreenState extends State<ComprehensiveActivityScree
           icon: Icons.card_membership,
           color: Colors.purple,
           label: 'PLAN',
-        );
-      case ActivityType.drillCreated:
-      case ActivityType.drillUpdated:
-      case ActivityType.drillDeleted:
-        return ActivityConfig(
-          icon: Icons.sports_tennis,
-          color: Colors.orange,
-          label: 'DRILL',
-        );
-      case ActivityType.programCreated:
-      case ActivityType.programUpdated:
-      case ActivityType.programDeleted:
-        return ActivityConfig(
-          icon: Icons.calendar_today,
-          color: Colors.green,
-          label: 'PROGRAM',
         );
       case ActivityType.planRequest:
         return ActivityConfig(

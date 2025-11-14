@@ -56,6 +56,36 @@ class AppUser extends Equatable {
 
   factory AppUser.fromFirestore(DocumentSnapshot doc) {
     final data = doc.data() as Map<String, dynamic>;
+    
+    // Handle role field conversion from string to enum
+    if (data['role'] is String) {
+      data['role'] = data['role']; // Keep as string for JSON parsing
+    }
+    
+    // Ensure required fields have defaults
+    data['subscription'] ??= {
+      'plan': 'free',
+      'status': 'active',
+      'moduleAccess': ['drills', 'profile', 'stats'],
+    };
+    
+    data['preferences'] ??= {
+      'theme': 'system',
+      'notifications': true,
+      'soundEnabled': true,
+      'language': 'en',
+      'timezone': 'UTC',
+    };
+    
+    data['stats'] ??= {
+      'totalSessions': 0,
+      'totalDrillsCompleted': 0,
+      'totalProgramsCompleted': 0,
+      'averageAccuracy': 0.0,
+      'averageReactionTime': 0.0,
+      'streakDays': 0,
+    };
+    
     return AppUser.fromJson({...data, 'id': doc.id});
   }
 
@@ -68,9 +98,9 @@ class AppUser extends Equatable {
       'subscription': subscription.toJson(),
       'preferences': preferences.toJson(),
       'stats': stats.toJson(),
-      'createdAt': createdAt != null ? Timestamp.fromDate(createdAt!) : null,
-      'lastActiveAt': lastActiveAt != null ? Timestamp.fromDate(lastActiveAt!) : null,
-      'updatedAt': updatedAt != null ? Timestamp.fromDate(updatedAt!) : null,
+      'createdAt': createdAt != null ? Timestamp.fromDate(createdAt!) : FieldValue.serverTimestamp(),
+      'lastActiveAt': lastActiveAt != null ? Timestamp.fromDate(lastActiveAt!) : FieldValue.serverTimestamp(),
+      'updatedAt': updatedAt != null ? Timestamp.fromDate(updatedAt!) : FieldValue.serverTimestamp(),
     };
   }
 

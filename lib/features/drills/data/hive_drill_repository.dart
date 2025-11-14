@@ -63,6 +63,19 @@ class HiveDrillRepository implements DrillRepository {
   Stream<List<Drill>> watchAll() => _controller.stream;
 
   @override
+  Stream<List<Drill>> watchFavorites() {
+    final currentUserId = FirebaseAuth.instance.currentUser?.uid;
+    if (currentUserId == null) {
+      return Stream.value([]);
+    }
+
+    // Return favorite drills that user can see (their own or public ones)
+    return _controller.stream.map((drills) => drills.where((drill) =>
+        drill.favorite &&
+        drill.createdBy == currentUserId).toList());
+  }
+
+  @override
   Future<void> toggleFavorite(String drillId) async {
     final drillMap = _box.get(drillId);
     if (drillMap != null && drillMap is Map<dynamic, dynamic>) {

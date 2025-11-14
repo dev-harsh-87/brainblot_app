@@ -67,6 +67,13 @@ class ProgramsCategoryFilterChanged extends ProgramsEvent {
   List<Object?> get props => [category];
 }
 
+class ProgramsQueryChanged extends ProgramsEvent {
+  final String query;
+  const ProgramsQueryChanged(this.query);
+  @override
+  List<Object?> get props => [query];
+}
+
 class ProgramsRetryRequested extends ProgramsEvent {
   const ProgramsRetryRequested();
 }

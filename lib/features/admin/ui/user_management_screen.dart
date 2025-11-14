@@ -80,17 +80,42 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
 
   Widget _buildUserList() {
     return StreamBuilder<QuerySnapshot>(
-      stream: _firestore.collection('users').orderBy('createdAt', descending: true).snapshots(),
+      stream: _firestore.collection('users').snapshots(),
       builder: (context, snapshot) {
+        print('📊 User stream state: ${snapshot.connectionState}');
+        
         if (snapshot.hasError) {
+          print('❌ User stream error: ${snapshot.error}');
           return Center(child: Text('Error: ${snapshot.error}'));
         }
 
         if (snapshot.connectionState == ConnectionState.waiting) {
+          print('⏳ Waiting for user data...');
           return const Center(child: CircularProgressIndicator());
         }
 
-        if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
+        if (!snapshot.hasData) {
+          print('📭 No snapshot data received');
+          return Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(Icons.people_outline, size: 64, color: Colors.grey[400]),
+                const SizedBox(height: 16),
+                Text(
+                  'No data received',
+                  style: TextStyle(fontSize: 18, color: Colors.grey[600]),
+                ),
+              ],
+            ),
+          );
+        }
+
+        final totalDocs = snapshot.data!.docs.length;
+        print('📄 Total user documents: $totalDocs');
+        
+        if (totalDocs == 0) {
+          print('📭 No user documents found');
           return Center(
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
@@ -107,18 +132,30 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
         }
 
         final users = snapshot.data!.docs.where((doc) {
-          final data = doc.data() as Map<String, dynamic>;
-          final displayName = (data['displayName'] as String? ?? '').toLowerCase();
-          final email = (data['email'] as String? ?? '').toLowerCase();
-          final matchesSearch = _searchQuery.isEmpty ||
-              displayName.contains(_searchQuery) ||
-              email.contains(_searchQuery);
+          try {
+            final data = doc.data() as Map<String, dynamic>;
+            print('👤 Processing user doc ${doc.id}: ${data.keys.toList()}');
+            
+            final displayName = (data['displayName'] as String? ?? '').toLowerCase();
+            final email = (data['email'] as String? ?? '').toLowerCase();
+            final matchesSearch = _searchQuery.isEmpty ||
+                displayName.contains(_searchQuery) ||
+                email.contains(_searchQuery);
 
-          final role = UserRole.fromString(data['role'] as String? ?? 'user');
-          final matchesFilter = _filterRole == null || role == _filterRole;
+            final role = UserRole.fromString(data['role'] as String? ?? 'user');
+            final matchesFilter = _filterRole == null || role == _filterRole;
 
-          return matchesSearch && matchesFilter;
+            final passes = matchesSearch && matchesFilter;
+            print('✅ User ${doc.id} passes filter: $passes (search: $matchesSearch, role: $matchesFilter)');
+            
+            return passes;
+          } catch (e) {
+            print('❌ Error processing user doc ${doc.id}: $e');
+            return false;
+          }
         }).toList();
+        
+        print('📋 Filtered users count: ${users.length}');
 
         if (users.isEmpty) {
           return Center(
@@ -142,9 +179,22 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
           itemBuilder: (context, index) {
             final doc = users[index];
             final data = doc.data() as Map<String, dynamic>;
-            final user = AppUser.fromFirestore(doc);
-
-            return _buildUserCard(user, data);
+            
+            try {
+              final user = AppUser.fromFirestore(doc);
+              return _buildUserCard(user, data);
+            } catch (e) {
+              print('Error parsing user document ${doc.id}: $e');
+              // Return a placeholder card for malformed documents
+              return Card(
+                margin: const EdgeInsets.only(bottom: 12),
+                child: ListTile(
+                  leading: const Icon(Icons.error, color: Colors.red),
+                  title: Text('Error loading user: ${doc.id}'),
+                  subtitle: Text('Data parsing error: $e'),
+                ),
+              );
+            }
           },
         );
       },
