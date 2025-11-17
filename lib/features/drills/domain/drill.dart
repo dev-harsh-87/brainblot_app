@@ -8,6 +8,12 @@ enum PresentationMode { visual, audio }
 
 enum ReactionZone { center, top, bottom, left, right, quadrants }
 
+enum ArrowDirection { up, down, left, right, upLeft, upRight, downLeft, downRight }
+
+enum ShapeType { circle, square, triangle, diamond, star, hexagon, pentagon, oval }
+
+enum NumberRange { oneToThree, oneToFive, oneToNine, oneToTwelve }
+
 class Drill {
   final String id;
   final String name;
@@ -24,6 +30,9 @@ class Drill {
   final int numberOfStimuli; // per rep or per minute depending on design
   final List<ReactionZone> zones;
   final List<Color> colors; // used for color stimulus
+  final List<ArrowDirection> arrows; // used for arrow stimulus
+  final List<ShapeType> shapes; // used for shape stimulus
+  final NumberRange numberRange; // used for number stimulus
   final PresentationMode presentationMode; // visual or audio presentation
   final bool favorite; // legacy field - now handled by user_favorites collection
   final bool isPreset; // legacy field - no longer used
@@ -52,6 +61,9 @@ class Drill {
     required this.numberOfStimuli,
     required this.zones,
     required this.colors,
+    this.arrows = const [ArrowDirection.up, ArrowDirection.down, ArrowDirection.left, ArrowDirection.right],
+    this.shapes = const [ShapeType.circle, ShapeType.square, ShapeType.triangle],
+    this.numberRange = NumberRange.oneToFive,
     this.presentationMode = PresentationMode.visual, // default to visual
     this.favorite = false,
     this.isPreset = false,
@@ -81,6 +93,9 @@ class Drill {
     int? numberOfStimuli,
     List<ReactionZone>? zones,
     List<Color>? colors,
+    List<ArrowDirection>? arrows,
+    List<ShapeType>? shapes,
+    NumberRange? numberRange,
     PresentationMode? presentationMode,
     bool? favorite,
     bool? isPreset,
@@ -108,6 +123,9 @@ class Drill {
         numberOfStimuli: numberOfStimuli ?? this.numberOfStimuli,
         zones: zones ?? this.zones,
         colors: colors ?? this.colors,
+        arrows: arrows ?? this.arrows,
+        shapes: shapes ?? this.shapes,
+        numberRange: numberRange ?? this.numberRange,
         presentationMode: presentationMode ?? this.presentationMode,
         favorite: favorite ?? this.favorite,
         isPreset: isPreset ?? this.isPreset,
@@ -138,6 +156,9 @@ class Drill {
           'numberOfStimuli': numberOfStimuli,
           'zones': zones.map((e) => e.name).toList(),
           'colors': colors.map((c) => '#${c.value.toRadixString(16).padLeft(8, '0')}').toList(),
+          'arrows': arrows.map((e) => e.name).toList(),
+          'shapes': shapes.map((e) => e.name).toList(),
+          'numberRange': numberRange.name,
           'presentationMode': presentationMode.name,
         },
         'media': {
@@ -161,6 +182,9 @@ class Drill {
         'numberOfStimuli': numberOfStimuli,
         'zones': zones.map((e) => e.name).toList(),
         'colors': colors.map((c) => '#${c.value.toRadixString(16).padLeft(8, '0')}').toList(),
+        'arrows': arrows.map((e) => e.name).toList(),
+        'shapes': shapes.map((e) => e.name).toList(),
+        'numberRange': numberRange.name,
         'presentationMode': presentationMode.name,
         'videoUrl': videoUrl,
         'stepImageUrl': stepImageUrl,
@@ -207,12 +231,30 @@ class Drill {
                 radix: 16,
               )))
           .toList(),
-      presentationMode: (config?['presentationMode'] ?? map['presentationMode']) != null
-          ? PresentationMode.values.firstWhere(
-              (p) => p.name == (config?['presentationMode'] ?? map['presentationMode']),
-              orElse: () => PresentationMode.visual,
-            )
-          : PresentationMode.visual,
+     arrows: (config?['arrows'] as List? ?? map['arrows'] as List? ?? ['up', 'down', 'left', 'right'])
+         .map((e) => ArrowDirection.values.firstWhere(
+               (a) => a.name == e,
+               orElse: () => ArrowDirection.up,
+             ))
+         .toList(),
+     shapes: (config?['shapes'] as List? ?? map['shapes'] as List? ?? ['circle', 'square', 'triangle'])
+         .map((e) => ShapeType.values.firstWhere(
+               (s) => s.name == e,
+               orElse: () => ShapeType.circle,
+             ))
+         .toList(),
+     numberRange: (config?['numberRange'] ?? map['numberRange']) != null
+         ? NumberRange.values.firstWhere(
+             (n) => n.name == (config?['numberRange'] ?? map['numberRange']),
+             orElse: () => NumberRange.oneToFive,
+           )
+         : NumberRange.oneToFive,
+     presentationMode: (config?['presentationMode'] ?? map['presentationMode']) != null
+         ? PresentationMode.values.firstWhere(
+             (p) => p.name == (config?['presentationMode'] ?? map['presentationMode']),
+             orElse: () => PresentationMode.visual,
+           )
+         : PresentationMode.visual,
       
       // Media - try nested first, then flat
       videoUrl: media?['videoUrl'] as String? ?? map['videoUrl'] as String?,

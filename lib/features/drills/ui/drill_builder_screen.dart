@@ -42,6 +42,9 @@ class _DrillBuilderScreenState extends State<DrillBuilderScreen>
   final Set<StimulusType> _stimuli = {StimulusType.color};
   final Set<ReactionZone> _zones = {ReactionZone.center}; // Always center only
   final List<Color> _selectedColors = [Colors.red, Colors.green, Colors.blue, Colors.yellow];
+  final List<ArrowDirection> _selectedArrows = [ArrowDirection.up, ArrowDirection.down, ArrowDirection.left, ArrowDirection.right];
+  final List<ShapeType> _selectedShapes = [ShapeType.circle, ShapeType.square, ShapeType.triangle];
+  NumberRange _selectedNumberRange = NumberRange.oneToFive;
   PresentationMode _presentationMode = PresentationMode.visual;
   
   int _currentStep = 0;
@@ -93,6 +96,17 @@ class _DrillBuilderScreenState extends State<DrillBuilderScreen>
           ..clear()
           ..addAll(d.colors);
       }
+      if (d.arrows.isNotEmpty) {
+        _selectedArrows
+          ..clear()
+          ..addAll(d.arrows);
+      }
+      if (d.shapes.isNotEmpty) {
+        _selectedShapes
+          ..clear()
+          ..addAll(d.shapes);
+      }
+      _selectedNumberRange = d.numberRange;
     }
     
     _loadCategories();
@@ -165,6 +179,9 @@ class _DrillBuilderScreenState extends State<DrillBuilderScreen>
       numberOfStimuli: _numberOfStimuli,
       zones: _zones.toList(),
       colors: _selectedColors,
+      arrows: _selectedArrows,
+      shapes: _selectedShapes,
+      numberRange: _selectedNumberRange,
       presentationMode: _presentationMode,
       favorite: initial?.favorite ?? false,
       isPreset: initial?.isPreset ?? false,
@@ -1001,131 +1018,114 @@ class _DrillBuilderScreenState extends State<DrillBuilderScreen>
           ),
           const SizedBox(height: 32),
 
-          // Stimulus Types Section with improved UI
-          Text(
-            'Stimulus Selection',
-            style: theme.textTheme.titleMedium?.copyWith(
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            'Select individual stimulus types and configure each one',
-            style: theme.textTheme.bodySmall?.copyWith(
-              color: colorScheme.onSurface.withOpacity(0.7),
-            ),
-          ),
-          const SizedBox(height: 16),
-          
-          // Color Stimulus Card
-          _buildStimulusCard(
-            'Colors',
-            Icons.palette,
-            StimulusType.color,
-            _presentationMode == PresentationMode.audio
-                ? 'Speaks color names (Red, Blue, Green, etc.)'
-                : 'Displays colors visually',
-            colorScheme.primary,
-          ),
-          const SizedBox(height: 12),
-          
-          // Arrow Stimulus Card
-          _buildStimulusCard(
-            'Arrows',
-            Icons.arrow_forward,
-            StimulusType.arrow,
-            _presentationMode == PresentationMode.audio
-                ? 'Speaks directions (Up arrow, Down arrow, etc.)'
-                : 'Displays directional arrows',
-            colorScheme.secondary,
-          ),
-          const SizedBox(height: 12),
-          
-          // Shape Stimulus Card
-          _buildStimulusCard(
-            'Shapes',
-            Icons.category,
-            StimulusType.shape,
-            _presentationMode == PresentationMode.audio
-                ? 'Speaks shape names (Circle, Square, Triangle)'
-                : 'Displays geometric shapes',
-            colorScheme.tertiary,
-          ),
-          const SizedBox(height: 12),
-          
-          // Number Stimulus Card
-          _buildStimulusCard(
-            'Numbers',
-            Icons.numbers,
-            StimulusType.number,
-            _presentationMode == PresentationMode.audio
-                ? 'Speaks numbers (One, Two, Three, etc.)'
-                : 'Displays numbers 1-9',
-            Colors.orange,
-          ),
-          const SizedBox(height: 32),
-
-          // Color Selection Section (only show if color stimulus is selected)
-          if (_stimuli.contains(StimulusType.color)) ...[
-            Text(
-              'Color Selection',
-              style: theme.textTheme.titleMedium?.copyWith(
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              'Select colors for your stimuli (minimum 2 colors)',
-              style: theme.textTheme.bodySmall?.copyWith(
-                color: colorScheme.onSurface.withOpacity(0.7),
-              ),
-            ),
-            const SizedBox(height: 16),
-            Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: colorScheme.surfaceContainerHighest,
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Column(
-                children: [
-                  Wrap(
-                    spacing: 12,
-                    runSpacing: 12,
-                    children: [
-                      Colors.red, Colors.green, Colors.blue, Colors.yellow,
-                      Colors.orange, Colors.purple, Colors.pink, Colors.cyan,
-                      Colors.brown, Colors.grey, Colors.black, Colors.white,
-                    ].map((color) => _buildColorChip(color)).toList(),
+          // Clean Stimulus Selection Section - Direct Integration
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Main Header
+              RichText(
+                text: TextSpan(
+                  style: theme.textTheme.headlineMedium?.copyWith(
+                    fontWeight: FontWeight.w900,
+                    color: colorScheme.onSurface,
                   ),
-                  if (_selectedColors.length < 2) ...[
-                    const SizedBox(height: 12),
-                    Container(
-                      padding: const EdgeInsets.all(8),
-                      decoration: BoxDecoration(
-                        color: Colors.orange.withOpacity(0.1),
-                        borderRadius: BorderRadius.circular(8),
-                        border: Border.all(color: Colors.orange.withOpacity(0.3)),
-                      ),
-                      child: Row(
-                        children: [
-                          Icon(Icons.warning_amber, color: Colors.orange, size: 16),
-                          const SizedBox(width: 8),
-                          Text(
-                            'Please select at least 2 colors',
-                            style: theme.textTheme.bodySmall?.copyWith(
-                              color: Colors.orange.shade700,
-                            ),
-                          ),
-                        ],
+                  children: [
+                    const TextSpan(text: 'SELECT YOUR '),
+                    TextSpan(
+                      text: 'STIMULI',
+                      style: TextStyle(
+                        color: Colors.orange,
                       ),
                     ),
                   ],
-                ],
+                ),
               ),
-            ),
-            const SizedBox(height: 32),
-          ],
+              const SizedBox(height: 8),
+              Text(
+                'Select which cues will appear on the screen',
+                style: theme.textTheme.bodyLarge?.copyWith(
+                  color: colorScheme.onSurface.withOpacity(0.7),
+                ),
+              ),
+              const SizedBox(height: 40),
+
+              // Colors Section with Checkbox
+              _buildStimulusSelectionSection(
+                'Colors',
+                StimulusType.color,
+                Wrap(
+                  spacing: 16,
+                  runSpacing: 16,
+                  children: [
+                    Colors.red, Colors.blue, Colors.green, Colors.yellow,
+                    Colors.purple, Colors.orange, Colors.black, Colors.grey,
+                  ].map((color) => _buildSimpleColorChip(color)).toList(),
+                ),
+                _stimuli.contains(StimulusType.color) && _selectedColors.length < 2,
+              ),
+              const SizedBox(height: 32),
+
+              // Arrows Section with Checkbox
+              _buildStimulusSelectionSection(
+                'Arrows',
+                StimulusType.arrow,
+                Wrap(
+                  spacing: 16,
+                  runSpacing: 16,
+                  children: [
+                    ArrowDirection.up, ArrowDirection.down,
+                    ArrowDirection.left, ArrowDirection.right,
+                    ArrowDirection.upLeft, ArrowDirection.upRight,
+                    ArrowDirection.downLeft, ArrowDirection.downRight,
+                  ].map((arrow) => _buildSimpleArrowChip(arrow)).toList(),
+                ),
+                _stimuli.contains(StimulusType.arrow) && _selectedArrows.length < 2,
+              ),
+              const SizedBox(height: 32),
+
+              // Numbers Section with Checkbox
+              _buildStimulusSelectionSection(
+                'Numbers',
+                StimulusType.number,
+                Column(
+                  children: [
+                    Row(
+                      children: [1, 2, 3, 4].map((num) =>
+                        Expanded(child: _buildSimpleNumberChip(num))
+                      ).toList(),
+                    ),
+                    const SizedBox(height: 16),
+                    Row(
+                      children: [5, 6, 7, 8].map((num) =>
+                        Expanded(child: _buildSimpleNumberChip(num))
+                      ).toList(),
+                    ),
+                    const SizedBox(height: 20),
+                    // Number Range Selection
+                    Text(
+                      'Select Range:',
+                      style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    Wrap(
+                      spacing: 8,
+                      children: NumberRange.values.map((range) =>
+                        _buildNumberRangeChip(range)
+                      ).toList(),
+                    ),
+                  ],
+                ),
+                false, // Numbers don't need validation warning
+              ),
+            ],
+          ),
+
+
+
+      
+    
         ],
       ),
     );
@@ -1367,61 +1367,8 @@ class _DrillBuilderScreenState extends State<DrillBuilderScreen>
     );
   }
 
-  Widget _buildStimulusTypeChip(StimulusType type) {
-    final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
-    final isSelected = _stimuli.contains(type);
 
-    return FilterChip(
-      label: Text(_getStimulusTypeLabel(type)),
-      selected: isSelected,
-      onSelected: (selected) {
-        setState(() {
-          if (selected) {
-            _stimuli.add(type);
-          } else {
-            _stimuli.remove(type);
-          }
-        });
-        HapticFeedback.lightImpact();
-      },
-      avatar: Icon(
-        _getStimulusTypeIcon(type),
-        size: 18,
-        color: isSelected ? colorScheme.onPrimary : colorScheme.onSurface.withOpacity(0.7),
-      ),
-      selectedColor: colorScheme.primary,
-      checkmarkColor: colorScheme.onPrimary,
-    );
-  }
 
-  Widget _buildReactionZoneChip(ReactionZone zone) {
-    final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
-    final isSelected = _zones.contains(zone);
-
-    return FilterChip(
-      label: Text(_getReactionZoneLabel(zone)),
-      selected: isSelected,
-      onSelected: (selected) {
-        setState(() {
-          if (selected) {
-            _zones.add(zone);
-          } else {
-            _zones.remove(zone);
-          }
-        });
-        HapticFeedback.lightImpact();
-      },
-      avatar: Icon(
-        _getReactionZoneIcon(zone),
-        size: 18,
-        color: isSelected ? colorScheme.onPrimary : colorScheme.onSurface.withOpacity(0.7),
-      ),
-      selectedColor: colorScheme.secondary,
-      checkmarkColor: colorScheme.onSecondary,
-    );
-  }
 
   Widget _buildPresentationModeCard(PresentationMode mode) {
     final theme = Theme.of(context);
@@ -1633,8 +1580,16 @@ class _DrillBuilderScreenState extends State<DrillBuilderScreen>
     
     // Zones are always set to center, no validation needed
     
-    if (_selectedColors.length < 2) {
+    if (_stimuli.contains(StimulusType.color) && _selectedColors.length < 2) {
       errors.add('Please select at least 2 colors');
+    }
+    
+    if (_stimuli.contains(StimulusType.arrow) && _selectedArrows.length < 2) {
+      errors.add('Please select at least 2 arrow directions');
+    }
+    
+    if (_stimuli.contains(StimulusType.shape) && _selectedShapes.length < 2) {
+      errors.add('Please select at least 2 shapes');
     }
     
     return errors;
@@ -1673,6 +1628,12 @@ class _DrillBuilderScreenState extends State<DrillBuilderScreen>
         if (_stimuli.contains(StimulusType.color) && _selectedColors.length < 2) {
           errors.add('Select at least 2 colors for color stimulus');
         }
+        if (_stimuli.contains(StimulusType.arrow) && _selectedArrows.length < 2) {
+          errors.add('Select at least 2 arrow directions for arrow stimulus');
+        }
+        if (_stimuli.contains(StimulusType.shape) && _selectedShapes.length < 2) {
+          errors.add('Select at least 2 shapes for shape stimulus');
+        }
         break;
         
       case 3: // Review - no additional validation needed
@@ -1682,46 +1643,6 @@ class _DrillBuilderScreenState extends State<DrillBuilderScreen>
     return errors;
   }
 
-  String _getStimulusTypeLabel(StimulusType type) {
-    switch (type) {
-      case StimulusType.color: return 'Color';
-      case StimulusType.shape: return 'Shape';
-      case StimulusType.arrow: return 'Arrow';
-      case StimulusType.number: return 'Number';
-    }
-  }
-
-  IconData _getStimulusTypeIcon(StimulusType type) {
-    switch (type) {
-      case StimulusType.color: return Icons.palette;
-      case StimulusType.shape: return Icons.category;
-      case StimulusType.arrow: return Icons.arrow_forward;
-      case StimulusType.number: return Icons.numbers;
-    
-    }
-  }
-
-  String _getReactionZoneLabel(ReactionZone zone) {
-    switch (zone) {
-      case ReactionZone.center: return 'Center';
-      case ReactionZone.top: return 'Top';
-      case ReactionZone.bottom: return 'Bottom';
-      case ReactionZone.left: return 'Left';
-      case ReactionZone.right: return 'Right';
-      case ReactionZone.quadrants: return 'Quadrants';
-    }
-  }
-
-  IconData _getReactionZoneIcon(ReactionZone zone) {
-    switch (zone) {
-      case ReactionZone.center: return Icons.center_focus_strong;
-      case ReactionZone.top: return Icons.keyboard_arrow_up;
-      case ReactionZone.bottom: return Icons.keyboard_arrow_down;
-      case ReactionZone.left: return Icons.keyboard_arrow_left;
-      case ReactionZone.right: return Icons.keyboard_arrow_right;
-      case ReactionZone.quadrants: return Icons.grid_view;
-    }
-  }
 
   Widget _buildStimulusCard(String title, IconData icon, StimulusType type, String description, Color accentColor) {
     final theme = Theme.of(context);
@@ -1989,5 +1910,628 @@ class _DrillBuilderScreenState extends State<DrillBuilderScreen>
         ),
       );
     }
+  }
+
+  Widget _buildArrowChip(ArrowDirection arrow) {
+    final isSelected = _selectedArrows.contains(arrow);
+    final colorScheme = Theme.of(context).colorScheme;
+    final theme = Theme.of(context);
+
+    return FilterChip(
+      label: Text(
+        _getArrowDirectionLabel(arrow),
+        style: TextStyle(
+          fontWeight: FontWeight.w600,
+          color: isSelected ? colorScheme.onPrimary : colorScheme.onSurface,
+        ),
+      ),
+      avatar: Icon(
+        _getArrowDirectionIcon(arrow),
+        size: 18,
+        color: isSelected ? colorScheme.onPrimary : colorScheme.onSurface.withOpacity(0.7),
+      ),
+      selected: isSelected,
+      onSelected: (selected) {
+        setState(() {
+          if (selected) {
+            _selectedArrows.add(arrow);
+          } else {
+            _selectedArrows.remove(arrow);
+          }
+        });
+        HapticFeedback.lightImpact();
+      },
+      backgroundColor: colorScheme.surface,
+      selectedColor: colorScheme.primary,
+      checkmarkColor: colorScheme.onPrimary,
+      side: BorderSide(
+        color: isSelected ? colorScheme.primary : colorScheme.outline,
+      ),
+    );
+  }
+
+  Widget _buildShapeChip(ShapeType shape) {
+    final isSelected = _selectedShapes.contains(shape);
+    final colorScheme = Theme.of(context).colorScheme;
+    final theme = Theme.of(context);
+
+    return FilterChip(
+      label: Text(
+        _getShapeTypeLabel(shape),
+        style: TextStyle(
+          fontWeight: FontWeight.w600,
+          color: isSelected ? colorScheme.onPrimary : colorScheme.onSurface,
+        ),
+      ),
+      avatar: Icon(
+        _getShapeTypeIcon(shape),
+        size: 18,
+        color: isSelected ? colorScheme.onPrimary : colorScheme.onSurface.withOpacity(0.7),
+      ),
+      selected: isSelected,
+      onSelected: (selected) {
+        setState(() {
+          if (selected) {
+            _selectedShapes.add(shape);
+          } else {
+            _selectedShapes.remove(shape);
+          }
+        });
+        HapticFeedback.lightImpact();
+      },
+      backgroundColor: colorScheme.surface,
+      selectedColor: colorScheme.secondary,
+      checkmarkColor: colorScheme.onSecondary,
+      side: BorderSide(
+        color: isSelected ? colorScheme.secondary : colorScheme.outline,
+      ),
+    );
+  }
+
+  Widget _buildNumberRangeCard(NumberRange range) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final isSelected = _selectedNumberRange == range;
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: GestureDetector(
+        onTap: () {
+          setState(() {
+            _selectedNumberRange = range;
+          });
+          HapticFeedback.lightImpact();
+        },
+        child: Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: isSelected
+                ? Colors.orange.withOpacity(0.1)
+                : colorScheme.surface,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(
+              color: isSelected
+                  ? Colors.orange
+                  : colorScheme.outline.withOpacity(0.3),
+              width: isSelected ? 2 : 1,
+            ),
+          ),
+          child: Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: isSelected
+                      ? Colors.orange
+                      : colorScheme.surfaceContainerHigh,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Icon(
+                  Icons.numbers,
+                  color: isSelected
+                      ? Colors.white
+                      : colorScheme.onSurface.withOpacity(0.7),
+                  size: 20,
+                ),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      _getNumberRangeLabel(range),
+                      style: theme.textTheme.titleSmall?.copyWith(
+                        fontWeight: FontWeight.w600,
+                        color: isSelected ? Colors.orange : colorScheme.onSurface,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      _getNumberRangeDescription(range),
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: isSelected
+                            ? colorScheme.onSurface
+                            : colorScheme.onSurface.withOpacity(0.6),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              if (isSelected)
+                Icon(
+                  Icons.check_circle,
+                  color: Colors.orange,
+                  size: 24,
+                ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  String _getArrowDirectionLabel(ArrowDirection direction) {
+    switch (direction) {
+      case ArrowDirection.up: return 'Up';
+      case ArrowDirection.down: return 'Down';
+      case ArrowDirection.left: return 'Left';
+      case ArrowDirection.right: return 'Right';
+      case ArrowDirection.upLeft: return 'Up-Left';
+      case ArrowDirection.upRight: return 'Up-Right';
+      case ArrowDirection.downLeft: return 'Down-Left';
+      case ArrowDirection.downRight: return 'Down-Right';
+    }
+  }
+
+  IconData _getArrowDirectionIcon(ArrowDirection direction) {
+    switch (direction) {
+      case ArrowDirection.up: return Icons.keyboard_arrow_up;
+      case ArrowDirection.down: return Icons.keyboard_arrow_down;
+      case ArrowDirection.left: return Icons.keyboard_arrow_left;
+      case ArrowDirection.right: return Icons.keyboard_arrow_right;
+      case ArrowDirection.upLeft: return Icons.north_west;
+      case ArrowDirection.upRight: return Icons.north_east;
+      case ArrowDirection.downLeft: return Icons.south_west;
+      case ArrowDirection.downRight: return Icons.south_east;
+    }
+  }
+
+  String _getShapeTypeLabel(ShapeType shape) {
+    switch (shape) {
+      case ShapeType.circle: return 'Circle';
+      case ShapeType.square: return 'Square';
+      case ShapeType.triangle: return 'Triangle';
+      case ShapeType.diamond: return 'Diamond';
+      case ShapeType.star: return 'Star';
+      case ShapeType.hexagon: return 'Hexagon';
+      case ShapeType.pentagon: return 'Pentagon';
+      case ShapeType.oval: return 'Oval';
+    }
+  }
+
+  IconData _getShapeTypeIcon(ShapeType shape) {
+    switch (shape) {
+      case ShapeType.circle: return Icons.circle_outlined;
+      case ShapeType.square: return Icons.square_outlined;
+      case ShapeType.triangle: return Icons.change_history;
+      case ShapeType.diamond: return Icons.diamond_outlined;
+      case ShapeType.star: return Icons.star_outline;
+      case ShapeType.hexagon: return Icons.hexagon_outlined;
+      case ShapeType.pentagon: return Icons.pentagon_outlined;
+      case ShapeType.oval: return Icons.circle;
+    }
+  }
+
+  String _getNumberRangeLabel(NumberRange range) {
+    switch (range) {
+      case NumberRange.oneToThree: return '1-3';
+      case NumberRange.oneToFive: return '1-5';
+      case NumberRange.oneToNine: return '1-9';
+      case NumberRange.oneToTwelve: return '1-12';
+    }
+  }
+
+  String _getNumberRangeDescription(NumberRange range) {
+    switch (range) {
+      case NumberRange.oneToThree: return 'Numbers 1, 2, 3';
+      case NumberRange.oneToFive: return 'Numbers 1, 2, 3, 4, 5';
+      case NumberRange.oneToNine: return 'Numbers 1 through 9';
+      case NumberRange.oneToTwelve: return 'Numbers 1 through 12';
+    }
+  }
+
+  Widget _buildSelectionSection(String title, IconData icon, Color accentColor, Widget content) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: accentColor.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Icon(
+                icon,
+                color: accentColor,
+                size: 18,
+              ),
+            ),
+            const SizedBox(width: 12),
+            Text(
+              title,
+              style: theme.textTheme.titleMedium?.copyWith(
+                fontWeight: FontWeight.w600,
+                color: colorScheme.onSurface,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
+        content,
+      ],
+    );
+  }
+
+  Widget _buildValidationWarning(String message) {
+    final theme = Theme.of(context);
+    
+    return Container(
+      padding: const EdgeInsets.all(8),
+      decoration: BoxDecoration(
+        color: Colors.orange.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: Colors.orange.withOpacity(0.3)),
+      ),
+      child: Row(
+        children: [
+          Icon(Icons.warning_amber, color: Colors.orange, size: 16),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              message,
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: Colors.orange.shade700,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildCleanStimulusSection(String title, Widget content, bool showWarning) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          title,
+          style: theme.textTheme.headlineSmall?.copyWith(
+            fontWeight: FontWeight.w600,
+            color: colorScheme.onSurface.withOpacity(0.8),
+          ),
+        ),
+        const SizedBox(height: 20),
+        content,
+        if (showWarning) ...[
+          const SizedBox(height: 16),
+          _buildValidationWarning('Please select at least 2 ${title.toLowerCase()}'),
+        ],
+      ],
+    );
+  }
+
+  Widget _buildSimpleColorChip(Color color) {
+    final isSelected = _selectedColors.contains(color);
+
+    return GestureDetector(
+      onTap: () {
+        setState(() {
+          if (isSelected) {
+            _selectedColors.remove(color);
+          } else {
+            _selectedColors.add(color);
+          }
+        });
+        HapticFeedback.lightImpact();
+      },
+      child: Container(
+        width: 50,
+        height: 50,
+        decoration: BoxDecoration(
+          color: color,
+          shape: BoxShape.circle,
+          border: Border.all(
+            color: isSelected ? Colors.black : Colors.grey.withOpacity(0.3),
+            width: isSelected ? 3 : 1,
+          ),
+        ),
+        child: isSelected
+            ? Icon(
+                Icons.check,
+                color: _getContrastColor(color),
+                size: 24,
+              )
+            : null,
+      ),
+    );
+  }
+
+  Widget _buildSimpleArrowChip(ArrowDirection arrow) {
+    final isSelected = _selectedArrows.contains(arrow);
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+
+    return GestureDetector(
+      onTap: () {
+        setState(() {
+          if (isSelected) {
+            _selectedArrows.remove(arrow);
+          } else {
+            _selectedArrows.add(arrow);
+          }
+        });
+        HapticFeedback.lightImpact();
+      },
+      child: Container(
+        width: 50,
+        height: 50,
+        decoration: BoxDecoration(
+          color: isSelected ? colorScheme.primary.withOpacity(0.1) : colorScheme.surface,
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(
+            color: isSelected ? colorScheme.primary : colorScheme.outline.withOpacity(0.3),
+            width: isSelected ? 2 : 1,
+          ),
+        ),
+        child: Icon(
+          _getArrowDirectionIcon(arrow),
+          color: isSelected ? colorScheme.primary : colorScheme.onSurface.withOpacity(0.6),
+          size: 24,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSimpleNumberChip(int number) {
+    final isInRange = _isNumberInSelectedRange(number);
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 4),
+      child: Row(
+        children: [
+          Expanded(
+            child: Container(
+              height: 50,
+              decoration: BoxDecoration(
+                color: isInRange ? Colors.orange.withOpacity(0.1) : colorScheme.surface,
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(
+                  color: isInRange ? Colors.orange : colorScheme.outline.withOpacity(0.3),
+                  width: isInRange ? 2 : 1,
+                ),
+              ),
+              child: Center(
+                child: Text(
+                  number.toString(),
+                  style: theme.textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.w600,
+                    color: isInRange ? Colors.orange : colorScheme.onSurface.withOpacity(0.6),
+                  ),
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(width: 8),
+          Container(
+            width: 20,
+            height: 20,
+            decoration: BoxDecoration(
+              color: isInRange ? Colors.orange : Colors.transparent,
+              border: Border.all(
+                color: isInRange ? Colors.orange : colorScheme.outline.withOpacity(0.3),
+              ),
+              borderRadius: BorderRadius.circular(4),
+            ),
+            child: isInRange
+                ? const Icon(
+                    Icons.check,
+                    color: Colors.white,
+                    size: 14,
+                  )
+                : null,
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildPresentationModeIndicator() {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+
+    return Column(
+      children: [
+        // Visual Indicator
+        Container(
+          width: 80,
+          height: 60,
+          decoration: BoxDecoration(
+            color: _presentationMode == PresentationMode.visual
+                ? Colors.orange.withOpacity(0.2)
+                : colorScheme.surfaceContainerHighest,
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(
+              color: _presentationMode == PresentationMode.visual
+                  ? Colors.orange
+                  : colorScheme.outline.withOpacity(0.3),
+            ),
+          ),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(
+                Icons.visibility,
+                color: _presentationMode == PresentationMode.visual
+                    ? Colors.orange
+                    : colorScheme.onSurface.withOpacity(0.5),
+                size: 20,
+              ),
+              const SizedBox(height: 4),
+              Text(
+                'VISUAL',
+                style: theme.textTheme.labelSmall?.copyWith(
+                  fontWeight: FontWeight.w600,
+                  color: _presentationMode == PresentationMode.visual
+                      ? Colors.orange
+                      : colorScheme.onSurface.withOpacity(0.5),
+                ),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 8),
+        // Audio Indicator
+        Container(
+          width: 80,
+          height: 60,
+          decoration: BoxDecoration(
+            color: _presentationMode == PresentationMode.audio
+                ? Colors.orange.withOpacity(0.2)
+                : colorScheme.surfaceContainerHighest,
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(
+              color: _presentationMode == PresentationMode.audio
+                  ? Colors.orange
+                  : colorScheme.outline.withOpacity(0.3),
+            ),
+          ),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(
+                Icons.volume_up,
+                color: _presentationMode == PresentationMode.audio
+                    ? Colors.orange
+                    : colorScheme.onSurface.withOpacity(0.5),
+                size: 20,
+              ),
+              const SizedBox(height: 4),
+              Text(
+                'AUDIO',
+                style: theme.textTheme.labelSmall?.copyWith(
+                  fontWeight: FontWeight.w600,
+                  color: _presentationMode == PresentationMode.audio
+                      ? Colors.orange
+                      : colorScheme.onSurface.withOpacity(0.5),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  bool _isNumberInSelectedRange(int number) {
+    switch (_selectedNumberRange) {
+      case NumberRange.oneToThree:
+        return number >= 1 && number <= 3;
+      case NumberRange.oneToFive:
+        return number >= 1 && number <= 5;
+      case NumberRange.oneToNine:
+        return number >= 1 && number <= 9;
+      case NumberRange.oneToTwelve:
+        return number >= 1 && number <= 12;
+    }
+  }
+
+  Widget _buildNumberRangeChip(NumberRange range) {
+    final isSelected = _selectedNumberRange == range;
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+
+    return FilterChip(
+      label: Text(
+        _getNumberRangeLabel(range),
+        style: TextStyle(
+          fontWeight: FontWeight.w600,
+          fontSize: 12,
+          color: isSelected ? Colors.white : colorScheme.onSurface,
+        ),
+      ),
+      selected: isSelected,
+      onSelected: (selected) {
+        setState(() {
+          _selectedNumberRange = range;
+        });
+        HapticFeedback.lightImpact();
+      },
+      backgroundColor: colorScheme.surface,
+      selectedColor: Colors.orange,
+      checkmarkColor: Colors.white,
+      side: BorderSide(
+        color: isSelected ? Colors.orange : colorScheme.outline,
+      ),
+    );
+  }
+
+  Widget _buildStimulusSelectionSection(String title, StimulusType type, Widget content, bool showWarning) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final isSelected = _stimuli.contains(type);
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // Header with checkbox
+        Row(
+          children: [
+            Checkbox(
+              value: isSelected,
+              onChanged: (value) {
+                setState(() {
+                  if (value == true) {
+                    _stimuli.add(type);
+                  } else {
+                    _stimuli.remove(type);
+                  }
+                });
+                HapticFeedback.lightImpact();
+              },
+              activeColor: Colors.orange,
+            ),
+            const SizedBox(width: 8),
+            Text(
+              title,
+              style: theme.textTheme.headlineSmall?.copyWith(
+                fontWeight: FontWeight.w600,
+                color: colorScheme.onSurface.withOpacity(0.8),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 20),
+        
+        // Content (only show if stimulus type is selected)
+        if (isSelected) ...[
+          content,
+          if (showWarning) ...[
+            const SizedBox(height: 16),
+            _buildValidationWarning('Please select at least 2 ${title.toLowerCase()}'),
+          ],
+        ],
+      ],
+    );
   }
 }
