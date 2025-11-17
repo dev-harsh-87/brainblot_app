@@ -12,6 +12,8 @@ class ProfessionalPermissionManager {
   static final List<permission_handler.Permission> requiredPermissions = [
     permission_handler.Permission.bluetooth,
     permission_handler.Permission.locationWhenInUse,
+    // Android requires both coarse and fine location for Bluetooth scanning
+    permission_handler.Permission.location,
     // Android 12+ specific Bluetooth permissions
     permission_handler.Permission.bluetoothScan,
     permission_handler.Permission.bluetoothConnect,
@@ -358,6 +360,8 @@ class ProfessionalPermissionManager {
       case permission_handler.Permission.bluetooth:
         return 'Bluetooth';
       case permission_handler.Permission.locationWhenInUse:
+        return 'Location (When In Use)';
+      case permission_handler.Permission.location:
         return 'Location';
       case permission_handler.Permission.microphone:
         return 'Microphone';
@@ -384,6 +388,8 @@ class ProfessionalPermissionManager {
         return 'Required to connect with other devices for multiplayer training sessions';
       case permission_handler.Permission.locationWhenInUse:
         return 'Required to discover nearby devices (your location is not stored or shared)';
+      case permission_handler.Permission.location:
+        return 'Required for Bluetooth device discovery (your location is not stored or shared)';
       case permission_handler.Permission.microphone:
         return 'Optional: For voice commands and communication features';
       case permission_handler.Permission.bluetoothScan:
@@ -413,10 +419,11 @@ class ProfessionalPermissionManager {
         permission_handler.Permission.locationWhenInUse,
       ];
     } else {
-      // Android needs all Bluetooth permissions and nearby WiFi devices
+      // Android needs all Bluetooth permissions, location permissions, and nearby WiFi devices
       return [
         permission_handler.Permission.bluetooth,
         permission_handler.Permission.locationWhenInUse,
+        permission_handler.Permission.location, // Required for Bluetooth scanning on Android
         permission_handler.Permission.bluetoothScan,
         permission_handler.Permission.bluetoothConnect,
         permission_handler.Permission.bluetoothAdvertise,

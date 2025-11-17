@@ -73,7 +73,6 @@ class MultiDeviceSessionService {
         .collection(_deviceSessionsCollection)
         .where('userId', isEqualTo: userId)
         .where('isActive', isEqualTo: true)
-        .orderBy('lastActiveTime', descending: true)
         .snapshots()
         .asyncMap((snapshot) async {
       try {
@@ -90,6 +89,9 @@ class MultiDeviceSessionService {
           );
           sessions.add(session);
         }
+
+        // Sort by lastActiveTime in descending order (most recent first)
+        sessions.sort((a, b) => b.lastActiveTime.compareTo(a.lastActiveTime));
 
         return sessions;
       } catch (e) {

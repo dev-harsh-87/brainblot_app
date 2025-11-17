@@ -23,7 +23,7 @@ class ProgramsBloc extends Bloc<ProgramsEvent, ProgramsState> {
     
     // Event handlers
     on<ProgramsStarted>(_onStarted);
-    on<_ProgramsUpdated>(_onProgramsUpdated);
+    on<_ProgramsUpdated>(_onProgramsUpdated); 
     on<_ActiveUpdated>(_onActiveUpdated);
     on<_ProgramsErrorOccurred>(_onError);
     on<ProgramsActivateRequested>(_onActivate);
@@ -93,7 +93,7 @@ class ProgramsBloc extends Bloc<ProgramsEvent, ProgramsState> {
 
   void _onProgramsUpdated(_ProgramsUpdated event, Emitter<ProgramsState> emit) {
     // Only update if the programs list has actually changed
-    if (state.programs.length != event.programs.length || 
+    if (state.programs.length != event.programs.length ||
         !const ListEquality<Program>().equals(state.programs, event.programs)) {
       emit(state.copyWith(
         status: ProgramsStatus.loaded,

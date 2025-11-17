@@ -42,7 +42,7 @@ import 'package:spark_app/features/stats/stats_screen.dart';
 import 'package:spark_app/features/subscription/ui/subscription_screen.dart';
 import 'package:spark_app/features/subscription/ui/user_requests_screen.dart';
 import 'package:spark_app/features/training/training_screen.dart';
-import 'package:spark_app/features/debug/admin_debug_screen.dart';
+
 
 /// Main application router configuration
 /// Handles all navigation, authentication guards, and hot reload support
@@ -143,8 +143,6 @@ class AppRouter {
       // Admin Routes
       _buildAdminRoute(),
       
-      // Debug Routes (only in debug mode)
-      if (kDebugMode) _buildDebugRoute(),
       
       // Subscription Routes
       ..._buildSubscriptionRoutes(),
@@ -412,13 +410,7 @@ class AppRouter {
   }
 
   /// Debug route (only available in debug mode)
-  GoRoute _buildDebugRoute() {
-    return GoRoute(
-      path: '/debug/admin',
-      name: 'debug-admin',
-      builder: (context, state) => const AdminDebugScreen(),
-    );
-  }
+
 
   /// Subscription routes
   List<GoRoute> _buildSubscriptionRoutes() {

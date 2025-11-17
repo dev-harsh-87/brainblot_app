@@ -33,6 +33,7 @@ Program _$ProgramFromJson(Map<String, dynamic> json) => Program(
       level: json['level'] as String,
       createdAt: DateTime.parse(json['createdAt'] as String),
       createdBy: json['createdBy'] as String?,
+      createdByRole: json['createdByRole'] as String?,
       sharedWith: (json['sharedWith'] as List<dynamic>?)
               ?.map((e) => e as String)
               .toList() ??
@@ -59,6 +60,7 @@ Map<String, dynamic> _$ProgramToJson(Program instance) => <String, dynamic>{
       'level': instance.level,
       'createdAt': instance.createdAt.toIso8601String(),
       'createdBy': instance.createdBy,
+      'createdByRole': instance.createdByRole,
       'sharedWith': instance.sharedWith,
       'favorite': instance.favorite,
       'dayWiseDrillIds':
@@ -72,6 +74,13 @@ ActiveProgram _$ActiveProgramFromJson(Map<String, dynamic> json) =>
       currentDay: (json['currentDay'] as num).toInt(),
       startedAt: DateTime.parse(json['startedAt'] as String),
       userId: json['userId'] as String?,
+      dayCompletionTimes:
+          (json['dayCompletionTimes'] as Map<String, dynamic>?)?.map(
+        (k, e) => MapEntry(int.parse(k), DateTime.parse(e as String)),
+      ),
+      lastDayCompletedAt: json['lastDayCompletedAt'] == null
+          ? null
+          : DateTime.parse(json['lastDayCompletedAt'] as String),
     );
 
 Map<String, dynamic> _$ActiveProgramToJson(ActiveProgram instance) =>
@@ -80,4 +89,7 @@ Map<String, dynamic> _$ActiveProgramToJson(ActiveProgram instance) =>
       'currentDay': instance.currentDay,
       'startedAt': instance.startedAt.toIso8601String(),
       'userId': instance.userId,
+      'dayCompletionTimes': instance.dayCompletionTimes
+          ?.map((k, e) => MapEntry(k.toString(), e.toIso8601String())),
+      'lastDayCompletedAt': instance.lastDayCompletedAt?.toIso8601String(),
     };

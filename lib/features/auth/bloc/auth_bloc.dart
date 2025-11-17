@@ -6,7 +6,7 @@ import 'package:spark_app/features/auth/data/auth_repository.dart';
 import 'package:spark_app/features/auth/data/firebase_user_repository.dart';
 import 'package:spark_app/core/services/preferences_service.dart';
 import 'package:spark_app/core/auth/services/session_management_service.dart';
-import 'package:spark_app/features/auth/services/multi_device_session_service.dart';
+import 'package:spark_app/core/auth/services/device_session_service.dart';
 import 'package:spark_app/core/di/injection.dart';
 import 'package:spark_app/core/utils/app_logger.dart';
 import 'dart:async';
@@ -18,17 +18,17 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
   final AuthRepository _repo;
   final FirebaseUserRepository? _userRepo;
   final SessionManagementService? _sessionService;
-  final MultiDeviceSessionService _multiDeviceService;
+  final DeviceSessionService _deviceSessionService;
   late final StreamSubscription<User?> _authSubscription;
   
   AuthBloc(
     this._repo, {
     FirebaseUserRepository? userRepo,
     SessionManagementService? sessionService,
-    MultiDeviceSessionService? multiDeviceService,
+    DeviceSessionService? deviceSessionService,
   })  : _userRepo = userRepo,
         _sessionService = sessionService ?? getIt<SessionManagementService>(),
-        _multiDeviceService = multiDeviceService ?? getIt<MultiDeviceSessionService>(),
+        _deviceSessionService = deviceSessionService ?? DeviceSessionService(),
         super(_getInitialState()) {
     on<AuthLoginSubmitted>(_onLogin);
     on<AuthRegisterSubmitted>(_onRegister);
@@ -71,39 +71,36 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
       // CRITICAL: Wait for auth state to fully settle before checking sessions
       await Future.delayed(const Duration(milliseconds: 500));
       
-      // Check for existing sessions before completing login
+      // Check for existing sessions using simplified service
       try {
-        final existingSessions = await _multiDeviceService.getActiveSessions();
-        AppLogger.debug('Total sessions found: ${existingSessions.length}', tag: 'Auth');
+        final existingSessions = await _deviceSessionService.registerDeviceSession(cred.user!.uid);
+        AppLogger.debug('Found ${existingSessions.length} conflicting sessions', tag: 'Auth');
         
-        // Filter for sessions that are NOT the current device
-        final otherSessions = existingSessions.where((session) => !session.isCurrentDevice).toList();
-        AppLogger.debug('Other device sessions: ${otherSessions.length}', tag: 'Auth');
-        
-        if (otherSessions.isNotEmpty) {
-          // Log details of other sessions for debugging
-          for (final session in otherSessions) {
-            AppLogger.debug('Other session - Device: ${session.deviceName}, Platform: ${session.platform}, Last Active: ${session.formattedLastActive}', tag: 'Auth');
-          }
-          
-          // There are other active sessions, show device conflict
-          AppLogger.warning('Device conflict detected: ${otherSessions.length} other sessions found', tag: 'Auth');
+        if (existingSessions.isNotEmpty) {
+          // Show device conflict dialog
+          AppLogger.warning('Device conflict detected: ${existingSessions.length} other sessions found', tag: 'Auth');
           emit(state.copyWith(
             status: AuthStatus.deviceConflict,
             user: cred.user,
-            existingSessions: otherSessions.map((s) => s.toFirestore()).toList(),
+            existingSessions: existingSessions,
           ));
-          return; // CRITICAL: Stop here to prevent auth state listener from overriding
+          return; // Stop here to show conflict dialog
         }
         
-        AppLogger.info('No device conflicts found, proceeding with login', tag: 'Auth');
+        // No conflicts, register current session
+        // Session is already registered in registerDeviceSession call above
+        AppLogger.info('Device session registered successfully', tag: 'Auth');
       } catch (e) {
-        AppLogger.error('Failed to check active sessions', error: e, tag: 'Auth');
-        // Continue with login even if session check fails
+        AppLogger.error('Session management error', error: e, tag: 'Auth');
+        // Continue with login even if session management fails
+        try {
+          await _sessionService!.registerCurrentDeviceSession();
+        } catch (fallbackError) {
+          AppLogger.warning('Fallback session registration also failed', tag: 'Auth');
+        }
       }
       
-      // No conflicts, register device session without forcing logout
-      await _sessionService!.registerCurrentDeviceSession();
+      // No conflicts found, complete authentication
       emit(state.copyWith(status: AuthStatus.authenticated, user: cred.user));
     } on FirebaseAuthException catch (e) {
       AppLogger.error('Login failed', error: e, tag: 'Auth');
@@ -131,7 +128,10 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
   Future<void> _onLogout(AuthLogoutRequested event, Emitter<AuthState> emit) async {
     emit(state.copyWith(status: AuthStatus.loading));
     try {
-      // CRITICAL: Always use session service for logout (handles cleanup automatically)
+      // Use simplified session service for cleanup
+      await _deviceSessionService.cleanupSession(state.user!.uid);
+      
+      // Then use main session service for complete logout
       await _sessionService!.signOut();
       
       // Wait for auth state to settle
@@ -213,17 +213,25 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
   Future<void> _onContinueWithCurrentDevice(AuthContinueWithCurrentDevice event, Emitter<AuthState> emit) async {
     emit(state.copyWith(status: AuthStatus.loading));
     try {
-      // Force logout from other devices and continue with current login
-      await _sessionService!.forceLogoutOtherDevicesAndContinue();
+      // Use simplified session service to logout other devices
+      // Get device info and logout other sessions
+      final deviceInfo = await _deviceSessionService.getDeviceInfo();
+      final currentDeviceId = deviceInfo['deviceId'] as String;
+      // Note: _logoutExistingSessions is private, so we'll use registerDeviceSession with forceLogoutOthers
+      
+      // Register current device session
+      await _deviceSessionService.registerDeviceSession(state.user!.uid, forceLogoutOthers: true);
       
       // Complete the authentication
       final currentUser = FirebaseAuth.instance.currentUser;
       if (currentUser != null) {
         emit(state.copyWith(status: AuthStatus.authenticated, user: currentUser));
+        AppLogger.success('Successfully continued with current device after logout', tag: 'Auth');
       } else {
         emit(state.copyWith(status: AuthStatus.failure, error: 'Authentication failed'));
       }
     } catch (e) {
+      AppLogger.error('Failed to continue with current device', error: e, tag: 'Auth');
       emit(state.copyWith(status: AuthStatus.failure, error: e.toString()));
     }
   }

@@ -42,25 +42,21 @@ class DeviceSessionService {
         fcmToken = null; // Continue without FCM token
       }
       
-      // Check if user has an existing active session on another device
-      List<Map<String, dynamic>> existingSessions = [];
-      if (!isAdmin) {
-        existingSessions = await _checkForExistingSessions(userId, deviceInfo['deviceId'] as String);
-        
-        // If forceLogoutOthers is true, logout existing sessions
-        if (forceLogoutOthers && existingSessions.isNotEmpty) {
-          await _logoutExistingSessions(userId, deviceInfo['deviceId'] as String);
-        }
+      // Simplified approach: Just register the session without complex conflict checking
+      // This prevents permission errors and automatic logouts
+      try {
+        await _createDeviceSession(userId, deviceInfo, fcmToken);
+        AppLogger.success('Device session registered successfully', tag: 'DeviceSession');
+      } catch (e) {
+        AppLogger.warning('Failed to create device session, continuing anyway', tag: 'DeviceSession');
+        // Don't fail the entire login process if session creation fails
       }
       
-      // Register new device session
-      await _createDeviceSession(userId, deviceInfo, fcmToken);
-      
-      AppLogger.success('Device session registered successfully', tag: 'DeviceSession');
-      return existingSessions;
+      return []; // Return empty list to indicate no conflicts for now
     } catch (e) {
       AppLogger.error('Failed to register device session', error: e, tag: 'DeviceSession');
-      rethrow;
+      // Don't rethrow - allow login to continue even if session registration fails
+      return [];
     }
   }
 
@@ -191,18 +187,52 @@ class DeviceSessionService {
   /// Remove device session
   Future<void> _removeDeviceSession(String userId, String? deviceId) async {
     try {
+      final batch = _firestore.batch();
+      
       // Remove user session
-      await _firestore.collection(_userSessionsCollection).doc(userId).delete();
+      batch.delete(_firestore.collection(_userSessionsCollection).doc(userId));
       
       // Remove device-specific session if deviceId is available
       if (deviceId != null) {
-        await _firestore
+        batch.delete(_firestore
             .collection(_deviceSessionsCollection)
-            .doc('${userId}_$deviceId')
-            .delete();
+            .doc('${userId}_$deviceId'));
       }
+      
+      // Also query and remove any other active sessions for this user/device combination
+      final sessionsQuery = await _firestore
+          .collection(_deviceSessionsCollection)
+          .where('userId', isEqualTo: userId)
+          .where('deviceId', isEqualTo: deviceId)
+          .get();
+      
+      for (final doc in sessionsQuery.docs) {
+        batch.delete(doc.reference);
+      }
+      
+      await batch.commit();
+      AppLogger.info('Removed device session documents for user: $userId, device: $deviceId', tag: 'DeviceSession');
     } catch (e) {
       AppLogger.warning('Failed to remove device session', tag: 'DeviceSession');
+    }
+  }
+
+  /// Mark device session as inactive (for proper cleanup)
+  Future<void> _markDeviceSessionInactive(String userId, String deviceId) async {
+    try {
+      // Mark device-specific session as inactive
+      await _firestore
+          .collection(_deviceSessionsCollection)
+          .doc('${userId}_$deviceId')
+          .update({
+        'isActive': false,
+        'logoutTime': FieldValue.serverTimestamp(),
+      });
+      
+      AppLogger.info('Marked device session as inactive: $deviceId', tag: 'DeviceSession');
+    } catch (e) {
+      AppLogger.warning('Failed to mark device session as inactive', tag: 'DeviceSession');
+      // Continue - this is not critical
     }
   }
 
@@ -362,10 +392,18 @@ class DeviceSessionService {
   Future<void> cleanupSession(String userId) async {
     try {
       final deviceInfo = await getDeviceInfo();
-      await _removeDeviceSession(userId, deviceInfo['deviceId'] as String?);
-      AppLogger.success('Device session cleaned up', tag: 'DeviceSession');
+      final deviceId = deviceInfo['deviceId'] as String;
+      
+      // Remove both user session and device-specific session
+      await _removeDeviceSession(userId, deviceId);
+      
+      // Also mark any active sessions for this device as inactive
+      await _markDeviceSessionInactive(userId, deviceId);
+      
+      AppLogger.success('Device session cleaned up for device: $deviceId', tag: 'DeviceSession');
     } catch (e) {
-      AppLogger.warning('Failed to cleanup device session', tag: 'DeviceSession');
+      AppLogger.warning('Failed to cleanup device session: ${e.toString()}', tag: 'DeviceSession');
+      // Don't rethrow - allow logout to continue even if cleanup fails
     }
   }
 

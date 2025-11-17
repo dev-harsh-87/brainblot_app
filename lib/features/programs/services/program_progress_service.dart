@@ -74,12 +74,28 @@ class ProgramProgressService {
       }
     }
 
-    // Update active program
+    final completionTime = DateTime.now();
+    
+    // Update active program in program_progress collection
     batch.update(activeProgramRef, {
       'currentDay': nextDay,
       'completedDays': completedDays,
-      'lastCompletedAt': DateTime.now().toIso8601String(),
+      'lastCompletedAt': completionTime.toIso8601String(),
       'progressPercentage': _calculateProgressPercentage(completedDays.length, activeData['totalDays'] as int? ?? 1),
+      'dayCompletionTimes.${dayNumber}': completionTime.toIso8601String(),
+    });
+
+    // IMPORTANT: Also update the active_programs collection that the BLoC watches
+    final activeProgramDocRef = _firestore
+        .collection('active_programs')
+        .doc(userId);
+    
+    // Use set instead of update to ensure the document exists
+    batch.set(activeProgramDocRef, {
+      'currentDay': nextDay,
+      'programId': programId,
+      'startedAt': activeData['startedAt'] ?? DateTime.now().toIso8601String(),
+      'userId': userId,
     });
 
     // Record day completion in progress collection
@@ -96,8 +112,13 @@ class ProgramProgressService {
       'userId': userId,
     });
 
-    await batch.commit();
-    AppLogger.info('Program day $dayNumber completed successfully');
+    try {
+      await batch.commit();
+      AppLogger.info('Program day $dayNumber completed successfully. Next day: $nextDay');
+    } catch (e) {
+      AppLogger.error('Failed to commit program day completion batch', error: e);
+      throw Exception('Failed to complete program day: $e');
+    }
 
     // Check if program is fully completed
     final program = await _getProgram(programId);
@@ -131,6 +152,23 @@ class ProgramProgressService {
           ? DateTime.parse(data['startedAt'] as String)
           : DateTime.now();
 
+      // Parse day completion times
+      final dayCompletionTimes = <int, DateTime>{};
+      final dayCompletionTimesData = data['dayCompletionTimes'] as Map<String, dynamic>?;
+      if (dayCompletionTimesData != null) {
+        for (final entry in dayCompletionTimesData.entries) {
+          final dayNumber = int.tryParse(entry.key);
+          final timeString = entry.value as String?;
+          if (dayNumber != null && timeString != null) {
+            try {
+              dayCompletionTimes[dayNumber] = DateTime.parse(timeString);
+            } catch (e) {
+              print('Error parsing day completion time for day $dayNumber: $e');
+            }
+          }
+        }
+      }
+
       return ProgramProgress(
         programId: programId,
         currentDay: currentDay,
@@ -138,9 +176,10 @@ class ProgramProgressService {
         durationDays: totalDays,
         startedAt: startedAt,
         progressPercentage: _calculateProgressPercentage(completedDays.length, totalDays),
-        lastCompletedAt: data['lastCompletedAt'] != null 
+        lastCompletedAt: data['lastCompletedAt'] != null
             ? DateTime.parse(data['lastCompletedAt'] as String)
             : null,
+        dayCompletionTimes: dayCompletionTimes,
       );
     } catch (e) {
       AppLogger.error('Error getting program progress', error: e);
@@ -172,6 +211,23 @@ class ProgramProgressService {
           ? DateTime.parse(data['startedAt'] as String)
           : DateTime.now();
 
+      // Parse day completion times
+      final dayCompletionTimes = <int, DateTime>{};
+      final dayCompletionTimesData = data['dayCompletionTimes'] as Map<String, dynamic>?;
+      if (dayCompletionTimesData != null) {
+        for (final entry in dayCompletionTimesData.entries) {
+          final dayNumber = int.tryParse(entry.key);
+          final timeString = entry.value as String?;
+          if (dayNumber != null && timeString != null) {
+            try {
+              dayCompletionTimes[dayNumber] = DateTime.parse(timeString);
+            } catch (e) {
+              print('Error parsing day completion time for day $dayNumber: $e');
+            }
+          }
+        }
+      }
+
       return ProgramProgress(
         programId: programId,
         currentDay: currentDay,
@@ -179,9 +235,10 @@ class ProgramProgressService {
         durationDays: totalDays,
         startedAt: startedAt,
         progressPercentage: _calculateProgressPercentage(completedDays.length, totalDays),
-        lastCompletedAt: data['lastCompletedAt'] != null 
+        lastCompletedAt: data['lastCompletedAt'] != null
             ? DateTime.parse(data['lastCompletedAt'] as String)
             : null,
+        dayCompletionTimes: dayCompletionTimes,
       );
     });
   }
@@ -408,6 +465,7 @@ class ProgramProgress {
   final DateTime startedAt;
   final double progressPercentage;
   final DateTime? lastCompletedAt;
+  final Map<int, DateTime>? dayCompletionTimes; // When each day was completed
 
   ProgramProgress({
     required this.programId,
@@ -417,12 +475,74 @@ class ProgramProgress {
     required this.startedAt,
     required this.progressPercentage,
     this.lastCompletedAt,
+    this.dayCompletionTimes,
   });
 
   bool get isCompleted => completedDays.length >= durationDays;
   bool isDayCompleted(int dayNumber) => completedDays.contains(dayNumber);
   int get remainingDays => durationDays - completedDays.length;
   Duration get timeActive => DateTime.now().difference(startedAt);
+  
+  /// Check if a specific day is accessible based on time-based rules
+  bool isDayAccessible(int dayNumber) {
+    // Day 1 is always accessible
+    if (dayNumber == 1) return true;
+    
+    // Check if previous day was completed
+    final previousDay = dayNumber - 1;
+    if (!isDayCompleted(previousDay)) {
+      return false; // Previous day not completed
+    }
+    
+    final previousDayCompletionTime = dayCompletionTimes?[previousDay];
+    if (previousDayCompletionTime == null) {
+      return false; // Previous day completion time not recorded
+    }
+    
+    // Check if it's been at least 24 hours since previous day completion
+    final now = DateTime.now();
+    final nextDayUnlockTime = DateTime(
+      previousDayCompletionTime.year,
+      previousDayCompletionTime.month,
+      previousDayCompletionTime.day + 1,
+      0, 0, 0, // Unlock at midnight
+    );
+    
+    return now.isAfter(nextDayUnlockTime) || now.isAtSameMomentAs(nextDayUnlockTime);
+  }
+  
+  /// Get the time when a specific day will be unlocked
+  DateTime? getDayUnlockTime(int dayNumber) {
+    if (dayNumber == 1) return startedAt; // Day 1 unlocks when program starts
+    
+    final previousDay = dayNumber - 1;
+    if (!isDayCompleted(previousDay)) {
+      return null; // Previous day not completed yet
+    }
+    
+    final previousDayCompletionTime = dayCompletionTimes?[previousDay];
+    if (previousDayCompletionTime == null) {
+      return null; // Previous day completion time not recorded
+    }
+    
+    return DateTime(
+      previousDayCompletionTime.year,
+      previousDayCompletionTime.month,
+      previousDayCompletionTime.day + 1,
+      0, 0, 0, // Unlock at midnight
+    );
+  }
+  
+  /// Get time remaining until next day unlock
+  Duration? getTimeUntilDayUnlock(int dayNumber) {
+    final unlockTime = getDayUnlockTime(dayNumber);
+    if (unlockTime == null) return null;
+    
+    final now = DateTime.now();
+    if (now.isAfter(unlockTime)) return Duration.zero;
+    
+    return unlockTime.difference(now);
+  }
 }
 
 /// Data class for program statistics

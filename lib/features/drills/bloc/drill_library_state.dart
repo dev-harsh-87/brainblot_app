@@ -36,9 +36,11 @@ class DrillLibraryState extends Equatable {
 
   const DrillLibraryState.initial()
       : this(
-          status: DrillLibraryStatus.initial, 
-          items: const [], 
+          status: DrillLibraryStatus.initial,
+          items: const [],
           all: const [],
+          query: '',
+          category: '',
           isRefreshing: false,
         );
 

@@ -71,8 +71,12 @@ class _ProgramDayScreenState extends State<ProgramDayScreen> {
         }
       } else if (widget.program.dayWiseDrillIds.isNotEmpty) {
         // New enhanced format: Use dayWiseDrillIds
-        final drillIds = widget.program.dayWiseDrillIds[widget.dayNumber];
+        print('🔍 DEBUG: Program ${widget.program.name} dayWiseDrillIds: ${widget.program.dayWiseDrillIds}');
+        print('🔍 DEBUG: Looking for day ${widget.dayNumber} drills');
         
+        final drillIds = widget.program.dayWiseDrillIds[widget.dayNumber];
+        print('🔍 DEBUG: Found drill IDs for day ${widget.dayNumber}: $drillIds');
+
         if (drillIds != null && drillIds.isNotEmpty) {
           // Load all assigned drills for this day
           final drills = <Drill>[];

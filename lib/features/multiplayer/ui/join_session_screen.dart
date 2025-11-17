@@ -11,6 +11,7 @@ import 'package:spark_app/features/drills/ui/drill_runner_screen.dart';
 import 'package:spark_app/features/multiplayer/domain/connection_session.dart';
 import 'package:spark_app/features/multiplayer/services/session_sync_service.dart';
 import 'package:spark_app/features/multiplayer/services/professional_permission_manager.dart';
+import 'package:spark_app/features/multiplayer/ui/widgets/multiplayer_permission_dialog.dart';
 
 /// Screen for joining a multiplayer training session
 class JoinSessionScreen extends StatefulWidget {
@@ -152,20 +153,19 @@ class _JoinSessionScreenState extends State<JoinSessionScreen>
     if (!mounted) return;
     
     try {
-      if (event.runtimeType.toString() == 'DrillStartedEvent') {
-        final drillStartedEvent = event as DrillStartedEvent;
+      if (event is DrillStartedEvent) {
         // Host started a drill - automatically navigate to drill runner
-        _navigateToDrillRunner(drillStartedEvent.drill);
+        _navigateToDrillRunner(event.drill);
         
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Drill started: ${drillStartedEvent.drill.name}'),
+            content: Text('Drill started: ${event.drill.name}'),
             backgroundColor: Colors.green,
             duration: const Duration(seconds: 2),
           ),
         );
         
-      } else if (event.runtimeType.toString() == 'DrillStoppedEvent') {
+      } else if (event is DrillStoppedEvent) {
         // Host stopped the drill - return to join screen if in drill runner
         _returnFromDrillRunner();
         
@@ -177,7 +177,7 @@ class _JoinSessionScreenState extends State<JoinSessionScreen>
           ),
         );
         
-      } else if (event.runtimeType.toString() == 'DrillPausedEvent') {
+      } else if (event is DrillPausedEvent) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('Drill paused by host'),
@@ -186,7 +186,7 @@ class _JoinSessionScreenState extends State<JoinSessionScreen>
           ),
         );
         
-      } else if (event.runtimeType.toString() == 'DrillResumedEvent') {
+      } else if (event is DrillResumedEvent) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('Drill resumed by host'),
@@ -195,12 +195,11 @@ class _JoinSessionScreenState extends State<JoinSessionScreen>
           ),
         );
         
-      } else if (event.runtimeType.toString() == 'ChatReceivedEvent') {
-        final chatEvent = event as ChatReceivedEvent;
+      } else if (event is ChatReceivedEvent) {
         // Handle chat messages if needed
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('${chatEvent.sender}: ${chatEvent.message}'),
+            content: Text('${event.sender}: ${event.message}'),
             duration: const Duration(seconds: 3),
           ),
         );
@@ -326,6 +325,10 @@ class _JoinSessionScreenState extends State<JoinSessionScreen>
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          // WiFi Warning Banner
+          _buildWiFiWarningBanner(context),
+          SizedBox(height: isSmallScreen ? 16 : 20),
+
           // Header
           _buildHeader(context),
           SizedBox(height: isSmallScreen ? 24 : 32),
@@ -374,9 +377,6 @@ class _JoinSessionScreenState extends State<JoinSessionScreen>
           // Current Drill Status
           _buildDrillStatus(context),
           SizedBox(height: isSmallScreen ? 16 : 24),
-
-          // Instructions for participants
-          _buildParticipantInstructions(context),
         ],
       ),
     );
@@ -441,6 +441,78 @@ class _JoinSessionScreenState extends State<JoinSessionScreen>
                 ),
               ],
             ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildWiFiWarningBanner(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final size = MediaQuery.of(context).size;
+    final isSmallScreen = size.width < 360;
+
+    return Container(
+      width: double.infinity,
+      padding: EdgeInsets.all(isSmallScreen ? 12 : 16),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: [
+            Colors.orange.withOpacity(0.1),
+            Colors.red.withOpacity(0.1),
+          ],
+          begin: Alignment.centerLeft,
+          end: Alignment.centerRight,
+        ),
+        borderRadius: BorderRadius.circular(isSmallScreen ? 10 : 12),
+        border: Border.all(
+          color: Colors.orange.withOpacity(0.3),
+          width: 1.5,
+        ),
+      ),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: Colors.orange.withOpacity(0.2),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Icon(
+              Icons.wifi_rounded,
+              color: Colors.orange.shade700,
+              size: isSmallScreen ? 20 : 24,
+            ),
+          ),
+          SizedBox(width: isSmallScreen ? 10 : 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Same WiFi Required',
+                  style: theme.textTheme.titleSmall?.copyWith(
+                    fontWeight: FontWeight.bold,
+                    fontSize: isSmallScreen ? 13 : 14,
+                    color: Colors.orange.shade800,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  'Both devices must be on the same WiFi network',
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    fontSize: isSmallScreen ? 11 : 12,
+                    color: Colors.orange.shade700,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Icon(
+            Icons.priority_high_rounded,
+            color: Colors.orange.shade600,
+            size: isSmallScreen ? 18 : 20,
           ),
         ],
       ),
@@ -667,50 +739,336 @@ class _JoinSessionScreenState extends State<JoinSessionScreen>
     final size = MediaQuery.of(context).size;
     final isSmallScreen = size.width < 360;
 
-    return Container(
-      padding: EdgeInsets.all(isSmallScreen ? 16 : 20),
-      decoration: BoxDecoration(
-        color: colorScheme.surfaceContainerHighest.withOpacity(0.3),
-        borderRadius: BorderRadius.circular(isSmallScreen ? 12 : 16),
-        border: Border.all(
-          color: colorScheme.outline.withOpacity(0.1),
-        ),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
+    return Column(
+      children: [
+        // Connection Requirements
+        Container(
+          padding: EdgeInsets.all(isSmallScreen ? 16 : 20),
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              colors: [
+                colorScheme.errorContainer.withOpacity(0.1),
+                colorScheme.secondaryContainer.withOpacity(0.1),
+              ],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+            borderRadius: BorderRadius.circular(isSmallScreen ? 12 : 16),
+            border: Border.all(
+              color: colorScheme.error.withOpacity(0.2),
+              width: 1.5,
+            ),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Icon(
-                Icons.help_outline_rounded,
-                color: colorScheme.primary,
-                size: isSmallScreen ? 18 : 20,
+              Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: colorScheme.error.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Icon(
+                      Icons.warning_rounded,
+                      color: colorScheme.error,
+                      size: isSmallScreen ? 18 : 20,
+                    ),
+                  ),
+                  SizedBox(width: isSmallScreen ? 8 : 12),
+                  Expanded(
+                    child: Text(
+                      'Connection Requirements',
+                      style: theme.textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.bold,
+                        fontSize: isSmallScreen ? 15 : null,
+                        color: colorScheme.error,
+                      ),
+                    ),
+                  ),
+                ],
               ),
-              SizedBox(width: isSmallScreen ? 6 : 8),
+              SizedBox(height: isSmallScreen ? 12 : 16),
+              _buildRequirementItem(
+                context,
+                Icons.wifi_rounded,
+                'Same WiFi Network',
+                'Both devices must be connected to the same WiFi network',
+                colorScheme.error,
+                isSmallScreen,
+              ),
+              SizedBox(height: isSmallScreen ? 8 : 12),
+              _buildRequirementItem(
+                context,
+                Icons.bluetooth_rounded,
+                'Bluetooth & Location',
+                'Enable Bluetooth and Location services on both devices',
+                colorScheme.error,
+                isSmallScreen,
+              ),
+              SizedBox(height: isSmallScreen ? 8 : 12),
+              _buildRequirementItem(
+                context,
+                Icons.location_on_rounded,
+                'Physical Proximity',
+                'Stay within 10-15 meters of the host device',
+                colorScheme.error,
+                isSmallScreen,
+              ),
+            ],
+          ),
+        ),
+        
+        SizedBox(height: isSmallScreen ? 16 : 20),
+        
+        // Step-by-step Instructions
+        Container(
+          padding: EdgeInsets.all(isSmallScreen ? 16 : 20),
+          decoration: BoxDecoration(
+            color: colorScheme.surfaceContainerHighest.withOpacity(0.3),
+            borderRadius: BorderRadius.circular(isSmallScreen ? 12 : 16),
+            border: Border.all(
+              color: colorScheme.outline.withOpacity(0.1),
+            ),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Icon(
+                    Icons.list_alt_rounded,
+                    color: colorScheme.primary,
+                    size: isSmallScreen ? 18 : 20,
+                  ),
+                  SizedBox(width: isSmallScreen ? 6 : 8),
+                  Text(
+                    'How to Join',
+                    style: theme.textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.bold,
+                      fontSize: isSmallScreen ? 15 : null,
+                    ),
+                  ),
+                ],
+              ),
+              SizedBox(height: isSmallScreen ? 12 : 16),
+              _buildStepItem(context, '1', 'Verify WiFi Connection', 'Ensure both devices are on the same WiFi network', isSmallScreen),
+              _buildStepItem(context, '2', 'Enable Permissions', 'Allow Bluetooth, Location, and Nearby Devices access', isSmallScreen),
+              _buildStepItem(context, '3', 'Get Session Code', 'Ask the host for the 6-digit session code', isSmallScreen),
+              _buildStepItem(context, '4', 'Enter Code', 'Type the code in the field above', isSmallScreen),
+              _buildStepItem(context, '5', 'Join Session', 'Tap "Join Session" and wait for connection', isSmallScreen),
+              _buildStepItem(context, '6', 'Start Training', 'Wait for host to begin synchronized drills', isSmallScreen),
+            ],
+          ),
+        ),
+        
+        SizedBox(height: isSmallScreen ? 16 : 20),
+        
+        // Troubleshooting Tips
+        Container(
+          padding: EdgeInsets.all(isSmallScreen ? 16 : 20),
+          decoration: BoxDecoration(
+            color: colorScheme.tertiaryContainer.withOpacity(0.2),
+            borderRadius: BorderRadius.circular(isSmallScreen ? 12 : 16),
+            border: Border.all(
+              color: colorScheme.tertiary.withOpacity(0.2),
+            ),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Icon(
+                    Icons.build_rounded,
+                    color: colorScheme.tertiary,
+                    size: isSmallScreen ? 18 : 20,
+                  ),
+                  SizedBox(width: isSmallScreen ? 6 : 8),
+                  Text(
+                    'Troubleshooting',
+                    style: theme.textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.bold,
+                      fontSize: isSmallScreen ? 15 : null,
+                      color: colorScheme.tertiary,
+                    ),
+                  ),
+                ],
+              ),
+              SizedBox(height: isSmallScreen ? 12 : 16),
+              _buildTroubleshootItem(
+                context,
+                'Session Not Found',
+                '• Check WiFi connection\n• Verify session code\n• Move closer to host\n• Restart Bluetooth',
+                isSmallScreen,
+              ),
+              SizedBox(height: isSmallScreen ? 8 : 12),
+              _buildTroubleshootItem(
+                context,
+                'Connection Failed',
+                '• Check app permissions\n• Ensure location is enabled\n• Try turning WiFi off/on\n• Restart the app',
+                isSmallScreen,
+              ),
+              SizedBox(height: isSmallScreen ? 8 : 12),
+              _buildTroubleshootItem(
+                context,
+                'Frequent Disconnections',
+                '• Stay within range of host\n• Keep devices charged\n• Avoid interference sources\n• Use 5GHz WiFi if available',
+                isSmallScreen,
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildRequirementItem(
+    BuildContext context,
+    IconData icon,
+    String title,
+    String description,
+    Color color,
+    bool isSmallScreen,
+  ) {
+    final theme = Theme.of(context);
+    
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Container(
+          padding: const EdgeInsets.all(6),
+          decoration: BoxDecoration(
+            color: color.withOpacity(0.1),
+            borderRadius: BorderRadius.circular(6),
+          ),
+          child: Icon(
+            icon,
+            color: color,
+            size: isSmallScreen ? 16 : 18,
+          ),
+        ),
+        SizedBox(width: isSmallScreen ? 8 : 12),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
               Text(
-                'How to join',
-                style: theme.textTheme.titleMedium?.copyWith(
+                title,
+                style: theme.textTheme.titleSmall?.copyWith(
                   fontWeight: FontWeight.bold,
-                  fontSize: isSmallScreen ? 15 : null,
+                  fontSize: isSmallScreen ? 13 : null,
+                ),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                description,
+                style: theme.textTheme.bodySmall?.copyWith(
+                  fontSize: isSmallScreen ? 11 : null,
+                  color: theme.colorScheme.onSurface.withOpacity(0.7),
+                  height: 1.3,
                 ),
               ),
             ],
           ),
-          SizedBox(height: isSmallScreen ? 10 : 12),
-          Text(
-            '1. Get the 6-digit session code from the host\n'
-            '2. Enter the code in the field above\n'
-            '3. Tap "Join Session" to connect\n'
-            '4. Wait for the host to start training\n'
-            '5. Follow along with synchronized drills',
-            style: theme.textTheme.bodyMedium?.copyWith(
-              fontSize: isSmallScreen ? 13 : null,
-              color: colorScheme.onSurface.withOpacity(0.7),
-              height: 1.5,
+        ),
+      ],
+    );
+  }
+
+  Widget _buildStepItem(
+    BuildContext context,
+    String stepNumber,
+    String title,
+    String description,
+    bool isSmallScreen,
+  ) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    
+    return Padding(
+      padding: EdgeInsets.only(bottom: isSmallScreen ? 8 : 12),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            width: isSmallScreen ? 24 : 28,
+            height: isSmallScreen ? 24 : 28,
+            decoration: BoxDecoration(
+              color: colorScheme.primary,
+              borderRadius: BorderRadius.circular(isSmallScreen ? 12 : 14),
+            ),
+            child: Center(
+              child: Text(
+                stepNumber,
+                style: TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.bold,
+                  fontSize: isSmallScreen ? 12 : 14,
+                ),
+              ),
+            ),
+          ),
+          SizedBox(width: isSmallScreen ? 8 : 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: theme.textTheme.titleSmall?.copyWith(
+                    fontWeight: FontWeight.bold,
+                    fontSize: isSmallScreen ? 13 : null,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  description,
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    fontSize: isSmallScreen ? 11 : null,
+                    color: colorScheme.onSurface.withOpacity(0.7),
+                    height: 1.3,
+                  ),
+                ),
+              ],
             ),
           ),
         ],
       ),
+    );
+  }
+
+  Widget _buildTroubleshootItem(
+    BuildContext context,
+    String problem,
+    String solutions,
+    bool isSmallScreen,
+  ) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          problem,
+          style: theme.textTheme.titleSmall?.copyWith(
+            fontWeight: FontWeight.bold,
+            fontSize: isSmallScreen ? 13 : null,
+            color: colorScheme.tertiary,
+          ),
+        ),
+        const SizedBox(height: 4),
+        Text(
+          solutions,
+          style: theme.textTheme.bodySmall?.copyWith(
+            fontSize: isSmallScreen ? 11 : null,
+            color: colorScheme.onSurface.withOpacity(0.7),
+            height: 1.4,
+          ),
+        ),
+      ],
     );
   }
 
@@ -1060,190 +1418,9 @@ class _JoinSessionScreenState extends State<JoinSessionScreen>
     );
   }
 
-  Widget _buildParticipantInstructions(BuildContext context) {
-    final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
-    final isActive = _syncService.isDrillActive;
-    final isPaused = _syncService.isDrillPaused;
+ 
 
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: Colors.blue.withOpacity(0.05),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: Colors.blue.withOpacity(0.2),
-        ),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Icon(
-                Icons.people_outline_rounded,
-                color: Colors.blue,
-                size: 20,
-              ),
-              const SizedBox(width: 8),
-              Text(
-                'Participant Mode - No Controls Needed',
-                style: theme.textTheme.titleMedium?.copyWith(
-                  fontWeight: FontWeight.bold,
-                  color: Colors.blue,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          
-          // Show dynamic status message based on drill state
-          if (isActive && !isPaused)
-            Container(
-              padding: const EdgeInsets.all(12),
-              margin: const EdgeInsets.only(bottom: 12),
-              decoration: BoxDecoration(
-                color: Colors.green.withOpacity(0.1),
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(
-                  color: Colors.green.withOpacity(0.3),
-                ),
-              ),
-              child: Row(
-                children: [
-                  Icon(
-                    Icons.play_circle_rounded,
-                    color: Colors.green[700],
-                    size: 20,
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Text(
-                      'Drill is running! Your drill should have started automatically.',
-                      style: theme.textTheme.bodyMedium?.copyWith(
-                        color: Colors.green[700],
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            )
-          else if (isActive && isPaused)
-            Container(
-              padding: const EdgeInsets.all(12),
-              margin: const EdgeInsets.only(bottom: 12),
-              decoration: BoxDecoration(
-                color: Colors.orange.withOpacity(0.1),
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(
-                  color: Colors.orange.withOpacity(0.3),
-                ),
-              ),
-              child: Row(
-                children: [
-                  Icon(
-                    Icons.pause_circle_rounded,
-                    color: Colors.orange[700],
-                    size: 20,
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Text(
-                      'Drill paused by host. Wait for the host to resume.',
-                      style: theme.textTheme.bodyMedium?.copyWith(
-                        color: Colors.orange[700],
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          
-          _buildInstructionItem(
-            '🎯 Wait for host to select and start drill',
-            'The host will choose which drill to run for everyone',
-          ),
-          _buildInstructionItem(
-            '🚀 Drill starts automatically on your device',
-            'When host starts, your drill begins immediately',
-          ),
-          _buildInstructionItem(
-            '⏸️ Host controls all timing',
-            'Start, pause, resume, and stop are managed by the host',
-          ),
-          _buildInstructionItem(
-            '🏃‍♂️ Focus on your performance',
-            'Just concentrate on the drill - no need to manage controls',
-          ),
-          _buildInstructionItem(
-            '📊 Individual results tracked',
-            'Your performance is recorded separately from others',
-          ),
-          const SizedBox(height: 12),
-          Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: Colors.orange.withOpacity(0.1),
-              borderRadius: BorderRadius.circular(8),
-              border: Border.all(
-                color: Colors.orange.withOpacity(0.3),
-              ),
-            ),
-            child: Row(
-              children: [
-                Icon(
-                  Icons.info_rounded,
-                  color: Colors.orange[700],
-                  size: 16,
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    'You have no drill controls as a participant. Everything is managed by the host.',
-                    style: theme.textTheme.bodySmall?.copyWith(
-                      color: Colors.orange[700],
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildInstructionItem(String title, String description) {
-    final theme = Theme.of(context);
-    
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 8),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            title,
-            style: theme.textTheme.bodyMedium?.copyWith(
-              fontWeight: FontWeight.w600,
-              color: Colors.blue.withOpacity(0.9),
-            ),
-          ),
-          const SizedBox(width: 8),
-          Expanded(
-            child: Text(
-              description,
-              style: theme.textTheme.bodySmall?.copyWith(
-                color: Colors.blue.withOpacity(0.7),
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
+ 
 
   Color _getDrillStatusColor(bool isActive, bool isPaused) {
     if (!isActive) return Colors.grey;
@@ -1353,44 +1530,33 @@ class _JoinSessionScreenState extends State<JoinSessionScreen>
   }
 
   void _showPermissionDialog() async {
-    debugPrint('🔐 JOIN: Showing permission dialog...');
+    debugPrint('🔐 JOIN: Showing user-friendly permission dialog...');
     
-    try {
-      // Use the professional permission manager for all platforms
-      final result = await ProfessionalPermissionManager.requestPermissions(
-        
-      );
-      
-      debugPrint('🔐 JOIN: Permission request result: $result');
-      
-      // Refresh permission status after request
-      await _checkPermissions();
-      
-      if (mounted) {
-        setState(() {
-          if (result.success) {
-            _statusMessage = 'All permissions granted! Ready to join sessions.';
-          } else if (result.needsSettings) {
-            _statusMessage = 'Please enable permissions in Settings and try again.';
-          } else {
-            _statusMessage = 'Some permissions were not granted. Please try again.';
+    if (!mounted) return;
+    
+    showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => MultiplayerPermissionDialog(
+        onPermissionsGranted: () async {
+          debugPrint('🔐 JOIN: Permissions granted via dialog');
+          await _checkPermissions();
+          if (mounted) {
+            setState(() {
+              _statusMessage = 'All permissions granted! Ready to join sessions.';
+            });
           }
-        });
-      }
-      
-      // If permissions still not granted and need settings, show settings dialog
-      if (!result.success && result.needsSettings && mounted) {
-        _showSettingsDialog();
-      }
-      
-    } catch (e) {
-      debugPrint('🔐 JOIN: ❌ Error requesting permissions: $e');
-      if (mounted) {
-        setState(() {
-          _statusMessage = 'Error requesting permissions: $e';
-        });
-      }
-    }
+        },
+        onDismiss: () {
+          debugPrint('🔐 JOIN: Permission dialog dismissed');
+          if (mounted) {
+            setState(() {
+              _statusMessage = 'Permissions are required to join multiplayer sessions.';
+            });
+          }
+        },
+      ),
+    );
   }
   
   void _showSettingsDialog() {

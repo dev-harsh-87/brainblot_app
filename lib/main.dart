@@ -166,8 +166,10 @@ class CogniTrainApp extends StatelessWidget {
             darkTheme: AppTheme.dark(),
             routerConfig: appRouter.router,
             builder: (context, child) {
-              return NavigationStateTracker(
-                child: AuthWrapper(child: child ?? const SizedBox.shrink()),
+              return SafeArea(
+                child: NavigationStateTracker(
+                  child: AuthWrapper(child: child ?? const SizedBox.shrink()),
+                ),
               );
             },
           );

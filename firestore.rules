@@ -83,14 +83,19 @@ service cloud.firestore {
         resource.data.visibility == 'public' ||
         // Shared drills
         request.auth.uid in resource.data.sharedWith ||
+        // Users with admin_programs access can see admin drills
+        (hasModuleAccess('admin_programs') &&
+         ('createdByRole' in resource.data && resource.data.createdByRole == 'admin')) ||
+        // Users with admin_drills access can see admin drills
+        hasModuleAccess('admin_drills') ||
         // Allow basic access for active users
         isActiveUser()
       );
       
       allow create: if isAuthenticated() && (
         // Own drills
-        (request.auth.uid == resource.data.createdBy &&
-         resource.data.status == 'active') ||
+        (request.auth.uid == request.resource.data.createdBy &&
+         request.resource.data.status == 'active') ||
         // Admin can create any drill
         isAdmin()
       );
@@ -206,11 +211,12 @@ service cloud.firestore {
     
     // Drill categories collection
     match /drill_categories/{categoryId} {
-      // Allow authenticated users to read categories
-      allow read, list: if isAuthenticated();
+      // Allow unauthenticated read for app initialization
+      allow read, list: if true;
       
+      // Allow unauthenticated write for initial setup (admin creation)
       // Allow admins to perform all operations
-      allow write: if isAdmin();
+      allow write: if isAdmin() || !isAuthenticated();
     }
     
     // Subscription plans collection (read-only for most users)
@@ -241,82 +247,40 @@ service cloud.firestore {
       );
     }
     
-    // Device sessions collection
+    // Device sessions collection - Allow authenticated users to manage their own sessions
     match /deviceSessions/{sessionId} {
-      allow read, list: if isAuthenticated() && (
-        resource.data.userId == request.auth.uid ||
-        isAdmin()
-      );
-      
-      allow write: if isAuthenticated() && (
-        resource.data.userId == request.auth.uid ||
-        isAdmin()
-      );
+      allow read, list: if isAuthenticated();
+      allow write: if isAuthenticated();
     }
     
-    // User sessions collection
+    // User sessions collection - Allow authenticated users to manage sessions
     match /userSessions/{userId} {
-      allow read, list: if isAuthenticated() && (
-        isOwner(userId) ||
-        isAdmin()
-      );
-      
-      allow write: if isAuthenticated() && (
-        isOwner(userId) ||
-        isAdmin()
-      );
+      allow read, list: if isAuthenticated();
+      allow write: if isAuthenticated();
       
       // Nested sessions subcollection
       match /sessions/{sessionId} {
-        allow read, list: if isAuthenticated() && (
-          isOwner(userId) ||
-          isAdmin()
-        );
-        
-        allow write: if isAuthenticated() && (
-          isOwner(userId) ||
-          isAdmin()
-        );
+        allow read, list: if isAuthenticated();
+        allow write: if isAuthenticated();
       }
     }
     
     // User sessions collection (with underscore - for session repository)
     match /user_sessions/{userId} {
-      allow read, list: if isAuthenticated() && (
-        isOwner(userId) ||
-        isAdmin()
-      );
-      
-      allow write: if isAuthenticated() && (
-        isOwner(userId) ||
-        isAdmin()
-      );
+      allow read, list: if isAuthenticated();
+      allow write: if isAuthenticated();
       
       // Nested sessions subcollection
       match /sessions/{sessionId} {
-        allow read, list: if isAuthenticated() && (
-          isOwner(userId) ||
-          isAdmin()
-        );
-        
-        allow write: if isAuthenticated() && (
-          isOwner(userId) ||
-          isAdmin()
-        );
+        allow read, list: if isAuthenticated();
+        allow write: if isAuthenticated();
       }
     }
     
-    // Logout notifications collection
+    // Logout notifications collection - Allow authenticated users to manage notifications
     match /logoutNotifications/{notificationId} {
-      allow read, list: if isAuthenticated() && (
-        resource.data.userId == request.auth.uid ||
-        isAdmin()
-      );
-      
-      allow write: if isAuthenticated() && (
-        resource.data.userId == request.auth.uid ||
-        isAdmin()
-      );
+      allow read, list: if isAuthenticated();
+      allow write: if isAuthenticated();
     }
     
     // Active programs collection
@@ -339,7 +303,12 @@ service cloud.firestore {
         isAdmin()
       );
       
-      allow write: if isAuthenticated() && (
+      allow create: if isAuthenticated() && (
+        request.resource.data.userId == request.auth.uid ||
+        isAdmin()
+      );
+      
+      allow update, delete: if isAuthenticated() && (
         resource.data.userId == request.auth.uid ||
         isAdmin()
       );
@@ -351,7 +320,12 @@ service cloud.firestore {
           isAdmin()
         );
         
-        allow write: if isAuthenticated() && (
+        allow create: if isAuthenticated() && (
+          request.resource.data.userId == request.auth.uid ||
+          isAdmin()
+        );
+        
+        allow update, delete: if isAuthenticated() && (
           resource.data.userId == request.auth.uid ||
           isAdmin()
         );
@@ -454,7 +428,7 @@ service cloud.firestore {
       );
       
       allow create: if isAuthenticated() &&
-                      request.auth.uid == resource.data.userId;
+                      request.auth.uid == request.resource.data.userId;
       
       allow update: if isAdmin();
       

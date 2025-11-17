@@ -110,27 +110,28 @@ class SessionManagementService {
         AppLogger.debug('Skipping device registration - will be handled after conflict check');
       }
       
+      // DISABLED: Logout notifications causing issues - will implement later
       // Listen for logout notifications from other devices
-      try {
-        _logoutSubscription = _deviceSessionService.listenForLogoutNotifications().listen(
-          (notification) async {
-            // Only process logout if we still have an active session
-            if (_currentSession != null && firebaseUser.uid == _currentSession!.id) {
-              AppLogger.info('Received valid logout notification from another device');
-              await _handleForceLogout();
-            } else {
-              AppLogger.debug('Ignoring stale logout notification');
-            }
-          },
-          onError: (error) {
-            // Silent fail - notification system is not critical
-            AppLogger.error('Logout notification error', error: error);
-          },
-        );
-      } catch (e) {
-        AppLogger.error('Failed to setup logout notifications', error: e);
-        // Continue - this is not critical for session establishment
-      }
+      // try {
+      //   _logoutSubscription = _deviceSessionService.listenForLogoutNotifications().listen(
+      //     (notification) async {
+      //       // Only process logout if we still have an active session
+      //       if (_currentSession != null && firebaseUser.uid == _currentSession!.id) {
+      //         AppLogger.info('Received valid logout notification from another device');
+      //         await _handleForceLogout();
+      //       } else {
+      //         AppLogger.debug('Ignoring stale logout notification');
+      //       }
+      //     },
+      //     onError: (error) {
+      //       // Silent fail - notification system is not critical
+      //       AppLogger.error('Logout notification error', error: error);
+      //     },
+      //   );
+      // } catch (e) {
+      //   AppLogger.error('Failed to setup logout notifications', error: e);
+      //   // Continue - this is not critical for session establishment
+      // }
       
       // CRITICAL: First ensure user profile exists
       await _ensureUserProfileExists(firebaseUser);
@@ -575,8 +576,9 @@ class SessionManagementService {
     
     const adminEmails = [
       'admin@spark.com',
-      'admin@gmail.com',  // Fixed spelling - user's actual admin email
-      
+      'admin@gmail.com',
+      'harsh@gmail.com',  // Add your actual admin email
+      'test@admin.com',   // For testing
     ];
     
     if (adminEmails.contains(email.toLowerCase())) {

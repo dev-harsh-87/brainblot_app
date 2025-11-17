@@ -131,20 +131,40 @@ class DrillLibraryBloc extends Bloc<DrillLibraryEvent, DrillLibraryState> {
       currentView: event.view,
     ),);
     
-    // For favorites view, we need to use a different data source
-    if (event.view == DrillLibraryView.favorites) {
-      await _sub?.cancel();
-      _sub = _repo.watchFavorites().listen(
-        (drills) => add(_DrillLibraryItemsUpdated(drills as List<Drill>)),
-        onError: (error) => add(_DrillLibraryErrorOccurred(error.toString())),
-      );
-    } else {
-      // For other views, use the regular watchAll stream
-      await _sub?.cancel();
-      _sub = _repo.watchAll().listen(
-        (drills) => add(_DrillLibraryItemsUpdated(drills as List<Drill>)),
-        onError: (error) => add(_DrillLibraryErrorOccurred(error.toString())),
-      );
+    await _sub?.cancel();
+    
+    // Use appropriate data source based on view
+    switch (event.view) {
+      case DrillLibraryView.favorites:
+        _sub = _repo.watchFavorites().listen(
+          (drills) => add(_DrillLibraryItemsUpdated(drills as List<Drill>)),
+          onError: (error) => add(_DrillLibraryErrorOccurred(error.toString())),
+        );
+        break;
+      case DrillLibraryView.all:
+        // For admin drills view, we need to fetch admin drills specifically
+        // This view is used for the "Admin Drills" tab
+        if (_repo is FirebaseDrillRepository) {
+          try {
+            final adminDrills = await (_repo as FirebaseDrillRepository).fetchAdminDrills();
+            add(_DrillLibraryItemsUpdated(adminDrills));
+          } catch (e) {
+            add(_DrillLibraryErrorOccurred('Failed to load admin drills: $e'));
+          }
+        } else {
+          _sub = _repo.watchAll().listen(
+            (drills) => add(_DrillLibraryItemsUpdated(drills as List<Drill>)),
+            onError: (error) => add(_DrillLibraryErrorOccurred(error.toString())),
+          );
+        }
+        break;
+      case DrillLibraryView.custom:
+        // For custom/my drills view
+        _sub = _repo.watchAll().listen(
+          (drills) => add(_DrillLibraryItemsUpdated(drills as List<Drill>)),
+          onError: (error) => add(_DrillLibraryErrorOccurred(error.toString())),
+        );
+        break;
     }
   }
 
@@ -229,8 +249,8 @@ class DrillLibraryBloc extends Bloc<DrillLibraryEvent, DrillLibraryState> {
 
   List<Drill> _applyFilters(List<Drill> items, {String? query, String? category, Difficulty? difficulty, DrillLibraryView? view}) {
     // Use provided parameters or fall back to state
-    final searchQuery = query ?? state.query;
-    final filterCategory = category ?? state.category;
+    final searchQuery = (query ?? state.query ?? '').trim();
+    final filterCategory = (category ?? state.category ?? '').trim();
     final filterDifficulty = difficulty ?? state.difficulty;
     final currentView = view ?? state.currentView;
     
@@ -242,24 +262,47 @@ class DrillLibraryBloc extends Bloc<DrillLibraryEvent, DrillLibraryState> {
         // No filtering needed - the stream already provides only favorites
         break;
       case DrillLibraryView.custom:
-        out = out.where((d) => !d.isPreset);
+        // Filter to show only user-created drills (not preset/admin drills)
+        out = out.where((d) => !d.isPreset && d.createdByRole != 'admin');
         break;
       case DrillLibraryView.all:
-        // No additional filtering needed
+        // For admin drills view, show only admin-created drills
+        // The data should already be filtered by the repository, but ensure consistency
+        out = out.where((d) => d.createdByRole == 'admin');
         break;
     }
     
-    // Apply other filters
-    if ((searchQuery ?? '').isNotEmpty) {
-      out = out.where((d) => d.name.toLowerCase().contains(searchQuery!.toLowerCase()));
+    // Apply search query filter
+    if (searchQuery.isNotEmpty) {
+      final queryLower = searchQuery.toLowerCase();
+      out = out.where((d) {
+        final name = d.name.toLowerCase();
+        final description = d.description.toLowerCase();
+        final category = d.category.toLowerCase();
+        final tags = d.tags.map((tag) => tag.toLowerCase()).toList();
+        
+        return name.contains(queryLower) ||
+               description.contains(queryLower) ||
+               category.contains(queryLower) ||
+               tags.any((tag) => tag.contains(queryLower));
+      });
     }
-    if ((filterCategory ?? '').isNotEmpty) {
-      out = out.where((d) => d.category.toLowerCase() == filterCategory!.toLowerCase());
+    
+    // Apply category filter
+    if (filterCategory.isNotEmpty) {
+      out = out.where((d) => d.category.toLowerCase() == filterCategory.toLowerCase());
     }
+    
+    // Apply difficulty filter
     if (filterDifficulty != null) {
       out = out.where((d) => d.difficulty == filterDifficulty);
     }
-    return out.toList(growable: false);
+    
+    final result = out.toList(growable: false);
+    print('🔍 Applied filters - Query: "$searchQuery", Category: "$filterCategory", Difficulty: $filterDifficulty, View: $currentView');
+    print('🔍 Filtered ${items.length} items down to ${result.length} items');
+    
+    return result;
   }
 
   @override

@@ -185,16 +185,16 @@ class _DrillLibraryScreenState extends State<DrillLibraryScreen>
       _tabController.dispose();
       
       // Tab configuration:
-      // Admin: 3 tabs (My Drills, Admin Drills, Favorites) - admins can see all admin drills
+      // Admin: 3 tabs (My Drills, Admin Drills, Favorites) - admins can see admin drills
       // User with drill access: 3 tabs (My Drills, Admin Drills, Favorites)
       // User without drill access: 2 tabs (My Drills, Favorites)
       int tabLength;
       if (isAdmin || hasDrillAccess) {
         tabLength = 3; // My Drills, Admin Drills, Favorites
-        print('🔍 Setting tabLength to 3 (isAdmin=$isAdmin, hasDrillAccess=$hasDrillAccess)');
+        print('🔍 Setting tabLength to 3 for ${isAdmin ? 'admin' : 'user with drill access'} (isAdmin=$isAdmin, hasDrillAccess=$hasDrillAccess)');
       } else {
         tabLength = 2; // My Drills, Favorites (no Admin Drills)
-        print('🔍 Setting tabLength to 2 (isAdmin=$isAdmin, hasDrillAccess=$hasDrillAccess)');
+        print('🔍 Setting tabLength to 2 for user without drill access');
       }
       
       _tabController = TabController(
@@ -273,20 +273,108 @@ class _DrillLibraryScreenState extends State<DrillLibraryScreen>
     print('🔍 _buildTabs called: _isAdmin=$_isAdmin, _hasDrillAccess=$_hasDrillAccess');
     if (_isAdmin || _hasDrillAccess) {
       // Admin or User with drill access: My Drills, Admin Drills, Favorites
-      print('🔍 Building 3 tabs (My Drills, Admin Drills, Favorites)');
-      return const [
-        Tab(text: 'My Drills'),
-        Tab(text: 'Admin Drills'),
-        Tab(text: 'Favorites'),
+      print('🔍 Building 3 tabs for ${_isAdmin ? 'admin' : 'user with drill access'} (My Drills, Admin Drills, Favorites)');
+      return [
+        const Tab(text: 'My Drills'),
+        const Tab(text: 'Admin Drills'),
+        const Tab(text: 'Favorites'),
       ];
     } else {
       // User without drill access: My Drills, Favorites (no Admin Drills)
-      print('🔍 Building 2 tabs (My Drills, Favorites)');
-      return const [
-        Tab(text: 'My Drills'),
-        Tab(text: 'Favorites'),
+      print('🔍 Building 2 tabs for user without drill access (My Drills, Favorites)');
+      return [
+        const Tab(text: 'My Drills'),
+        const Tab(text: 'Favorites'),
       ];
     }
+  }
+
+  List<Widget> _buildTabsWithCounts(DrillLibraryState state) {
+    final userId = FirebaseAuth.instance.currentUser?.uid;
+    
+    // Calculate counts for each tab based on current state
+    final myDrillsCount = state.all.where((drill) =>
+      !drill.isPreset && drill.createdBy == userId
+    ).length;
+    
+    if (_isAdmin || _hasDrillAccess) {
+      // Admin or User with drill access: My Drills, Admin Drills, Favorites
+      return [
+        Tab(
+          child: _buildTabWithCount('My Drills', myDrillsCount),
+        ),
+        Tab(
+          child: FutureBuilder<List<Drill>>(
+            future: _drillRepository.fetchAdminDrills(),
+            builder: (context, snapshot) {
+              final adminDrillsCount = snapshot.data?.length ?? 0;
+              return _buildTabWithCount('Admin Drills', adminDrillsCount);
+            },
+          ),
+        ),
+        Tab(
+          child: FutureBuilder<List<Drill>>(
+            future: _drillRepository.fetchFavoriteDrills(),
+            builder: (context, snapshot) {
+              final favoritesCount = snapshot.data?.length ?? 0;
+              return _buildTabWithCount('Favorites', favoritesCount);
+            },
+          ),
+        ),
+      ];
+    } else {
+      // User without drill access: My Drills, Favorites (no Admin Drills)
+      return [
+        Tab(
+          child: _buildTabWithCount('My Drills', myDrillsCount),
+        ),
+        Tab(
+          child: FutureBuilder<List<Drill>>(
+            future: _drillRepository.fetchFavoriteDrills(),
+            builder: (context, snapshot) {
+              final favoritesCount = snapshot.data?.length ?? 0;
+              return _buildTabWithCount('Favorites', favoritesCount);
+            },
+          ),
+        ),
+      ];
+    }
+  }
+
+  Widget _buildTabWithCount(String title, int count) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Text(title),
+        if (count > 0) ...[
+          const SizedBox(width: 6),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+            decoration: BoxDecoration(
+              color: colorScheme.primary.withOpacity(0.1),
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(
+                color: colorScheme.primary.withOpacity(0.3),
+                width: 1,
+              ),
+            ),
+            constraints: const BoxConstraints(minWidth: 18),
+            child: Text(
+              count.toString(),
+              style: theme.textTheme.labelSmall?.copyWith(
+                color: colorScheme.primary,
+                fontWeight: FontWeight.w600,
+                fontSize: 10,
+              ),
+              textAlign: TextAlign.center,
+            ),
+          ),
+        ],
+      ],
+    );
   }
 
   List<Widget> _buildTabViews(DrillLibraryState state) {
@@ -517,15 +605,19 @@ class _DrillLibraryScreenState extends State<DrillLibraryScreen>
                   ),
                 ],
               ),
-              child: TabBar(
-                controller: _tabController,
-                labelColor: colorScheme.primary,
-                unselectedLabelColor: colorScheme.onSurface.withOpacity(0.6),
-                indicatorColor: colorScheme.primary,
-                indicatorWeight: 3,
-                indicatorSize: TabBarIndicatorSize.tab,
-                dividerColor: Colors.transparent,
-                tabs: _buildTabs(),
+              child: BlocBuilder<DrillLibraryBloc, DrillLibraryState>(
+                builder: (context, state) {
+                  return TabBar(
+                    controller: _tabController,
+                    labelColor: colorScheme.primary,
+                    unselectedLabelColor: colorScheme.onSurface.withOpacity(0.6),
+                    indicatorColor: colorScheme.primary,
+                    indicatorWeight: 3,
+                    indicatorSize: TabBarIndicatorSize.tab,
+                    dividerColor: Colors.transparent,
+                    tabs: _buildTabsWithCounts(state),
+                  );
+                },
               ),
             ),
             const SizedBox(height: 16),
@@ -1049,8 +1141,40 @@ Widget _buildCompactStatChip(IconData icon, String text, Color color) {
   Widget _buildMyDrillsView() {
     return BlocBuilder<DrillLibraryBloc, DrillLibraryState>(
       builder: (context, state) {
-        // Filter drills based on current view and filters
-        final myDrills = state.items.where((drill) => !drill.isPreset).toList();
+        // Get user ID
+        final userId = FirebaseAuth.instance.currentUser?.uid;
+        
+        // Filter drills: only user-created drills (not preset) and apply search/category/difficulty filters
+        var myDrills = state.all.where((drill) =>
+          !drill.isPreset && drill.createdBy == userId
+        ).toList();
+        
+        // Apply search filter
+        if (state.query != null && state.query!.isNotEmpty) {
+          final queryLower = state.query!.toLowerCase();
+          myDrills = myDrills.where((drill) =>
+            drill.name.toLowerCase().contains(queryLower) ||
+            drill.description.toLowerCase().contains(queryLower) ||
+            drill.category.toLowerCase().contains(queryLower) ||
+            drill.tags.any((tag) => tag.toLowerCase().contains(queryLower))
+          ).toList();
+        }
+        
+        // Apply category filter
+        if (state.category != null && state.category!.isNotEmpty) {
+          myDrills = myDrills.where((drill) =>
+            drill.category.toLowerCase() == state.category!.toLowerCase()
+          ).toList();
+        }
+        
+        // Apply difficulty filter
+        if (state.difficulty != null) {
+          myDrills = myDrills.where((drill) =>
+            drill.difficulty == state.difficulty
+          ).toList();
+        }
+        
+        print('🔍 My Drills: Found ${myDrills.length} drills after filtering');
         
         if (myDrills.isEmpty) {
           return _buildEmptyMyDrillsState();
@@ -1062,6 +1186,38 @@ Widget _buildCompactStatChip(IconData icon, String text, Color color) {
   }
 
   Widget _buildAdminDrillsView() {
+    // Admin users have inherent access to admin drills, skip module access check
+    if (_isAdmin) {
+      print('🔍 Admin user detected - bypassing module access check');
+      return BlocBuilder<DrillLibraryBloc, DrillLibraryState>(
+        builder: (context, state) {
+          // Filter admin drills from the BLoC state
+          final adminDrills = state.items.where((drill) => drill.createdByRole == 'admin').toList();
+          print('🔍 Admin drills from BLoC: ${adminDrills.length} drills (filtered)');
+          
+          if (state.status == DrillLibraryStatus.loading || state.status == DrillLibraryStatus.filtering) {
+            return const Center(child: CircularProgressIndicator());
+          }
+
+          if (state.status == DrillLibraryStatus.error) {
+            print('🔴 Error in BLoC state: ${state.errorMessage}');
+            return Center(
+              child: Text('Error loading admin drills: ${state.errorMessage}'),
+            );
+          }
+          
+          if (adminDrills.isEmpty) {
+            print('🔍 No admin drills found - showing empty state');
+            return _buildEmptyAdminDrillsState();
+          }
+
+          print('🔍 Showing ${adminDrills.length} admin drills');
+          return _buildDrillView(adminDrills);
+        },
+      );
+    }
+
+    // For non-admin users, check module access
     return FutureBuilder<bool>(
       future: getIt<SubscriptionPermissionService>().hasModuleAccess('admin_drills'),
       builder: (context, moduleAccessSnapshot) {
@@ -1070,30 +1226,38 @@ Widget _buildCompactStatChip(IconData icon, String text, Color color) {
         }
 
         final hasAccess = moduleAccessSnapshot.data ?? false;
+        print('🔍 Admin drills module access check: $hasAccess');
         
         if (!hasAccess) {
+          print('🔴 User does not have admin_drills module access - showing no access state');
           return _buildNoAccessState();
         }
 
-        return FutureBuilder<List<Drill>>(
-          future: _drillRepository.fetchAdminDrills(),
-          builder: (context, adminDrillsSnapshot) {
-            if (adminDrillsSnapshot.connectionState == ConnectionState.waiting) {
+        print('✅ User has admin_drills module access - proceeding to show drills');
+
+        return BlocBuilder<DrillLibraryBloc, DrillLibraryState>(
+          builder: (context, state) {
+            // Filter admin drills from the BLoC state
+            final adminDrills = state.items.where((drill) => drill.createdByRole == 'admin').toList();
+            print('🔍 Admin drills from BLoC: ${adminDrills.length} drills (filtered)');
+            
+            if (state.status == DrillLibraryStatus.loading || state.status == DrillLibraryStatus.filtering) {
               return const Center(child: CircularProgressIndicator());
             }
 
-            if (adminDrillsSnapshot.hasError) {
+            if (state.status == DrillLibraryStatus.error) {
+              print('🔴 Error in BLoC state: ${state.errorMessage}');
               return Center(
-                child: Text('Error loading admin drills: ${adminDrillsSnapshot.error}'),
+                child: Text('Error loading admin drills: ${state.errorMessage}'),
               );
             }
-
-            final adminDrills = adminDrillsSnapshot.data ?? [];
             
             if (adminDrills.isEmpty) {
+              print('🔍 No admin drills found - showing empty state');
               return _buildEmptyAdminDrillsState();
             }
 
+            print('🔍 Showing ${adminDrills.length} admin drills');
             return _buildDrillView(adminDrills);
           },
         );
@@ -1104,15 +1268,34 @@ Widget _buildCompactStatChip(IconData icon, String text, Color color) {
   Widget _buildFavoriteDrillsView() {
     return BlocBuilder<DrillLibraryBloc, DrillLibraryState>(
       builder: (context, state) {
-        // The BLoC already filters for favorites when currentView is DrillLibraryView.favorites
-        // state.items already contains only favorites due to the view filter
-        final favoriteDrills = state.items;
-        
-        if (favoriteDrills.isEmpty) {
-          return _buildEmptyFavoriteDrillsState();
-        }
+        return FutureBuilder<List<Drill>>(
+          future: _drillRepository.fetchFavoriteDrills(
+            query: state.query,
+            category: state.category,
+            difficulty: state.difficulty,
+          ),
+          builder: (context, snapshot) {
+            if (snapshot.connectionState == ConnectionState.waiting) {
+              return const Center(child: CircularProgressIndicator());
+            }
 
-        return _buildDrillView(favoriteDrills);
+            if (snapshot.hasError) {
+              print('🔴 Error loading favorite drills: ${snapshot.error}');
+              return Center(
+                child: Text('Error loading favorite drills: ${snapshot.error}'),
+              );
+            }
+
+            final favoriteDrills = snapshot.data ?? [];
+            print('🔍 Favorite drills fetched: ${favoriteDrills.length} drills (filtered)');
+            
+            if (favoriteDrills.isEmpty) {
+              return _buildEmptyFavoriteDrillsState();
+            }
+
+            return _buildDrillView(favoriteDrills);
+          },
+        );
       },
     );
   }
@@ -1248,7 +1431,7 @@ Widget _buildCompactStatChip(IconData icon, String text, Color color) {
           ),
           const SizedBox(height: 12),
           Text(
-            'No drills have been created by admins yet.\nCheck back later for admin-created drills.',
+            'Admin drills are premium content created by professional coaches.\nThey will appear here once admins create them.',
             textAlign: TextAlign.center,
             style: theme.textTheme.bodyMedium?.copyWith(
               color: colorScheme.onSurface.withOpacity(0.6),
@@ -1366,13 +1549,16 @@ int _getActiveFilterCount() {
   void _showComprehensiveFilterBottomSheet() {
     HapticFeedback.lightImpact();
     
+    // Capture the parent context to access the BLoC
+    final parentContext = context;
+    
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (context) => StatefulBuilder(
-        builder: (context, setModalState) {
-          final theme = Theme.of(context);
+      builder: (modalContext) => StatefulBuilder(
+        builder: (builderContext, setModalState) {
+          final theme = Theme.of(builderContext);
           final colorScheme = theme.colorScheme;
           
           return Container(
@@ -1411,7 +1597,7 @@ int _getActiveFilterCount() {
                             _selectedDifficulty = null;
                           });
                           setModalState(() {});
-                          context.read<DrillLibraryBloc>().add(
+                          parentContext.read<DrillLibraryBloc>().add(
                             const DrillLibraryFiltersChanged(
                               category: '',
                               difficulty: null,
@@ -1452,7 +1638,7 @@ int _getActiveFilterCount() {
                                 _selectedCategory = '';
                               });
                               setModalState(() {});
-                              context.read<DrillLibraryBloc>().add(
+                              parentContext.read<DrillLibraryBloc>().add(
                                 DrillLibraryFiltersChanged(
                                   category: '',
                                   difficulty: _selectedDifficulty,
@@ -1474,7 +1660,7 @@ int _getActiveFilterCount() {
                                   _selectedCategory = selected ? category.name : '';
                                 });
                                 setModalState(() {});
-                                context.read<DrillLibraryBloc>().add(
+                                parentContext.read<DrillLibraryBloc>().add(
                                   DrillLibraryFiltersChanged(
                                     category: selected ? category.name : '',
                                     difficulty: _selectedDifficulty,
@@ -1524,7 +1710,7 @@ int _getActiveFilterCount() {
                                 _selectedDifficulty = null;
                               });
                               setModalState(() {});
-                              context.read<DrillLibraryBloc>().add(
+                              parentContext.read<DrillLibraryBloc>().add(
                                 DrillLibraryFiltersChanged(
                                   category: _selectedCategory,
                                   difficulty: null,
@@ -1546,7 +1732,7 @@ int _getActiveFilterCount() {
                                   _selectedDifficulty = selected ? difficulty : null;
                                 });
                                 setModalState(() {});
-                                context.read<DrillLibraryBloc>().add(
+                                parentContext.read<DrillLibraryBloc>().add(
                                   DrillLibraryFiltersChanged(
                                     category: _selectedCategory,
                                     difficulty: selected ? difficulty : null,

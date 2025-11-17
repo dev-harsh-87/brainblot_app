@@ -37,4 +37,8 @@ const _$SyncMessageTypeEnumMap = {
   SyncMessageType.sessionStatus: 'session_status',
   SyncMessageType.heartbeat: 'heartbeat',
   SyncMessageType.chat: 'chat',
+  SyncMessageType.drillContent: 'drill_content',
+  SyncMessageType.drillStimulus: 'drill_stimulus',
+  SyncMessageType.drillScoreUpdate: 'drill_score_update',
+  SyncMessageType.drillRepComplete: 'drill_rep_complete',
 };

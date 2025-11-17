@@ -2,8 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 
 import 'package:spark_app/core/di/injection.dart';
+import 'package:spark_app/core/utils/app_logger.dart';
 import 'package:spark_app/features/drills/data/drill_category_repository.dart';
 import 'package:spark_app/features/drills/domain/drill_category.dart';
 import 'package:spark_app/features/programs/bloc/programs_bloc.dart';
@@ -127,7 +130,8 @@ class _ProgramsScreenState extends State<ProgramsScreen>
 
                   if (state.status == ProgramsStatus.error) {
                     return _buildErrorState(
-                        state.errorMessage ?? 'Unknown error occurred',);
+                      state.errorMessage ?? 'Unknown error occurred',
+                    );
                   }
 
                   return Stack(
@@ -164,15 +168,24 @@ class _ProgramsScreenState extends State<ProgramsScreen>
           ),
         ],
       ),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: () {
-          HapticFeedback.mediumImpact();
-          _showCreateProgramScreen();
+      floatingActionButton: AnimatedBuilder(
+        animation: _tabController,
+        builder: (context, child) {
+          // Only show FAB on Browse tab (index 1), hide on Active tab (index 0)
+          if (_tabController.index == 1) {
+            return FloatingActionButton.extended(
+              onPressed: () {
+                HapticFeedback.mediumImpact();
+                _showCreateProgramScreen();
+              },
+              icon: const Icon(Icons.add),
+              label: const Text('Create Program'),
+              backgroundColor: colorScheme.primary,
+              foregroundColor: colorScheme.onPrimary,
+            );
+          }
+          return const SizedBox.shrink(); // Hide FAB on other tabs
         },
-        icon: const Icon(Icons.add),
-        label: const Text('Create Program'),
-        backgroundColor: colorScheme.primary,
-        foregroundColor: colorScheme.onPrimary,
       ),
     );
   }
@@ -360,15 +373,19 @@ class _ProgramsScreenState extends State<ProgramsScreen>
                   prefixIcon: Icon(Icons.search, color: colorScheme.primary),
                   suffixIcon: _searchController.text.isNotEmpty
                       ? IconButton(
-                          icon: Icon(Icons.clear, color: colorScheme.onSurface.withOpacity(0.6)),
+                          icon: Icon(Icons.clear,
+                              color: colorScheme.onSurface.withOpacity(0.6)),
                           onPressed: () {
                             _searchController.clear();
-                            context.read<ProgramsBloc>().add(const ProgramsQueryChanged(''));
+                            context
+                                .read<ProgramsBloc>()
+                                .add(const ProgramsQueryChanged(''));
                           },
                         )
                       : null,
                   border: InputBorder.none,
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+                  contentPadding:
+                      const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
                 ),
                 onChanged: (query) {
                   setState(() {});
@@ -377,7 +394,7 @@ class _ProgramsScreenState extends State<ProgramsScreen>
               ),
             ),
             const SizedBox(height: 16),
-            
+
             // Filter Tabs
             Container(
               decoration: BoxDecoration(
@@ -429,8 +446,9 @@ class _ProgramsScreenState extends State<ProgramsScreen>
   void _showFilterOptions() {
     // Get the current state to extract levels before showing modal
     final currentState = context.read<ProgramsBloc>().state;
-    final levels = currentState.programs.map((p) => p.level).toSet().toList()..sort();
-    
+    final levels = currentState.programs.map((p) => p.level).toSet().toList()
+      ..sort();
+
     showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
@@ -441,7 +459,7 @@ class _ProgramsScreenState extends State<ProgramsScreen>
       builder: (modalContext) {
         final theme = Theme.of(modalContext);
         final colorScheme = theme.colorScheme;
-        
+
         return Container(
           decoration: BoxDecoration(
             color: colorScheme.surface,
@@ -472,8 +490,8 @@ class _ProgramsScreenState extends State<ProgramsScreen>
                       ),
                     ),
                   ),
-                  const SizedBox(height: 20),
-                  
+                  const SizedBox(height: 12),
+
                   // Header
                   Row(
                     children: [
@@ -491,7 +509,8 @@ class _ProgramsScreenState extends State<ProgramsScreen>
                         ),
                       ),
                       const Spacer(),
-                      if (_selectedCategory.isNotEmpty || _selectedLevel.isNotEmpty)
+                      if (_selectedCategory.isNotEmpty ||
+                          _selectedLevel.isNotEmpty)
                         TextButton(
                           onPressed: () {
                             setState(() {
@@ -511,7 +530,7 @@ class _ProgramsScreenState extends State<ProgramsScreen>
                     ],
                   ),
                   const SizedBox(height: 24),
-                  
+
                   // Category Section
                   Text(
                     'Category',
@@ -536,21 +555,25 @@ class _ProgramsScreenState extends State<ProgramsScreen>
                           Navigator.pop(modalContext);
                         },
                       ),
-                      ..._availableCategories.map((category) => _buildFilterChip(
-                        modalContext,
-                        _formatCategoryName(category.name),
-                        _selectedCategory == category.name,
-                        () {
-                          setState(() {
-                            _selectedCategory = _selectedCategory == category.name ? '' : category.name;
-                          });
-                          Navigator.pop(modalContext);
-                        },
-                      )),
+                      ..._availableCategories
+                          .map((category) => _buildFilterChip(
+                                modalContext,
+                                _formatCategoryName(category.name),
+                                _selectedCategory == category.name,
+                                () {
+                                  setState(() {
+                                    _selectedCategory =
+                                        _selectedCategory == category.name
+                                            ? ''
+                                            : category.name;
+                                  });
+                                  Navigator.pop(modalContext);
+                                },
+                              )),
                     ],
                   ),
                   const SizedBox(height: 24),
-                  
+
                   // Level Section
                   Text(
                     'Level',
@@ -576,16 +599,17 @@ class _ProgramsScreenState extends State<ProgramsScreen>
                         },
                       ),
                       ...levels.map((level) => _buildFilterChip(
-                        modalContext,
-                        level,
-                        _selectedLevel == level,
-                        () {
-                          setState(() {
-                            _selectedLevel = _selectedLevel == level ? '' : level;
-                          });
-                          Navigator.pop(modalContext);
-                        },
-                      )),
+                            modalContext,
+                            level,
+                            _selectedLevel == level,
+                            () {
+                              setState(() {
+                                _selectedLevel =
+                                    _selectedLevel == level ? '' : level;
+                              });
+                              Navigator.pop(modalContext);
+                            },
+                          )),
                     ],
                   ),
                   const SizedBox(height: 16),
@@ -598,10 +622,11 @@ class _ProgramsScreenState extends State<ProgramsScreen>
     );
   }
 
-  Widget _buildFilterChip(BuildContext context, String label, bool isSelected, VoidCallback onTap) {
+  Widget _buildFilterChip(
+      BuildContext context, String label, bool isSelected, VoidCallback onTap) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
-    
+
     return GestureDetector(
       onTap: onTap,
       child: AnimatedContainer(
@@ -611,27 +636,27 @@ class _ProgramsScreenState extends State<ProgramsScreen>
           color: isSelected
               ? colorScheme.primary
               : colorScheme.surfaceContainerHighest,
-          borderRadius: BorderRadius.circular(20),
+          borderRadius: BorderRadius.circular(16),
           border: Border.all(
             color: isSelected
                 ? colorScheme.primary
                 : colorScheme.outline.withOpacity(0.2),
             width: isSelected ? 2 : 1,
           ),
-          boxShadow: isSelected ? [
-            BoxShadow(
-              color: colorScheme.primary.withOpacity(0.2),
-              blurRadius: 8,
-              offset: const Offset(0, 2),
-            ),
-          ] : null,
+          boxShadow: isSelected
+              ? [
+                  BoxShadow(
+                    color: colorScheme.primary.withOpacity(0.2),
+                    blurRadius: 8,
+                    offset: const Offset(0, 2),
+                  ),
+                ]
+              : null,
         ),
         child: Text(
           label,
           style: theme.textTheme.bodyMedium?.copyWith(
-            color: isSelected
-                ? colorScheme.onPrimary
-                : colorScheme.onSurface,
+            color: isSelected ? colorScheme.onPrimary : colorScheme.onSurface,
             fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
           ),
         ),
@@ -690,13 +715,23 @@ class _ProgramsScreenState extends State<ProgramsScreen>
 
   // ENHANCED ACTIVE TAB - This is the main improvement
   Widget _buildActiveTab(ProgramsState state) {
+    // Debug logging for active tab
+    print('🔍 DEBUG: Active Tab State:');
+    print('  - Status: ${state.status}');
+    print('  - Active program: ${state.active}');
+    print('  - Active program ID: ${state.active?.programId}');
+    print('  - Programs count: ${state.programs.length}');
+    print('  - Programs: ${state.programs.map((p) => '${p.id}: ${p.name} (${p.createdByRole})').toList()}');
+    
     // Handle loading state with professional loading UI
     if (state.status == ProgramsStatus.loading) {
+      print('  - Showing loading state');
       return _buildActiveTabLoadingState();
     }
 
     // Handle no active program
     if (state.active == null) {
+      print('  - No active program found, showing empty state');
       return SingleChildScrollView(
         physics: const AlwaysScrollableScrollPhysics(),
         child: SizedBox(
@@ -742,8 +777,6 @@ class _ProgramsScreenState extends State<ProgramsScreen>
           _buildEnhancedProgressSection(activeProgram, state.active!),
           const SizedBox(height: 24),
           _buildEnhancedTodaySection(activeProgram, state.active!),
-          const SizedBox(height: 24),
-          _buildQuickActionsSection(activeProgram, state.active!),
         ],
       ),
     );
@@ -841,7 +874,9 @@ class _ProgramsScreenState extends State<ProgramsScreen>
 
     try {
       // First, try to find exact match
-      final exactMatch = state.programs.where((p) => p.id == state.active!.programId).firstOrNull;
+      final exactMatch = state.programs
+          .where((p) => p.id == state.active!.programId)
+          .firstOrNull;
       if (exactMatch != null) {
         return exactMatch;
       }
@@ -862,15 +897,16 @@ class _ProgramsScreenState extends State<ProgramsScreen>
         return false;
       }
 
-      // Check if program has valid structure
+      // Allow empty programs to be displayed - they might be in draft state
       if (program.days.isEmpty && program.dayWiseDrillIds.isEmpty) {
-        return false;
+        return true; // Allow empty programs to be shown
       }
 
       // Check if current day exists in program structure
       if (program.days.isNotEmpty) {
         // Old format - check if day exists
-        final dayExists = program.days.any((day) => day.dayNumber == active.currentDay);
+        final dayExists =
+            program.days.any((day) => day.dayNumber == active.currentDay);
         return dayExists;
       } else if (program.dayWiseDrillIds.isNotEmpty) {
         // New format - day might not exist (rest day), which is valid
@@ -934,14 +970,7 @@ class _ProgramsScreenState extends State<ProgramsScreen>
                   icon: const Icon(Icons.explore),
                   label: const Text('Browse Programs'),
                 ),
-                const SizedBox(width: 16),
-                FilledButton.icon(
-                  onPressed: () {
-                    context.read<ProgramsBloc>().add(const ProgramsRefreshRequested());
-                  },
-                  icon: const Icon(Icons.refresh),
-                  label: const Text('Refresh'),
-                ),
+                
               ],
             ),
           ],
@@ -950,7 +979,8 @@ class _ProgramsScreenState extends State<ProgramsScreen>
     );
   }
 
-  Widget _buildInvalidActiveProgramState(Program program, ActiveProgram active) {
+  Widget _buildInvalidActiveProgramState(
+      Program program, ActiveProgram active) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
 
@@ -993,18 +1023,8 @@ class _ProgramsScreenState extends State<ProgramsScreen>
             Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                OutlinedButton.icon(
-                  onPressed: () {
-                    Navigator.of(context).push(
-                      MaterialPageRoute(
-                        builder: (context) => ProgramDetailsScreen(program: program),
-                      ),
-                    );
-                  },
-                  icon: const Icon(Icons.info_outline),
-                  label: const Text('View Details'),
-                ),
-                const SizedBox(width: 16),
+        
+          
                 FilledButton.icon(
                   onPressed: () {
                     _tabController.animateTo(1); // Switch to Browse tab
@@ -1089,170 +1109,190 @@ class _ProgramsScreenState extends State<ProgramsScreen>
 
   // Enhanced UI components for active program tab
 
-  Widget _buildEnhancedActiveProgramCard(Program program, ActiveProgram active) {
+  Widget _buildEnhancedActiveProgramCard(
+      Program program, ActiveProgram active) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
-    final progress = active.currentDay / program.durationDays;
-    final daysCompleted = active.currentDay - 1;
-    final daysRemaining = program.durationDays - active.currentDay + 1;
 
-    return Card(
-      elevation: 8,
-      shadowColor: colorScheme.primary.withOpacity(0.2),
-      child: Container(
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(12),
-          gradient: LinearGradient(
-            colors: [
-              colorScheme.primaryContainer,
-              colorScheme.secondaryContainer,
-            ],
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-          ),
+    return Container(
+      margin: const EdgeInsets.only(bottom: 16),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(16),
+        gradient: LinearGradient(
+          colors: [
+            colorScheme.primary.withOpacity(0.08),
+            colorScheme.secondary.withOpacity(0.04),
+          ],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
         ),
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Header with program info
-              Row(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: colorScheme.primary,
-                      borderRadius: BorderRadius.circular(12),
-                      boxShadow: [
-                        BoxShadow(
-                          color: colorScheme.primary.withOpacity(0.3),
-                          blurRadius: 8,
-                          offset: const Offset(0, 4),
-                        ),
+        border: Border.all(
+          color: colorScheme.primary.withOpacity(0.15),
+          width: 1,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: colorScheme.primary.withOpacity(0.08),
+            blurRadius: 12,
+            offset: const Offset(0, 4),
+            spreadRadius: 0,
+          ),
+        ],
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Compact Header
+            Row(
+              children: [
+                Container(
+                  width: 48,
+                  height: 48,
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: [
+                        colorScheme.primary,
+                        colorScheme.primary.withOpacity(0.8),
                       ],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
                     ),
-                    child: Icon(
-                      Icons.psychology,
-                      color: colorScheme.onPrimary,
-                      size: 28,
-                    ),
-                  ),
-                  const SizedBox(width: 16),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          children: [
-                            Expanded(
-                              child: Text(
-                                program.name,
-                                style: theme.textTheme.titleLarge?.copyWith(
-                                  fontWeight: FontWeight.bold,
-                                  color: colorScheme.onPrimaryContainer,
-                                ),
-                              ),
-                            ),
-                            Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 12,
-                                vertical: 6,
-                              ),
-                              decoration: BoxDecoration(
-                                color: colorScheme.primary,
-                                borderRadius: BorderRadius.circular(20),
-                              ),
-                              child: Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  Icon(
-                                    Icons.play_circle_fill,
-                                    color: colorScheme.onPrimary,
-                                    size: 16,
-                                  ),
-                                  const SizedBox(width: 4),
-                                  Text(
-                                    'ACTIVE',
-                                    style: TextStyle(
-                                      color: colorScheme.onPrimary,
-                                      fontSize: 12,
-                                      fontWeight: FontWeight.bold,
-                                      letterSpacing: 0.5,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          '${program.category} • ${program.level}',
-                          style: theme.textTheme.bodyMedium?.copyWith(
-                            color: colorScheme.onPrimaryContainer.withOpacity(0.8),
-                            fontWeight: FontWeight.w500,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 24),
-              
-              // Progress section
-              Row(
-                children: [
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'Day ${active.currentDay} of ${program.durationDays}',
-                          style: theme.textTheme.titleMedium?.copyWith(
-                            fontWeight: FontWeight.bold,
-                            color: colorScheme.onPrimaryContainer,
-                          ),
-                        ),
-                        const SizedBox(height: 8),
-                        LinearProgressIndicator(
-                          value: progress,
-                          backgroundColor: colorScheme.onPrimaryContainer.withOpacity(0.2),
-                          valueColor: AlwaysStoppedAnimation<Color>(colorScheme.primary),
-                        ),
-                        const SizedBox(height: 8),
-                        Text(
-                          '${(progress * 100).toInt()}% Complete',
-                          style: theme.textTheme.bodySmall?.copyWith(
-                            color: colorScheme.onPrimaryContainer.withOpacity(0.7),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(width: 24),
-                  Column(
-                    children: [
-                      _buildStatCard(
-                        'Completed',
-                        '$daysCompleted',
-                        Icons.check_circle,
-                        Colors.green,
-                      ),
-                      const SizedBox(height: 8),
-                      _buildStatCard(
-                        'Remaining',
-                        '$daysRemaining',
-                        Icons.schedule,
-                        Colors.orange,
+                    borderRadius: BorderRadius.circular(14),
+                    boxShadow: [
+                      BoxShadow(
+                        color: colorScheme.primary.withOpacity(0.25),
+                        blurRadius: 8,
+                        offset: const Offset(0, 3),
                       ),
                     ],
                   ),
-                ],
-              ),
-            ],
-          ),
+                  child: Icon(
+                    Icons.psychology_rounded,
+                    color: colorScheme.onPrimary,
+                    size: 24,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              program.name,
+                              style: theme.textTheme.titleLarge?.copyWith(
+                                fontWeight: FontWeight.w700,
+                                color: colorScheme.onSurface,
+                                letterSpacing: -0.3,
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 8,
+                              vertical: 4,
+                            ),
+                            decoration: BoxDecoration(
+                              gradient: LinearGradient(
+                                colors: [
+                                  Colors.green.shade400,
+                                  Colors.green.shade600,
+                                ],
+                              ),
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(
+                                  Icons.play_circle_fill_rounded,
+                                  color: Colors.white,
+                                  size: 12,
+                                ),
+                                const SizedBox(width: 4),
+                                Text(
+                                  'ACTIVE',
+                                  style: TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 9,
+                                    fontWeight: FontWeight.w700,
+                                    letterSpacing: 0.5,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 6),
+                      Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 8,
+                              vertical: 3,
+                            ),
+                            decoration: BoxDecoration(
+                              color:
+                                  colorScheme.primaryContainer.withOpacity(0.6),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: Text(
+                              program.category.toUpperCase(),
+                              style: theme.textTheme.labelSmall?.copyWith(
+                                color: colorScheme.primary,
+                                fontWeight: FontWeight.w600,
+                                fontSize: 9,
+                                letterSpacing: 0.3,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 6),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 8,
+                              vertical: 3,
+                            ),
+                            decoration: BoxDecoration(
+                              color: colorScheme.secondaryContainer
+                                  .withOpacity(0.6),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: Text(
+                              program.level,
+                              style: theme.textTheme.labelSmall?.copyWith(
+                                color: colorScheme.secondary,
+                                fontWeight: FontWeight.w600,
+                                fontSize: 9,
+                              ),
+                            ),
+                          ),
+                          const Spacer(),
+                          Text(
+                            '${program.durationDays} days',
+                            style: theme.textTheme.bodySmall?.copyWith(
+                              color: colorScheme.onSurface.withOpacity(0.7),
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+
+            const SizedBox(height: 16),
+
+            // Modern Progress Section
+          ],
         ),
       ),
     );
@@ -1261,61 +1301,184 @@ class _ProgramsScreenState extends State<ProgramsScreen>
   Widget _buildEnhancedProgressSection(Program program, ActiveProgram active) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
-    final progress = active.currentDay / program.durationDays;
+    final daysCompleted = active.currentDay - 1; // Days actually completed
+    final progress = daysCompleted / program.durationDays; // Progress based on completed days
+    final daysRemaining = program.durationDays - active.currentDay + 1;
 
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'Progress Overview',
-              style: theme.textTheme.titleMedium?.copyWith(
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            const SizedBox(height: 16),
-            Row(
-              children: [
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Overall Progress',
-                        style: theme.textTheme.bodyMedium?.copyWith(
-                          fontWeight: FontWeight.w500,
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      LinearProgressIndicator(
-                        value: progress,
-                        backgroundColor: colorScheme.surfaceContainerHighest,
-                        valueColor: AlwaysStoppedAnimation<Color>(colorScheme.primary),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        '${(progress * 100).toInt()}% Complete',
-                        style: theme.textTheme.bodySmall?.copyWith(
-                          color: colorScheme.onSurface.withOpacity(0.7),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(width: 16),
-                FilledButton.icon(
-                  onPressed: () {
-                    _showProgramDaysOverview(program, active);
-                  },
-                  icon: const Icon(Icons.calendar_view_day),
-                  label: const Text('View Schedule'),
-                ),
-              ],
-            ),
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            colorScheme.primaryContainer.withOpacity(0.3),
+            colorScheme.secondaryContainer.withOpacity(0.2),
           ],
         ),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: colorScheme.outline.withOpacity(0.1),
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: colorScheme.shadow.withOpacity(0.08),
+            blurRadius: 12,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                '📊 Progress',
+                style: theme.textTheme.titleMedium?.copyWith(
+                  fontWeight: FontWeight.w600,
+                  color: colorScheme.primary,
+                ),
+              ),
+              Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                decoration: BoxDecoration(
+                  color: colorScheme.primary.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(
+                    color: colorScheme.primary.withOpacity(0.2),
+                  ),
+                ),
+                child: Text(
+                  '${(progress * 100).toInt()}%',
+                  style: theme.textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.w800,
+                    color: colorScheme.primary,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+
+          // Enhanced Progress Bar
+          Container(
+            height: 8,
+            decoration: BoxDecoration(
+              color: colorScheme.surfaceContainerHighest,
+              borderRadius: BorderRadius.circular(6),
+            ),
+            child: FractionallySizedBox(
+              alignment: Alignment.centerLeft,
+              widthFactor: progress.clamp(0.0, 1.0),
+              child: Container(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: [
+                      colorScheme.primary,
+                      colorScheme.secondary,
+                      colorScheme.tertiary,
+                    ],
+                  ),
+                  borderRadius: BorderRadius.circular(6),
+                  boxShadow: [
+                    BoxShadow(
+                      color: colorScheme.primary.withOpacity(0.4),
+                      blurRadius: 6,
+                      offset: const Offset(0, 2),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(height: 16),
+
+          // Compact Stats Row
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                '✅ $daysCompleted completed',
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: Colors.green,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              Text(
+                '⏳ $daysRemaining remaining',
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: Colors.orange,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              Text(
+                '🎯 ${program.durationDays} total',
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: colorScheme.primary,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+
+          // Compact Action Button
+          SizedBox(
+            width: double.infinity,
+            child: OutlinedButton.icon(
+              onPressed: () {
+                _showProgramDaysOverview(program, active);
+              },
+              style: OutlinedButton.styleFrom(
+                padding: const EdgeInsets.symmetric(vertical: 8),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10),
+                ),
+              ),
+              icon: const Icon(Icons.calendar_view_day, size: 18),
+              label: const Text('View Schedule'),
+            ),
+          ),
+          
+        ],
+      ),
+    );
+  }
+
+  Widget _buildProgressStatItem(
+      String label, String value, Color color, ThemeData theme) {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: color.withOpacity(0.2),
+        ),
+      ),
+      child: Column(
+        children: [
+          Text(
+            value,
+            style: theme.textTheme.titleMedium?.copyWith(
+              fontWeight: FontWeight.w700,
+              color: color,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            label,
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: color.withOpacity(0.8),
+              fontWeight: FontWeight.w500,
+            ),
+            textAlign: TextAlign.center,
+          ),
+        ],
       ),
     );
   }
@@ -1323,7 +1486,7 @@ class _ProgramsScreenState extends State<ProgramsScreen>
   Widget _buildEnhancedTodaySection(Program program, ActiveProgram active) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
-    
+
     // Find today's training
     ProgramDay? todayDay;
     String? todayDrillId;
@@ -1331,7 +1494,9 @@ class _ProgramsScreenState extends State<ProgramsScreen>
 
     // Check old format first
     if (program.days.isNotEmpty) {
-      todayDay = program.days.where((day) => day.dayNumber == active.currentDay).firstOrNull;
+      todayDay = program.days
+          .where((day) => day.dayNumber == active.currentDay)
+          .firstOrNull;
       if (todayDay != null && todayDay.drillId != null) {
         todayDrillId = todayDay.drillId;
         drillCount = 1;
@@ -1368,150 +1533,292 @@ class _ProgramsScreenState extends State<ProgramsScreen>
     }
 
     final hasDrill = todayDay?.drillId != null && todayDay!.drillId!.isNotEmpty;
+    final isRestDay = !hasDrill;
 
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'Today\'s Training',
-              style: theme.textTheme.titleMedium?.copyWith(
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            const SizedBox(height: 16),
-            ListTile(
-              leading: Container(
-                padding: const EdgeInsets.all(8),
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: hasDrill
+              ? [
+                  colorScheme.secondaryContainer.withOpacity(0.4),
+                  colorScheme.tertiaryContainer.withOpacity(0.3),
+                ]
+              : [
+                  colorScheme.surfaceContainerHighest.withOpacity(0.5),
+                  colorScheme.surfaceContainer.withOpacity(0.3),
+                ],
+        ),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: hasDrill
+              ? colorScheme.secondary.withOpacity(0.2)
+              : colorScheme.outline.withOpacity(0.1),
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: colorScheme.shadow.withOpacity(0.08),
+            blurRadius: 12,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
-                  color: hasDrill
-                      ? colorScheme.primaryContainer
-                      : colorScheme.surfaceContainerHighest,
-                  borderRadius: BorderRadius.circular(8),
+                  gradient: LinearGradient(
+                    colors: hasDrill
+                        ? [colorScheme.secondary, colorScheme.tertiary]
+                        : [
+                            colorScheme.outline,
+                            colorScheme.outline.withOpacity(0.7)
+                          ],
+                  ),
+                  borderRadius: BorderRadius.circular(16),
+                  boxShadow: [
+                    BoxShadow(
+                      color: (hasDrill
+                              ? colorScheme.secondary
+                              : colorScheme.outline)
+                          .withOpacity(0.3),
+                      blurRadius: 8,
+                      offset: const Offset(0, 2),
+                    ),
+                  ],
                 ),
                 child: Icon(
                   hasDrill ? Icons.fitness_center : Icons.self_improvement,
-                  color: hasDrill
-                      ? colorScheme.onPrimaryContainer
-                      : colorScheme.onSurface.withOpacity(0.6),
+                  color: Colors.white,
+                  size: 28,
                 ),
               ),
-              title: Text(
-                todayDay?.title ?? 'Day ${active.currentDay}',
-                style: theme.textTheme.titleSmall?.copyWith(
-                  fontWeight: FontWeight.w600,
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      hasDrill ? '🔥 Today\'s Training' : '😌 Rest Day',
+                      style: theme.textTheme.titleLarge?.copyWith(
+                        fontWeight: FontWeight.w700,
+                        color: hasDrill
+                            ? colorScheme.secondary
+                            : colorScheme.onSurface,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      'Day ${active.currentDay} of ${program.durationDays}',
+                      style: theme.textTheme.bodyMedium?.copyWith(
+                        color: colorScheme.onSurface.withOpacity(0.7),
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ],
                 ),
               ),
-              subtitle: Text(todayDay?.description ?? 'No training scheduled'),
-              trailing: hasDrill
-                  ? FilledButton(
-                      onPressed: () {
-                        HapticFeedback.lightImpact();
-                        if (todayDay != null) {
-                          _startTodayTraining(todayDay);
-                        }
-                      },
-                      child: const Text('Start'),
-                    )
-                  : null,
+            ],
+          ),
+          const SizedBox(height: 12),
+
+          // Training Details Card
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: colorScheme.surface.withOpacity(0.8),
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(
+                color: colorScheme.outline.withOpacity(0.1),
+              ),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Icon(
+                      hasDrill ? Icons.schedule : Icons.spa,
+                      color: hasDrill
+                          ? colorScheme.secondary
+                          : colorScheme.onSurface.withOpacity(0.6),
+                      size: 20,
+                    ),
+                    const SizedBox(width: 8),
+                    Text(
+                      todayDay?.title ?? 'Day ${active.currentDay}',
+                      style: theme.textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.w600,
+                        color: hasDrill
+                            ? colorScheme.secondary
+                            : colorScheme.onSurface,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  todayDay?.description ?? 'No training scheduled',
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    color: colorScheme.onSurface.withOpacity(0.8),
+                  ),
+                ),
+                if (hasDrill && drillCount > 1) ...[
+                  const SizedBox(height: 12),
+                  Container(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: colorScheme.secondaryContainer.withOpacity(0.5),
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                    child: Text(
+                      '🎯 $drillCount drills to complete',
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: colorScheme.onSecondaryContainer,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+
+          if (hasDrill) ...[
+            const SizedBox(height: 16),
+            SizedBox(
+              width: double.infinity,
+              child: FilledButton.icon(
+                onPressed: () {
+                  HapticFeedback.lightImpact();
+                  if (todayDay != null) {
+                    _startTodayTraining(todayDay);
+                  }
+                },
+                style: FilledButton.styleFrom(
+                  backgroundColor: colorScheme.secondary,
+                  foregroundColor: colorScheme.onSecondary,
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+                icon: const Icon(Icons.play_arrow, size: 24),
+                label: Text(
+                  drillCount > 1 ? 'Start All Drills' : 'Start Training',
+                  style: const TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
             ),
           ],
-        ),
+        ],
       ),
     );
   }
 
-  Widget _buildQuickActionsSection(Program program, ActiveProgram active) {
+  Widget _buildProgramDetailChip({
+    required IconData icon,
+    required String label,
+    required String value,
+    required Color color,
+  }) {
     final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
-
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'Quick Actions',
-              style: theme.textTheme.titleMedium?.copyWith(
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            const SizedBox(height: 16),
-            Row(
+    return Container(
+      padding: const EdgeInsets.all(8),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(
+          color: color.withOpacity(0.2),
+        ),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(
+            icon,
+            color: color,
+            size: 14,
+          ),
+          const SizedBox(width: 6),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Expanded(
-                  child: OutlinedButton.icon(
-                    onPressed: () {
-                      Navigator.of(context).push(
-                        MaterialPageRoute(
-                          builder: (context) => ProgramDetailsScreen(program: program),
-                        ),
-                      );
-                    },
-                    icon: const Icon(Icons.info_outline),
-                    label: const Text('View Details'),
+                Text(
+                  label,
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: color.withOpacity(0.8),
+                    fontSize: 10,
+                    fontWeight: FontWeight.w500,
                   ),
                 ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: OutlinedButton.icon(
-                    onPressed: () {
-                      Navigator.of(context).push(
-                        MaterialPageRoute(
-                          builder: (context) => const ProgramStatsScreen(),
-                        ),
-                      );
-                    },
-                    icon: const Icon(Icons.analytics_outlined),
-                    label: const Text('View Stats'),
+                Text(
+                  value,
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: color,
+                    fontSize: 11,
+                    fontWeight: FontWeight.w600,
                   ),
                 ),
               ],
             ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildStatCard(
-      String label, String value, IconData icon, Color color,) {
-    final theme = Theme.of(context);
-
-    return Container(
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: color.withOpacity(0.1),
-        borderRadius: BorderRadius.circular(8),
-      ),
-      child: Column(
-        children: [
-          Icon(icon, color: color, size: 24),
-          const SizedBox(height: 8),
-          Text(
-            value,
-            style: theme.textTheme.headlineSmall?.copyWith(
-              fontWeight: FontWeight.bold,
-              color: color,
-            ),
-          ),
-          Text(
-            label,
-            style: theme.textTheme.bodySmall?.copyWith(
-              color: color.withOpacity(0.8),
-            ),
-            textAlign: TextAlign.center,
           ),
         ],
       ),
     );
   }
 
-  Widget _buildProgramCard(Program program,
-      {required bool isActive, required ProgramsState state,}) {
+  String _formatStartDate(DateTime? startDate) {
+    if (startDate == null) return 'Today';
+    final now = DateTime.now();
+    final difference = now.difference(startDate).inDays;
+    if (difference == 0) return 'Today';
+    if (difference == 1) return 'Yesterday';
+    if (difference < 7) return '$difference days ago';
+    if (difference < 30) return '${(difference / 7).floor()} weeks ago';
+    return '${(difference / 30).floor()} months ago';
+  }
+
+  String _formatTargetDate(DateTime? startDate, int durationDays) {
+    if (startDate == null) {
+      final targetDate = DateTime.now().add(Duration(days: durationDays));
+      return '${targetDate.day}/${targetDate.month}';
+    }
+    final targetDate = startDate.add(Duration(days: durationDays));
+    return '${targetDate.day}/${targetDate.month}';
+  }
+
+  Color _getDifficultyColor(String level) {
+    switch (level.toLowerCase()) {
+      case 'beginner':
+        return Colors.green;
+      case 'intermediate':
+        return Colors.orange;
+      case 'advanced':
+        return Colors.red;
+      default:
+        return Colors.blue;
+    }
+  }
+
+  Widget _buildProgramCard(
+    Program program, {
+    required bool isActive,
+    required ProgramsState state,
+  }) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
     final categoryColor = _getCategoryColor(program.category);
@@ -1520,10 +1827,9 @@ class _ProgramsScreenState extends State<ProgramsScreen>
       margin: const EdgeInsets.only(bottom: 12),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(20),
-        border: isActive
-            ? Border.all(color: colorScheme.primary, width: 2)
-            : null,
+        borderRadius: BorderRadius.circular(16),
+        border:
+            isActive ? Border.all(color: colorScheme.primary, width: 2) : null,
         boxShadow: [
           BoxShadow(
             color: isActive
@@ -1536,7 +1842,7 @@ class _ProgramsScreenState extends State<ProgramsScreen>
         ],
       ),
       child: ClipRRect(
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(16),
         child: Material(
           color: Colors.transparent,
           child: InkWell(
@@ -1614,10 +1920,45 @@ class _ProgramsScreenState extends State<ProgramsScreen>
                                     overflow: TextOverflow.ellipsis,
                                   ),
                                 ),
+                                // Admin tag for admin programs
+                                if (program.createdByRole == 'admin' || program.createdByRole == null)
+                                  Container(
+                                    margin: EdgeInsets.only(right: isActive ? 8 : 0),
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 8,
+                                      vertical: 4,
+                                    ),
+                                    decoration: BoxDecoration(
+                                      color: Colors.orange.shade600,
+                                      borderRadius: BorderRadius.circular(12),
+                                    ),
+                                    child: Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Icon(
+                                          Icons.admin_panel_settings,
+                                          color: Colors.white,
+                                          size: 12,
+                                        ),
+                                        const SizedBox(width: 4),
+                                        Text(
+                                          'ADMIN',
+                                          style: TextStyle(
+                                            color: Colors.white,
+                                            fontSize: 10,
+                                            fontWeight: FontWeight.w700,
+                                            letterSpacing: 0.5,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
                                 if (isActive)
                                   Container(
                                     padding: const EdgeInsets.symmetric(
-                                        horizontal: 8, vertical: 4,),
+                                      horizontal: 8,
+                                      vertical: 4,
+                                    ),
                                     decoration: BoxDecoration(
                                       color: colorScheme.primary,
                                       borderRadius: BorderRadius.circular(12),
@@ -1648,7 +1989,9 @@ class _ProgramsScreenState extends State<ProgramsScreen>
                             const SizedBox(height: 4),
                             Container(
                               padding: const EdgeInsets.symmetric(
-                                  horizontal: 10, vertical: 4,),
+                                horizontal: 10,
+                                vertical: 4,
+                              ),
                               decoration: BoxDecoration(
                                 color: categoryColor.withOpacity(0.15),
                                 borderRadius: BorderRadius.circular(12),
@@ -1668,7 +2011,7 @@ class _ProgramsScreenState extends State<ProgramsScreen>
                     ],
                   ),
                 ),
-                
+
                 // Content section
                 Padding(
                   padding: const EdgeInsets.all(20),
@@ -1701,7 +2044,7 @@ class _ProgramsScreenState extends State<ProgramsScreen>
                             ),
                         ],
                       ),
-                      
+
                       // Description
                       if (program.description != null &&
                           program.description!.isNotEmpty) ...[
@@ -1716,9 +2059,9 @@ class _ProgramsScreenState extends State<ProgramsScreen>
                           overflow: TextOverflow.ellipsis,
                         ),
                       ],
-                      
-                      const SizedBox(height: 20),
-                      
+
+                      const SizedBox(height: 12),
+
                       // Action buttons
                       Row(
                         children: [
@@ -1728,12 +2071,14 @@ class _ProgramsScreenState extends State<ProgramsScreen>
                               onPressed: () {
                                 Navigator.of(context).push(
                                   MaterialPageRoute(
-                                    builder: (context) => ProgramDetailsScreen(program: program),
+                                    builder: (context) =>
+                                        ProgramDetailsScreen(program: program),
                                   ),
                                 );
                               },
                               style: OutlinedButton.styleFrom(
-                                padding: const EdgeInsets.symmetric(vertical: 14),
+                                padding:
+                                    const EdgeInsets.symmetric(vertical: 14),
                                 side: BorderSide(color: Colors.grey[300]!),
                                 shape: RoundedRectangleBorder(
                                   borderRadius: BorderRadius.circular(12),
@@ -1748,9 +2093,9 @@ class _ProgramsScreenState extends State<ProgramsScreen>
                               ),
                             ),
                           ),
-                          
+
                           const SizedBox(width: 12),
-                          
+
                           // Activate button (if not active)
                           if (!isActive)
                             Expanded(
@@ -1768,15 +2113,15 @@ class _ProgramsScreenState extends State<ProgramsScreen>
 
                                   if (confirmed == true) {
                                     HapticFeedback.mediumImpact();
-                                    context
-                                        .read<ProgramsBloc>()
-                                        .add(ProgramsActivateRequested(program));
+                                    context.read<ProgramsBloc>().add(
+                                        ProgramsActivateRequested(program));
                                   }
                                 },
                                 style: ElevatedButton.styleFrom(
                                   backgroundColor: categoryColor,
                                   foregroundColor: Colors.white,
-                                  padding: const EdgeInsets.symmetric(vertical: 14),
+                                  padding:
+                                      const EdgeInsets.symmetric(vertical: 14),
                                   elevation: 0,
                                   shape: RoundedRectangleBorder(
                                     borderRadius: BorderRadius.circular(12),
@@ -1790,7 +2135,7 @@ class _ProgramsScreenState extends State<ProgramsScreen>
                                 ),
                               ),
                             ),
-                          
+
                           // Share button
                           const SizedBox(width: 8),
                           Container(
@@ -1821,9 +2166,10 @@ class _ProgramsScreenState extends State<ProgramsScreen>
     );
   }
 
-  Widget _buildModernStatItem(IconData icon, String value, String label, Color color) {
+  Widget _buildModernStatItem(
+      IconData icon, String value, String label, Color color) {
     final theme = Theme.of(context);
-    
+
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
@@ -1860,31 +2206,6 @@ class _ProgramsScreenState extends State<ProgramsScreen>
           ],
         ),
       ],
-    );
-  }
-
-  Widget _buildStatChip(IconData icon, String label, Color color) {
-    final theme = Theme.of(context);
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-      decoration: BoxDecoration(
-        color: color.withOpacity(0.1),
-        borderRadius: BorderRadius.circular(8),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, size: 12, color: color),
-          const SizedBox(width: 4),
-          Text(
-            label,
-            style: theme.textTheme.labelSmall?.copyWith(
-              color: color,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-        ],
-      ),
     );
   }
 
@@ -1925,7 +2246,7 @@ class _ProgramsScreenState extends State<ProgramsScreen>
       'All': Icons.apps,
       ..._buildCategoryIconMap(),
     };
-    
+
     showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
@@ -1952,38 +2273,6 @@ class _ProgramsScreenState extends State<ProgramsScreen>
       iconMap[category.name] = _getCategoryIcon(category.name);
     }
     return iconMap;
-  }
-
-  void _showLevelFilter(List<String> levels) {
-    showModalBottomSheet<void>(
-      context: context,
-      isScrollControlled: true,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (context) => _FilterBottomSheet(
-        title: 'Select Level',
-        options: ['All', ...levels],
-        selectedValue: _selectedLevel.isEmpty ? 'All' : _selectedLevel,
-        onSelected: (value) {
-          setState(() {
-            _selectedLevel = value == 'All' ? '' : value;
-          });
-        },
-        icons: {
-          'All': Icons.apps,
-          'Beginner': Icons.star_border,
-          'Intermediate': Icons.star_half,
-          'Advanced': Icons.star,
-        },
-        colors: {
-          'All': Colors.grey,
-          'Beginner': Colors.green,
-          'Intermediate': Colors.orange,
-          'Advanced': Colors.red,
-        },
-      ),
-    );
   }
 
   Future<void> _navigateToProgramDay(Program program, int dayNumber) async {
@@ -2014,137 +2303,144 @@ class _ProgramsScreenState extends State<ProgramsScreen>
     }
   }
 
-void _showProgramDaysOverview(Program program, ActiveProgram active) {
-  showModalBottomSheet<void>(
-    context: context,
-    isScrollControlled: true,
-    backgroundColor: Colors.transparent,
-    builder: (context) {
-      return FractionallySizedBox(
-        heightFactor: 0.7, // 70% of screen height
-        child: Container(
-          decoration: const BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-          ),
-          child: Column(
-            children: [
-              // --- Top drag handle and title ---
-              Padding(
-                padding: const EdgeInsets.only(top: 12, bottom: 8),
-                child: Container(
-                  width: 40,
-                  height: 4,
-                  decoration: BoxDecoration(
-                    color: Colors.grey[300],
-                    borderRadius: BorderRadius.circular(2),
+  void _showProgramDaysOverview(Program program, ActiveProgram active) {
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) {
+        return FractionallySizedBox(
+          heightFactor: 0.7, // 70% of screen height
+          child: Container(
+            decoration: const BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+            ),
+            child: Column(
+              children: [
+                // --- Top drag handle and title ---
+                Padding(
+                  padding: const EdgeInsets.only(top: 12, bottom: 8),
+                  child: Container(
+                    width: 40,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: Colors.grey[300],
+                      borderRadius: BorderRadius.circular(2),
+                    ),
                   ),
                 ),
-              ),
-              Text(
-                '${program.name} - Program Days',
-                style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                      fontWeight: FontWeight.bold,
-                    ),
-              ),
-              const SizedBox(height: 12),
-              const Divider(height: 1),
-
-              // --- Scrollable content ---
-              Expanded(
-                child: FutureBuilder<ProgramProgress?>(
-                  future: getIt<ProgramProgressService>()
-                      .getProgramProgress(program.id),
-                  builder: (context, snapshot) {
-                    final progress = snapshot.data;
-
-                    if (program.days.isNotEmpty) {
-                      // Old format
-                      return ListView.builder(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 16, vertical: 8,),
-                        itemCount: program.days.length,
-                        itemBuilder: (context, index) {
-                          final day = program.days[index];
-                          final isCompleted =
-                              progress?.isDayCompleted(day.dayNumber) ?? false;
-                          final isCurrent = active.currentDay == day.dayNumber;
-                          final isAccessible =
-                              day.dayNumber <= active.currentDay;
-
-                          return _buildDayOverviewCard(
-                            context,
-                            program,
-                            dayNumber: day.dayNumber,
-                            title: day.title,
-                            description: day.description,
-                            isCompleted: isCompleted,
-                            isCurrent: isCurrent,
-                            isAccessible: isAccessible,
-                          );
-                        },
-                      );
-                    } else if (program.dayWiseDrillIds.isNotEmpty) {
-                      // New format
-                      final sortedDays = program.dayWiseDrillIds.keys.toList()
-                        ..sort();
-
-                      return ListView.builder(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 16, vertical: 8,),
-                        itemCount: sortedDays.length,
-                        itemBuilder: (context, index) {
-                          final dayNumber = sortedDays[index];
-                          final drillIds =
-                              program.dayWiseDrillIds[dayNumber] ?? [];
-                          final isCompleted =
-                              progress?.isDayCompleted(dayNumber) ?? false;
-                          final isCurrent = active.currentDay == dayNumber;
-                          final isAccessible = dayNumber <= active.currentDay;
-                          final drillCount = drillIds.length;
-
-                          return _buildDayOverviewCard(
-                            context,
-                            program,
-                            dayNumber: dayNumber,
-                            title: 'Day $dayNumber',
-                            description: drillCount > 1
-                                ? '$drillCount drills assigned'
-                                : (drillCount == 1
-                                    ? 'Training day'
-                                    : 'Rest day'),
-                            isCompleted: isCompleted,
-                            isCurrent: isCurrent,
-                            isAccessible: isAccessible,
-                          );
-                        },
-                      );
-                    } else {
-                      // No data available
-                      return Center(
-                        child: Padding(
-                          padding: const EdgeInsets.all(32),
-                          child: Text(
-                            'No program schedule available',
-                            style:
-                                Theme.of(context).textTheme.bodyLarge?.copyWith(
-                                      color: Colors.grey,
-                                    ),
-                          ),
-                        ),
-                      );
-                    }
-                  },
+                Text(
+                  '${program.name} - Program Days',
+                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                        fontWeight: FontWeight.bold,
+                      ),
                 ),
-              ),
-            ],
-          ),
-        ),
-      );
-    },
-  );
-}
+                const SizedBox(height: 12),
+                const Divider(height: 1),
 
+                // --- Scrollable content ---
+                Expanded(
+                  child: FutureBuilder<ProgramProgress?>(
+                    future: getIt<ProgramProgressService>()
+                        .getProgramProgress(program.id),
+                    builder: (context, snapshot) {
+                      final progress = snapshot.data;
+
+                      if (program.days.isNotEmpty) {
+                        // Old format
+                        return ListView.builder(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 16,
+                            vertical: 8,
+                          ),
+                          itemCount: program.days.length,
+                          itemBuilder: (context, index) {
+                            final day = program.days[index];
+                            final isCompleted =
+                                progress?.isDayCompleted(day.dayNumber) ??
+                                    false;
+                            final isCurrent =
+                                active.currentDay == day.dayNumber;
+                            final isAccessible =
+                                day.dayNumber <= active.currentDay;
+
+                            return _buildDayOverviewCard(
+                              context,
+                              program,
+                              dayNumber: day.dayNumber,
+                              title: day.title,
+                              description: day.description,
+                              isCompleted: isCompleted,
+                              isCurrent: isCurrent,
+                              isAccessible: isAccessible,
+                            );
+                          },
+                        );
+                      } else if (program.dayWiseDrillIds.isNotEmpty) {
+                        // New format
+                        final sortedDays = program.dayWiseDrillIds.keys.toList()
+                          ..sort();
+
+                        return ListView.builder(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 16,
+                            vertical: 8,
+                          ),
+                          itemCount: sortedDays.length,
+                          itemBuilder: (context, index) {
+                            final dayNumber = sortedDays[index];
+                            final drillIds =
+                                program.dayWiseDrillIds[dayNumber] ?? [];
+                            final isCompleted =
+                                progress?.isDayCompleted(dayNumber) ?? false;
+                            final isCurrent = active.currentDay == dayNumber;
+                            final isAccessible = dayNumber <= active.currentDay;
+                            final drillCount = drillIds.length;
+
+                            return _buildDayOverviewCard(
+                              context,
+                              program,
+                              dayNumber: dayNumber,
+                              title: 'Day $dayNumber',
+                              description: drillCount > 1
+                                  ? '$drillCount drills assigned'
+                                  : (drillCount == 1
+                                      ? 'Training day'
+                                      : 'Rest day'),
+                              isCompleted: isCompleted,
+                              isCurrent: isCurrent,
+                              isAccessible: isAccessible,
+                            );
+                          },
+                        );
+                      } else {
+                        // No data available
+                        return Center(
+                          child: Padding(
+                            padding: const EdgeInsets.all(32),
+                            child: Text(
+                              'No program schedule available',
+                              style: Theme.of(context)
+                                  .textTheme
+                                  .bodyLarge
+                                  ?.copyWith(
+                                    color: Colors.grey,
+                                  ),
+                            ),
+                          ),
+                        );
+                      }
+                    },
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
 
   void _showCreateProgramScreen() {
     // Get the bloc from the parent context before navigating
@@ -2170,59 +2466,219 @@ void _showProgramDaysOverview(Program program, ActiveProgram active) {
     required bool isCurrent,
     required bool isAccessible,
   }) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+
+    // Check if this day has drills assigned
+    bool hasDrills = false;
+    int drillCount = 0;
+    List<String> drillIds = [];
+
+    if (program.days.isNotEmpty) {
+      // Old format
+      final day =
+          program.days.where((d) => d.dayNumber == dayNumber).firstOrNull;
+      hasDrills = day?.drillId != null && day!.drillId!.isNotEmpty;
+      if (hasDrills) {
+        drillCount = 1;
+        drillIds = [day!.drillId!];
+      }
+    } else if (program.dayWiseDrillIds.isNotEmpty) {
+      // New format
+      drillIds = program.dayWiseDrillIds[dayNumber] ?? [];
+      hasDrills = drillIds.isNotEmpty;
+      drillCount = drillIds.length;
+    }
+
     return Card(
       margin: const EdgeInsets.only(bottom: 8),
-      child: ListTile(
-        leading: Container(
-          width: 40,
-          height: 40,
-          decoration: BoxDecoration(
-            color: isCompleted
-                ? Colors.green
-                : isCurrent
-                    ? Theme.of(context).primaryColor
-                    : isAccessible
-                        ? Colors.grey[400]
-                        : Colors.grey[300],
-            shape: BoxShape.circle,
-          ),
-          child: Center(
-            child: isCompleted
-                ? const Icon(Icons.check, color: Colors.white, size: 20)
-                : Text(
-                    '$dayNumber',
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontWeight: FontWeight.bold,
-                      fontSize: 14,
+      elevation: isCurrent ? 4 : 1,
+      child: Container(
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(12),
+          border: isCurrent
+              ? Border.all(color: colorScheme.primary, width: 2)
+              : null,
+        ),
+        child: Column(
+          children: [
+            ListTile(
+              leading: Container(
+                width: 40,
+                height: 40,
+                decoration: BoxDecoration(
+                  color: isCompleted
+                      ? Colors.green
+                      : isCurrent
+                          ? colorScheme.primary
+                          : isAccessible
+                              ? Colors.grey[400]
+                              : Colors.grey[300],
+                  shape: BoxShape.circle,
+                ),
+                child: Center(
+                  child: isCompleted
+                      ? const Icon(Icons.check, color: Colors.white, size: 20)
+                      : Text(
+                          '$dayNumber',
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 14,
+                          ),
+                        ),
+                ),
+              ),
+              title: Text(
+                title,
+                style: TextStyle(
+                  fontWeight: isCurrent ? FontWeight.bold : FontWeight.normal,
+                  color: isAccessible ? null : Colors.grey,
+                ),
+              ),
+              subtitle: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    description.length > 60
+                        ? '${description.substring(0, 60)}...'
+                        : description,
+                    style: TextStyle(
+                      color: isAccessible ? null : Colors.grey,
                     ),
                   ),
-          ),
+                  if (hasDrills) ...[
+                    const SizedBox(height: 4),
+                    Row(
+                      children: [
+                        Icon(
+                          Icons.fitness_center,
+                          size: 14,
+                          color: isCurrent
+                              ? colorScheme.primary
+                              : Colors.grey[600],
+                        ),
+                        const SizedBox(width: 4),
+                        Text(
+                          drillCount > 1
+                              ? '$drillCount drills assigned'
+                              : '1 drill assigned',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: isCurrent
+                                ? colorScheme.primary
+                                : Colors.grey[600],
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ],
+              ),
+              trailing: isAccessible
+                  ? Icon(
+                      Icons.arrow_forward_ios,
+                      size: 16,
+                      color: isCurrent ? colorScheme.primary : null,
+                    )
+                  : Icon(Icons.lock, color: Colors.grey[400], size: 16),
+              onTap: isAccessible
+                  ? () {
+                      Navigator.pop(context);
+                      _navigateToProgramDay(program, dayNumber);
+                    }
+                  : null,
+            ),
+
+            // Enhanced current day actions
+            if (isCurrent && isAccessible && hasDrills) ...[
+              const Divider(height: 1),
+              Padding(
+                padding: const EdgeInsets.all(12),
+                child: Column(
+                  children: [
+                    Row(
+                      children: [
+                        Expanded(
+                          child: OutlinedButton.icon(
+                            onPressed: () {
+                              Navigator.pop(context);
+                              _navigateToProgramDay(program, dayNumber);
+                            },
+                            icon: const Icon(Icons.info_outline, size: 18),
+                            label: const Text('View Details'),
+                            style: OutlinedButton.styleFrom(
+                              padding: const EdgeInsets.symmetric(vertical: 8),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: ElevatedButton.icon(
+                            onPressed: () {
+                              Navigator.pop(context);
+                              _startAllDrillsForDay(
+                                  program, dayNumber, drillIds);
+                            },
+                            icon:
+                                const Icon(Icons.play_circle_filled, size: 18),
+                            label: Text(drillCount > 1
+                                ? 'Start All Drills'
+                                : 'Start Drill'),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: colorScheme.primary,
+                              foregroundColor: colorScheme.onPrimary,
+                              padding: const EdgeInsets.symmetric(vertical: 8),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton.icon(
+                        onPressed: () {
+                          Navigator.pop(context);
+                          _completeDayDirectly(program, dayNumber);
+                        },
+                        icon: const Icon(Icons.check_circle, size: 18),
+                        label: const Text('Complete Day'),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.green,
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(vertical: 8),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ] else if (isCurrent && isAccessible && !hasDrills) ...[
+              const Divider(height: 1),
+              Padding(
+                padding: const EdgeInsets.all(12),
+                child: SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton.icon(
+                    onPressed: () {
+                      Navigator.pop(context);
+                      _completeDayDirectly(program, dayNumber);
+                    },
+                    icon: const Icon(Icons.check_circle, size: 18),
+                    label: const Text('Complete Rest Day'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.green,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 8),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ],
         ),
-        title: Text(
-          title,
-          style: TextStyle(
-            fontWeight: isCurrent ? FontWeight.bold : FontWeight.normal,
-            color: isAccessible ? null : Colors.grey,
-          ),
-        ),
-        subtitle: Text(
-          description.length > 60
-              ? '${description.substring(0, 60)}...'
-              : description,
-          style: TextStyle(
-            color: isAccessible ? null : Colors.grey,
-          ),
-        ),
-        trailing: isAccessible
-            ? const Icon(Icons.arrow_forward_ios, size: 16)
-            : Icon(Icons.lock, color: Colors.grey[400], size: 16),
-        onTap: isAccessible
-            ? () {
-                Navigator.pop(context);
-                _navigateToProgramDay(program, dayNumber);
-              }
-            : null,
       ),
     );
   }
@@ -2238,7 +2694,7 @@ void _showProgramDaysOverview(Program program, ActiveProgram active) {
           // Get the active program from the current state
           final state = context.read<ProgramsBloc>().state;
           final activeProgram = state.active;
-          
+
           if (activeProgram == null) {
             ScaffoldMessenger.of(context).showSnackBar(
               const SnackBar(content: Text('No active program found')),
@@ -2247,7 +2703,9 @@ void _showProgramDaysOverview(Program program, ActiveProgram active) {
           }
 
           // Find the program by active program ID
-          final program = state.programs.where((p) => p.id == activeProgram.programId).firstOrNull;
+          final program = state.programs
+              .where((p) => p.id == activeProgram.programId)
+              .firstOrNull;
 
           if (program == null) {
             ScaffoldMessenger.of(context).showSnackBar(
@@ -2286,7 +2744,7 @@ void _showProgramDaysOverview(Program program, ActiveProgram active) {
       // No drill assigned, navigate to program day screen
       final state = context.read<ProgramsBloc>().state;
       final activeProgram = state.active;
-      
+
       if (activeProgram == null) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('No active program found')),
@@ -2295,7 +2753,9 @@ void _showProgramDaysOverview(Program program, ActiveProgram active) {
       }
 
       // Find the program by active program ID
-      final program = state.programs.where((p) => p.id == activeProgram.programId).firstOrNull;
+      final program = state.programs
+          .where((p) => p.id == activeProgram.programId)
+          .firstOrNull;
 
       if (program != null) {
         _navigateToProgramDay(
@@ -2307,6 +2767,214 @@ void _showProgramDaysOverview(Program program, ActiveProgram active) {
           const SnackBar(content: Text('Program not found')),
         );
       }
+    }
+  }
+
+  /// Starts all drills for a specific day
+  Future<void> _startAllDrillsForDay(
+      Program program, int dayNumber, List<String> drillIds) async {
+    if (drillIds.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('No drills assigned for this day'),
+          backgroundColor: Colors.orange,
+        ),
+      );
+      return;
+    }
+
+    try {
+      // Ensure program progress exists before starting drills
+      await _ensureProgramProgressExists(program);
+
+      final drillService = getIt<DrillAssignmentService>();
+
+      // Get the first drill to start with
+      final firstDrill = await drillService.getDrillById(drillIds.first);
+
+      if (firstDrill != null && mounted) {
+        // Navigate to drill runner with program context
+        context.push('/drill-runner', extra: {
+          'drill': firstDrill,
+          'programId': program.id,
+          'programDayNumber': dayNumber,
+          'allDrillIds':
+              drillIds, // Pass all drill IDs for sequential execution
+        });
+      } else {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Drill not found'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error loading drill: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
+  /// Completes a program day directly without running drills
+  Future<void> _completeDayDirectly(Program program, int dayNumber) async {
+    try {
+      // Show confirmation dialog
+      final confirmed = await showDialog<bool>(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('Complete Day'),
+          content: Text(
+              'Are you sure you want to mark Day $dayNumber as completed?'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(false),
+              child: const Text('Cancel'),
+            ),
+            ElevatedButton(
+              onPressed: () => Navigator.of(context).pop(true),
+              child: const Text('Complete'),
+            ),
+          ],
+        ),
+      );
+
+      if (confirmed != true) return;
+
+      final progressService = getIt<ProgramProgressService>();
+
+      // First, ensure the program has progress tracking set up
+      await _ensureProgramProgressExists(program);
+
+      // Then complete the day
+      await progressService.completeProgramDay(program.id, dayNumber);
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Day $dayNumber completed! 🎉'),
+            backgroundColor: Colors.green,
+            duration: const Duration(seconds: 2),
+          ),
+        );
+
+        // Refresh the programs to update the UI
+        context.read<ProgramsBloc>().add(const ProgramsRefreshRequested());
+
+        // Check if there's a next day and show option to start it
+        final nextDay = dayNumber + 1;
+        if (nextDay <= program.durationDays) {
+          _showNextDayOption(program, nextDay);
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        print("completd day error is : $e");
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error completing day: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
+  /// Ensures that program progress tracking exists for the given program
+  Future<void> _ensureProgramProgressExists(Program program) async {
+    try {
+      final progressService = getIt<ProgramProgressService>();
+
+      // Check if progress already exists
+      final existingProgress =
+          await progressService.getProgramProgress(program.id);
+
+      if (existingProgress == null) {
+        // No progress exists, we need to create it
+        // This happens when a program is active but progress tracking wasn't set up properly
+
+        // Get current user ID
+        final auth = FirebaseAuth.instance;
+        final userId = auth.currentUser?.uid;
+
+        if (userId == null) {
+          throw Exception('User not authenticated');
+        }
+
+        // Create initial progress document
+        final firestore = FirebaseFirestore.instance;
+        await firestore.collection('program_progress').add({
+          'userId': userId,
+          'programId': program.id,
+          'currentDay': 1,
+          'completedDays': <int>[],
+          'totalDays': program.durationDays,
+          'durationDays': program.durationDays,
+          'startedAt': DateTime.now().toIso8601String(),
+          'status': 'active',
+          'progressPercentage': 0.0,
+          'lastCompletedAt': null,
+        });
+
+        AppLogger.info(
+            'Created missing program progress for program ${program.id}');
+      }
+    } catch (e) {
+      AppLogger.error('Error ensuring program progress exists', error: e);
+      rethrow;
+    }
+  }
+
+  /// Shows option to start the next day after completing current day
+  void _showNextDayOption(Program program, int nextDayNumber) {
+    // Check if next day has drills
+    bool hasNextDayDrills = false;
+    List<String> nextDayDrillIds = [];
+
+    if (program.days.isNotEmpty) {
+      final nextDay =
+          program.days.where((d) => d.dayNumber == nextDayNumber).firstOrNull;
+      hasNextDayDrills =
+          nextDay?.drillId != null && nextDay!.drillId!.isNotEmpty;
+      if (hasNextDayDrills) {
+        nextDayDrillIds = [nextDay!.drillId!];
+      }
+    } else if (program.dayWiseDrillIds.isNotEmpty) {
+      nextDayDrillIds = program.dayWiseDrillIds[nextDayNumber] ?? [];
+      hasNextDayDrills = nextDayDrillIds.isNotEmpty;
+    }
+
+    if (hasNextDayDrills) {
+      showDialog(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: Text('Day $nextDayNumber Ready!'),
+          content: Text(
+              'Great job! Day $nextDayNumber is now available. Would you like to start the ${nextDayDrillIds.length > 1 ? 'drills' : 'drill'} for the next day?'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('Later'),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                Navigator.of(context).pop();
+                _startAllDrillsForDay(program, nextDayNumber, nextDayDrillIds);
+              },
+              child: Text(nextDayDrillIds.length > 1
+                  ? 'Start All Drills'
+                  : 'Start Drill'),
+            ),
+          ],
+        ),
+      );
     }
   }
 
@@ -2334,37 +3002,10 @@ void _showProgramDaysOverview(Program program, ActiveProgram active) {
     }
   }
 
-  Widget _buildPrivacyIndicator(Program program) {
-    return FutureBuilder<bool>(
-      future: _isOwner(program),
-      builder: (context, snapshot) {
-        final isOwner = snapshot.data ?? false;
-        final isLoading = snapshot.connectionState == ConnectionState.waiting;
-
-        // Privacy toggle removed - all programs are private by default
-        return const SizedBox.shrink();
-      },
-    );
-  }
-
-  Future<bool> _isOwner(Program program) async {
-    if (_ownershipCache.containsKey(program.id)) {
-      return _ownershipCache[program.id]!;
-    }
-
-    try {
-      final isOwner = await _sharingService.isOwner('program', program.id);
-      _ownershipCache[program.id] = isOwner;
-      return isOwner;
-    } catch (e) {
-      return false;
-    }
-  }
-
   // Browse Tab - Shows all available programs
   Widget _buildBrowseTab(ProgramsState state) {
     final filteredPrograms = _getFilteredPrograms(state);
-    
+
     if (filteredPrograms.isEmpty) {
       return _buildEmptyBrowseState();
     }
@@ -2503,20 +3144,29 @@ void _showProgramDaysOverview(Program program, ActiveProgram active) {
     // Apply search filter
     if (state.searchQuery.isNotEmpty) {
       programs = programs.where((program) {
-        return program.name.toLowerCase().contains(state.searchQuery.toLowerCase()) ||
-               program.category.toLowerCase().contains(state.searchQuery.toLowerCase()) ||
-               program.level.toLowerCase().contains(state.searchQuery.toLowerCase());
+        return program.name
+                .toLowerCase()
+                .contains(state.searchQuery.toLowerCase()) ||
+            program.category
+                .toLowerCase()
+                .contains(state.searchQuery.toLowerCase()) ||
+            program.level
+                .toLowerCase()
+                .contains(state.searchQuery.toLowerCase());
       }).toList();
     }
 
     // Apply category filter
     if (_selectedCategory.isNotEmpty) {
-      programs = programs.where((program) => program.category == _selectedCategory).toList();
+      programs = programs
+          .where((program) => program.category == _selectedCategory)
+          .toList();
     }
 
     // Apply level filter
     if (_selectedLevel.isNotEmpty) {
-      programs = programs.where((program) => program.level == _selectedLevel).toList();
+      programs =
+          programs.where((program) => program.level == _selectedLevel).toList();
     }
 
     return programs;
@@ -2787,7 +3437,9 @@ class _ProgramDetailsSheetState extends State<_ProgramDetailsSheet> {
   }
 
   Widget _buildEnhancedFormatDaysList(
-      ThemeData theme, ColorScheme colorScheme,) {
+    ThemeData theme,
+    ColorScheme colorScheme,
+  ) {
     // Build list from dayWiseDrillIds
     final sortedDays = widget.program.dayWiseDrillIds.keys.toList()..sort();
 

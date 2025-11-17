@@ -5,6 +5,9 @@ import 'package:spark_app/features/drills/data/session_repository.dart';
 import 'package:spark_app/features/drills/domain/drill.dart';
 import 'package:spark_app/features/drills/domain/session_result.dart';
 import 'package:spark_app/features/programs/services/program_progress_service.dart';
+import 'package:spark_app/features/programs/data/program_repository.dart';
+import 'package:spark_app/features/programs/domain/program.dart';
+import 'package:spark_app/features/programs/services/drill_assignment_service.dart';
 import 'package:spark_app/features/multiplayer/services/session_sync_service.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -1302,8 +1305,30 @@ void _completeRep() {
       try {
         final progressService = getIt<ProgramProgressService>();
         await progressService.completeProgramDay(widget.programId!, widget.programDayNumber!);
+        AppLogger.info('Program day ${widget.programDayNumber} completed successfully', tag: 'DrillRunner');
+        
+        // Show success message for program day completion
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Day ${widget.programDayNumber} completed! 🎉'),
+              backgroundColor: Colors.green,
+              duration: const Duration(seconds: 3),
+            ),
+          );
+        }
       } catch (e) {
         AppLogger.error('Error completing program day', error: e, tag: 'DrillRunner');
+        // Show error to user
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Failed to complete program day: $e'),
+              backgroundColor: Colors.red,
+              duration: const Duration(seconds: 5),
+            ),
+          );
+        }
       }
     }
     
@@ -1331,10 +1356,16 @@ void _completeRep() {
               ),
             );
           }
-          // Navigate back to program with guard
-          if (mounted && context.mounted) {
-            context.go('/programs');
-          }
+          
+          // Check if there's a next day and show option to start it
+          _checkAndShowNextDayOption();
+          
+          // Navigate back to program with guard after a delay
+          Future.delayed(const Duration(seconds: 2), () {
+            if (mounted && context.mounted) {
+              context.go('/programs');
+            }
+          });
         } else {
           // Navigate to drill results screen with detailed set results
           final detailedSetResults = _setResults.map((setResult) {
@@ -2244,6 +2275,45 @@ void _completeRep() {
         ],
       ),
     );
+  }
+
+  /// Checks if there's a next day and shows option to start it
+  Future<void> _checkAndShowNextDayOption() async {
+    if (widget.programId == null || widget.programDayNumber == null) return;
+    
+    try {
+      final nextDay = widget.programDayNumber! + 1;
+      
+      // Show a simple dialog asking if user wants to continue to next day
+      // The actual program data will be fetched when they navigate back to programs
+      if (mounted) {
+        showDialog(
+          context: context,
+          builder: (context) => AlertDialog(
+            title: Text('Day $nextDay Ready!'),
+            content: Text(
+              'Great job completing Day ${widget.programDayNumber}! Would you like to continue to Day $nextDay?'
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(),
+                child: const Text('Later'),
+              ),
+              ElevatedButton(
+                onPressed: () {
+                  Navigator.of(context).pop();
+                  // Navigate back to programs screen where they can start the next day
+                  context.go('/programs');
+                },
+                child: const Text('Continue'),
+              ),
+            ],
+          ),
+        );
+      }
+    } catch (e) {
+      AppLogger.error('Error checking next day option', error: e, tag: 'DrillRunner');
+    }
   }
 }
 

@@ -178,6 +178,7 @@ class BluetoothConnectionService {
           Permission.bluetoothConnect,
           Permission.bluetoothAdvertise,
           Permission.locationWhenInUse,
+          Permission.location, // Required for Bluetooth scanning on Android
           Permission.nearbyWifiDevices,
         ]);
       }

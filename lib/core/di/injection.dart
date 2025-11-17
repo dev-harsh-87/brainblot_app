@@ -34,6 +34,8 @@ import 'package:spark_app/core/services/fcm_token_service.dart';
 import 'package:spark_app/core/auth/services/session_management_service.dart';
 import 'package:spark_app/core/auth/services/user_management_service.dart';
 import 'package:spark_app/features/auth/services/multi_device_session_service.dart';
+import 'package:spark_app/features/auth/services/simple_session_service.dart';
+import 'package:spark_app/core/services/subscription_migration_service.dart';
 import 'package:spark_app/core/utils/app_logger.dart';
 
 final GetIt getIt = GetIt.instance;
@@ -160,19 +162,32 @@ Future<void> configureDependencies() async {
     subscriptionSync: getIt<SubscriptionSyncService>(),
   ),);
   
-  // Register Multi-Device Session Service
-  getIt.registerLazySingleton<MultiDeviceSessionService>(() => MultiDeviceSessionService(
-    firestore: firebaseFirestore,
-    auth: firebaseAuth,
-  ),);
   
   // Register Subscription Permission Service
   getIt.registerLazySingleton<SubscriptionPermissionService>(() => SubscriptionPermissionService(
     auth: firebaseAuth,
     firestore: firebaseFirestore,
   ),);
+
+  // Register Subscription Migration Service
+  getIt.registerLazySingleton<SubscriptionMigrationService>(() => SubscriptionMigrationService(
+    firestore: firebaseFirestore,
+  ),);
+
 // Register User Management Service
   getIt.registerLazySingleton<UserManagementService>(() => UserManagementService());
+
+  // Register Multi-Device Session Service
+  getIt.registerLazySingleton<MultiDeviceSessionService>(() => MultiDeviceSessionService(
+    firestore: firebaseFirestore,
+    auth: firebaseAuth,
+  ));
+
+  // Register Simple Session Service (if needed as fallback)
+  getIt.registerLazySingleton<SimpleSessionService>(() => SimpleSessionService(
+    firestore: firebaseFirestore,
+    auth: firebaseAuth,
+  ));
   
   AppLogger.info('Firebase dependency injection configuration completed successfully');
   AppLogger.debug('Available repositories: Firebase (primary), Hive (local fallback)');

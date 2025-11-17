@@ -38,10 +38,10 @@ class _ProfileScreenState extends State<ProfileScreen> with AutoRefreshMixin {
   void initState() {
     super.initState();
     _profileService = getIt<ProfileService>();
-    
+
     // Add a small delay to ensure auth state is fully settled
     Future.delayed(const Duration(milliseconds: 300), _loadUserData);
-    
+
     // Setup auto-refresh listeners
     listenToMultipleAutoRefresh({
       AutoRefreshService.profile: _loadUserData,
@@ -53,7 +53,8 @@ class _ProfileScreenState extends State<ProfileScreen> with AutoRefreshMixin {
   Future<void> _loadUserData() async {
     // Check if user is authenticated before loading
     if (_profileService.currentUserId == null) {
-      AppLogger.warning('Cannot load profile data - user not authenticated', tag: 'ProfileScreen');
+      AppLogger.warning('Cannot load profile data - user not authenticated',
+          tag: 'ProfileScreen');
       setState(() {
         _isLoading = false;
         _error = 'User not authenticated';
@@ -69,7 +70,7 @@ class _ProfileScreenState extends State<ProfileScreen> with AutoRefreshMixin {
     try {
       final profile = await _profileService.getCurrentUserProfile();
       final stats = await _profileService.getUserStats();
-      
+
       if (mounted) {
         setState(() {
           _userProfile = profile;
@@ -78,7 +79,8 @@ class _ProfileScreenState extends State<ProfileScreen> with AutoRefreshMixin {
         });
       }
     } catch (e) {
-      AppLogger.error('Failed to load profile data', error: e, tag: 'ProfileScreen');
+      AppLogger.error('Failed to load profile data',
+          error: e, tag: 'ProfileScreen');
       if (mounted) {
         setState(() {
           _error = e.toString();
@@ -145,17 +147,6 @@ class _ProfileScreenState extends State<ProfileScreen> with AutoRefreshMixin {
         ),
       ),
       actions: [
-        IconButton(
-          icon: Icon(
-            Icons.edit_rounded,
-            color: colorScheme.onPrimary,
-          ),
-          onPressed: () {
-            HapticFeedback.lightImpact();
-            _showEditProfileDialog();
-          },
-          tooltip: 'Edit Profile',
-        ),
         PopupMenuButton<String>(
           icon: Icon(
             Icons.more_vert_rounded,
@@ -163,8 +154,36 @@ class _ProfileScreenState extends State<ProfileScreen> with AutoRefreshMixin {
           ),
           onSelected: (value) {
             switch (value) {
-              case 'settings':
-                context.go('/settings');
+              case 'logout':
+                showDialog<void>(
+                  context: context,
+                  builder: (context) => AlertDialog(
+                    title: const Text('Logout'),
+                    content: const Text('Are you sure you want to logout?'),
+                    actions: [
+                      TextButton(
+                        onPressed: () => Navigator.of(context).pop(),
+                        child: const Text('Cancel'),
+                      ),
+                      FilledButton(
+                        onPressed: () {
+                          Navigator.of(context).pop();
+                          // Trigger logout via AuthBloc
+                          context
+                              .read<AuthBloc>()
+                              .add(const AuthLogoutRequested());
+                          // Navigate to auth screen
+                          context.go('/auth');
+                        },
+                        style: FilledButton.styleFrom(
+                          backgroundColor: Colors.red,
+                        ),
+                        child: const Text('Logout'),
+                      ),
+                    ],
+                  ),
+                );
+
                 break;
               case 'device_sessions':
                 Navigator.of(context).push(
@@ -173,23 +192,10 @@ class _ProfileScreenState extends State<ProfileScreen> with AutoRefreshMixin {
                   ),
                 );
                 break;
-              case 'change_password':
-                _showChangePasswordDialog();
-                break;
-              case 'delete_account':
-                _showDeleteAccountDialog();
-                break;
             }
           },
           itemBuilder: (context) => [
-            const PopupMenuItem(
-              value: 'settings',
-              child: ListTile(
-                leading: Icon(Icons.settings_rounded),
-                title: Text('Settings'),
-                contentPadding: EdgeInsets.zero,
-              ),
-            ),
+          
             const PopupMenuItem(
               value: 'device_sessions',
               child: ListTile(
@@ -198,20 +204,12 @@ class _ProfileScreenState extends State<ProfileScreen> with AutoRefreshMixin {
                 contentPadding: EdgeInsets.zero,
               ),
             ),
-            const PopupMenuItem(
-              value: 'change_password',
+            PopupMenuDivider(),
+              const PopupMenuItem(
+              value: 'logout',
               child: ListTile(
-                leading: Icon(Icons.lock_rounded),
-                title: Text('Change Password'),
-                contentPadding: EdgeInsets.zero,
-              ),
-            ),
-            const PopupMenuDivider(),
-            const PopupMenuItem(
-              value: 'delete_account',
-              child: ListTile(
-                leading: Icon(Icons.delete_forever_rounded, color: Colors.red),
-                title: Text('Delete Account', style: TextStyle(color: Colors.red)),
+                leading: Icon(Icons.settings_rounded, color: Colors.red,),
+                title: Text('Logout', style: TextStyle(color: Colors.red),),
                 contentPadding: EdgeInsets.zero,
               ),
             ),
@@ -224,7 +222,7 @@ class _ProfileScreenState extends State<ProfileScreen> with AutoRefreshMixin {
   Widget _buildLoadingState(BuildContext context) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
-    
+
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(64),
@@ -269,7 +267,7 @@ class _ProfileScreenState extends State<ProfileScreen> with AutoRefreshMixin {
   Widget _buildErrorState(BuildContext context) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
-    
+
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(32),
@@ -320,7 +318,7 @@ class _ProfileScreenState extends State<ProfileScreen> with AutoRefreshMixin {
     return BlocBuilder<StatsBloc, StatsState>(
       builder: (context, statsState) {
         final sessions = statsState.sessions;
-        
+
         return Column(
           children: [
             _buildEnhancedProfileHeader(context),
@@ -343,7 +341,7 @@ class _ProfileScreenState extends State<ProfileScreen> with AutoRefreshMixin {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
     final profile = _userProfile;
-    
+
     if (profile == null) return const SizedBox.shrink();
 
     return Container(
@@ -419,7 +417,7 @@ class _ProfileScreenState extends State<ProfileScreen> with AutoRefreshMixin {
               ),
             ),
             const SizedBox(width: 16),
-            
+
             // Profile Info
             Expanded(
               child: Column(
@@ -443,10 +441,14 @@ class _ProfileScreenState extends State<ProfileScreen> with AutoRefreshMixin {
                   ),
                   const SizedBox(height: 8),
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                     decoration: BoxDecoration(
                       gradient: LinearGradient(
-                        colors: [Colors.blue.withOpacity(0.15), Colors.blue.withOpacity(0.05)],
+                        colors: [
+                          Colors.blue.withOpacity(0.15),
+                          Colors.blue.withOpacity(0.05)
+                        ],
                       ),
                       borderRadius: BorderRadius.circular(16),
                       border: Border.all(
@@ -492,7 +494,7 @@ class _ProfileScreenState extends State<ProfileScreen> with AutoRefreshMixin {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
     final profile = _userProfile;
-    
+
     if (profile == null) return const SizedBox.shrink();
 
     return Container(
@@ -533,7 +535,7 @@ class _ProfileScreenState extends State<ProfileScreen> with AutoRefreshMixin {
             ],
           ),
           const SizedBox(height: 12),
-          
+
           // Compact Horizontal Layout
           Container(
             decoration: BoxDecoration(
@@ -571,7 +573,8 @@ class _ProfileScreenState extends State<ProfileScreen> with AutoRefreshMixin {
                         child: _buildEnhancedInfoItem(
                           context,
                           'Last Active',
-                          DateFormat('MMM dd, yyyy').format(profile.lastActiveAt),
+                          DateFormat('MMM dd, yyyy')
+                              .format(profile.lastActiveAt),
                           Icons.access_time_rounded,
                           Colors.green,
                         ),
@@ -631,7 +634,7 @@ class _ProfileScreenState extends State<ProfileScreen> with AutoRefreshMixin {
   ) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
-    
+
     return Row(
       children: [
         Container(
@@ -690,7 +693,7 @@ class _ProfileScreenState extends State<ProfileScreen> with AutoRefreshMixin {
   ) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
-    
+
     return Container(
       padding: const EdgeInsets.all(10),
       decoration: BoxDecoration(
@@ -765,10 +768,11 @@ class _ProfileScreenState extends State<ProfileScreen> with AutoRefreshMixin {
     );
   }
 
-  Widget _buildModernStatsOverview(BuildContext context, List<SessionResult> sessions) {
+  Widget _buildModernStatsOverview(
+      BuildContext context, List<SessionResult> sessions) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
-    
+
     if (sessions.isEmpty) {
       return Container(
         margin: const EdgeInsets.symmetric(horizontal: 20),
@@ -823,7 +827,8 @@ class _ProfileScreenState extends State<ProfileScreen> with AutoRefreshMixin {
               icon: const Icon(Icons.play_arrow_rounded, size: 16),
               label: const Text('Start'),
               style: FilledButton.styleFrom(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                 minimumSize: const Size(0, 32),
               ),
             ),
@@ -832,8 +837,12 @@ class _ProfileScreenState extends State<ProfileScreen> with AutoRefreshMixin {
       );
     }
 
-    final avgReaction = sessions.map((s) => s.avgReactionMs).reduce((a, b) => a + b) / sessions.length;
-    final avgAccuracy = sessions.map((s) => s.accuracy).reduce((a, b) => a + b) / sessions.length;
+    final avgReaction =
+        sessions.map((s) => s.avgReactionMs).reduce((a, b) => a + b) /
+            sessions.length;
+    final avgAccuracy =
+        sessions.map((s) => s.accuracy).reduce((a, b) => a + b) /
+            sessions.length;
     final totalTime = sessions.fold<Duration>(
       Duration.zero,
       (sum, session) => sum + session.endedAt.difference(session.startedAt),
@@ -876,7 +885,7 @@ class _ProfileScreenState extends State<ProfileScreen> with AutoRefreshMixin {
             ],
           ),
           const SizedBox(height: 12),
-          
+
           // Compact Horizontal Layout
           Container(
             decoration: BoxDecoration(
@@ -931,7 +940,9 @@ class _ProfileScreenState extends State<ProfileScreen> with AutoRefreshMixin {
                     child: _buildCompactStatItem(
                       context,
                       'Best',
-                      sessions.isNotEmpty ? '${(sessions.map((s) => s.accuracy).reduce((a, b) => a > b ? a : b) * 100).toStringAsFixed(0)}%' : '-',
+                      sessions.isNotEmpty
+                          ? '${(sessions.map((s) => s.accuracy).reduce((a, b) => a > b ? a : b) * 100).toStringAsFixed(0)}%'
+                          : '-',
                       Icons.emoji_events_rounded,
                       Colors.amber,
                     ),
@@ -953,7 +964,7 @@ class _ProfileScreenState extends State<ProfileScreen> with AutoRefreshMixin {
     Color color,
   ) {
     final theme = Theme.of(context);
-    
+
     return Column(
       children: [
         Container(
@@ -993,17 +1004,18 @@ class _ProfileScreenState extends State<ProfileScreen> with AutoRefreshMixin {
     );
   }
 
-  Widget _buildModernAchievements(BuildContext context, List<SessionResult> sessions) {
+  Widget _buildModernAchievements(
+      BuildContext context, List<SessionResult> sessions) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
-    
+
     try {
       final achievements = _calculateAchievements(sessions);
-      
+
       if (achievements.isEmpty) {
         return const SizedBox.shrink();
       }
-      
+
       return Container(
         margin: const EdgeInsets.symmetric(horizontal: 20),
         child: Column(
@@ -1052,7 +1064,8 @@ class _ProfileScreenState extends State<ProfileScreen> with AutoRefreshMixin {
                     padding: EdgeInsets.only(
                       right: index < achievements.length - 1 ? 10 : 0,
                     ),
-                    child: _buildCompactAchievementCard(context, achievements[index]),
+                    child: _buildCompactAchievementCard(
+                        context, achievements[index]),
                   );
                 },
               ),
@@ -1065,20 +1078,21 @@ class _ProfileScreenState extends State<ProfileScreen> with AutoRefreshMixin {
     }
   }
 
-  Widget _buildCompactAchievementCard(BuildContext context, Map<String, dynamic> achievement) {
+  Widget _buildCompactAchievementCard(
+      BuildContext context, Map<String, dynamic> achievement) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
-    
+
     try {
       final isUnlocked = (achievement['unlocked'] ?? false) as bool;
       final title = (achievement['title'] ?? 'Achievement') as String;
       final icon = (achievement['icon'] ?? Icons.star_rounded) as IconData;
-      
+
       return Container(
         width: 105,
         padding: const EdgeInsets.all(10),
         decoration: BoxDecoration(
-          gradient: isUnlocked 
+          gradient: isUnlocked
               ? LinearGradient(
                   begin: Alignment.topLeft,
                   end: Alignment.bottomRight,
@@ -1091,16 +1105,20 @@ class _ProfileScreenState extends State<ProfileScreen> with AutoRefreshMixin {
           color: isUnlocked ? null : colorScheme.surfaceContainerHighest,
           borderRadius: BorderRadius.circular(12),
           border: Border.all(
-            color: isUnlocked ? Colors.amber.withOpacity(0.3) : colorScheme.outline.withOpacity(0.3),
+            color: isUnlocked
+                ? Colors.amber.withOpacity(0.3)
+                : colorScheme.outline.withOpacity(0.3),
             width: 1.5,
           ),
-          boxShadow: isUnlocked ? [
-            BoxShadow(
-              color: Colors.amber.withOpacity(0.2),
-              blurRadius: 6,
-              offset: const Offset(0, 2),
-            ),
-          ] : null,
+          boxShadow: isUnlocked
+              ? [
+                  BoxShadow(
+                    color: Colors.amber.withOpacity(0.2),
+                    blurRadius: 6,
+                    offset: const Offset(0, 2),
+                  ),
+                ]
+              : null,
         ),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
@@ -1121,7 +1139,9 @@ class _ProfileScreenState extends State<ProfileScreen> with AutoRefreshMixin {
               ),
               child: Icon(
                 icon,
-                color: isUnlocked ? Colors.amber.shade700 : colorScheme.onSurface.withOpacity(0.5),
+                color: isUnlocked
+                    ? Colors.amber.shade700
+                    : colorScheme.onSurface.withOpacity(0.5),
                 size: 22,
               ),
             ),
@@ -1135,7 +1155,9 @@ class _ProfileScreenState extends State<ProfileScreen> with AutoRefreshMixin {
                     title,
                     style: theme.textTheme.bodySmall?.copyWith(
                       fontWeight: FontWeight.w700,
-                      color: isUnlocked ? Colors.amber.shade700 : colorScheme.onSurface.withOpacity(0.7),
+                      color: isUnlocked
+                          ? Colors.amber.shade700
+                          : colorScheme.onSurface.withOpacity(0.7),
                       fontSize: 11,
                     ),
                     textAlign: TextAlign.center,
@@ -1147,7 +1169,9 @@ class _ProfileScreenState extends State<ProfileScreen> with AutoRefreshMixin {
                     Text(
                       achievement['description'] as String,
                       style: theme.textTheme.bodySmall?.copyWith(
-                        color: isUnlocked ? Colors.amber.shade600 : colorScheme.onSurface.withOpacity(0.5),
+                        color: isUnlocked
+                            ? Colors.amber.shade600
+                            : colorScheme.onSurface.withOpacity(0.5),
                         fontSize: 9,
                       ),
                       textAlign: TextAlign.center,
@@ -1166,11 +1190,12 @@ class _ProfileScreenState extends State<ProfileScreen> with AutoRefreshMixin {
     }
   }
 
-  Widget _buildModernRecentActivity(BuildContext context, List<SessionResult> sessions) {
+  Widget _buildModernRecentActivity(
+      BuildContext context, List<SessionResult> sessions) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
     final recentSessions = sessions.take(3).toList();
-    
+
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 20),
       child: Column(
@@ -1288,10 +1313,11 @@ class _ProfileScreenState extends State<ProfileScreen> with AutoRefreshMixin {
     );
   }
 
-  Widget _buildCompactActivityItem(BuildContext context, SessionResult session) {
+  Widget _buildCompactActivityItem(
+      BuildContext context, SessionResult session) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
-    
+
     return Padding(
       padding: const EdgeInsets.all(16),
       child: Row(
@@ -1398,17 +1424,22 @@ class _ProfileScreenState extends State<ProfileScreen> with AutoRefreshMixin {
   }
 
   // Helper Methods
-  List<Map<String, dynamic>> _calculateAchievements(List<SessionResult> sessions) {
+  List<Map<String, dynamic>> _calculateAchievements(
+      List<SessionResult> sessions) {
     try {
       final totalSessions = sessions.length;
-      
+
       double avgAccuracy = 0.0;
       double avgReaction = 0.0;
-      
+
       if (sessions.isNotEmpty) {
         try {
-          avgAccuracy = sessions.map((s) => s.accuracy).reduce((a, b) => a + b) / sessions.length;
-          avgReaction = sessions.map((s) => s.avgReactionMs).reduce((a, b) => a + b) / sessions.length;
+          avgAccuracy =
+              sessions.map((s) => s.accuracy).reduce((a, b) => a + b) /
+                  sessions.length;
+          avgReaction =
+              sessions.map((s) => s.avgReactionMs).reduce((a, b) => a + b) /
+                  sessions.length;
         } catch (e) {
           avgAccuracy = 0.0;
           avgReaction = 0.0;
@@ -1467,7 +1498,8 @@ class _ProfileScreenState extends State<ProfileScreen> with AutoRefreshMixin {
     final profile = _userProfile;
     if (profile == null) return;
 
-    final displayNameController = TextEditingController(text: profile.displayName);
+    final displayNameController =
+        TextEditingController(text: profile.displayName);
     final formKey = GlobalKey<FormState>();
     bool isLoading = false;
 
@@ -1475,10 +1507,12 @@ class _ProfileScreenState extends State<ProfileScreen> with AutoRefreshMixin {
       context: context,
       builder: (context) => StatefulBuilder(
         builder: (context, setState) => AlertDialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
           title: Row(
             children: [
-              Icon(Icons.edit_rounded, color: Theme.of(context).colorScheme.primary),
+              Icon(Icons.edit_rounded,
+                  color: Theme.of(context).colorScheme.primary),
               const SizedBox(width: 12),
               const Text('Edit Profile'),
             ],
@@ -1514,40 +1548,42 @@ class _ProfileScreenState extends State<ProfileScreen> with AutoRefreshMixin {
               child: const Text('Cancel'),
             ),
             FilledButton(
-              onPressed: isLoading ? null : () async {
-                if (formKey.currentState!.validate()) {
-                  setState(() => isLoading = true);
-                  
-                  try {
-                    await _profileService.updateProfile(
-                      displayName: displayNameController.text.trim(),
-                    );
-                    
-                    if (mounted) {
-                      Navigator.of(context).pop();
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text('✅ Profile updated successfully'),
-                          backgroundColor: Colors.green,
-                        ),
-                      );
-                      _loadUserData();
-                    }
-                  } catch (e) {
-                    if (mounted) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          content: Text('❌ Failed to update profile: $e'),
-                          backgroundColor: Colors.red,
-                        ),
-                      );
-                    }
-                  } finally {
-                    if (mounted) setState(() => isLoading = false);
-                  }
-                }
-              },
-              child: isLoading 
+              onPressed: isLoading
+                  ? null
+                  : () async {
+                      if (formKey.currentState!.validate()) {
+                        setState(() => isLoading = true);
+
+                        try {
+                          await _profileService.updateProfile(
+                            displayName: displayNameController.text.trim(),
+                          );
+
+                          if (mounted) {
+                            Navigator.of(context).pop();
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text('✅ Profile updated successfully'),
+                                backgroundColor: Colors.green,
+                              ),
+                            );
+                            _loadUserData();
+                          }
+                        } catch (e) {
+                          if (mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text('❌ Failed to update profile: $e'),
+                                backgroundColor: Colors.red,
+                              ),
+                            );
+                          }
+                        } finally {
+                          if (mounted) setState(() => isLoading = false);
+                        }
+                      }
+                    },
+              child: isLoading
                   ? const SizedBox(
                       width: 16,
                       height: 16,
@@ -1575,10 +1611,12 @@ class _ProfileScreenState extends State<ProfileScreen> with AutoRefreshMixin {
       context: context,
       builder: (context) => StatefulBuilder(
         builder: (context, setState) => AlertDialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
           title: Row(
             children: [
-              Icon(Icons.lock_rounded, color: Theme.of(context).colorScheme.primary),
+              Icon(Icons.lock_rounded,
+                  color: Theme.of(context).colorScheme.primary),
               const SizedBox(width: 12),
               const Text('Change Password'),
             ],
@@ -1595,8 +1633,11 @@ class _ProfileScreenState extends State<ProfileScreen> with AutoRefreshMixin {
                     labelText: 'Current Password',
                     prefixIcon: const Icon(Icons.lock_outline),
                     suffixIcon: IconButton(
-                      icon: Icon(obscureCurrentPassword ? Icons.visibility : Icons.visibility_off),
-                      onPressed: () => setState(() => obscureCurrentPassword = !obscureCurrentPassword),
+                      icon: Icon(obscureCurrentPassword
+                          ? Icons.visibility
+                          : Icons.visibility_off),
+                      onPressed: () => setState(() =>
+                          obscureCurrentPassword = !obscureCurrentPassword),
                     ),
                     border: const OutlineInputBorder(),
                   ),
@@ -1615,8 +1656,11 @@ class _ProfileScreenState extends State<ProfileScreen> with AutoRefreshMixin {
                     labelText: 'New Password',
                     prefixIcon: const Icon(Icons.lock),
                     suffixIcon: IconButton(
-                      icon: Icon(obscureNewPassword ? Icons.visibility : Icons.visibility_off),
-                      onPressed: () => setState(() => obscureNewPassword = !obscureNewPassword),
+                      icon: Icon(obscureNewPassword
+                          ? Icons.visibility
+                          : Icons.visibility_off),
+                      onPressed: () => setState(
+                          () => obscureNewPassword = !obscureNewPassword),
                     ),
                     border: const OutlineInputBorder(),
                   ),
@@ -1638,8 +1682,11 @@ class _ProfileScreenState extends State<ProfileScreen> with AutoRefreshMixin {
                     labelText: 'Confirm New Password',
                     prefixIcon: const Icon(Icons.lock),
                     suffixIcon: IconButton(
-                      icon: Icon(obscureConfirmPassword ? Icons.visibility : Icons.visibility_off),
-                      onPressed: () => setState(() => obscureConfirmPassword = !obscureConfirmPassword),
+                      icon: Icon(obscureConfirmPassword
+                          ? Icons.visibility
+                          : Icons.visibility_off),
+                      onPressed: () => setState(() =>
+                          obscureConfirmPassword = !obscureConfirmPassword),
                     ),
                     border: const OutlineInputBorder(),
                   ),
@@ -1662,40 +1709,44 @@ class _ProfileScreenState extends State<ProfileScreen> with AutoRefreshMixin {
               child: const Text('Cancel'),
             ),
             FilledButton(
-              onPressed: isLoading ? null : () async {
-                if (formKey.currentState!.validate()) {
-                  setState(() => isLoading = true);
-                  
-                  try {
-                    await _profileService.updatePassword(
-                      currentPasswordController.text,
-                      newPasswordController.text,
-                    );
-                    
-                    if (mounted) {
-                      Navigator.of(context).pop();
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text('✅ Password updated successfully'),
-                          backgroundColor: Colors.green,
-                        ),
-                      );
-                    }
-                  } catch (e) {
-                    if (mounted) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          content: Text('❌ Failed to update password: $e'),
-                          backgroundColor: Colors.red,
-                        ),
-                      );
-                    }
-                  } finally {
-                    if (mounted) setState(() => isLoading = false);
-                  }
-                }
-              },
-              child: isLoading 
+              onPressed: isLoading
+                  ? null
+                  : () async {
+                      if (formKey.currentState!.validate()) {
+                        setState(() => isLoading = true);
+
+                        try {
+                          await _profileService.updatePassword(
+                            currentPasswordController.text,
+                            newPasswordController.text,
+                          );
+
+                          if (mounted) {
+                            Navigator.of(context).pop();
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content:
+                                    Text('✅ Password updated successfully'),
+                                backgroundColor: Colors.green,
+                              ),
+                            );
+                          }
+                        } catch (e) {
+                          if (mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content:
+                                    Text('❌ Failed to update password: $e'),
+                                backgroundColor: Colors.red,
+                              ),
+                            );
+                          }
+                        } finally {
+                          if (mounted) setState(() => isLoading = false);
+                        }
+                      }
+                    },
+              child: isLoading
                   ? const SizedBox(
                       width: 16,
                       height: 16,
@@ -1719,7 +1770,8 @@ class _ProfileScreenState extends State<ProfileScreen> with AutoRefreshMixin {
       context: context,
       builder: (context) => StatefulBuilder(
         builder: (context, setState) => AlertDialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
           title: Row(
             children: [
               Icon(Icons.warning_amber_rounded, color: Colors.red, size: 28),
@@ -1746,9 +1798,9 @@ class _ProfileScreenState extends State<ProfileScreen> with AutoRefreshMixin {
                       Text(
                         'This action cannot be undone!',
                         style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                          color: Colors.red,
-                          fontWeight: FontWeight.bold,
-                        ),
+                              color: Colors.red,
+                              fontWeight: FontWeight.bold,
+                            ),
                       ),
                       const SizedBox(height: 8),
                       const Text(
@@ -1766,8 +1818,8 @@ class _ProfileScreenState extends State<ProfileScreen> with AutoRefreshMixin {
                 Text(
                   'Enter your password to confirm:',
                   style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                    fontWeight: FontWeight.w500,
-                  ),
+                        fontWeight: FontWeight.w500,
+                      ),
                 ),
                 const SizedBox(height: 12),
                 TextFormField(
@@ -1777,8 +1829,11 @@ class _ProfileScreenState extends State<ProfileScreen> with AutoRefreshMixin {
                     labelText: 'Password',
                     prefixIcon: const Icon(Icons.lock_outline),
                     suffixIcon: IconButton(
-                      icon: Icon(obscurePassword ? Icons.visibility : Icons.visibility_off),
-                      onPressed: () => setState(() => obscurePassword = !obscurePassword),
+                      icon: Icon(obscurePassword
+                          ? Icons.visibility
+                          : Icons.visibility_off),
+                      onPressed: () =>
+                          setState(() => obscurePassword = !obscurePassword),
                     ),
                     border: const OutlineInputBorder(),
                   ),
@@ -1798,48 +1853,54 @@ class _ProfileScreenState extends State<ProfileScreen> with AutoRefreshMixin {
               child: const Text('Cancel'),
             ),
             FilledButton(
-              onPressed: isLoading ? null : () async {
-                if (formKey.currentState!.validate()) {
-                  setState(() => isLoading = true);
-                  
-                  try {
-                    await _profileService.deleteProfile();
-                    
-                    if (mounted) {
-                      Navigator.of(context).pop();
-                      // Navigate to auth screen and clear all routes
-                      context.read<AuthBloc>().add(const AuthLogoutRequested());
-                      context.go('/auth');
-                      
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text('Account deleted successfully'),
-                          backgroundColor: Colors.green,
-                        ),
-                      );
-                    }
-                  } catch (e) {
-                    if (mounted) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          content: Text('❌ Failed to delete account: $e'),
-                          backgroundColor: Colors.red,
-                        ),
-                      );
-                    }
-                  } finally {
-                    if (mounted) setState(() => isLoading = false);
-                  }
-                }
-              },
+              onPressed: isLoading
+                  ? null
+                  : () async {
+                      if (formKey.currentState!.validate()) {
+                        setState(() => isLoading = true);
+
+                        try {
+                          await _profileService.deleteProfile();
+
+                          if (mounted) {
+                            Navigator.of(context).pop();
+                            // Navigate to auth screen and clear all routes
+                            context
+                                .read<AuthBloc>()
+                                .add(const AuthLogoutRequested());
+                            context.go('/auth');
+
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text('Account deleted successfully'),
+                                backgroundColor: Colors.green,
+                              ),
+                            );
+                          }
+                        } catch (e) {
+                          if (mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text('❌ Failed to delete account: $e'),
+                                backgroundColor: Colors.red,
+                              ),
+                            );
+                          }
+                        } finally {
+                          if (mounted) setState(() => isLoading = false);
+                        }
+                      }
+                    },
               style: FilledButton.styleFrom(backgroundColor: Colors.red),
-              child: isLoading 
+              child: isLoading
                   ? const SizedBox(
                       width: 16,
                       height: 16,
-                      child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                      child: CircularProgressIndicator(
+                          strokeWidth: 2, color: Colors.white),
                     )
-                  : const Text('Delete Account', style: TextStyle(color: Colors.white)),
+                  : const Text('Delete Account',
+                      style: TextStyle(color: Colors.white)),
             ),
           ],
         ),

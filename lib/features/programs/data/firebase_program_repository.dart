@@ -56,21 +56,41 @@ class FirebaseProgramRepository implements ProgramRepository {
 
     return _firestore
         .collection(_programsCollection)
-        .where('createdBy', isEqualTo: userId) // Only user-created programs
         .snapshots()
         .asyncMap((snapshot) async {
           try {
             // Get shared programs for current user (excluding system programs)
             final sharedPrograms = await _getSharedPrograms(userId);
-            final userPrograms = _mapSnapshotToPrograms(snapshot);
             
-            // Combine user-created and shared programs, remove duplicates
-            final allPrograms = {...userPrograms, ...sharedPrograms}.toList();
+            // Convert all documents to Program objects first
+            final allPrograms = _mapSnapshotToPrograms(snapshot);
+            
+            // Filter to include:
+            // 1. Programs created by current user
+            // 2. Programs created by admins (createdByRole == 'admin')
+            // 3. Programs shared with current user
+            // 4. Legacy programs with null createdByRole but different createdBy (treat as admin programs)
+            final relevantPrograms = allPrograms.where((program) {
+              final isUserProgram = program.createdBy == userId;
+              final isAdminProgram = program.createdByRole == 'admin';
+              final isSharedProgram = program.sharedWith.contains(userId);
+              
+              // Handle legacy programs: if createdByRole is null and createdBy is different from current user,
+              // treat as admin program (this handles existing programs created before the createdByRole field)
+              final isLegacyAdminProgram = program.createdByRole == null &&
+                                         program.createdBy != null &&
+                                         program.createdBy != userId;
+              
+              return isUserProgram || isAdminProgram || isSharedProgram || isLegacyAdminProgram;
+            }).toList();
+            
+            // Combine with shared programs and remove duplicates
+            final allRelevantPrograms = {...relevantPrograms, ...sharedPrograms}.toList();
             
             // Sort by createdAt in memory
-            allPrograms.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+            allRelevantPrograms.sort((a, b) => b.createdAt.compareTo(a.createdAt));
             
-            return allPrograms;
+            return allRelevantPrograms;
           } catch (e) {
             developer.log(
               'Error in watchAll',

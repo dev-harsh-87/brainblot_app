@@ -240,6 +240,12 @@ class FirebaseDrillRepository implements DrillRepository {
   @override
   Future<List<Drill>> fetchAdminDrills({String? query, String? category, Difficulty? difficulty}) async {
     try {
+      AppLogger.info('🔍 Fetching admin drills...', tag: 'DrillRepository');
+      
+      // Try multiple approaches to find admin drills
+      List<Drill> adminDrills = [];
+      
+      // Approach 1: Query by createdByRole = 'admin'
       Query drillQuery = _firestore
           .collection(_drillsCollection)
           .where('createdByRole', isEqualTo: 'admin')
@@ -254,21 +260,85 @@ class FirebaseDrillRepository implements DrillRepository {
       }
 
       final snapshot = await drillQuery.get();
-      List<Drill> drills = _mapSnapshotToDrills(snapshot);
+      adminDrills = _mapSnapshotToDrills(snapshot);
+      
+      AppLogger.info('📊 Found ${adminDrills.length} drills with createdByRole=admin', tag: 'DrillRepository');
+      
+      // Approach 2: If no drills found, try querying by is_admin field
+      if (adminDrills.isEmpty) {
+        AppLogger.info('🔍 No drills found with createdByRole=admin, trying is_admin field...', tag: 'DrillRepository');
+        
+        Query adminFlagQuery = _firestore
+            .collection(_drillsCollection)
+            .where('is_admin', isEqualTo: true)
+            .where('status', isEqualTo: 'active');
+
+        if (category != null && category.isNotEmpty) {
+          adminFlagQuery = adminFlagQuery.where('category', isEqualTo: category);
+        }
+
+        if (difficulty != null) {
+          adminFlagQuery = adminFlagQuery.where('difficulty', isEqualTo: difficulty.name);
+        }
+
+        final adminFlagSnapshot = await adminFlagQuery.get();
+        adminDrills = _mapSnapshotToDrills(adminFlagSnapshot);
+        
+        AppLogger.info('📊 Found ${adminDrills.length} drills with is_admin=true', tag: 'DrillRepository');
+      }
+      
+      // Approach 3: If still no drills, try finding drills created by admin users
+      if (adminDrills.isEmpty) {
+        AppLogger.info('🔍 No admin drills found, checking for drills created by admin users...', tag: 'DrillRepository');
+        
+        // Get admin user IDs
+        final adminUsersSnapshot = await _firestore
+            .collection('users')
+            .where('role', isEqualTo: 'admin')
+            .get();
+        
+        final adminUserIds = adminUsersSnapshot.docs.map((doc) => doc.id).toList();
+        AppLogger.info('👥 Found ${adminUserIds.length} admin users', tag: 'DrillRepository');
+        
+        if (adminUserIds.isNotEmpty) {
+          // Query drills created by admin users (Firestore 'in' query supports up to 10 values)
+          final adminUserIdsToQuery = adminUserIds.take(10).toList();
+          
+          Query adminUserDrillsQuery = _firestore
+              .collection(_drillsCollection)
+              .where('createdBy', whereIn: adminUserIdsToQuery)
+              .where('status', isEqualTo: 'active');
+
+          if (category != null && category.isNotEmpty) {
+            adminUserDrillsQuery = adminUserDrillsQuery.where('category', isEqualTo: category);
+          }
+
+          if (difficulty != null) {
+            adminUserDrillsQuery = adminUserDrillsQuery.where('difficulty', isEqualTo: difficulty.name);
+          }
+
+          final adminUserDrillsSnapshot = await adminUserDrillsQuery.get();
+          adminDrills = _mapSnapshotToDrills(adminUserDrillsSnapshot);
+          
+          AppLogger.info('📊 Found ${adminDrills.length} drills created by admin users', tag: 'DrillRepository');
+        }
+      }
 
       // Apply search query filter in memory
       if (query != null && query.isNotEmpty) {
         final queryLower = query.toLowerCase();
-        drills = drills.where((drill) =>
+        adminDrills = adminDrills.where((drill) =>
           drill.name.toLowerCase().contains(queryLower) ||
           drill.tags.any((tag) => tag.toLowerCase().contains(queryLower))
         ).toList();
       }
 
-      drills.sort((a, b) => b.createdAt.compareTo(a.createdAt));
-      return drills;
+      adminDrills.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+      
+      AppLogger.info('✅ Returning ${adminDrills.length} admin drills', tag: 'DrillRepository');
+      return adminDrills;
     } catch (error) {
-      AppLogger.error('Error fetching admin drills', error: error);
+      AppLogger.error('Error fetching admin drills', error: error, tag: 'DrillRepository');
       throw Exception('Failed to fetch admin drills: $error');
     }
   }
