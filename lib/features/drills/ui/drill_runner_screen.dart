@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:math';
 import 'package:spark_app/core/di/injection.dart';
 import 'package:spark_app/features/drills/data/session_repository.dart';
@@ -9,6 +10,8 @@ import 'package:spark_app/features/programs/data/program_repository.dart';
 import 'package:spark_app/features/programs/domain/program.dart';
 import 'package:spark_app/features/programs/services/drill_assignment_service.dart';
 import 'package:spark_app/features/multiplayer/services/session_sync_service.dart';
+import 'package:spark_app/features/admin/services/custom_stimulus_service.dart';
+import 'package:spark_app/features/admin/domain/custom_stimulus.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
@@ -129,6 +132,9 @@ class _DrillRunnerScreenState extends State<DrillRunnerScreen>
   String _display = '';
   Color _displayColor = Colors.white;
   
+  // Custom stimuli cache
+  final Map<String, CustomStimulus> _customStimuliCache = {};
+  
   // Animation controllers
   late AnimationController _stimulusAnimationController;
   late AnimationController _pulseAnimationController;
@@ -187,6 +193,9 @@ class _DrillRunnerScreenState extends State<DrillRunnerScreen>
     
     // Debug: Print drill configuration to verify values
     AppLogger.debug('Drill Runner - Enhanced Drill Configuration: ${validatedDrill.name}, Sets: ${validatedDrill.sets}, Reps: ${validatedDrill.reps}, Duration: ${validatedDrill.durationSec}s, Rest: ${validatedDrill.restSec}s, Stimuli: ${validatedDrill.numberOfStimuli}');
+    
+    // Preload custom stimuli if needed
+    _preloadCustomStimuli(validatedDrill);
     
     _schedule = _generateSchedule(validatedDrill);
     _initializeAnimations();
@@ -277,7 +286,8 @@ class _DrillRunnerScreenState extends State<DrillRunnerScreen>
         type == StimulusType.color ||
         type == StimulusType.arrow ||
         type == StimulusType.number ||
-        type == StimulusType.shape
+        type == StimulusType.shape ||
+        type == StimulusType.custom
       ).toList();
       
       if (audioCompatibleTypes.isEmpty) {
@@ -344,6 +354,45 @@ class _DrillRunnerScreenState extends State<DrillRunnerScreen>
     ),);
     
     _pulseAnimationController.repeat(reverse: true);
+  }
+
+  /// Preloads custom stimuli for the drill to avoid async calls during stimulus generation
+  Future<void> _preloadCustomStimuli(Drill drill) async {
+    AppLogger.debug('Preloading custom stimuli - drill.customStimuliIds: ${drill.customStimuliIds}', tag: 'DrillRunner');
+    
+    if (drill.customStimuliIds.isEmpty) {
+      AppLogger.debug('No custom stimuli IDs to preload', tag: 'DrillRunner');
+      return; // No custom stimuli to preload
+    }
+    
+    try {
+      final customStimulusService = getIt<CustomStimulusService>();
+      
+      // Since drill.customStimuliIds contains item IDs, not stimulus IDs,
+      // we need to load all custom stimuli and find the ones containing our items
+      final allCustomStimuli = await customStimulusService.getAllCustomStimuli();
+      AppLogger.debug('Loaded ${allCustomStimuli.length} total custom stimuli', tag: 'DrillRunner');
+      
+      for (final customStimulus in allCustomStimuli) {
+        // Check if this stimulus contains any of our selected items
+        final hasSelectedItems = customStimulus.items.any((item) => drill.customStimuliIds.contains(item.id));
+        if (hasSelectedItems) {
+          _customStimuliCache[customStimulus.id] = customStimulus;
+          AppLogger.debug('Cached custom stimulus: ${customStimulus.name} (${customStimulus.items.length} items)', tag: 'DrillRunner');
+          
+          // Log which items from this stimulus are selected
+          for (final item in customStimulus.items) {
+            if (drill.customStimuliIds.contains(item.id)) {
+              AppLogger.debug('  - Selected item: ${item.name} (${item.id})', tag: 'DrillRunner');
+            }
+          }
+        }
+      }
+      
+      AppLogger.success('Preloaded ${_customStimuliCache.length} custom stimuli containing selected items', tag: 'DrillRunner');
+    } catch (e) {
+      AppLogger.error('Failed to preload custom stimuli', error: e, tag: 'DrillRunner');
+    }
   }
 
   Future<void> _initializeTts() async {
@@ -743,6 +792,8 @@ class _DrillRunnerScreenState extends State<DrillRunnerScreen>
           case '▲': return 'Triangle';
           default: return 'Shape';
         }
+      case StimulusType.custom:
+        return stimulus.label.isEmpty ? 'Custom' : stimulus.label;
     }
   }
 
@@ -795,6 +846,75 @@ class _DrillRunnerScreenState extends State<DrillRunnerScreen>
       case StimulusType.shape:
         const shapes = ['●', '■', '▲', '♦', '★']; // Added more shapes for variety
         return shapes[rnd.nextInt(shapes.length)];
+      case StimulusType.custom:
+        // Handle custom stimuli using selected item IDs
+        AppLogger.debug('Custom stimulus generation - customStimuliIds: ${drill.customStimuliIds}', tag: 'DrillRunner');
+        AppLogger.debug('Custom stimulus generation - cache size: ${_customStimuliCache.length}', tag: 'DrillRunner');
+        
+        if (drill.customStimuliIds.isNotEmpty && _customStimuliCache.isNotEmpty) {
+          // Find all selected custom stimulus items from all cached stimuli
+          final availableItems = <CustomStimulusItem>[];
+          
+          for (final customStimulus in _customStimuliCache.values) {
+            AppLogger.debug('Checking stimulus: ${customStimulus.name} with ${customStimulus.items.length} items', tag: 'DrillRunner');
+            for (final item in customStimulus.items) {
+              AppLogger.debug('Checking item: ${item.id} (${item.name})', tag: 'DrillRunner');
+              if (drill.customStimuliIds.contains(item.id)) {
+                availableItems.add(item);
+                AppLogger.debug('Added item to available: ${item.name}', tag: 'DrillRunner');
+              }
+            }
+          }
+          
+          AppLogger.debug('Available items count: ${availableItems.length}', tag: 'DrillRunner');
+          
+          if (availableItems.isNotEmpty) {
+            // Get a random item from the selected ones
+            final randomItem = availableItems[rnd.nextInt(availableItems.length)];
+            AppLogger.debug('Selected random item: ${randomItem.name}', tag: 'DrillRunner');
+            
+            // Find the parent stimulus to get the type
+            CustomStimulus? parentStimulus;
+            for (final stimulus in _customStimuliCache.values) {
+              if (stimulus.items.contains(randomItem)) {
+                parentStimulus = stimulus;
+                break;
+              }
+            }
+            
+            if (parentStimulus != null) {
+              AppLogger.debug('Parent stimulus type: ${parentStimulus.type}', tag: 'DrillRunner');
+              // Return appropriate label based on item type
+              switch (parentStimulus.type) {
+                case CustomStimulusType.text:
+                  final result = randomItem.textValue ?? randomItem.name;
+                  AppLogger.debug('Returning text value: $result', tag: 'DrillRunner');
+                  return result;
+                case CustomStimulusType.image:
+                  AppLogger.debug('Returning image name: ${randomItem.name}', tag: 'DrillRunner');
+                  return randomItem.name; // Use name as label for images
+                case CustomStimulusType.shape:
+                  final result = randomItem.shapeType ?? randomItem.name;
+                  AppLogger.debug('Returning shape value: $result', tag: 'DrillRunner');
+                  return result; // Use shape type or name
+                case CustomStimulusType.color:
+                  // For colors, we might want to set the display color
+                  if (randomItem.color != null) {
+                    _displayColor = randomItem.color!;
+                    final result = drill.presentationMode == PresentationMode.audio
+                        ? randomItem.name
+                        : '';
+                    AppLogger.debug('Returning color value: $result', tag: 'DrillRunner');
+                    return result;
+                  }
+                  AppLogger.debug('Returning color name: ${randomItem.name}', tag: 'DrillRunner');
+                  return randomItem.name;
+              }
+            }
+          }
+        }
+        AppLogger.warning('Falling back to Custom - no items found', tag: 'DrillRunner');
+        return 'Custom'; // Fallback if no custom stimuli available
       case StimulusType.color:
       default:
         // Enhanced color selection with validation
@@ -993,6 +1113,9 @@ class _DrillRunnerScreenState extends State<DrillRunnerScreen>
         break;
       case StimulusType.number:
         HapticFeedback.lightImpact();
+        break;
+      case StimulusType.custom:
+        HapticFeedback.selectionClick();
         break;
     }
   }
@@ -1701,7 +1824,7 @@ void _completeRep() {
                       alignment: Alignment.center,
                       decoration: BoxDecoration(
                         color: isActive
-                            ? (_current?.type == StimulusType.color ? _displayColor : Colors.white.withOpacity(0.9))
+                            ? (_current?.type == StimulusType.color || _current?.type == StimulusType.custom ? _displayColor : Colors.white.withOpacity(0.9))
                             : Colors.white.withOpacity(0.1),
                         borderRadius: BorderRadius.circular(stimulusSize / 2),
                         border: Border.all(
@@ -1712,7 +1835,7 @@ void _completeRep() {
                         ),
                         boxShadow: isActive ? [
                           BoxShadow(
-                            color: (_current?.type == StimulusType.color
+                            color: (_current?.type == StimulusType.color || _current?.type == StimulusType.custom
                                 ? _displayColor
                                 : Colors.white).withOpacity(0.5),
                             blurRadius: 40,
@@ -1720,22 +1843,7 @@ void _completeRep() {
                           ),
                         ] : null,
                       ),
-                      child: isActive ? Text(
-                        _display,
-                        style: TextStyle(
-                          color: _current?.type == StimulusType.color
-                              ? Colors.white
-                              : Colors.black,
-                          fontSize: fontSize,
-                          fontWeight: FontWeight.bold,
-                          shadows: [
-                            Shadow(
-                              color: Colors.black.withOpacity(0.7),
-                              blurRadius: 15,
-                            ),
-                          ],
-                        ),
-                      ) : Icon(
+                      child: isActive ? _buildStimulusContent(fontSize) : Icon(
                         _getZoneIcon(zone),
                         color: Colors.white.withOpacity(0.5),
                         size: iconSize,
@@ -1747,6 +1855,126 @@ void _completeRep() {
             );
           },
         ),
+      ),
+    );
+  }
+
+  Widget _buildStimulusContent(double fontSize) {
+    if (_current?.type == StimulusType.custom) {
+      // Handle custom stimulus display
+      final drill = widget.drill;
+      if (drill.customStimuliIds.isNotEmpty && _customStimuliCache.isNotEmpty) {
+        // Find all selected custom stimulus items from all cached stimuli
+        for (final customStimulus in _customStimuliCache.values) {
+          for (final item in customStimulus.items) {
+            if (drill.customStimuliIds.contains(item.id)) {
+              bool isCurrentItem = false;
+              
+              switch (customStimulus.type) {
+                case CustomStimulusType.text:
+                  isCurrentItem = (item.textValue ?? item.name) == _display;
+                  break;
+                case CustomStimulusType.image:
+                  isCurrentItem = item.name == _display;
+                  break;
+                case CustomStimulusType.shape:
+                  isCurrentItem = (item.shapeType ?? item.name) == _display;
+                  break;
+                case CustomStimulusType.color:
+                  isCurrentItem = item.name == _display;
+                  break;
+              }
+              
+              if (isCurrentItem) {
+                // Display the custom stimulus item
+                switch (customStimulus.type) {
+                  case CustomStimulusType.image:
+                    if (item.imageBase64 != null) {
+                      try {
+                        // Handle both data URL format and plain base64
+                        String base64String = item.imageBase64!;
+                        if (base64String.startsWith('data:')) {
+                          // Extract base64 part from data URL (e.g., "data:image/png;base64,...")
+                          final commaIndex = base64String.indexOf(',');
+                          if (commaIndex != -1) {
+                            base64String = base64String.substring(commaIndex + 1);
+                          }
+                        }
+                        
+                        final bytes = base64Decode(base64String);
+                        return ClipRRect(
+                          borderRadius: BorderRadius.circular(8),
+                          child: Image.memory(
+                            bytes,
+                            width: fontSize * 2,
+                            height: fontSize * 2,
+                            fit: BoxFit.cover,
+                            errorBuilder: (context, error, stackTrace) {
+                              AppLogger.error('Failed to display custom image', error: error, tag: 'DrillRunner');
+                              return Container(
+                                width: fontSize * 2,
+                                height: fontSize * 2,
+                                decoration: BoxDecoration(
+                                  color: Colors.grey[300],
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                child: Icon(
+                                  Icons.broken_image,
+                                  size: fontSize,
+                                  color: Colors.grey[600],
+                                ),
+                              );
+                            },
+                          ),
+                        );
+                      } catch (e) {
+                        AppLogger.error('Failed to decode custom image', error: e, tag: 'DrillRunner');
+                        // Return error placeholder instead of breaking
+                        return Container(
+                          width: fontSize * 2,
+                          height: fontSize * 2,
+                          decoration: BoxDecoration(
+                            color: Colors.red[100],
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Icon(
+                            Icons.error,
+                            size: fontSize,
+                            color: Colors.red,
+                          ),
+                        );
+                      }
+                    }
+                    break;
+                  case CustomStimulusType.text:
+                  case CustomStimulusType.shape:
+                  case CustomStimulusType.color:
+                    // Fall through to default text display
+                    break;
+                }
+                break;
+              }
+            }
+          }
+        }
+      }
+    }
+    
+    // Default text display for all other cases
+    return Text(
+      _display,
+      style: TextStyle(
+        color: _current?.type == StimulusType.color || _current?.type == StimulusType.custom
+            ? Colors.white
+            : Colors.black,
+        fontSize: fontSize,
+        fontWeight: FontWeight.bold,
+        shadows: [
+          Shadow(
+            color: Colors.black.withOpacity(0.7),
+            blurRadius: 15,
+          ),
+        ],
       ),
     );
   }

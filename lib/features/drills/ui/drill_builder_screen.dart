@@ -7,8 +7,11 @@ import 'package:spark_app/features/drills/domain/drill_category.dart';
 import 'package:spark_app/features/drills/data/drill_category_repository.dart';
 import 'package:spark_app/features/drills/services/drill_creation_service.dart';
 import 'package:spark_app/features/drills/services/image_upload_service.dart';
+import 'package:spark_app/features/admin/domain/custom_stimulus.dart';
+import 'package:spark_app/features/admin/services/custom_stimulus_service.dart';
 import 'package:image_picker/image_picker.dart';
 import 'dart:io';
+import 'dart:convert';
 
 class DrillBuilderScreen extends StatefulWidget {
   final Drill? initial;
@@ -41,45 +44,67 @@ class _DrillBuilderScreenState extends State<DrillBuilderScreen>
   int _numberOfStimuli = 30;
   final Set<StimulusType> _stimuli = {StimulusType.color};
   final Set<ReactionZone> _zones = {ReactionZone.center}; // Always center only
-  final List<Color> _selectedColors = [Colors.red, Colors.green, Colors.blue, Colors.yellow];
-  final List<ArrowDirection> _selectedArrows = [ArrowDirection.up, ArrowDirection.down, ArrowDirection.left, ArrowDirection.right];
-  final List<ShapeType> _selectedShapes = [ShapeType.circle, ShapeType.square, ShapeType.triangle];
-  NumberRange _selectedNumberRange = NumberRange.oneToFive;
+  final List<Color> _selectedColors = [
+    Colors.red,
+    Colors.green,
+    Colors.blue,
+    Colors.yellow
+  ];
+  final List<ArrowDirection> _selectedArrows = [
+    ArrowDirection.up,
+    ArrowDirection.down,
+    ArrowDirection.left,
+    ArrowDirection.right
+  ];
+  final List<ShapeType> _selectedShapes = [
+    ShapeType.circle,
+    ShapeType.square,
+    ShapeType.triangle
+  ];
+  final List<int> _selectedNumbers = [1, 2, 3, 4, 5];
   PresentationMode _presentationMode = PresentationMode.visual;
-  
+
+  // Custom stimulus variables
+  List<CustomStimulus> _customStimuli = [];
+  final List<CustomStimulusItem> _selectedCustomStimulusItems = [];
+  bool _loadingCustomStimuli = true;
+
   int _currentStep = 0;
   final int _totalSteps = 4;
-  
+
   late AnimationController _animationController;
   late Animation<double> _fadeAnimation;
 
   @override
   void initState() {
     super.initState();
-    
+
     _animationController = AnimationController(
       duration: const Duration(milliseconds: 300),
       vsync: this,
     );
-    
+
     _fadeAnimation = Tween<double>(
       begin: 0.0,
       end: 1.0,
-    ).animate(CurvedAnimation(
-      parent: _animationController,
-      curve: Curves.easeInOut,
-    ),);
-    
+    ).animate(
+      CurvedAnimation(
+        parent: _animationController,
+        curve: Curves.easeInOut,
+      ),
+    );
+
     final d = widget.initial;
     _name = TextEditingController(text: d?.name ?? 'Custom Drill');
     _description = TextEditingController(text: '');
     _videoUrl = TextEditingController(text: d?.videoUrl ?? '');
     _stepImageUrl = d?.stepImageUrl;
-    
+
     if (d != null) {
       _category = d.category;
       _difficulty = d.difficulty;
-      _duration = d.durationSec < 60 ? 60 : d.durationSec; // Ensure minimum 60 seconds
+      _duration =
+          d.durationSec < 60 ? 60 : d.durationSec; // Ensure minimum 60 seconds
       _rest = d.restSec;
       _sets = d.sets;
       _reps = d.reps;
@@ -106,10 +131,29 @@ class _DrillBuilderScreenState extends State<DrillBuilderScreen>
           ..clear()
           ..addAll(d.shapes);
       }
-      _selectedNumberRange = d.numberRange;
+      // Convert numberRange to selected numbers list
+      switch (d.numberRange) {
+        case NumberRange.oneToThree:
+          _selectedNumbers.clear();
+          _selectedNumbers.addAll([1, 2, 3]);
+          break;
+        case NumberRange.oneToFive:
+          _selectedNumbers.clear();
+          _selectedNumbers.addAll([1, 2, 3, 4, 5]);
+          break;
+        case NumberRange.oneToNine:
+          _selectedNumbers.clear();
+          _selectedNumbers.addAll([1, 2, 3, 4, 5, 6, 7, 8, 9]);
+          break;
+        case NumberRange.oneToTwelve:
+          _selectedNumbers.clear();
+          _selectedNumbers.addAll([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]);
+          break;
+      }
     }
-    
+
     _loadCategories();
+    _loadCustomStimuli();
     _animationController.forward();
   }
 
@@ -119,11 +163,12 @@ class _DrillBuilderScreenState extends State<DrillBuilderScreen>
       final repository = DrillCategoryRepository();
       final categories = await repository.getActiveCategories();
       print('✅ Loaded ${categories.length} categories');
-      
+
       if (categories.isNotEmpty) {
-        print('📋 Categories: ${categories.map((c) => c.displayName).join(", ")}');
+        print(
+            '📋 Categories: ${categories.map((c) => c.displayName).join(", ")}');
       }
-      
+
       setState(() {
         _availableCategories = categories;
         _loadingCategories = false;
@@ -154,6 +199,38 @@ class _DrillBuilderScreenState extends State<DrillBuilderScreen>
     }
   }
 
+  Future<void> _loadCustomStimuli() async {
+    try {
+      print('🔄 Loading custom stimuli...');
+
+      // Check if CustomStimulusService is registered
+      if (getIt.isRegistered<CustomStimulusService>()) {
+        final customStimulusService = getIt<CustomStimulusService>();
+        final stimuli = await customStimulusService.getAllCustomStimuli();
+        print('✅ Loaded ${stimuli.length} custom stimuli');
+
+        setState(() {
+          _customStimuli = stimuli;
+          _loadingCustomStimuli = false;
+        });
+      } else {
+        print(
+            '⚠️ CustomStimulusService not registered - skipping custom stimuli loading');
+        setState(() {
+          _customStimuli = [];
+          _loadingCustomStimuli = false;
+        });
+      }
+    } catch (e, stackTrace) {
+      print('❌ Error loading custom stimuli: $e');
+      print('Stack trace: $stackTrace');
+      setState(() {
+        _customStimuli = [];
+        _loadingCustomStimuli = false;
+      });
+    }
+  }
+
   @override
   void dispose() {
     _name.dispose();
@@ -166,6 +243,14 @@ class _DrillBuilderScreenState extends State<DrillBuilderScreen>
 
   Drill _build() {
     final initial = widget.initial;
+    
+    // Debug logging
+    print('🔷 Spark 🔍 [DrillBuilder] Building drill with ${_selectedCustomStimulusItems.length} selected custom stimulus items');
+    for (final item in _selectedCustomStimulusItems) {
+      print('🔷 Spark 🔍 [DrillBuilder] Selected item: ${item.name} (${item.id})');
+    }
+    print('🔷 Spark 🔍 [DrillBuilder] Final customStimuliIds: ${_selectedCustomStimulusItems.map((item) => item.id).toList()}');
+    
     return Drill(
       id: initial?.id ?? _uuid.v4(),
       name: _name.text.trim(),
@@ -181,7 +266,7 @@ class _DrillBuilderScreenState extends State<DrillBuilderScreen>
       colors: _selectedColors,
       arrows: _selectedArrows,
       shapes: _selectedShapes,
-      numberRange: _selectedNumberRange,
+      numberRange: _getNumberRangeFromSelectedNumbers(),
       presentationMode: _presentationMode,
       favorite: initial?.favorite ?? false,
       isPreset: initial?.isPreset ?? false,
@@ -189,6 +274,8 @@ class _DrillBuilderScreenState extends State<DrillBuilderScreen>
       sharedWith: initial?.sharedWith ?? [],
       videoUrl: _videoUrl.text.trim().isEmpty ? null : _videoUrl.text.trim(),
       stepImageUrl: _stepImageUrl,
+      customStimuliIds:
+          _selectedCustomStimulusItems.map((item) => item.id).toList(),
     );
   }
 
@@ -204,7 +291,7 @@ class _DrillBuilderScreenState extends State<DrillBuilderScreen>
         children: [
           // Progress indicator
           _buildProgressIndicator(),
-          
+
           // Content
           Expanded(
             child: FadeTransition(
@@ -221,7 +308,7 @@ class _DrillBuilderScreenState extends State<DrillBuilderScreen>
               ),
             ),
           ),
-          
+
           // Navigation buttons
           _buildNavigationButtons(),
         ],
@@ -232,7 +319,7 @@ class _DrillBuilderScreenState extends State<DrillBuilderScreen>
   PreferredSizeWidget _buildAppBar(BuildContext context) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
-    
+
     return AppBar(
       elevation: 0,
       backgroundColor: colorScheme.primary,
@@ -278,7 +365,7 @@ class _DrillBuilderScreenState extends State<DrillBuilderScreen>
   Widget _buildProgressIndicator() {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
-    
+
     return Container(
       padding: const EdgeInsets.all(20),
       child: Column(
@@ -287,14 +374,15 @@ class _DrillBuilderScreenState extends State<DrillBuilderScreen>
             children: List.generate(_totalSteps, (index) {
               final isActive = index <= _currentStep;
               final isCurrent = index == _currentStep;
-              
+
               return Expanded(
                 child: Container(
                   height: 4,
-                  margin: EdgeInsets.only(right: index < _totalSteps - 1 ? 8 : 0),
+                  margin:
+                      EdgeInsets.only(right: index < _totalSteps - 1 ? 8 : 0),
                   decoration: BoxDecoration(
-                    color: isActive 
-                        ? colorScheme.primary 
+                    color: isActive
+                        ? colorScheme.primary
                         : colorScheme.outline.withOpacity(0.3),
                     borderRadius: BorderRadius.circular(2),
                   ),
@@ -322,21 +410,31 @@ class _DrillBuilderScreenState extends State<DrillBuilderScreen>
 
   String _getStepTitle(int step) {
     switch (step) {
-      case 0: return 'Basic Information';
-      case 1: return 'Configuration';
-      case 2: return 'Stimulus & Zones';
-      case 3: return 'Review & Save';
-      default: return '';
+      case 0:
+        return 'Basic Information';
+      case 1:
+        return 'Configuration';
+      case 2:
+        return 'Stimulus & Zones';
+      case 3:
+        return 'Review & Save';
+      default:
+        return '';
     }
   }
 
   String _getStepSubtitle(int step) {
     switch (step) {
-      case 0: return 'Name, category, and difficulty';
-      case 1: return 'Duration, repetitions, and timing';
-      case 2: return 'Stimulus types and reaction zones';
-      case 3: return 'Review your drill settings';
-      default: return '';
+      case 0:
+        return 'Name, category, and difficulty';
+      case 1:
+        return 'Duration, repetitions, and timing';
+      case 2:
+        return 'Stimulus types and reaction zones';
+      case 3:
+        return 'Review your drill settings';
+      default:
+        return '';
     }
   }
 
@@ -362,7 +460,8 @@ class _DrillBuilderScreenState extends State<DrillBuilderScreen>
                   borderRadius: BorderRadius.circular(12),
                 ),
               ),
-              validator: (v) => (v == null || v.isEmpty) ? 'Drill name is required' : null,
+              validator: (v) =>
+                  (v == null || v.isEmpty) ? 'Drill name is required' : null,
             ),
             const SizedBox(height: 20),
 
@@ -452,13 +551,13 @@ class _DrillBuilderScreenState extends State<DrillBuilderScreen>
                             width: double.infinity,
                             fit: BoxFit.cover,
                             errorBuilder: (context, error, stackTrace) =>
-                              Container(
-                                height: 120,
-                                color: colorScheme.errorContainer,
-                                child: const Center(
-                                  child: Icon(Icons.broken_image),
-                                ),
+                                Container(
+                              height: 120,
+                              color: colorScheme.errorContainer,
+                              child: const Center(
+                                child: Icon(Icons.broken_image),
                               ),
+                            ),
                           ),
                         ),
                         Positioned(
@@ -514,7 +613,9 @@ class _DrillBuilderScreenState extends State<DrillBuilderScreen>
                       children: [
                         Expanded(
                           child: OutlinedButton.icon(
-                            onPressed: _isUploadingImage ? null : () => _pickImage(ImageSource.gallery),
+                            onPressed: _isUploadingImage
+                                ? null
+                                : () => _pickImage(ImageSource.gallery),
                             icon: const Icon(Icons.photo_library),
                             label: const Text('Gallery'),
                             style: OutlinedButton.styleFrom(
@@ -528,7 +629,9 @@ class _DrillBuilderScreenState extends State<DrillBuilderScreen>
                         const SizedBox(width: 12),
                         Expanded(
                           child: OutlinedButton.icon(
-                            onPressed: _isUploadingImage ? null : () => _pickImage(ImageSource.camera),
+                            onPressed: _isUploadingImage
+                                ? null
+                                : () => _pickImage(ImageSource.camera),
                             icon: const Icon(Icons.camera_alt),
                             label: const Text('Camera'),
                             style: OutlinedButton.styleFrom(
@@ -612,14 +715,16 @@ class _DrillBuilderScreenState extends State<DrillBuilderScreen>
             ),
             const SizedBox(height: 12),
             Row(
-              children: Difficulty.values.map((diff) => 
-                Expanded(
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 4),
-                    child: _buildDifficultyCard(diff),
-                  ),
-                ),
-              ).toList(),
+              children: Difficulty.values
+                  .map(
+                    (diff) => Expanded(
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 4),
+                        child: _buildDifficultyCard(diff),
+                      ),
+                    ),
+                  )
+                  .toList(),
             ),
           ],
         ),
@@ -660,12 +765,15 @@ class _DrillBuilderScreenState extends State<DrillBuilderScreen>
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
     final isSelected = _difficulty == difficulty;
-    
+
     Color getDifficultyColor() {
       switch (difficulty) {
-        case Difficulty.beginner: return Colors.green;
-        case Difficulty.intermediate: return Colors.orange;
-        case Difficulty.advanced: return Colors.red;
+        case Difficulty.beginner:
+          return Colors.green;
+        case Difficulty.intermediate:
+          return Colors.orange;
+        case Difficulty.advanced:
+          return Colors.red;
       }
     }
 
@@ -679,12 +787,12 @@ class _DrillBuilderScreenState extends State<DrillBuilderScreen>
       child: Container(
         padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
-          color: isSelected 
+          color: isSelected
               ? getDifficultyColor().withOpacity(0.1)
               : colorScheme.surfaceContainerHighest,
           borderRadius: BorderRadius.circular(12),
           border: Border.all(
-            color: isSelected 
+            color: isSelected
                 ? getDifficultyColor()
                 : colorScheme.outline.withOpacity(0.3),
             width: isSelected ? 2 : 1,
@@ -694,7 +802,9 @@ class _DrillBuilderScreenState extends State<DrillBuilderScreen>
           children: [
             Icon(
               _getDifficultyIcon(difficulty),
-              color: isSelected ? getDifficultyColor() : colorScheme.onSurface.withOpacity(0.7),
+              color: isSelected
+                  ? getDifficultyColor()
+                  : colorScheme.onSurface.withOpacity(0.7),
               size: 24,
             ),
             const SizedBox(height: 8),
@@ -702,7 +812,8 @@ class _DrillBuilderScreenState extends State<DrillBuilderScreen>
               difficulty.name.toUpperCase(),
               style: theme.textTheme.labelSmall?.copyWith(
                 fontWeight: FontWeight.w600,
-                color: isSelected ? getDifficultyColor() : colorScheme.onSurface,
+                color:
+                    isSelected ? getDifficultyColor() : colorScheme.onSurface,
               ),
             ),
           ],
@@ -713,9 +824,12 @@ class _DrillBuilderScreenState extends State<DrillBuilderScreen>
 
   IconData _getDifficultyIcon(Difficulty difficulty) {
     switch (difficulty) {
-      case Difficulty.beginner: return Icons.sentiment_satisfied;
-      case Difficulty.intermediate: return Icons.sentiment_neutral;
-      case Difficulty.advanced: return Icons.sentiment_very_dissatisfied;
+      case Difficulty.beginner:
+        return Icons.sentiment_satisfied;
+      case Difficulty.intermediate:
+        return Icons.sentiment_neutral;
+      case Difficulty.advanced:
+        return Icons.sentiment_very_dissatisfied;
     }
   }
 
@@ -755,9 +869,13 @@ class _DrillBuilderScreenState extends State<DrillBuilderScreen>
           Expanded(
             flex: _currentStep == 0 ? 1 : 1,
             child: FilledButton.icon(
-              onPressed: _currentStep < _totalSteps - 1 ? _nextStep : _saveDrill,
-              icon: Icon(_currentStep < _totalSteps - 1 ? Icons.arrow_forward : Icons.save),
-              label: Text(_currentStep < _totalSteps - 1 ? 'Next' : 'Save Drill'),
+              onPressed:
+                  _currentStep < _totalSteps - 1 ? _nextStep : _saveDrill,
+              icon: Icon(_currentStep < _totalSteps - 1
+                  ? Icons.arrow_forward
+                  : Icons.save),
+              label:
+                  Text(_currentStep < _totalSteps - 1 ? 'Next' : 'Save Drill'),
               style: FilledButton.styleFrom(
                 backgroundColor: colorScheme.primary,
                 foregroundColor: colorScheme.onPrimary,
@@ -788,7 +906,7 @@ class _DrillBuilderScreenState extends State<DrillBuilderScreen>
         HapticFeedback.heavyImpact();
         return;
       }
-      
+
       setState(() {
         _currentStep++;
       });
@@ -812,8 +930,6 @@ class _DrillBuilderScreenState extends State<DrillBuilderScreen>
       HapticFeedback.lightImpact();
     }
   }
-
-
 
   Widget _buildConfigurationStep() {
     final theme = Theme.of(context);
@@ -928,7 +1044,8 @@ class _DrillBuilderScreenState extends State<DrillBuilderScreen>
                         _numberOfStimuli.toDouble(),
                         5.0,
                         100.0,
-                        (value) => setState(() => _numberOfStimuli = value.round()),
+                        (value) =>
+                            setState(() => _numberOfStimuli = value.round()),
                         '$_numberOfStimuli stimuli',
                       ),
                     ),
@@ -970,9 +1087,12 @@ class _DrillBuilderScreenState extends State<DrillBuilderScreen>
                   ],
                 ),
                 const SizedBox(height: 12),
-                _buildSummaryRow('Total drill time:', '${(_duration * _reps + _rest * (_reps - 1))}s'),
-                _buildSummaryRow('Total stimuli:', '${_numberOfStimuli * _reps}'),
-                _buildSummaryRow('Avg stimuli per second:', (_numberOfStimuli / _duration).toStringAsFixed(1)),
+                _buildSummaryRow('Total drill time:',
+                    '${(_duration * _reps + _rest * (_reps - 1))}s'),
+                _buildSummaryRow(
+                    'Total stimuli:', '${_numberOfStimuli * _reps}'),
+                _buildSummaryRow('Avg stimuli per second:',
+                    (_numberOfStimuli / _duration).toStringAsFixed(1)),
               ],
             ),
           ),
@@ -1023,109 +1143,330 @@ class _DrillBuilderScreenState extends State<DrillBuilderScreen>
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               // Main Header
-              RichText(
-                text: TextSpan(
-                  style: theme.textTheme.headlineMedium?.copyWith(
-                    fontWeight: FontWeight.w900,
-                    color: colorScheme.onSurface,
-                  ),
-                  children: [
-                    const TextSpan(text: 'SELECT YOUR '),
-                    TextSpan(
-                      text: 'STIMULI',
-                      style: TextStyle(
-                        color: Colors.orange,
-                      ),
-                    ),
-                  ],
+
+              Text(
+                'Select Your Stimuli',
+                style: theme.textTheme.titleMedium?.copyWith(
+                  fontWeight: FontWeight.w600,
                 ),
               ),
               const SizedBox(height: 8),
               Text(
                 'Select which cues will appear on the screen',
-                style: theme.textTheme.bodyLarge?.copyWith(
+                style: theme.textTheme.bodySmall?.copyWith(
                   color: colorScheme.onSurface.withOpacity(0.7),
                 ),
               ),
-              const SizedBox(height: 40),
+              const SizedBox(height: 16),
 
               // Colors Section with Checkbox
               _buildStimulusSelectionSection(
                 'Colors',
                 StimulusType.color,
-                Wrap(
-                  spacing: 16,
-                  runSpacing: 16,
+                Column(
                   children: [
-                    Colors.red, Colors.blue, Colors.green, Colors.yellow,
-                    Colors.purple, Colors.orange, Colors.black, Colors.grey,
-                  ].map((color) => _buildSimpleColorChip(color)).toList(),
+                    Row(
+                      children: [
+                        Colors.red,
+                        Colors.blue,
+                        Colors.green,
+                        Colors.yellow
+                      ]
+                          .map((color) => Expanded(
+                                  child: Padding(
+                                padding:
+                                    const EdgeInsets.symmetric(horizontal: 4),
+                                child: _buildSimpleColorChip(color),
+                              )))
+                          .toList(),
+                    ),
+                    const SizedBox(height: 12),
+                    Row(
+                      children: [
+                        Colors.purple,
+                        Colors.orange,
+                        Colors.black,
+                        Colors.grey
+                      ]
+                          .map((color) => Expanded(
+                                  child: Padding(
+                                padding:
+                                    const EdgeInsets.symmetric(horizontal: 4),
+                                child: _buildSimpleColorChip(color),
+                              )))
+                          .toList(),
+                    ),
+                  ],
                 ),
-                _stimuli.contains(StimulusType.color) && _selectedColors.length < 2,
+                _stimuli.contains(StimulusType.color) &&
+                    _selectedColors.length < 2,
               ),
-              const SizedBox(height: 32),
+              const SizedBox(height: 12),
 
               // Arrows Section with Checkbox
               _buildStimulusSelectionSection(
                 'Arrows',
                 StimulusType.arrow,
-                Wrap(
-                  spacing: 16,
-                  runSpacing: 16,
+                Column(
                   children: [
-                    ArrowDirection.up, ArrowDirection.down,
-                    ArrowDirection.left, ArrowDirection.right,
-                    ArrowDirection.upLeft, ArrowDirection.upRight,
-                    ArrowDirection.downLeft, ArrowDirection.downRight,
-                  ].map((arrow) => _buildSimpleArrowChip(arrow)).toList(),
+                    Row(
+                      children: [
+                        ArrowDirection.up,
+                        ArrowDirection.down,
+                        ArrowDirection.left,
+                        ArrowDirection.right
+                      ]
+                          .map((arrow) => Expanded(
+                                  child: Padding(
+                                padding:
+                                    const EdgeInsets.symmetric(horizontal: 4),
+                                child: _buildSimpleArrowChip(arrow),
+                              )))
+                          .toList(),
+                    ),
+                    const SizedBox(height: 12),
+                    Row(
+                      children: [
+                        ArrowDirection.upLeft,
+                        ArrowDirection.upRight,
+                        ArrowDirection.downLeft,
+                        ArrowDirection.downRight
+                      ]
+                          .map((arrow) => Expanded(
+                                  child: Padding(
+                                padding:
+                                    const EdgeInsets.symmetric(horizontal: 4),
+                                child: _buildSimpleArrowChip(arrow),
+                              )))
+                          .toList(),
+                    ),
+                  ],
                 ),
-                _stimuli.contains(StimulusType.arrow) && _selectedArrows.length < 2,
+                _stimuli.contains(StimulusType.arrow) &&
+                    _selectedArrows.length < 2,
               ),
-              const SizedBox(height: 32),
+              const SizedBox(height: 12),
 
-              // Numbers Section with Checkbox
+              // Shapes Section with Checkbox
+              _buildStimulusSelectionSection(
+                'Shapes',
+                StimulusType.shape,
+                Column(
+                  children: [
+                    Row(
+                      children: [
+                        ShapeType.circle,
+                        ShapeType.square,
+                        ShapeType.triangle,
+                        ShapeType.diamond
+                      ]
+                          .map((shape) => Expanded(
+                                  child: Padding(
+                                padding:
+                                    const EdgeInsets.symmetric(horizontal: 4),
+                                child: _buildSimpleShapeChip(shape),
+                              )))
+                          .toList(),
+                    ),
+                    const SizedBox(height: 12),
+                    Row(
+                      children: [
+                        ShapeType.star,
+                        ShapeType.hexagon,
+                        ShapeType.pentagon,
+                        ShapeType.oval
+                      ]
+                          .map((shape) => Expanded(
+                                  child: Padding(
+                                padding:
+                                    const EdgeInsets.symmetric(horizontal: 4),
+                                child: _buildSimpleShapeChip(shape),
+                              )))
+                          .toList(),
+                    ),
+                  ],
+                ),
+                _stimuli.contains(StimulusType.shape) &&
+                    _selectedShapes.length < 2,
+              ),
+              const SizedBox(height: 12),
+
+              // Numbers Section with Checkbox (simplified)
               _buildStimulusSelectionSection(
                 'Numbers',
                 StimulusType.number,
                 Column(
                   children: [
                     Row(
-                      children: [1, 2, 3, 4].map((num) =>
-                        Expanded(child: _buildSimpleNumberChip(num))
-                      ).toList(),
-                    ),
-                    const SizedBox(height: 16),
-                    Row(
-                      children: [5, 6, 7, 8].map((num) =>
-                        Expanded(child: _buildSimpleNumberChip(num))
-                      ).toList(),
-                    ),
-                    const SizedBox(height: 20),
-                    // Number Range Selection
-                    Text(
-                      'Select Range:',
-                      style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                        fontWeight: FontWeight.w600,
-                      ),
+                      children: [1, 2, 3, 4]
+                          .map((number) => Expanded(
+                                  child: Padding(
+                                padding:
+                                    const EdgeInsets.symmetric(horizontal: 4),
+                                child: _buildSimpleNumberChip(number),
+                              )))
+                          .toList(),
                     ),
                     const SizedBox(height: 12),
-                    Wrap(
-                      spacing: 8,
-                      children: NumberRange.values.map((range) =>
-                        _buildNumberRangeChip(range)
-                      ).toList(),
+                    Row(
+                      children: [5, 6, 7, 8]
+                          .map((number) => Expanded(
+                                  child: Padding(
+                                padding:
+                                    const EdgeInsets.symmetric(horizontal: 4),
+                                child: _buildSimpleNumberChip(number),
+                              )))
+                          .toList(),
                     ),
                   ],
                 ),
-                false, // Numbers don't need validation warning
+                _stimuli.contains(StimulusType.number) &&
+                    _selectedNumbers.length < 2,
               ),
+              const SizedBox(height: 12),
+
+              // Custom Stimuli Section
+              const SizedBox(height: 12),
+
+              // Custom Stimuli Header
+              Row(
+                children: [
+                  Icon(
+                    Icons.extension,
+                    color: colorScheme.primary,
+                    size: 20,
+                  ),
+                  const SizedBox(width: 8),
+                  Text(
+                    'Custom Stimuli',
+                    style: theme.textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'Select from custom stimuli created by administrators',
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: colorScheme.onSurface.withOpacity(0.7),
+                ),
+              ),
+              const SizedBox(height: 16),
+
+              // Custom Stimuli Content
+              if (_loadingCustomStimuli) ...[
+                Container(
+                  padding: const EdgeInsets.all(20),
+                  child: const Center(
+                    child: CircularProgressIndicator(),
+                  ),
+                ),
+              ] else if (_customStimuli.isEmpty) ...[
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: colorScheme.surfaceContainerHighest.withOpacity(0.5),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                      color: colorScheme.outline.withOpacity(0.3),
+                    ),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(
+                        Icons.info_outline,
+                        color: colorScheme.onSurface.withOpacity(0.6),
+                        size: 20,
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Text(
+                          'No custom stimuli available. Contact your administrator to add custom stimuli.',
+                          style: theme.textTheme.bodyMedium?.copyWith(
+                            color: colorScheme.onSurface.withOpacity(0.7),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ] else ...[
+                ...(_customStimuli.map((stimulus) => Container(
+                      margin: const EdgeInsets.only(bottom: 20),
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: colorScheme.surfaceContainerHighest,
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                          color: colorScheme.outline.withOpacity(0.3),
+                        ),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          // Stimulus header
+                          Row(
+                            children: [
+                              Icon(
+                                _getCustomStimulusIcon(stimulus.type),
+                                color: colorScheme.primary,
+                                size: 20,
+                              ),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: Text(
+                                  stimulus.name,
+                                  style: theme.textTheme.titleSmall?.copyWith(
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              ),
+                              // Selection count
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 8,
+                                  vertical: 4,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: colorScheme.primary.withOpacity(0.1),
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                child: Text(
+                                  '${_selectedCustomStimulusItems.where((item) => stimulus.items.contains(item)).length}/${stimulus.items.length}',
+                                  style: theme.textTheme.bodySmall?.copyWith(
+                                    color: colorScheme.primary,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                          if (stimulus.description.isNotEmpty) ...[
+                            const SizedBox(height: 8),
+                            Text(
+                              stimulus.description,
+                              style: theme.textTheme.bodySmall?.copyWith(
+                                color: colorScheme.onSurface.withOpacity(0.7),
+                              ),
+                            ),
+                          ],
+                          const SizedBox(height: 12),
+                          // Stimulus items
+                          Wrap(
+                            spacing: 12,
+                            runSpacing: 12,
+                            children: stimulus.items
+                                .map((item) => _buildCustomStimulusItemChip(
+                                    item, stimulus.type))
+                                .toList(),
+                          ),
+                        ],
+                      ),
+                    ))),
+              ],
             ],
           ),
-
-
-
-      
-    
         ],
       ),
     );
@@ -1194,9 +1535,14 @@ class _DrillBuilderScreenState extends State<DrillBuilderScreen>
             Icons.info_outline,
             [
               _buildReviewItem('Name', _name.text),
-              _buildReviewItem('Description', _description.text.isEmpty ? 'No description' : _description.text),
+              _buildReviewItem(
+                  'Description',
+                  _description.text.isEmpty
+                      ? 'No description'
+                      : _description.text),
               _buildReviewItem('Category', _category ?? 'Not selected'),
-              _buildReviewItem('Difficulty', _difficulty.name.toUpperCase() ?? 'Not selected'),
+              _buildReviewItem('Difficulty',
+                  _difficulty.name.toUpperCase() ?? 'Not selected'),
             ],
           ),
           const SizedBox(height: 20),
@@ -1210,20 +1556,30 @@ class _DrillBuilderScreenState extends State<DrillBuilderScreen>
               _buildReviewItem('Rest between reps', '${_rest}s'),
               _buildReviewItem('Number of reps', '$_reps'),
               _buildReviewItem('Stimuli per rep', '$_numberOfStimuli'),
-              _buildReviewItem('Total drill time', '${(_duration * _reps + _rest * (_reps - 1))}s'),
+              _buildReviewItem('Total drill time',
+                  '${(_duration * _reps + _rest * (_reps - 1))}s'),
             ],
           ),
           const SizedBox(height: 20),
 
-          // Stimulus & Zones
           _buildReviewSection(
             'Stimulus & Zones',
             Icons.psychology,
             [
-              _buildReviewItem('Presentation mode', _presentationMode.name.toUpperCase()),
-              _buildReviewItem('Stimulus types', _stimuli.isEmpty ? 'None selected' : _stimuli.map((s) => s.name).join(', ')),
-              _buildReviewItem('Reaction zones', _zones.isEmpty ? 'None selected' : _zones.map((z) => z.name).join(', ')),
-              _buildReviewItem('Colors', '${_selectedColors.length} colors selected'),
+              _buildReviewItem(
+                  'Presentation mode', _presentationMode.name.toUpperCase()),
+              _buildReviewItem(
+                  'Stimulus types',
+                  _stimuli.isEmpty
+                      ? 'None selected'
+                      : _stimuli.map((s) => s.name).join(', ')),
+              _buildReviewItem(
+                  'Reaction zones',
+                  _zones.isEmpty
+                      ? 'None selected'
+                      : _zones.map((z) => z.name).join(', ')),
+              _buildReviewItem(
+                  'Colors', '${_selectedColors.length} colors selected'),
             ],
           ),
           const SizedBox(height: 24),
@@ -1254,15 +1610,17 @@ class _DrillBuilderScreenState extends State<DrillBuilderScreen>
                     ],
                   ),
                   const SizedBox(height: 8),
-                  ..._getValidationErrors().map((error) => Padding(
-                    padding: const EdgeInsets.only(left: 28, top: 4),
-                    child: Text(
-                      '• $error',
-                      style: theme.textTheme.bodySmall?.copyWith(
-                        color: Colors.red.shade700,
+                  ..._getValidationErrors().map(
+                    (error) => Padding(
+                      padding: const EdgeInsets.only(left: 28, top: 4),
+                      child: Text(
+                        '• $error',
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: Colors.red.shade700,
+                        ),
                       ),
                     ),
-                  ),),
+                  ),
                 ],
               ),
             ),
@@ -1280,7 +1638,8 @@ class _DrillBuilderScreenState extends State<DrillBuilderScreen>
               ),
               child: Row(
                 children: [
-                  Icon(Icons.check_circle_outline, color: Colors.green, size: 20),
+                  Icon(Icons.check_circle_outline,
+                      color: Colors.green, size: 20),
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(
@@ -1299,8 +1658,10 @@ class _DrillBuilderScreenState extends State<DrillBuilderScreen>
       ),
     );
   }
+
   // Helper methods for the drill builder
-  Widget _buildSliderField(String label, double value, double min, double max, ValueChanged<double> onChanged, String displayValue) {
+  Widget _buildSliderField(String label, double value, double min, double max,
+      ValueChanged<double> onChanged, String displayValue) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
 
@@ -1346,7 +1707,7 @@ class _DrillBuilderScreenState extends State<DrillBuilderScreen>
 
   Widget _buildSummaryRow(String label, String value) {
     final theme = Theme.of(context);
-    
+
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 4),
       child: Row(
@@ -1367,14 +1728,11 @@ class _DrillBuilderScreenState extends State<DrillBuilderScreen>
     );
   }
 
-
-
-
   Widget _buildPresentationModeCard(PresentationMode mode) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
     final isSelected = _presentationMode == mode;
-    
+
     String getLabel() {
       switch (mode) {
         case PresentationMode.visual:
@@ -1383,7 +1741,7 @@ class _DrillBuilderScreenState extends State<DrillBuilderScreen>
           return 'Audio';
       }
     }
-    
+
     String getDescription() {
       switch (mode) {
         case PresentationMode.visual:
@@ -1392,7 +1750,7 @@ class _DrillBuilderScreenState extends State<DrillBuilderScreen>
           return 'Speak stimuli aloud';
       }
     }
-    
+
     IconData getIcon() {
       switch (mode) {
         case PresentationMode.visual:
@@ -1427,7 +1785,9 @@ class _DrillBuilderScreenState extends State<DrillBuilderScreen>
           children: [
             Icon(
               getIcon(),
-              color: isSelected ? colorScheme.primary : colorScheme.onSurface.withOpacity(0.7),
+              color: isSelected
+                  ? colorScheme.primary
+                  : colorScheme.onSurface.withOpacity(0.7),
               size: 32,
             ),
             const SizedBox(height: 8),
@@ -1450,51 +1810,6 @@ class _DrillBuilderScreenState extends State<DrillBuilderScreen>
             ),
           ],
         ),
-      ),
-    );
-  }
-
-  Widget _buildColorChip(Color color) {
-    final isSelected = _selectedColors.contains(color);
-    final colorScheme = Theme.of(context).colorScheme;
-
-    return GestureDetector(
-      onTap: () {
-        setState(() {
-          if (isSelected) {
-            _selectedColors.remove(color);
-          } else {
-            _selectedColors.add(color);
-          }
-        });
-        HapticFeedback.lightImpact();
-      },
-      child: Container(
-        width: 48,
-        height: 48,
-        decoration: BoxDecoration(
-          color: color,
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(
-            color: isSelected ? colorScheme.primary : Colors.grey.withOpacity(0.3),
-            width: isSelected ? 3 : 1,
-          ),
-          boxShadow: [
-            if (isSelected)
-              BoxShadow(
-                color: colorScheme.primary.withOpacity(0.3),
-                blurRadius: 8,
-                offset: const Offset(0, 2),
-              ),
-          ],
-        ),
-        child: isSelected
-            ? Icon(
-                Icons.check,
-                color: _getContrastColor(color),
-                size: 24,
-              )
-            : null,
       ),
     );
   }
@@ -1534,7 +1849,7 @@ class _DrillBuilderScreenState extends State<DrillBuilderScreen>
 
   Widget _buildReviewItem(String label, String value) {
     final theme = Theme.of(context);
-    
+
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 6),
       child: Row(
@@ -1564,40 +1879,48 @@ class _DrillBuilderScreenState extends State<DrillBuilderScreen>
 
   List<String> _getValidationErrors() {
     final errors = <String>[];
-    
+
     if (_name.text.trim().isEmpty) {
       errors.add('Drill name is required');
     }
-    
+
     // Validate minimum duration of 60 seconds
     if (_duration < 60) {
       errors.add('Drill duration must be at least 60 seconds (1 minute)');
     }
-    
+
     if (_stimuli.isEmpty) {
       errors.add('Please select at least one stimulus type');
     }
-    
+
     // Zones are always set to center, no validation needed
-    
+
     if (_stimuli.contains(StimulusType.color) && _selectedColors.length < 2) {
       errors.add('Please select at least 2 colors');
     }
-    
+
     if (_stimuli.contains(StimulusType.arrow) && _selectedArrows.length < 2) {
       errors.add('Please select at least 2 arrow directions');
     }
-    
+
     if (_stimuli.contains(StimulusType.shape) && _selectedShapes.length < 2) {
       errors.add('Please select at least 2 shapes');
     }
-    
+
+    if (_stimuli.contains(StimulusType.number) && _selectedNumbers.length < 2) {
+      errors.add('Please select at least 2 numbers');
+    }
+
+    if (_stimuli.contains(StimulusType.custom) && _selectedCustomStimulusItems.length < 2) {
+      errors.add('Please select at least 2 custom stimulus items');
+    }
+
     return errors;
   }
 
   List<String> _getStepValidationErrors(int step) {
     final errors = <String>[];
-    
+
     switch (step) {
       case 0: // Basic Information
         if (_name.text.trim().isEmpty) {
@@ -1607,7 +1930,7 @@ class _DrillBuilderScreenState extends State<DrillBuilderScreen>
           errors.add('Drill name must be at least 3 characters');
         }
         break;
-        
+
       case 1: // Configuration
         if (_duration < 60) {
           errors.add('Duration must be at least 60 seconds');
@@ -1619,194 +1942,45 @@ class _DrillBuilderScreenState extends State<DrillBuilderScreen>
           errors.add('Rest time cannot be negative');
         }
         break;
-        
+
       case 2: // Stimulus & Zones
         if (_stimuli.isEmpty) {
           errors.add('Select at least one stimulus type');
         }
         // Zones are always set to center, no validation needed
-        if (_stimuli.contains(StimulusType.color) && _selectedColors.length < 2) {
+        if (_stimuli.contains(StimulusType.color) &&
+            _selectedColors.length < 2) {
           errors.add('Select at least 2 colors for color stimulus');
         }
-        if (_stimuli.contains(StimulusType.arrow) && _selectedArrows.length < 2) {
+        if (_stimuli.contains(StimulusType.arrow) &&
+            _selectedArrows.length < 2) {
           errors.add('Select at least 2 arrow directions for arrow stimulus');
         }
-        if (_stimuli.contains(StimulusType.shape) && _selectedShapes.length < 2) {
+        if (_stimuli.contains(StimulusType.shape) &&
+            _selectedShapes.length < 2) {
           errors.add('Select at least 2 shapes for shape stimulus');
         }
+        if (_stimuli.contains(StimulusType.number) &&
+            _selectedNumbers.length < 2) {
+          errors.add('Select at least 2 numbers for number stimulus');
+        }
+        if (_stimuli.contains(StimulusType.custom) &&
+            _selectedCustomStimulusItems.length < 2) {
+          errors.add('Select at least 2 custom stimulus items');
+        }
         break;
-        
+
       case 3: // Review - no additional validation needed
         break;
     }
-    
+
     return errors;
-  }
-
-
-  Widget _buildStimulusCard(String title, IconData icon, StimulusType type, String description, Color accentColor) {
-    final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
-    final isSelected = _stimuli.contains(type);
-
-    return GestureDetector(
-      onTap: () {
-        setState(() {
-          if (isSelected) {
-            _stimuli.remove(type);
-          } else {
-            _stimuli.add(type);
-          }
-        });
-        HapticFeedback.lightImpact();
-      },
-      child: Container(
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: isSelected 
-              ? accentColor.withOpacity(0.1) 
-              : colorScheme.surfaceContainerHighest,
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(
-            color: isSelected 
-                ? accentColor 
-                : colorScheme.outline.withOpacity(0.3),
-            width: isSelected ? 2 : 1,
-          ),
-        ),
-        child: Row(
-          children: [
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: isSelected 
-                    ? accentColor 
-                    : colorScheme.surfaceContainerHigh,
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Icon(
-                icon,
-                color: isSelected 
-                    ? Colors.white 
-                    : colorScheme.onSurface.withOpacity(0.7),
-                size: 24,
-              ),
-            ),
-            const SizedBox(width: 16),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      Text(
-                        title,
-                        style: theme.textTheme.titleSmall?.copyWith(
-                          fontWeight: FontWeight.w600,
-                          color: isSelected ? accentColor : colorScheme.onSurface,
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      if (_presentationMode == PresentationMode.audio)
-                        Icon(
-                          Icons.volume_up,
-                          size: 16,
-                          color: isSelected ? accentColor : colorScheme.onSurface.withOpacity(0.5),
-                        ),
-                      if (_presentationMode == PresentationMode.visual)
-                        Icon(
-                          Icons.visibility,
-                          size: 16,
-                          color: isSelected ? accentColor : colorScheme.onSurface.withOpacity(0.5),
-                        ),
-                    ],
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    description,
-                    style: theme.textTheme.bodySmall?.copyWith(
-                      color: isSelected 
-                          ? colorScheme.onSurface 
-                          : colorScheme.onSurface.withOpacity(0.6),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            if (isSelected)
-              Icon(
-                Icons.check_circle,
-                color: accentColor,
-                size: 24,
-              ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildReactionZoneCard(String title, IconData icon, String description, ReactionZone zone) {
-    final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
-    final isSelected = _zones.contains(zone);
-
-    return GestureDetector(
-      onTap: () {
-        setState(() {
-          // Clear all zones and add the selected one (single selection)
-          _zones.clear();
-          _zones.add(zone);
-        });
-        HapticFeedback.lightImpact();
-      },
-      child: Container(
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: isSelected 
-              ? colorScheme.primaryContainer 
-              : colorScheme.surfaceContainerHighest,
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(
-            color: isSelected 
-                ? colorScheme.primary 
-                : colorScheme.outline.withOpacity(0.3),
-            width: isSelected ? 2 : 1,
-          ),
-        ),
-        child: Column(
-          children: [
-            Icon(
-              icon,
-              color: isSelected ? colorScheme.primary : colorScheme.onSurface.withOpacity(0.7),
-              size: 32,
-            ),
-            const SizedBox(height: 8),
-            Text(
-              title,
-              style: theme.textTheme.titleSmall?.copyWith(
-                fontWeight: FontWeight.w600,
-                color: isSelected ? colorScheme.primary : colorScheme.onSurface,
-              ),
-            ),
-            const SizedBox(height: 4),
-            Text(
-              description,
-              textAlign: TextAlign.center,
-              style: theme.textTheme.bodySmall?.copyWith(
-                color: isSelected 
-                    ? colorScheme.onPrimaryContainer 
-                    : colorScheme.onSurface.withOpacity(0.6),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
   }
 
   Color _getContrastColor(Color color) {
     // Calculate luminance to determine if we should use black or white text
-    final luminance = (0.299 * color.red + 0.587 * color.green + 0.114 * color.blue) / 255;
+    final luminance =
+        (0.299 * color.red + 0.587 * color.green + 0.114 * color.blue) / 255;
     return luminance > 0.5 ? Colors.black : Colors.white;
   }
 
@@ -1814,11 +1988,11 @@ class _DrillBuilderScreenState extends State<DrillBuilderScreen>
     final errors = _getValidationErrors();
     if (errors.isEmpty) {
       final drill = _build();
-      
+
       try {
         // Use DrillCreationService for additional validation
         final drillCreationService = getIt<DrillCreationService>();
-        
+
         if (widget.initial == null) {
           // Creating new drill
           await drillCreationService.createDrill(drill);
@@ -1826,15 +2000,17 @@ class _DrillBuilderScreenState extends State<DrillBuilderScreen>
           // Updating existing drill
           await drillCreationService.updateDrill(drill);
         }
-        
+
         if (mounted) {
           Navigator.of(context).pop(drill);
           HapticFeedback.mediumImpact();
-          
+
           // Show success message
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text(widget.initial == null ? 'Drill created successfully!' : 'Drill updated successfully!'),
+              content: Text(widget.initial == null
+                  ? 'Drill created successfully!'
+                  : 'Drill updated successfully!'),
               backgroundColor: Colors.green,
             ),
           );
@@ -1844,7 +2020,8 @@ class _DrillBuilderScreenState extends State<DrillBuilderScreen>
           // Show validation error from service
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text('Error: ${e.toString().replaceAll('Exception: ', '').replaceAll('ArgumentError: ', '')}'),
+              content: Text(
+                  'Error: ${e.toString().replaceAll('Exception: ', '').replaceAll('ArgumentError: ', '')}'),
               backgroundColor: Colors.red,
             ),
           );
@@ -1855,7 +2032,8 @@ class _DrillBuilderScreenState extends State<DrillBuilderScreen>
       // Show validation errors
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Please fix ${errors.length} validation error${errors.length > 1 ? 's' : ''}'),
+          content: Text(
+              'Please fix ${errors.length} validation error${errors.length > 1 ? 's' : ''}'),
           backgroundColor: Colors.red,
         ),
       );
@@ -1867,27 +2045,28 @@ class _DrillBuilderScreenState extends State<DrillBuilderScreen>
     try {
       final imageUploadService = ImageUploadService();
       File? imageFile;
-      
+
       if (source == ImageSource.gallery) {
         imageFile = await imageUploadService.pickImageFromGallery();
       } else {
         imageFile = await imageUploadService.pickImageFromCamera();
       }
-      
+
       if (imageFile != null) {
         setState(() {
           _selectedImageFile = imageFile;
           _isUploadingImage = true;
         });
-        
+
         // Convert image to base64
-        final base64Image = await imageUploadService.convertImageToBase64(imageFile);
-        
+        final base64Image =
+            await imageUploadService.convertImageToBase64(imageFile);
+
         setState(() {
           _stepImageUrl = base64Image;
           _isUploadingImage = false;
         });
-        
+
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('Image uploaded successfully!'),
@@ -1901,10 +2080,11 @@ class _DrillBuilderScreenState extends State<DrillBuilderScreen>
         _isUploadingImage = false;
         _selectedImageFile = null;
       });
-      
+
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Failed to upload image: ${e.toString().replaceAll('Exception: ', '')}'),
+          content: Text(
+              'Failed to upload image: ${e.toString().replaceAll('Exception: ', '')}'),
           backgroundColor: Colors.red,
           duration: const Duration(seconds: 3),
         ),
@@ -1912,275 +2092,30 @@ class _DrillBuilderScreenState extends State<DrillBuilderScreen>
     }
   }
 
-  Widget _buildArrowChip(ArrowDirection arrow) {
-    final isSelected = _selectedArrows.contains(arrow);
-    final colorScheme = Theme.of(context).colorScheme;
-    final theme = Theme.of(context);
-
-    return FilterChip(
-      label: Text(
-        _getArrowDirectionLabel(arrow),
-        style: TextStyle(
-          fontWeight: FontWeight.w600,
-          color: isSelected ? colorScheme.onPrimary : colorScheme.onSurface,
-        ),
-      ),
-      avatar: Icon(
-        _getArrowDirectionIcon(arrow),
-        size: 18,
-        color: isSelected ? colorScheme.onPrimary : colorScheme.onSurface.withOpacity(0.7),
-      ),
-      selected: isSelected,
-      onSelected: (selected) {
-        setState(() {
-          if (selected) {
-            _selectedArrows.add(arrow);
-          } else {
-            _selectedArrows.remove(arrow);
-          }
-        });
-        HapticFeedback.lightImpact();
-      },
-      backgroundColor: colorScheme.surface,
-      selectedColor: colorScheme.primary,
-      checkmarkColor: colorScheme.onPrimary,
-      side: BorderSide(
-        color: isSelected ? colorScheme.primary : colorScheme.outline,
-      ),
-    );
-  }
-
-  Widget _buildShapeChip(ShapeType shape) {
-    final isSelected = _selectedShapes.contains(shape);
-    final colorScheme = Theme.of(context).colorScheme;
-    final theme = Theme.of(context);
-
-    return FilterChip(
-      label: Text(
-        _getShapeTypeLabel(shape),
-        style: TextStyle(
-          fontWeight: FontWeight.w600,
-          color: isSelected ? colorScheme.onPrimary : colorScheme.onSurface,
-        ),
-      ),
-      avatar: Icon(
-        _getShapeTypeIcon(shape),
-        size: 18,
-        color: isSelected ? colorScheme.onPrimary : colorScheme.onSurface.withOpacity(0.7),
-      ),
-      selected: isSelected,
-      onSelected: (selected) {
-        setState(() {
-          if (selected) {
-            _selectedShapes.add(shape);
-          } else {
-            _selectedShapes.remove(shape);
-          }
-        });
-        HapticFeedback.lightImpact();
-      },
-      backgroundColor: colorScheme.surface,
-      selectedColor: colorScheme.secondary,
-      checkmarkColor: colorScheme.onSecondary,
-      side: BorderSide(
-        color: isSelected ? colorScheme.secondary : colorScheme.outline,
-      ),
-    );
-  }
-
-  Widget _buildNumberRangeCard(NumberRange range) {
-    final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
-    final isSelected = _selectedNumberRange == range;
-
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 8),
-      child: GestureDetector(
-        onTap: () {
-          setState(() {
-            _selectedNumberRange = range;
-          });
-          HapticFeedback.lightImpact();
-        },
-        child: Container(
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            color: isSelected
-                ? Colors.orange.withOpacity(0.1)
-                : colorScheme.surface,
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(
-              color: isSelected
-                  ? Colors.orange
-                  : colorScheme.outline.withOpacity(0.3),
-              width: isSelected ? 2 : 1,
-            ),
-          ),
-          child: Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: isSelected
-                      ? Colors.orange
-                      : colorScheme.surfaceContainerHigh,
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Icon(
-                  Icons.numbers,
-                  color: isSelected
-                      ? Colors.white
-                      : colorScheme.onSurface.withOpacity(0.7),
-                  size: 20,
-                ),
-              ),
-              const SizedBox(width: 16),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      _getNumberRangeLabel(range),
-                      style: theme.textTheme.titleSmall?.copyWith(
-                        fontWeight: FontWeight.w600,
-                        color: isSelected ? Colors.orange : colorScheme.onSurface,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      _getNumberRangeDescription(range),
-                      style: theme.textTheme.bodySmall?.copyWith(
-                        color: isSelected
-                            ? colorScheme.onSurface
-                            : colorScheme.onSurface.withOpacity(0.6),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              if (isSelected)
-                Icon(
-                  Icons.check_circle,
-                  color: Colors.orange,
-                  size: 24,
-                ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  String _getArrowDirectionLabel(ArrowDirection direction) {
-    switch (direction) {
-      case ArrowDirection.up: return 'Up';
-      case ArrowDirection.down: return 'Down';
-      case ArrowDirection.left: return 'Left';
-      case ArrowDirection.right: return 'Right';
-      case ArrowDirection.upLeft: return 'Up-Left';
-      case ArrowDirection.upRight: return 'Up-Right';
-      case ArrowDirection.downLeft: return 'Down-Left';
-      case ArrowDirection.downRight: return 'Down-Right';
-    }
-  }
-
   IconData _getArrowDirectionIcon(ArrowDirection direction) {
     switch (direction) {
-      case ArrowDirection.up: return Icons.keyboard_arrow_up;
-      case ArrowDirection.down: return Icons.keyboard_arrow_down;
-      case ArrowDirection.left: return Icons.keyboard_arrow_left;
-      case ArrowDirection.right: return Icons.keyboard_arrow_right;
-      case ArrowDirection.upLeft: return Icons.north_west;
-      case ArrowDirection.upRight: return Icons.north_east;
-      case ArrowDirection.downLeft: return Icons.south_west;
-      case ArrowDirection.downRight: return Icons.south_east;
+      case ArrowDirection.up:
+        return Icons.keyboard_arrow_up;
+      case ArrowDirection.down:
+        return Icons.keyboard_arrow_down;
+      case ArrowDirection.left:
+        return Icons.keyboard_arrow_left;
+      case ArrowDirection.right:
+        return Icons.keyboard_arrow_right;
+      case ArrowDirection.upLeft:
+        return Icons.north_west;
+      case ArrowDirection.upRight:
+        return Icons.north_east;
+      case ArrowDirection.downLeft:
+        return Icons.south_west;
+      case ArrowDirection.downRight:
+        return Icons.south_east;
     }
-  }
-
-  String _getShapeTypeLabel(ShapeType shape) {
-    switch (shape) {
-      case ShapeType.circle: return 'Circle';
-      case ShapeType.square: return 'Square';
-      case ShapeType.triangle: return 'Triangle';
-      case ShapeType.diamond: return 'Diamond';
-      case ShapeType.star: return 'Star';
-      case ShapeType.hexagon: return 'Hexagon';
-      case ShapeType.pentagon: return 'Pentagon';
-      case ShapeType.oval: return 'Oval';
-    }
-  }
-
-  IconData _getShapeTypeIcon(ShapeType shape) {
-    switch (shape) {
-      case ShapeType.circle: return Icons.circle_outlined;
-      case ShapeType.square: return Icons.square_outlined;
-      case ShapeType.triangle: return Icons.change_history;
-      case ShapeType.diamond: return Icons.diamond_outlined;
-      case ShapeType.star: return Icons.star_outline;
-      case ShapeType.hexagon: return Icons.hexagon_outlined;
-      case ShapeType.pentagon: return Icons.pentagon_outlined;
-      case ShapeType.oval: return Icons.circle;
-    }
-  }
-
-  String _getNumberRangeLabel(NumberRange range) {
-    switch (range) {
-      case NumberRange.oneToThree: return '1-3';
-      case NumberRange.oneToFive: return '1-5';
-      case NumberRange.oneToNine: return '1-9';
-      case NumberRange.oneToTwelve: return '1-12';
-    }
-  }
-
-  String _getNumberRangeDescription(NumberRange range) {
-    switch (range) {
-      case NumberRange.oneToThree: return 'Numbers 1, 2, 3';
-      case NumberRange.oneToFive: return 'Numbers 1, 2, 3, 4, 5';
-      case NumberRange.oneToNine: return 'Numbers 1 through 9';
-      case NumberRange.oneToTwelve: return 'Numbers 1 through 12';
-    }
-  }
-
-  Widget _buildSelectionSection(String title, IconData icon, Color accentColor, Widget content) {
-    final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          children: [
-            Container(
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                color: accentColor.withOpacity(0.1),
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Icon(
-                icon,
-                color: accentColor,
-                size: 18,
-              ),
-            ),
-            const SizedBox(width: 12),
-            Text(
-              title,
-              style: theme.textTheme.titleMedium?.copyWith(
-                fontWeight: FontWeight.w600,
-                color: colorScheme.onSurface,
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 12),
-        content,
-      ],
-    );
   }
 
   Widget _buildValidationWarning(String message) {
     final theme = Theme.of(context);
-    
+
     return Container(
       padding: const EdgeInsets.all(8),
       decoration: BoxDecoration(
@@ -2205,32 +2140,9 @@ class _DrillBuilderScreenState extends State<DrillBuilderScreen>
     );
   }
 
-  Widget _buildCleanStimulusSection(String title, Widget content, bool showWarning) {
-    final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          title,
-          style: theme.textTheme.headlineSmall?.copyWith(
-            fontWeight: FontWeight.w600,
-            color: colorScheme.onSurface.withOpacity(0.8),
-          ),
-        ),
-        const SizedBox(height: 20),
-        content,
-        if (showWarning) ...[
-          const SizedBox(height: 16),
-          _buildValidationWarning('Please select at least 2 ${title.toLowerCase()}'),
-        ],
-      ],
-    );
-  }
-
   Widget _buildSimpleColorChip(Color color) {
     final isSelected = _selectedColors.contains(color);
+    final colorScheme = Theme.of(context).colorScheme;
 
     return GestureDetector(
       onTap: () {
@@ -2247,20 +2159,31 @@ class _DrillBuilderScreenState extends State<DrillBuilderScreen>
         width: 50,
         height: 50,
         decoration: BoxDecoration(
-          color: color,
-          shape: BoxShape.circle,
+          color: isSelected
+              ? colorScheme.primary.withOpacity(0.1)
+              : colorScheme.surface,
+          borderRadius: BorderRadius.circular(8),
           border: Border.all(
-            color: isSelected ? Colors.black : Colors.grey.withOpacity(0.3),
-            width: isSelected ? 3 : 1,
+            color: isSelected
+                ? colorScheme.primary
+                : colorScheme.outline.withOpacity(0.3),
+            width: isSelected ? 2 : 1,
           ),
         ),
-        child: isSelected
-            ? Icon(
-                Icons.check,
-                color: _getContrastColor(color),
-                size: 24,
-              )
-            : null,
+        child: Center(
+          child: Container(
+            width: 30,
+            height: 30,
+            decoration: BoxDecoration(
+              color: color,
+              shape: BoxShape.circle,
+              border: Border.all(
+                color: Colors.white,
+                width: 2,
+              ),
+            ),
+          ),
+        ),
       ),
     );
   }
@@ -2285,16 +2208,64 @@ class _DrillBuilderScreenState extends State<DrillBuilderScreen>
         width: 50,
         height: 50,
         decoration: BoxDecoration(
-          color: isSelected ? colorScheme.primary.withOpacity(0.1) : colorScheme.surface,
+          color: isSelected
+              ? colorScheme.primary.withOpacity(0.1)
+              : colorScheme.surface,
           borderRadius: BorderRadius.circular(8),
           border: Border.all(
-            color: isSelected ? colorScheme.primary : colorScheme.outline.withOpacity(0.3),
+            color: isSelected
+                ? colorScheme.primary
+                : colorScheme.outline.withOpacity(0.3),
             width: isSelected ? 2 : 1,
           ),
         ),
         child: Icon(
           _getArrowDirectionIcon(arrow),
-          color: isSelected ? colorScheme.primary : colorScheme.onSurface.withOpacity(0.6),
+          color: isSelected
+              ? colorScheme.primary
+              : colorScheme.onSurface.withOpacity(0.6),
+          size: 24,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSimpleShapeChip(ShapeType shape) {
+    final isSelected = _selectedShapes.contains(shape);
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+
+    return GestureDetector(
+      onTap: () {
+        setState(() {
+          if (isSelected) {
+            _selectedShapes.remove(shape);
+          } else {
+            _selectedShapes.add(shape);
+          }
+        });
+        HapticFeedback.lightImpact();
+      },
+      child: Container(
+        width: 50,
+        height: 50,
+        decoration: BoxDecoration(
+          color: isSelected
+              ? colorScheme.primary.withOpacity(0.1)
+              : colorScheme.surface,
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(
+            color: isSelected
+                ? colorScheme.primary
+                : colorScheme.outline.withOpacity(0.3),
+            width: isSelected ? 2 : 1,
+          ),
+        ),
+        child: Icon(
+          _getShapeTypeIcon(shape),
+          color: isSelected
+              ? colorScheme.primary
+              : colorScheme.onSurface.withOpacity(0.6),
           size: 24,
         ),
       ),
@@ -2302,194 +2273,73 @@ class _DrillBuilderScreenState extends State<DrillBuilderScreen>
   }
 
   Widget _buildSimpleNumberChip(int number) {
-    final isInRange = _isNumberInSelectedRange(number);
+    final isSelected = _selectedNumbers.contains(number);
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
 
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 4),
-      child: Row(
-        children: [
-          Expanded(
-            child: Container(
-              height: 50,
-              decoration: BoxDecoration(
-                color: isInRange ? Colors.orange.withOpacity(0.1) : colorScheme.surface,
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(
-                  color: isInRange ? Colors.orange : colorScheme.outline.withOpacity(0.3),
-                  width: isInRange ? 2 : 1,
-                ),
-              ),
-              child: Center(
-                child: Text(
-                  number.toString(),
-                  style: theme.textTheme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.w600,
-                    color: isInRange ? Colors.orange : colorScheme.onSurface.withOpacity(0.6),
-                  ),
-                ),
-              ),
-            ),
-          ),
-          const SizedBox(width: 8),
-          Container(
-            width: 20,
-            height: 20,
-            decoration: BoxDecoration(
-              color: isInRange ? Colors.orange : Colors.transparent,
-              border: Border.all(
-                color: isInRange ? Colors.orange : colorScheme.outline.withOpacity(0.3),
-              ),
-              borderRadius: BorderRadius.circular(4),
-            ),
-            child: isInRange
-                ? const Icon(
-                    Icons.check,
-                    color: Colors.white,
-                    size: 14,
-                  )
-                : null,
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildPresentationModeIndicator() {
-    final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
-
-    return Column(
-      children: [
-        // Visual Indicator
-        Container(
-          width: 80,
-          height: 60,
-          decoration: BoxDecoration(
-            color: _presentationMode == PresentationMode.visual
-                ? Colors.orange.withOpacity(0.2)
-                : colorScheme.surfaceContainerHighest,
-            borderRadius: BorderRadius.circular(8),
-            border: Border.all(
-              color: _presentationMode == PresentationMode.visual
-                  ? Colors.orange
-                  : colorScheme.outline.withOpacity(0.3),
-            ),
-          ),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(
-                Icons.visibility,
-                color: _presentationMode == PresentationMode.visual
-                    ? Colors.orange
-                    : colorScheme.onSurface.withOpacity(0.5),
-                size: 20,
-              ),
-              const SizedBox(height: 4),
-              Text(
-                'VISUAL',
-                style: theme.textTheme.labelSmall?.copyWith(
-                  fontWeight: FontWeight.w600,
-                  color: _presentationMode == PresentationMode.visual
-                      ? Colors.orange
-                      : colorScheme.onSurface.withOpacity(0.5),
-                ),
-              ),
-            ],
-          ),
-        ),
-        const SizedBox(height: 8),
-        // Audio Indicator
-        Container(
-          width: 80,
-          height: 60,
-          decoration: BoxDecoration(
-            color: _presentationMode == PresentationMode.audio
-                ? Colors.orange.withOpacity(0.2)
-                : colorScheme.surfaceContainerHighest,
-            borderRadius: BorderRadius.circular(8),
-            border: Border.all(
-              color: _presentationMode == PresentationMode.audio
-                  ? Colors.orange
-                  : colorScheme.outline.withOpacity(0.3),
-            ),
-          ),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(
-                Icons.volume_up,
-                color: _presentationMode == PresentationMode.audio
-                    ? Colors.orange
-                    : colorScheme.onSurface.withOpacity(0.5),
-                size: 20,
-              ),
-              const SizedBox(height: 4),
-              Text(
-                'AUDIO',
-                style: theme.textTheme.labelSmall?.copyWith(
-                  fontWeight: FontWeight.w600,
-                  color: _presentationMode == PresentationMode.audio
-                      ? Colors.orange
-                      : colorScheme.onSurface.withOpacity(0.5),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ],
-    );
-  }
-
-  bool _isNumberInSelectedRange(int number) {
-    switch (_selectedNumberRange) {
-      case NumberRange.oneToThree:
-        return number >= 1 && number <= 3;
-      case NumberRange.oneToFive:
-        return number >= 1 && number <= 5;
-      case NumberRange.oneToNine:
-        return number >= 1 && number <= 9;
-      case NumberRange.oneToTwelve:
-        return number >= 1 && number <= 12;
-    }
-  }
-
-  Widget _buildNumberRangeChip(NumberRange range) {
-    final isSelected = _selectedNumberRange == range;
-    final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
-
-    return FilterChip(
-      label: Text(
-        _getNumberRangeLabel(range),
-        style: TextStyle(
-          fontWeight: FontWeight.w600,
-          fontSize: 12,
-          color: isSelected ? Colors.white : colorScheme.onSurface,
-        ),
-      ),
-      selected: isSelected,
-      onSelected: (selected) {
+    return GestureDetector(
+      onTap: () {
         setState(() {
-          _selectedNumberRange = range;
+          if (isSelected) {
+            _selectedNumbers.remove(number);
+          } else {
+            _selectedNumbers.add(number);
+          }
         });
         HapticFeedback.lightImpact();
       },
-      backgroundColor: colorScheme.surface,
-      selectedColor: Colors.orange,
-      checkmarkColor: Colors.white,
-      side: BorderSide(
-        color: isSelected ? Colors.orange : colorScheme.outline,
+      child: Container(
+        width: 50,
+        height: 50,
+        decoration: BoxDecoration(
+          color: isSelected
+              ? colorScheme.primary.withOpacity(0.1)
+              : colorScheme.surface,
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(
+            color: isSelected
+                ? colorScheme.primary
+                : colorScheme.outline.withOpacity(0.3),
+            width: isSelected ? 2 : 1,
+          ),
+        ),
+        child: Center(
+          child: Text(
+            number.toString(),
+            style: theme.textTheme.titleMedium?.copyWith(
+              fontWeight: FontWeight.w600,
+              color: isSelected
+                  ? colorScheme.primary
+                  : colorScheme.onSurface.withOpacity(0.6),
+            ),
+          ),
+        ),
       ),
     );
   }
 
-  Widget _buildStimulusSelectionSection(String title, StimulusType type, Widget content, bool showWarning) {
+  NumberRange _getNumberRangeFromSelectedNumbers() {
+    if (_selectedNumbers.isEmpty) return NumberRange.oneToFive;
+
+    final maxNumber = _selectedNumbers.reduce((a, b) => a > b ? a : b);
+
+    if (maxNumber <= 3) return NumberRange.oneToThree;
+    if (maxNumber <= 5) return NumberRange.oneToFive;
+    if (maxNumber <= 9) return NumberRange.oneToNine;
+    return NumberRange.oneToTwelve;
+  }
+
+  Widget _buildStimulusSelectionSection(
+      String title,
+      StimulusType type,
+      Widget content,
+      bool showWarning, {
+      bool? customCheckboxValue,
+      void Function(bool?)? customCheckboxOnChanged,
+    }) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
-    final isSelected = _stimuli.contains(type);
+    final isSelected = customCheckboxValue ?? _stimuli.contains(type);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -2499,7 +2349,7 @@ class _DrillBuilderScreenState extends State<DrillBuilderScreen>
           children: [
             Checkbox(
               value: isSelected,
-              onChanged: (value) {
+              onChanged: customCheckboxOnChanged ?? (value) {
                 setState(() {
                   if (value == true) {
                     _stimuli.add(type);
@@ -2521,17 +2371,253 @@ class _DrillBuilderScreenState extends State<DrillBuilderScreen>
             ),
           ],
         ),
-        const SizedBox(height: 20),
-        
+        const SizedBox(height: 8),
+
         // Content (only show if stimulus type is selected)
         if (isSelected) ...[
           content,
           if (showWarning) ...[
             const SizedBox(height: 16),
-            _buildValidationWarning('Please select at least 2 ${title.toLowerCase()}'),
+            _buildValidationWarning(
+                'Please select at least 2 ${title.toLowerCase()}'),
           ],
         ],
+        
+
       ],
+    );
+  }
+
+  // Custom stimulus helper methods
+  IconData _getCustomStimulusIcon(CustomStimulusType type) {
+    switch (type) {
+      case CustomStimulusType.color:
+        return Icons.palette;
+      case CustomStimulusType.shape:
+        return Icons.category;
+      case CustomStimulusType.text:
+        return Icons.text_fields;
+      case CustomStimulusType.image:
+        return Icons.image;
+    }
+  }
+
+  Widget _buildCustomStimulusItemChip(
+      CustomStimulusItem item, CustomStimulusType stimulusType) {
+    final isSelected = _selectedCustomStimulusItems.contains(item);
+    final colorScheme = Theme.of(context).colorScheme;
+
+    // For color stimuli, use circular design like current color chips
+    if (stimulusType == CustomStimulusType.color) {
+      return GestureDetector(
+        onTap: () {
+          setState(() {
+            if (isSelected) {
+              _selectedCustomStimulusItems.remove(item);
+              // Remove custom stimulus type if no items are selected
+              if (_selectedCustomStimulusItems.isEmpty) {
+                _stimuli.remove(StimulusType.custom);
+              }
+            } else {
+              _selectedCustomStimulusItems.add(item);
+              // Add custom stimulus type when first item is selected
+              _stimuli.add(StimulusType.custom);
+            }
+          });
+          HapticFeedback.lightImpact();
+        },
+        child: Container(
+          width: 50,
+          height: 50,
+          decoration: BoxDecoration(
+            color: item.color ?? Colors.grey,
+            shape: BoxShape.circle,
+            border: Border.all(
+              color: isSelected ? Colors.black : Colors.grey.withOpacity(0.3),
+              width: isSelected ? 3 : 1,
+            ),
+          ),
+          child: isSelected
+              ? Icon(
+                  Icons.check,
+                  color: _getContrastColor(item.color ?? Colors.grey),
+                  size: 24,
+                )
+              : null,
+        ),
+      );
+    }
+
+    // For other stimuli (shape, text, image), use rounded rectangle design like arrows
+    return GestureDetector(
+      onTap: () {
+        setState(() {
+          if (isSelected) {
+            _selectedCustomStimulusItems.remove(item);
+            // Remove custom stimulus type if no items are selected
+            if (_selectedCustomStimulusItems.isEmpty) {
+              _stimuli.remove(StimulusType.custom);
+            }
+          } else {
+            _selectedCustomStimulusItems.add(item);
+            // Add custom stimulus type when first item is selected
+            _stimuli.add(StimulusType.custom);
+          }
+        });
+        HapticFeedback.lightImpact();
+      },
+      child: Container(
+        width: 50,
+        height: 50,
+        decoration: BoxDecoration(
+          color: isSelected
+              ? colorScheme.primary.withOpacity(0.1)
+              : colorScheme.surface,
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(
+            color: isSelected
+                ? colorScheme.primary
+                : colorScheme.outline.withOpacity(0.3),
+            width: isSelected ? 2 : 1,
+          ),
+        ),
+        child: _buildCustomStimulusItemContent(item, stimulusType, isSelected),
+      ),
+    );
+  }
+
+  Widget _buildCustomStimulusItemContent(CustomStimulusItem item,
+      CustomStimulusType stimulusType, bool isSelected) {
+    final colorScheme = Theme.of(context).colorScheme;
+
+    switch (stimulusType) {
+      case CustomStimulusType.color:
+        // Color content is handled in the main method above
+        return const SizedBox.shrink();
+      case CustomStimulusType.shape:
+        return Icon(
+          _getShapeIcon(item.shapeType ?? ''),
+          color: isSelected
+              ? colorScheme.primary
+              : colorScheme.onSurface.withOpacity(0.6),
+          size: 24,
+        );
+      case CustomStimulusType.text:
+        final text = item.textValue ?? '';
+        return Center(
+          child: Text(
+            text.length > 2 ? text.substring(0, 2) : text,
+            style: TextStyle(
+              color: isSelected
+                  ? colorScheme.primary
+                  : colorScheme.onSurface.withOpacity(0.6),
+              fontWeight: FontWeight.bold,
+              fontSize: 12,
+            ),
+          ),
+        );
+      case CustomStimulusType.image:
+        if (item.imageBase64 != null) {
+          return ClipRRect(
+            borderRadius: BorderRadius.circular(6),
+            child: Image.memory(
+              base64.decode(item.imageBase64!.split(',').last),
+              width: 40,
+              height: 40,
+              fit: BoxFit.cover,
+            ),
+          );
+        }
+        return Icon(
+          Icons.image,
+          color: isSelected
+              ? colorScheme.primary
+              : colorScheme.onSurface.withOpacity(0.6),
+          size: 24,
+        );
+    }
+  }
+
+  IconData _getShapeIcon(String shapeValue) {
+    switch (shapeValue.toLowerCase()) {
+      case 'circle':
+        return Icons.circle;
+      case 'square':
+        return Icons.square;
+      case 'triangle':
+        return Icons.change_history;
+      case 'star':
+        return Icons.star;
+      case 'heart':
+        return Icons.favorite;
+      default:
+        return Icons.shape_line;
+    }
+  }
+
+  IconData _getShapeTypeIcon(ShapeType shape) {
+    switch (shape) {
+      case ShapeType.circle:
+        return Icons.circle_outlined;
+      case ShapeType.square:
+        return Icons.square_outlined;
+      case ShapeType.triangle:
+        return Icons.change_history_outlined;
+      case ShapeType.diamond:
+        return Icons.diamond_outlined;
+      case ShapeType.star:
+        return Icons.star_outline;
+      case ShapeType.hexagon:
+        return Icons.hexagon;
+      case ShapeType.pentagon:
+        return Icons.pentagon;
+      case ShapeType.oval:
+        return Icons.circle;
+    }
+  }
+
+  Widget _buildCustomStimulusSection(CustomStimulus stimulus) {
+    final selectedItems = _selectedCustomStimulusItems
+        .where((item) => stimulus.items.contains(item))
+        .toList();
+    final isEnabled = selectedItems.isNotEmpty;
+
+    return _buildStimulusSelectionSection(
+      stimulus.name,
+      StimulusType.custom, // Use custom type instead of placeholder
+      Wrap(
+        spacing: 12,
+        runSpacing: 12,
+        children: stimulus.items
+            .map((item) => _buildCustomStimulusItemChip(item, stimulus.type))
+            .toList(),
+      ),
+      selectedItems.length < 2,
+      customCheckboxValue: isEnabled,
+      customCheckboxOnChanged: (value) {
+        setState(() {
+          if (value == true) {
+            // Add custom stimulus type to stimuli set
+            _stimuli.add(StimulusType.custom);
+            // Enable by selecting first two items if available
+            final itemsToAdd = stimulus.items.take(2).toList();
+            for (final item in itemsToAdd) {
+              if (!_selectedCustomStimulusItems.contains(item)) {
+                _selectedCustomStimulusItems.add(item);
+              }
+            }
+          } else {
+            // Remove custom stimulus type from stimuli set if no custom items are selected
+            _selectedCustomStimulusItems.removeWhere(
+                (item) => stimulus.items.contains(item));
+            // Check if any custom stimulus items are still selected
+            if (_selectedCustomStimulusItems.isEmpty) {
+              _stimuli.remove(StimulusType.custom);
+            }
+          }
+        });
+        HapticFeedback.lightImpact();
+      },
     );
   }
 }

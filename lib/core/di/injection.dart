@@ -37,6 +37,7 @@ import 'package:spark_app/features/auth/services/multi_device_session_service.da
 import 'package:spark_app/features/auth/services/simple_session_service.dart';
 import 'package:spark_app/core/services/subscription_migration_service.dart';
 import 'package:spark_app/core/utils/app_logger.dart';
+import 'package:spark_app/features/admin/services/custom_stimulus_service.dart';
 
 final GetIt getIt = GetIt.instance;
 
@@ -133,6 +134,9 @@ Future<void> configureDependencies() async {
   // Creation Services with Auto-Refresh
   getIt.registerLazySingleton<DrillCreationService>(() => DrillCreationService());
   getIt.registerLazySingleton<ProgramCreationService>(() => ProgramCreationService());
+
+  // Admin Services
+  getIt.registerLazySingleton<CustomStimulusService>(() => CustomStimulusService());
 
   // Multiplayer Services
   getIt.registerLazySingleton<BluetoothConnectionService>(() => BluetoothConnectionService());

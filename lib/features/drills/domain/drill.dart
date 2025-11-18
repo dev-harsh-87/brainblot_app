@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 
 enum Difficulty { beginner, intermediate, advanced }
 
-enum StimulusType { color, shape, arrow, number }
+enum StimulusType { color, shape, arrow, number, custom }
 
 enum PresentationMode { visual, audio }
 
@@ -44,6 +44,7 @@ class Drill {
   final DateTime createdAt; // when the drill was created
   final String? videoUrl; // YouTube video URL for drill demonstration
   final String? stepImageUrl; // Image URL for drill step visualization
+  final List<String> customStimuliIds; // IDs of selected custom stimuli
 
   Drill({
     required this.id,
@@ -75,6 +76,7 @@ class Drill {
     DateTime? createdAt,
     this.videoUrl,
     this.stepImageUrl,
+    this.customStimuliIds = const [],
   }) : createdAt = createdAt ?? DateTime.now();
 
   Drill copyWith({
@@ -107,6 +109,7 @@ class Drill {
     DateTime? createdAt,
     String? videoUrl,
     String? stepImageUrl,
+    List<String>? customStimuliIds,
   }) => Drill(
         id: id ?? this.id,
         name: name ?? this.name,
@@ -137,6 +140,7 @@ class Drill {
         createdAt: createdAt ?? this.createdAt,
         videoUrl: videoUrl ?? this.videoUrl,
         stepImageUrl: stepImageUrl ?? this.stepImageUrl,
+        customStimuliIds: customStimuliIds ?? this.customStimuliIds,
       );
 
   Map<String, dynamic> toMap() => {
@@ -160,6 +164,7 @@ class Drill {
           'shapes': shapes.map((e) => e.name).toList(),
           'numberRange': numberRange.name,
           'presentationMode': presentationMode.name,
+          'customStimuliIds': customStimuliIds,
         },
         'media': {
           'videoUrl': videoUrl,
@@ -255,6 +260,7 @@ class Drill {
              orElse: () => PresentationMode.visual,
            )
          : PresentationMode.visual,
+     customStimuliIds: List<String>.from((config?['customStimuliIds'] as List?) ?? []),
       
       // Media - try nested first, then flat
       videoUrl: media?['videoUrl'] as String? ?? map['videoUrl'] as String?,

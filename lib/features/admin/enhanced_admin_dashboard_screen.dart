@@ -8,6 +8,7 @@ import 'package:spark_app/features/admin/ui/subscription_management_screen.dart'
 import 'package:spark_app/features/admin/ui/plan_requests_screen.dart';
 import 'package:spark_app/features/admin/ui/screens/comprehensive_activity_screen.dart';
 import 'package:spark_app/features/admin/ui/category_management_screen.dart';
+import 'package:spark_app/features/admin/ui/stimulus_management_screen.dart';
 
 
 class EnhancedAdminDashboardScreen extends StatelessWidget {
@@ -252,7 +253,7 @@ Widget _buildStatCard(
           crossAxisCount: 2,
           mainAxisSpacing: 16,
           crossAxisSpacing: 16,
-          childAspectRatio: 1.3,
+          childAspectRatio: 1.2,
           children: [
             _buildManagementCard(
               context,
@@ -303,6 +304,19 @@ Widget _buildStatCard(
                 context,
                 MaterialPageRoute(
                   builder: (context) => const PlanRequestsScreen(),
+                ),
+              ),
+            ),
+            _buildManagementCard(
+              context,
+              title: 'Stimulus Management',
+              description: 'Manage custom stimuli',
+              icon: Icons.auto_awesome_outlined,
+              color: Colors.purple,
+              onTap: () => Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => const StimulusManagementScreen(),
                 ),
               ),
             ),
