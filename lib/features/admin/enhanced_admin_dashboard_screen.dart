@@ -26,7 +26,6 @@ class EnhancedAdminDashboardScreen extends StatelessWidget {
       requiredRole: UserRole.admin,
       child: Scaffold(
         backgroundColor: Colors.grey[50],
-        appBar: _buildAppBar(context),
         body: RefreshIndicator(
           onRefresh: () async {
             // Trigger rebuild to refresh statistics

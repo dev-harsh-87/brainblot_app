@@ -42,6 +42,8 @@ class _DrillBuilderScreenState extends State<DrillBuilderScreen>
   int _sets = 1;
   int _reps = 3;
   int _numberOfStimuli = 30;
+  int _stimulusLengthMs = 1000; // 1 second default for Timed mode
+  int _delayBetweenStimuliMs = 500; // 500ms default delay between stimuli
   final Set<StimulusType> _stimuli = {StimulusType.color};
   final Set<ReactionZone> _zones = {ReactionZone.center}; // Always center only
   final List<Color> _selectedColors = [
@@ -63,6 +65,7 @@ class _DrillBuilderScreenState extends State<DrillBuilderScreen>
   ];
   final List<int> _selectedNumbers = [1, 2, 3, 4, 5];
   PresentationMode _presentationMode = PresentationMode.visual;
+  DrillMode _drillMode = DrillMode.touch;
 
   // Custom stimulus variables
   List<CustomStimulus> _customStimuli = [];
@@ -110,6 +113,9 @@ class _DrillBuilderScreenState extends State<DrillBuilderScreen>
       _reps = d.reps;
       _numberOfStimuli = d.numberOfStimuli;
       _presentationMode = d.presentationMode;
+      _drillMode = d.drillMode;
+      _stimulusLengthMs = d.stimulusLengthMs;
+      _delayBetweenStimuliMs = d.delayBetweenStimuliMs;
       _stimuli
         ..clear()
         ..addAll(d.stimulusTypes);
@@ -213,6 +219,30 @@ class _DrillBuilderScreenState extends State<DrillBuilderScreen>
           _customStimuli = stimuli;
           _loadingCustomStimuli = false;
         });
+
+        // If editing an existing drill, populate selected custom stimulus items
+        final existingDrill = widget.initial;
+        if (existingDrill != null && existingDrill.customStimuliIds.isNotEmpty) {
+          print('🔄 Loading selected custom stimulus items for existing drill...');
+          print('🔍 Drill customStimuliIds: ${existingDrill.customStimuliIds}');
+          
+          _selectedCustomStimulusItems.clear();
+          
+          // Find and add the selected custom stimulus items
+          for (final customStimulus in stimuli) {
+            for (final item in customStimulus.items) {
+              if (existingDrill.customStimuliIds.contains(item.id)) {
+                _selectedCustomStimulusItems.add(item);
+                print('✅ Added selected item: ${item.name} (${item.id})');
+              }
+            }
+          }
+          
+          print('✅ Loaded ${_selectedCustomStimulusItems.length} selected custom stimulus items');
+          
+          // Trigger UI update
+          setState(() {});
+        }
       } else {
         print(
             '⚠️ CustomStimulusService not registered - skipping custom stimuli loading');
@@ -268,6 +298,9 @@ class _DrillBuilderScreenState extends State<DrillBuilderScreen>
       shapes: _selectedShapes,
       numberRange: _getNumberRangeFromSelectedNumbers(),
       presentationMode: _presentationMode,
+      drillMode: _drillMode,
+      stimulusLengthMs: _stimulusLengthMs,
+      delayBetweenStimuliMs: _delayBetweenStimuliMs,
       favorite: initial?.favorite ?? false,
       isPreset: initial?.isPreset ?? false,
       createdBy: initial?.createdBy,
@@ -301,8 +334,8 @@ class _DrillBuilderScreenState extends State<DrillBuilderScreen>
                 physics: const NeverScrollableScrollPhysics(),
                 children: [
                   _buildBasicInfoStep(),
-                  _buildConfigurationStep(),
                   _buildStimulusStep(),
+                  _buildConfigurationStep(),
                   _buildReviewStep(),
                 ],
               ),
@@ -413,9 +446,9 @@ class _DrillBuilderScreenState extends State<DrillBuilderScreen>
       case 0:
         return 'Basic Information';
       case 1:
-        return 'Configuration';
+        return 'Select Stimulus';
       case 2:
-        return 'Stimulus & Zones';
+        return 'Drill Settings & Mode';
       case 3:
         return 'Review & Save';
       default:
@@ -428,9 +461,9 @@ class _DrillBuilderScreenState extends State<DrillBuilderScreen>
       case 0:
         return 'Name, category, and difficulty';
       case 1:
-        return 'Duration, repetitions, and timing';
-      case 2:
         return 'Stimulus types and reaction zones';
+      case 2:
+        return 'Mode, duration, repetitions, and timing';
       case 3:
         return 'Review your drill settings';
       default:
@@ -833,6 +866,102 @@ class _DrillBuilderScreenState extends State<DrillBuilderScreen>
     }
   }
 
+  Widget _buildDrillModeCard(DrillMode mode) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final isSelected = _drillMode == mode;
+
+    String getTitle() {
+      switch (mode) {
+        case DrillMode.touch:
+          return 'Touch';
+        case DrillMode.timed:
+          return 'Timed';
+      }
+    }
+
+    IconData getIcon() {
+      switch (mode) {
+        case DrillMode.touch:
+          return Icons.touch_app;
+        case DrillMode.timed:
+          return Icons.timer;
+      }
+    }
+
+    return GestureDetector(
+      onTap: () {
+        setState(() {
+          _drillMode = mode;
+        });
+        HapticFeedback.lightImpact();
+      },
+      child: Container(
+      
+        padding: const EdgeInsets.all(20),
+        decoration: BoxDecoration(
+          gradient: isSelected
+              ? LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [
+                    colorScheme.primaryContainer.withOpacity(0.4),
+                    colorScheme.primaryContainer.withOpacity(0.2),
+                  ],
+                )
+              : null,
+          color: isSelected ? null : colorScheme.surfaceContainerHighest,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(
+            color: isSelected
+                ? colorScheme.primary
+                : colorScheme.outline.withOpacity(0.2),
+            width: isSelected ? 2.5 : 1,
+          ),
+          boxShadow: isSelected
+              ? [
+                  BoxShadow(
+                    color: colorScheme.primary.withOpacity(0.15),
+                    blurRadius: 12,
+                    offset: const Offset(0, 4),
+                  ),
+                ]
+              : null,
+        ),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: isSelected
+                    ? colorScheme.primary.withOpacity(0.1)
+                    : colorScheme.surfaceContainerHigh,
+                shape: BoxShape.circle,
+              ),
+              child: Icon(
+                getIcon(),
+                color: isSelected
+                    ? colorScheme.primary
+                    : colorScheme.onSurface.withOpacity(0.7),
+                size: 26,
+              ),
+            ),
+            const SizedBox(height: 10),
+            Text(
+              getTitle(),
+              style: theme.textTheme.titleMedium?.copyWith(
+                fontWeight: FontWeight.w700,
+                color: isSelected ? colorScheme.primary : colorScheme.onSurface,
+                letterSpacing: 0.5,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   Widget _buildNavigationButtons() {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
@@ -940,9 +1069,72 @@ class _DrillBuilderScreenState extends State<DrillBuilderScreen>
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Duration Section
+          // Drill Mode Section
           Text(
-            'Drill Duration',
+            'Drill Mode',
+            style: theme.textTheme.titleMedium?.copyWith(
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'Choose how you want to interact with the drill',
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: colorScheme.onSurface.withOpacity(0.7),
+            ),
+          ),
+          const SizedBox(height: 16),
+          Row(
+            children: [
+              Expanded(
+                child: _buildDrillModeCard(DrillMode.touch),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: _buildDrillModeCard(DrillMode.timed),
+              ),
+            ],
+            ),
+            const SizedBox(height: 16),
+  
+            // Mode Meaning Section
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: colorScheme.primaryContainer.withOpacity(0.2),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(
+                  color: colorScheme.primary.withOpacity(0.3),
+                  width: 1,
+                ),
+              ),
+              child: Row(
+                children: [
+                  Icon(
+                    Icons.info_outline,
+                    color: colorScheme.primary,
+                    size: 20,
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      _drillMode == DrillMode.touch
+                          ? 'Touch Mode: Tap stimuli as they appear. Performance metrics will be tracked and analyzed.'
+                          : 'Timed Mode: Watch stimuli appear automatically. No interaction required, perfect for passive observation.',
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: colorScheme.onSurface.withOpacity(0.8),
+                        height: 1.4,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 24),
+  
+            // Timing Section - Different fields based on drill mode
+          Text(
+            _drillMode == DrillMode.timed ? 'Timing Settings' : 'Drill Duration',
             style: theme.textTheme.titleMedium?.copyWith(
               fontWeight: FontWeight.w600,
             ),
@@ -956,21 +1148,73 @@ class _DrillBuilderScreenState extends State<DrillBuilderScreen>
             ),
             child: Column(
               children: [
-                Row(
-                  children: [
-                    Expanded(
-                      child: _buildSliderField(
-                        'Duration (seconds)',
-                        _duration.toDouble(),
-                        60.0,
-                        300.0,
-                        (value) => setState(() => _duration = value.round()),
-                        '${_duration}s',
+                // Timed Mode: Show stimulus length and delay
+                if (_drillMode == DrillMode.timed) ...[
+                  Row(
+                    children: [
+                      Expanded(
+                        child: _buildSliderField(
+                          'Stimulus length (milliseconds)',
+                          _stimulusLengthMs.toDouble(),
+                          100.0,
+                          5000.0,
+                          (value) => setState(() => _stimulusLengthMs = value.round()),
+                          '${_stimulusLengthMs}ms',
+                        ),
                       ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 16),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: _buildSliderField(
+                          'Delay between stimuli (milliseconds)',
+                          _delayBetweenStimuliMs.toDouble(),
+                          100.0,
+                          3000.0,
+                          (value) => setState(() => _delayBetweenStimuliMs = value.round()),
+                          '${_delayBetweenStimuliMs}ms',
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+                ],
+                // Touch Mode: Show duration and delay
+                if (_drillMode == DrillMode.touch) ...[
+                  Row(
+                    children: [
+                      Expanded(
+                        child: _buildSliderField(
+                          'Duration per rep (seconds)',
+                          _duration.toDouble(),
+                          60.0,
+                          300.0,
+                          (value) => setState(() => _duration = value.round()),
+                          '${_duration}s',
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: _buildSliderField(
+                          'Delay between stimuli (milliseconds)',
+                          _delayBetweenStimuliMs.toDouble(),
+                          100.0,
+                          3000.0,
+                          (value) => setState(() => _delayBetweenStimuliMs = value.round()),
+                          '${_delayBetweenStimuliMs}ms',
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+                ],
+                // Both modes: Rest between reps
                 Row(
                   children: [
                     Expanded(
@@ -1552,12 +1796,22 @@ class _DrillBuilderScreenState extends State<DrillBuilderScreen>
             'Configuration',
             Icons.settings,
             [
-              _buildReviewItem('Duration per rep', '${_duration}s'),
+              _buildReviewItem('Drill Mode', _drillMode.name.toUpperCase()),
+              if (_drillMode == DrillMode.timed) ...[
+                _buildReviewItem('Stimulus length', '${_stimulusLengthMs}ms'),
+                _buildReviewItem('Delay between stimuli', '${_delayBetweenStimuliMs}ms'),
+              ],
+              if (_drillMode == DrillMode.touch) ...[
+                _buildReviewItem('Duration per rep', '${_duration}s'),
+                _buildReviewItem('Delay between stimuli', '${_delayBetweenStimuliMs}ms'),
+              ],
               _buildReviewItem('Rest between reps', '${_rest}s'),
-              _buildReviewItem('Number of reps', '$_reps'),
+              _buildReviewItem('Number of sets', '$_sets'),
+              _buildReviewItem('Reps per set', '$_reps'),
               _buildReviewItem('Stimuli per rep', '$_numberOfStimuli'),
-              _buildReviewItem('Total drill time',
-                  '${(_duration * _reps + _rest * (_reps - 1))}s'),
+              if (_drillMode == DrillMode.touch)
+                _buildReviewItem('Total drill time',
+                    '${(_duration * _reps + _rest * (_reps - 1))}s'),
             ],
           ),
           const SizedBox(height: 20),
@@ -2414,15 +2668,21 @@ class _DrillBuilderScreenState extends State<DrillBuilderScreen>
           setState(() {
             if (isSelected) {
               _selectedCustomStimulusItems.remove(item);
+              print('🔷 Spark 🔍 [DrillBuilder] Removed custom stimulus item: ${item.name} (${item.id})');
               // Remove custom stimulus type if no items are selected
               if (_selectedCustomStimulusItems.isEmpty) {
                 _stimuli.remove(StimulusType.custom);
+                print('🔷 Spark 🔍 [DrillBuilder] Removed StimulusType.custom - no items selected');
               }
             } else {
               _selectedCustomStimulusItems.add(item);
+              print('🔷 Spark 🔍 [DrillBuilder] Added custom stimulus item: ${item.name} (${item.id})');
               // Add custom stimulus type when first item is selected
               _stimuli.add(StimulusType.custom);
+              print('🔷 Spark 🔍 [DrillBuilder] Added StimulusType.custom to stimuli set');
             }
+            print('🔷 Spark 🔍 [DrillBuilder] Total selected custom items: ${_selectedCustomStimulusItems.length}');
+            print('🔷 Spark 🔍 [DrillBuilder] Current stimuli types: ${_stimuli.map((s) => s.name).join(', ')}');
           });
           HapticFeedback.lightImpact();
         },
@@ -2454,15 +2714,21 @@ class _DrillBuilderScreenState extends State<DrillBuilderScreen>
         setState(() {
           if (isSelected) {
             _selectedCustomStimulusItems.remove(item);
+            print('🔷 Spark 🔍 [DrillBuilder] Removed custom stimulus item: ${item.name} (${item.id})');
             // Remove custom stimulus type if no items are selected
             if (_selectedCustomStimulusItems.isEmpty) {
               _stimuli.remove(StimulusType.custom);
+              print('🔷 Spark 🔍 [DrillBuilder] Removed StimulusType.custom - no items selected');
             }
           } else {
             _selectedCustomStimulusItems.add(item);
+            print('🔷 Spark 🔍 [DrillBuilder] Added custom stimulus item: ${item.name} (${item.id})');
             // Add custom stimulus type when first item is selected
             _stimuli.add(StimulusType.custom);
+            print('🔷 Spark 🔍 [DrillBuilder] Added StimulusType.custom to stimuli set');
           }
+          print('🔷 Spark 🔍 [DrillBuilder] Total selected custom items: ${_selectedCustomStimulusItems.length}');
+          print('🔷 Spark 🔍 [DrillBuilder] Current stimuli types: ${_stimuli.map((s) => s.name).join(', ')}');
         });
         HapticFeedback.lightImpact();
       },

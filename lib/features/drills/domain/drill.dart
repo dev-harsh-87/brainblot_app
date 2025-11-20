@@ -6,6 +6,8 @@ enum StimulusType { color, shape, arrow, number, custom }
 
 enum PresentationMode { visual, audio }
 
+enum DrillMode { touch, timed }
+
 enum ReactionZone { center, top, bottom, left, right, quadrants }
 
 enum ArrowDirection { up, down, left, right, upLeft, upRight, downLeft, downRight }
@@ -34,6 +36,9 @@ class Drill {
   final List<ShapeType> shapes; // used for shape stimulus
   final NumberRange numberRange; // used for number stimulus
   final PresentationMode presentationMode; // visual or audio presentation
+  final DrillMode drillMode; // touch or timed mode
+  final int stimulusLengthMs; // length of on-screen stimuli in milliseconds (for Timed mode)
+  final int delayBetweenStimuliMs; // delay between each stimuli in milliseconds (for both modes)
   final bool favorite; // legacy field - now handled by user_favorites collection
   final bool isPreset; // legacy field - no longer used
   final String? createdBy; // user ID who created the drill
@@ -66,6 +71,9 @@ class Drill {
     this.shapes = const [ShapeType.circle, ShapeType.square, ShapeType.triangle],
     this.numberRange = NumberRange.oneToFive,
     this.presentationMode = PresentationMode.visual, // default to visual
+    this.drillMode = DrillMode.touch, // default to touch mode
+    this.stimulusLengthMs = 1000, // default 1 second for stimulus display in Timed mode
+    this.delayBetweenStimuliMs = 500, // default 500ms delay between stimuli
     this.favorite = false,
     this.isPreset = false,
     this.createdBy,
@@ -99,6 +107,9 @@ class Drill {
     List<ShapeType>? shapes,
     NumberRange? numberRange,
     PresentationMode? presentationMode,
+    DrillMode? drillMode,
+    int? stimulusLengthMs,
+    int? delayBetweenStimuliMs,
     bool? favorite,
     bool? isPreset,
     String? createdBy,
@@ -130,6 +141,9 @@ class Drill {
         shapes: shapes ?? this.shapes,
         numberRange: numberRange ?? this.numberRange,
         presentationMode: presentationMode ?? this.presentationMode,
+        drillMode: drillMode ?? this.drillMode,
+        stimulusLengthMs: stimulusLengthMs ?? this.stimulusLengthMs,
+        delayBetweenStimuliMs: delayBetweenStimuliMs ?? this.delayBetweenStimuliMs,
         favorite: favorite ?? this.favorite,
         isPreset: isPreset ?? this.isPreset,
         createdBy: createdBy ?? this.createdBy,
@@ -164,6 +178,9 @@ class Drill {
           'shapes': shapes.map((e) => e.name).toList(),
           'numberRange': numberRange.name,
           'presentationMode': presentationMode.name,
+          'drillMode': drillMode.name,
+          'stimulusLengthMs': stimulusLengthMs,
+          'delayBetweenStimuliMs': delayBetweenStimuliMs,
           'customStimuliIds': customStimuliIds,
         },
         'media': {
@@ -191,6 +208,9 @@ class Drill {
         'shapes': shapes.map((e) => e.name).toList(),
         'numberRange': numberRange.name,
         'presentationMode': presentationMode.name,
+        'stimulusLengthMs': stimulusLengthMs,
+        'delayBetweenStimuliMs': delayBetweenStimuliMs,
+        'drillMode': drillMode.name,
         'videoUrl': videoUrl,
         'stepImageUrl': stepImageUrl,
       };
@@ -260,6 +280,14 @@ class Drill {
              orElse: () => PresentationMode.visual,
            )
          : PresentationMode.visual,
+     drillMode: (config?['drillMode'] ?? map['drillMode']) != null
+          ? DrillMode.values.firstWhere(
+              (m) => m.name == (config?['drillMode'] ?? map['drillMode']),
+              orElse: () => DrillMode.touch,
+            )
+          : DrillMode.touch,
+     stimulusLengthMs: config?['stimulusLengthMs'] as int? ?? map['stimulusLengthMs'] as int? ?? 1000,
+     delayBetweenStimuliMs: config?['delayBetweenStimuliMs'] as int? ?? map['delayBetweenStimuliMs'] as int? ?? 500,
      customStimuliIds: List<String>.from((config?['customStimuliIds'] as List?) ?? []),
       
       // Media - try nested first, then flat

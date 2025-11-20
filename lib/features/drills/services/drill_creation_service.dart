@@ -18,17 +18,27 @@ class DrillCreationService {
   /// Create a new drill and trigger auto-refresh
   Future<String> createDrill(Drill drill) async {
     try {
+      // Debug logging
+      print('🔷 Spark 🔍 [DrillCreationService] Creating drill: ${drill.name}');
+      print('🔷 Spark 🔍 [DrillCreationService] Stimulus types: ${drill.stimulusTypes}');
+      print('🔷 Spark 🔍 [DrillCreationService] Custom stimulus IDs: ${drill.customStimuliIds}');
+      
       // Validate drill configuration
       _validateDrillConfiguration(drill);
       
       // Create the drill using upsert
       final createdDrill = await _drillRepository.upsert(drill);
       
+      // Debug logging after creation
+      print('🔷 Spark 🔍 [DrillCreationService] Created drill ID: ${createdDrill.id}');
+      print('🔷 Spark 🔍 [DrillCreationService] Created drill custom stimulus IDs: ${createdDrill.customStimuliIds}');
+      
       // Trigger auto-refresh for related data
       _autoRefreshService.onDrillChanged();
       
       return createdDrill.id;
     } catch (e) {
+      print('🔷 Spark ❌ [DrillCreationService] Error creating drill: $e');
       rethrow;
     }
   }
@@ -155,6 +165,15 @@ class DrillCreationService {
 
     if (drill.colors.length > 10) {
       throw ArgumentError('Cannot have more than 10 colors');
+    }
+
+    // Validate custom stimuli
+    if (drill.stimulusTypes.contains(StimulusType.custom) && drill.customStimuliIds.isEmpty) {
+      throw ArgumentError('Custom stimulus items must be specified when using custom stimulus');
+    }
+
+    if (drill.customStimuliIds.length > 20) {
+      throw ArgumentError('Cannot have more than 20 custom stimulus items');
     }
   }
 

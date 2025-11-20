@@ -7,6 +7,7 @@ import 'package:spark_app/features/auth/data/firebase_user_repository.dart';
 import 'package:spark_app/core/services/preferences_service.dart';
 import 'package:spark_app/core/auth/services/session_management_service.dart';
 import 'package:spark_app/core/auth/services/device_session_service.dart';
+import 'package:spark_app/core/auth/services/permission_initialization_service.dart';
 import 'package:spark_app/core/di/injection.dart';
 import 'package:spark_app/core/utils/app_logger.dart';
 import 'dart:async';
@@ -19,6 +20,7 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
   final FirebaseUserRepository? _userRepo;
   final SessionManagementService? _sessionService;
   final DeviceSessionService _deviceSessionService;
+  final PermissionInitializationService _permissionService;
   late final StreamSubscription<User?> _authSubscription;
   
   AuthBloc(
@@ -26,9 +28,11 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
     FirebaseUserRepository? userRepo,
     SessionManagementService? sessionService,
     DeviceSessionService? deviceSessionService,
+    PermissionInitializationService? permissionService,
   })  : _userRepo = userRepo,
         _sessionService = sessionService ?? getIt<SessionManagementService>(),
         _deviceSessionService = deviceSessionService ?? DeviceSessionService(),
+        _permissionService = permissionService ?? PermissionInitializationService(),
         super(_getInitialState()) {
     on<AuthLoginSubmitted>(_onLogin);
     on<AuthRegisterSubmitted>(_onRegister);
@@ -51,7 +55,7 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
     final currentUser = FirebaseAuth.instance.currentUser;
     if (currentUser != null) {
       // User is logged in, start with authenticated state immediately
-      // The session will be established asynchronously via SessionManagementService
+      // Permissions will be loaded asynchronously
       debugPrint('🔄 Initial state: User exists in Firebase Auth, starting as authenticated');
       return AuthState(status: AuthStatus.authenticated, user: currentUser);
     }
@@ -100,8 +104,17 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
         }
       }
       
-      // No conflicts found, complete authentication
-      emit(state.copyWith(status: AuthStatus.authenticated, user: cred.user));
+      // Initialize permissions immediately after successful authentication
+      AppLogger.info('Initializing user permissions', tag: 'Auth');
+      final permissions = await _permissionService.initializePermissions();
+      AppLogger.success('Permissions loaded: ${permissions.toString()}', tag: 'Auth');
+      
+      // No conflicts found, complete authentication with permissions
+      emit(state.copyWith(
+        status: AuthStatus.authenticated,
+        user: cred.user,
+        permissions: permissions,
+      ));
     } on FirebaseAuthException catch (e) {
       AppLogger.error('Login failed', error: e, tag: 'Auth');
       emit(state.copyWith(status: AuthStatus.failure, error: e.message ?? 'Authentication failed'));
@@ -116,8 +129,20 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
     try {
       final cred = await _repo.registerWithEmailPassword(email: event.email, password: event.password);
       
+      // Wait for profile creation to complete
+      await Future.delayed(const Duration(milliseconds: 500));
+      
+      // Initialize permissions for new user
+      AppLogger.info('Initializing permissions for new user', tag: 'Auth');
+      final permissions = await _permissionService.initializePermissions();
+      AppLogger.success('Permissions loaded: ${permissions.toString()}', tag: 'Auth');
+      
       // Profile creation is now handled by SessionManagementService
-      emit(state.copyWith(status: AuthStatus.authenticated, user: cred.user));
+      emit(state.copyWith(
+        status: AuthStatus.authenticated,
+        user: cred.user,
+        permissions: permissions,
+      ));
     } on FirebaseAuthException catch (e) {
       emit(state.copyWith(status: AuthStatus.failure, error: e.message ?? 'Registration failed'));
     } catch (e) {
@@ -134,6 +159,9 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
       // Then use main session service for complete logout
       await _sessionService!.signOut();
       
+      // Clear permission cache
+      _permissionService.clearCache();
+      
       // Wait for auth state to settle
       await Future.delayed(const Duration(milliseconds: 200));
       
@@ -148,7 +176,7 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
     }
   }
   
-  void _onUserChanged(AuthUserChanged event, Emitter<AuthState> emit) {
+  Future<void> _onUserChanged(AuthUserChanged event, Emitter<AuthState> emit) async {
     // CRITICAL: Don't override deviceConflict state
     // This prevents race condition where auth listener overrides conflict dialog
     if (state.status == AuthStatus.deviceConflict) {
@@ -157,8 +185,24 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
     }
     
     if (event.user != null) {
-      emit(state.copyWith(status: AuthStatus.authenticated, user: event.user));
+      // Load permissions when user changes
+      UserPermissions? permissions;
+      try {
+        AppLogger.info('User changed - initializing permissions', tag: 'Auth');
+        permissions = await _permissionService.initializePermissions();
+        AppLogger.success('Permissions loaded on user change: ${permissions.toString()}', tag: 'Auth');
+      } catch (e) {
+        AppLogger.error('Failed to load permissions on user change', error: e, tag: 'Auth');
+      }
+      
+      emit(state.copyWith(
+        status: AuthStatus.authenticated,
+        user: event.user,
+        permissions: permissions,
+      ));
     } else {
+      // Clear permissions cache on logout
+      _permissionService.clearCache();
       emit(const AuthState.initial());
     }
   }
@@ -167,9 +211,22 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
     final currentUser = FirebaseAuth.instance.currentUser;
     if (currentUser != null) {
       // User exists in Firebase Auth, mark as authenticated immediately
-      // Session establishment happens asynchronously via SessionManagementService
+      // Load permissions on auth check (important for app restart)
+      UserPermissions? permissions;
+      try {
+        AppLogger.info('Auth check - initializing permissions', tag: 'Auth');
+        permissions = await _permissionService.initializePermissions();
+        AppLogger.success('Permissions loaded on auth check: ${permissions.toString()}', tag: 'Auth');
+      } catch (e) {
+        AppLogger.error('Failed to load permissions on auth check', error: e, tag: 'Auth');
+      }
+      
       AppLogger.debug('Auth check: Found Firebase user, marking as authenticated', tag: 'Auth');
-      emit(state.copyWith(status: AuthStatus.authenticated, user: currentUser));
+      emit(state.copyWith(
+        status: AuthStatus.authenticated,
+        user: currentUser,
+        permissions: permissions,
+      ));
     } else {
       // No user found
       AppLogger.debug('Auth check: No Firebase user found', tag: 'Auth');
@@ -222,10 +279,24 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
       // Register current device session
       await _deviceSessionService.registerDeviceSession(state.user!.uid, forceLogoutOthers: true);
       
+      // Initialize permissions after device session is registered
+      UserPermissions? permissions;
+      try {
+        AppLogger.info('Initializing permissions after device conflict resolution', tag: 'Auth');
+        permissions = await _permissionService.initializePermissions();
+        AppLogger.success('Permissions loaded: ${permissions.toString()}', tag: 'Auth');
+      } catch (e) {
+        AppLogger.error('Failed to load permissions after device conflict', error: e, tag: 'Auth');
+      }
+      
       // Complete the authentication
       final currentUser = FirebaseAuth.instance.currentUser;
       if (currentUser != null) {
-        emit(state.copyWith(status: AuthStatus.authenticated, user: currentUser));
+        emit(state.copyWith(
+          status: AuthStatus.authenticated,
+          user: currentUser,
+          permissions: permissions,
+        ));
         AppLogger.success('Successfully continued with current device after logout', tag: 'Auth');
       } else {
         emit(state.copyWith(status: AuthStatus.failure, error: 'Authentication failed'));

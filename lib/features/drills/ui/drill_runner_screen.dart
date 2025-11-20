@@ -359,6 +359,8 @@ class _DrillRunnerScreenState extends State<DrillRunnerScreen>
   /// Preloads custom stimuli for the drill to avoid async calls during stimulus generation
   Future<void> _preloadCustomStimuli(Drill drill) async {
     AppLogger.debug('Preloading custom stimuli - drill.customStimuliIds: ${drill.customStimuliIds}', tag: 'DrillRunner');
+    AppLogger.debug('Drill details - name: "${drill.name}", stimulusTypes: ${drill.stimulusTypes}', tag: 'DrillRunner');
+    AppLogger.debug('Drill customStimuliIds length: ${drill.customStimuliIds.length}', tag: 'DrillRunner');
     
     if (drill.customStimuliIds.isEmpty) {
       AppLogger.debug('No custom stimuli IDs to preload', tag: 'DrillRunner');
@@ -1080,7 +1082,15 @@ class _DrillRunnerScreenState extends State<DrillRunnerScreen>
     _stimulusAnimationController.forward();
     
     setState(() {
-      _display = type == StimulusType.color ? '' : label;
+      // For custom stimuli, always set the display to the label
+      // For color stimuli, set empty string for visual mode, label for audio mode
+      if (type == StimulusType.custom) {
+        _display = label;
+      } else if (type == StimulusType.color) {
+        _display = widget.drill.presentationMode == PresentationMode.audio ? label : '';
+      } else {
+        _display = label;
+      }
       _displayColor = color;
     });
     
@@ -1490,32 +1500,48 @@ void _completeRep() {
             }
           });
         } else {
-          // Navigate to drill results screen with detailed set results
-          final detailedSetResults = _setResults.map((setResult) {
-            AppLogger.debug('Set ${setResult.setNumber}: ${setResult.repResults.length} reps', tag: 'DrillRunner');
-            return {
-              'setNumber': setResult.setNumber,
-              'reps': setResult.repResults.map((repResult) {
-                AppLogger.debug('Rep ${repResult.repNumber}: ${repResult.score} hits, ${repResult.events.length} stimuli', tag: 'DrillRunner');
-                return {
-                  'repNumber': repResult.repNumber,
-                  'hits': repResult.score,
-                  'totalStimuli': repResult.events.length,
-                  'accuracy': repResult.accuracy,
-                  'avgReactionTime': repResult.averageReactionTime,
-                };
-              }).toList(),
-            };
-          }).toList();
-          
-          AppLogger.debug('Total sets being passed: ${detailedSetResults.length}', tag: 'DrillRunner');
-          
-          // Navigate with proper guard
-          if (mounted && context.mounted) {
-            context.go('/drill-results', extra: {
-              'result': result,
-              'detailedSetResults': detailedSetResults,
-            });
+          // Check drill mode
+          if (widget.drill.drillMode == DrillMode.timed) {
+            // For Timed mode: skip results and go directly to drill library
+            if (mounted && context.mounted) {
+              context.go('/drills');
+              // Show completion message
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: const Text('Drill completed! 🎉'),
+                  backgroundColor: Colors.green,
+                  duration: const Duration(seconds: 2),
+                ),
+              );
+            }
+          } else {
+            // For Touch mode: Navigate to drill results screen with detailed set results
+            final detailedSetResults = _setResults.map((setResult) {
+              AppLogger.debug('Set ${setResult.setNumber}: ${setResult.repResults.length} reps', tag: 'DrillRunner');
+              return {
+                'setNumber': setResult.setNumber,
+                'reps': setResult.repResults.map((repResult) {
+                  AppLogger.debug('Rep ${repResult.repNumber}: ${repResult.score} hits, ${repResult.events.length} stimuli', tag: 'DrillRunner');
+                  return {
+                    'repNumber': repResult.repNumber,
+                    'hits': repResult.score,
+                    'totalStimuli': repResult.events.length,
+                    'accuracy': repResult.accuracy,
+                    'avgReactionTime': repResult.averageReactionTime,
+                  };
+                }).toList(),
+              };
+            }).toList();
+            
+            AppLogger.debug('Total sets being passed: ${detailedSetResults.length}', tag: 'DrillRunner');
+            
+            // Navigate with proper guard
+            if (mounted && context.mounted) {
+              context.go('/drill-results', extra: {
+                'result': result,
+                'detailedSetResults': detailedSetResults,
+              });
+            }
           }
         }
       } catch (e) {
@@ -1863,104 +1889,165 @@ void _completeRep() {
     if (_current?.type == StimulusType.custom) {
       // Handle custom stimulus display
       final drill = widget.drill;
+      AppLogger.debug('Building custom stimulus content - customStimuliIds: ${drill.customStimuliIds.length}, cache: ${_customStimuliCache.length}', tag: 'DrillRunner');
+      AppLogger.debug('Current stimulus label: "${_current?.label}", display: "$_display"', tag: 'DrillRunner');
+      
       if (drill.customStimuliIds.isNotEmpty && _customStimuliCache.isNotEmpty) {
-        // Find all selected custom stimulus items from all cached stimuli
+        // Find the current stimulus item based on the current stimulus label
+        CustomStimulusItem? currentItem;
+        CustomStimulus? parentStimulus;
+        
+        // Search through all cached stimuli to find the item that matches current display
         for (final customStimulus in _customStimuliCache.values) {
+          AppLogger.debug('Checking stimulus: ${customStimulus.name} (${customStimulus.type}) with ${customStimulus.items.length} items', tag: 'DrillRunner');
           for (final item in customStimulus.items) {
             if (drill.customStimuliIds.contains(item.id)) {
-              bool isCurrentItem = false;
+              // Check if this item matches the current display
+              bool isMatch = false;
               
               switch (customStimulus.type) {
                 case CustomStimulusType.text:
-                  isCurrentItem = (item.textValue ?? item.name) == _display;
+                  isMatch = (item.textValue ?? item.name) == _current?.label;
+                  AppLogger.debug('Text match check: "${item.textValue ?? item.name}" == "${_current?.label}" = $isMatch', tag: 'DrillRunner');
                   break;
                 case CustomStimulusType.image:
-                  isCurrentItem = item.name == _display;
+                  isMatch = item.name == _current?.label;
+                  AppLogger.debug('Image match check: "${item.name}" == "${_current?.label}" = $isMatch', tag: 'DrillRunner');
                   break;
                 case CustomStimulusType.shape:
-                  isCurrentItem = (item.shapeType ?? item.name) == _display;
+                  isMatch = (item.shapeType ?? item.name) == _current?.label;
+                  AppLogger.debug('Shape match check: "${item.shapeType ?? item.name}" == "${_current?.label}" = $isMatch', tag: 'DrillRunner');
                   break;
                 case CustomStimulusType.color:
-                  isCurrentItem = item.name == _display;
+                  isMatch = item.name == _current?.label ||
+                           (item.color != null && item.color == _displayColor);
+                  AppLogger.debug('Color match check: "${item.name}" == "${_current?.label}" OR color match = $isMatch', tag: 'DrillRunner');
                   break;
               }
               
-              if (isCurrentItem) {
-                // Display the custom stimulus item
-                switch (customStimulus.type) {
-                  case CustomStimulusType.image:
-                    if (item.imageBase64 != null) {
-                      try {
-                        // Handle both data URL format and plain base64
-                        String base64String = item.imageBase64!;
-                        if (base64String.startsWith('data:')) {
-                          // Extract base64 part from data URL (e.g., "data:image/png;base64,...")
-                          final commaIndex = base64String.indexOf(',');
-                          if (commaIndex != -1) {
-                            base64String = base64String.substring(commaIndex + 1);
-                          }
-                        }
-                        
-                        final bytes = base64Decode(base64String);
-                        return ClipRRect(
-                          borderRadius: BorderRadius.circular(8),
-                          child: Image.memory(
-                            bytes,
-                            width: fontSize * 2,
-                            height: fontSize * 2,
-                            fit: BoxFit.cover,
-                            errorBuilder: (context, error, stackTrace) {
-                              AppLogger.error('Failed to display custom image', error: error, tag: 'DrillRunner');
-                              return Container(
-                                width: fontSize * 2,
-                                height: fontSize * 2,
-                                decoration: BoxDecoration(
-                                  color: Colors.grey[300],
-                                  borderRadius: BorderRadius.circular(8),
-                                ),
-                                child: Icon(
-                                  Icons.broken_image,
-                                  size: fontSize,
-                                  color: Colors.grey[600],
-                                ),
-                              );
-                            },
-                          ),
-                        );
-                      } catch (e) {
-                        AppLogger.error('Failed to decode custom image', error: e, tag: 'DrillRunner');
-                        // Return error placeholder instead of breaking
-                        return Container(
-                          width: fontSize * 2,
-                          height: fontSize * 2,
-                          decoration: BoxDecoration(
-                            color: Colors.red[100],
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          child: Icon(
-                            Icons.error,
-                            size: fontSize,
-                            color: Colors.red,
-                          ),
-                        );
-                      }
-                    }
-                    break;
-                  case CustomStimulusType.text:
-                  case CustomStimulusType.shape:
-                  case CustomStimulusType.color:
-                    // Fall through to default text display
-                    break;
-                }
+              if (isMatch) {
+                currentItem = item;
+                parentStimulus = customStimulus;
+                AppLogger.success('Found matching custom stimulus item: ${item.name} (${customStimulus.type})', tag: 'DrillRunner');
                 break;
               }
             }
           }
+          if (currentItem != null) break;
         }
+        
+        // Display the found custom stimulus item
+        if (currentItem != null && parentStimulus != null) {
+          switch (parentStimulus.type) {
+            case CustomStimulusType.image:
+              if (currentItem.imageBase64 != null) {
+                try {
+                  // Handle both data URL format and plain base64
+                  String base64String = currentItem.imageBase64!;
+                  if (base64String.startsWith('data:')) {
+                    // Extract base64 part from data URL (e.g., "data:image/png;base64,...")
+                    final commaIndex = base64String.indexOf(',');
+                    if (commaIndex != -1) {
+                      base64String = base64String.substring(commaIndex + 1);
+                    }
+                  }
+                  
+                  final bytes = base64Decode(base64String);
+                  return ClipRRect(
+                    borderRadius: BorderRadius.circular(8),
+                    child: Image.memory(
+                      bytes,
+                      width: fontSize * 2,
+                      height: fontSize * 2,
+                      fit: BoxFit.cover,
+                      errorBuilder: (context, error, stackTrace) {
+                        AppLogger.error('Failed to display custom image', error: error, tag: 'DrillRunner');
+                        return Container(
+                          width: fontSize * 2,
+                          height: fontSize * 2,
+                          decoration: BoxDecoration(
+                            color: Colors.grey[300],
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Icon(
+                            Icons.broken_image,
+                            size: fontSize,
+                            color: Colors.grey[600],
+                          ),
+                        );
+                      },
+                    ),
+                  );
+                } catch (e) {
+                  AppLogger.error('Failed to decode custom image', error: e, tag: 'DrillRunner');
+                  // Return error placeholder instead of breaking
+                  return Container(
+                    width: fontSize * 2,
+                    height: fontSize * 2,
+                    decoration: BoxDecoration(
+                      color: Colors.red[100],
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Icon(
+                      Icons.error,
+                      size: fontSize,
+                      color: Colors.red,
+                    ),
+                  );
+                }
+              }
+              break;
+            case CustomStimulusType.color:
+              // For color stimuli, the background color is already set via _displayColor
+              // Just return empty container or color name for audio mode
+              if (widget.drill.presentationMode == PresentationMode.audio) {
+                return Text(
+                  currentItem.name,
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: fontSize,
+                    fontWeight: FontWeight.bold,
+                    shadows: [
+                      Shadow(
+                        color: Colors.black.withOpacity(0.7),
+                        blurRadius: 15,
+                      ),
+                    ],
+                  ),
+                );
+              } else {
+                // For visual mode, don't show text for colors - the background color is the stimulus
+                return const SizedBox.shrink();
+              }
+            case CustomStimulusType.text:
+            case CustomStimulusType.shape:
+              // Display as text
+              final displayText = parentStimulus.type == CustomStimulusType.text
+                  ? (currentItem.textValue ?? currentItem.name)
+                  : (currentItem.shapeType ?? currentItem.name);
+              return Text(
+                displayText,
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: fontSize,
+                  fontWeight: FontWeight.bold,
+                  shadows: [
+                    Shadow(
+                      color: Colors.black.withOpacity(0.7),
+                      blurRadius: 15,
+                    ),
+                  ],
+                ),
+              );
+          }
+        }
+      } else {
+        AppLogger.warning('No custom stimuli IDs or cache is empty', tag: 'DrillRunner');
       }
     }
     
     // Default text display for all other cases
+    AppLogger.debug('Falling back to default text display: "$_display"', tag: 'DrillRunner');
     return Text(
       _display,
       style: TextStyle(

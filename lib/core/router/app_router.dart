@@ -10,6 +10,7 @@ import 'package:spark_app/core/auth/services/permission_service.dart';
 import 'package:spark_app/core/di/injection.dart';
 import 'package:spark_app/core/router/go_router_refresh_stream.dart';
 import 'package:spark_app/core/storage/app_storage.dart';
+import 'package:spark_app/core/widgets/main_navigation.dart';
 import 'package:spark_app/features/admin/enhanced_admin_dashboard_screen.dart';
 import 'package:spark_app/features/auth/bloc/auth_bloc.dart';
 import 'package:spark_app/features/auth/forgot_password_screen.dart';
@@ -24,7 +25,7 @@ import 'package:spark_app/features/drills/ui/drill_detail_screen.dart';
 import 'package:spark_app/features/drills/ui/drill_results_screen.dart';
 import 'package:spark_app/features/drills/ui/drill_runner_screen.dart';
 import 'package:spark_app/features/home/bloc/home_bloc.dart';
-import 'package:spark_app/features/home/ui/modern_home_screen.dart';
+import 'package:spark_app/features/home/ui/home_screen.dart';
 import 'package:spark_app/features/multiplayer/ui/host_session_screen.dart';
 import 'package:spark_app/features/multiplayer/ui/join_session_screen.dart';
 import 'package:spark_app/features/multiplayer/ui/multiplayer_selection_screen.dart';
@@ -125,27 +126,127 @@ class AppRouter {
   /// Builds all application routes
   List<RouteBase> _buildRoutes() {
     return [
-      // Authentication Routes
+      // Authentication Routes (outside shell)
       ..._buildAuthRoutes(),
       
-      // Main Application Routes
-      _buildHomeRoute(),
+      // Main Application Shell with Bottom Navigation
+      ShellRoute(
+        builder: (context, state, child) {
+          return MainNavigation(
+            currentPath: state.uri.path,
+            child: child,
+          );
+        },
+        routes: [
+          // Main tabs with bottom navigation
+          GoRoute(
+            path: '/home',
+            name: 'home',
+            builder: (context, state) => AuthGuard(
+              child: MultiBlocProvider(
+                providers: [
+                  BlocProvider(
+                    create: (_) => HomeBloc(getIt(), getIt())..add(const HomeStarted()),
+                  ),
+                  BlocProvider.value(value: getIt<DrillLibraryBloc>()),
+                  BlocProvider.value(value: getIt<ProgramsBloc>()),
+                ],
+                child: const HomeScreen(),
+              ),
+            ),
+          ),
+          GoRoute(
+            path: '/drills',
+            name: 'drills',
+            builder: (context, state) {
+              final categoryId = state.uri.queryParameters['category'];
+              return BlocProvider.value(
+                value: getIt<DrillLibraryBloc>(),
+                child: DrillLibraryScreen(initialCategory: categoryId),
+              );
+            },
+          ),
+          GoRoute(
+            path: '/programs',
+            name: 'programs',
+            builder: (context, state) => BlocProvider.value(
+              value: getIt<ProgramsBloc>(),
+              child: const ProgramsScreen(),
+            ),
+          ),
+          GoRoute(
+            path: '/subscription',
+            name: 'subscription',
+            builder: (context, state) => const SubscriptionScreen(),
+          ),
+          GoRoute(
+            path: '/admin',
+            name: 'admin',
+            builder: (context, state) => AdminGuard(
+              permissionService: getIt<PermissionService>(),
+              requiredRole: UserRole.admin,
+              child: EnhancedAdminDashboardScreen(
+                permissionService: getIt<PermissionService>(),
+              ),
+            ),
+          ),
+        ],
+      ),
       
-      // Drill Routes
+      // Routes outside the shell (full screen)
+      GoRoute(
+        path: '/',
+        redirect: (context, state) => '/home',
+      ),
+      
+      // Drill Routes (full screen)
       ..._buildDrillRoutes(),
       
-      // Program Routes
+      // Program Routes (full screen)
       ..._buildProgramRoutes(),
       
-      // Multiplayer Routes
+      // Multiplayer Routes (full screen)
       _buildMultiplayerRoute(),
       
-      // Admin Routes
-      _buildAdminRoute(),
+      // Profile and Settings (full screen)
+      GoRoute(
+        path: '/profile',
+        name: 'profile',
+        builder: (context, state) => MultiBlocProvider(
+          providers: [
+            BlocProvider.value(
+              value: getIt<SettingsBloc>()..add(const SettingsStarted()),
+            ),
+            BlocProvider(
+              create: (_) => StatsBloc(getIt())..add(const StatsStarted()),
+            ),
+          ],
+          child: const ProfileScreen(),
+        ),
+      ),
+      GoRoute(
+        path: '/settings',
+        name: 'settings',
+        builder: (context, state) => BlocProvider.value(
+          value: getIt<SettingsBloc>()..add(const SettingsStarted()),
+          child: const SettingsScreen(),
+        ),
+      ),
+      GoRoute(
+        path: '/stats',
+        name: 'stats',
+        builder: (context, state) => BlocProvider(
+          create: (_) => StatsBloc(getIt())..add(const StatsStarted()),
+          child: const StatsScreen(),
+        ),
+      ),
       
-      
-      // Subscription Routes
-      ..._buildSubscriptionRoutes(),
+      // Other Subscription Routes
+      GoRoute(
+        path: '/user-requests',
+        name: 'user-requests',
+        builder: (context, state) => const UserRequestsScreen(),
+      ),
     ];
   }
 
@@ -168,80 +269,6 @@ class AppRouter {
         builder: (context, state) => const ForgotPasswordScreen(),
       ),
     ];
-  }
-
-  /// Main home route with nested routes
-  GoRoute _buildHomeRoute() {
-    return GoRoute(
-      path: '/',
-      name: 'home',
-      builder: (context, state) => AuthGuard(
-        child: MultiBlocProvider(
-          providers: [
-            BlocProvider(
-              create: (_) => HomeBloc(getIt(), getIt())..add(const HomeStarted()),
-            ),
-            BlocProvider.value(value: getIt<DrillLibraryBloc>()),
-            BlocProvider.value(value: getIt<ProgramsBloc>()),
-          ],
-          child: const ModernHomeScreen(),
-        ),
-      ),
-      routes: [
-        GoRoute(
-          path: 'training',
-          name: 'training',
-          builder: (context, state) => const TrainingScreen(),
-        ),
-        GoRoute(
-          path: 'drills',
-          name: 'drills',
-          builder: (context, state) => BlocProvider.value(
-            value: getIt<DrillLibraryBloc>(),
-            child: const DrillLibraryScreen(),
-          ),
-        ),
-        GoRoute(
-          path: 'programs',
-          name: 'programs',
-          builder: (context, state) => BlocProvider.value(
-            value: getIt<ProgramsBloc>(),
-            child: const ProgramsScreen(),
-          ),
-        ),
-        GoRoute(
-          path: 'stats',
-          name: 'stats',
-          builder: (context, state) => BlocProvider(
-            create: (_) => StatsBloc(getIt())..add(const StatsStarted()),
-            child: const StatsScreen(),
-          ),
-        ),
-        GoRoute(
-          path: 'settings',
-          name: 'settings',
-          builder: (context, state) => BlocProvider.value(
-            value: getIt<SettingsBloc>()..add(const SettingsStarted()),
-            child: const SettingsScreen(),
-          ),
-        ),
-        GoRoute(
-          path: 'profile',
-          name: 'profile',
-          builder: (context, state) => MultiBlocProvider(
-            providers: [
-              BlocProvider.value(
-                value: getIt<SettingsBloc>()..add(const SettingsStarted()),
-              ),
-              BlocProvider(
-                create: (_) => StatsBloc(getIt())..add(const StatsStarted()),
-              ),
-            ],
-            child: const ProfileScreen(),
-          ),
-        ),
-      ],
-    );
   }
 
   /// Drill-related routes
@@ -392,40 +419,6 @@ class AppRouter {
         ),
       ],
     );
-  }
-
-  /// Admin route (protected by AdminGuard)
-  GoRoute _buildAdminRoute() {
-    return GoRoute(
-      path: '/admin',
-      name: 'admin',
-      builder: (context, state) => AdminGuard(
-        permissionService: getIt<PermissionService>(),
-        requiredRole: UserRole.admin,
-        child: EnhancedAdminDashboardScreen(
-          permissionService: getIt<PermissionService>(),
-        ),
-      ),
-    );
-  }
-
-  /// Debug route (only available in debug mode)
-
-
-  /// Subscription routes
-  List<GoRoute> _buildSubscriptionRoutes() {
-    return [
-      GoRoute(
-        path: '/subscription',
-        name: 'subscription',
-        builder: (context, state) => const SubscriptionScreen(),
-      ),
-      GoRoute(
-        path: '/user-requests',
-        name: 'user-requests',
-        builder: (context, state) => const UserRequestsScreen(),
-      ),
-    ];
   }
 
   /// Builds an error screen when navigation data is missing

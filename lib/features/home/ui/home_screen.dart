@@ -1,4 +1,3 @@
-import 'package:spark_app/features/home/ui/admin_section_enhanced.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
@@ -14,16 +13,19 @@ import 'package:spark_app/features/auth/bloc/auth_bloc.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:spark_app/features/subscription/data/subscription_plan_repository.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:spark_app/features/drills/data/drill_category_repository.dart';
+import 'package:spark_app/features/drills/domain/drill_category.dart';
+import 'package:spark_app/core/di/injection.dart';
 
 /// Modern home screen with professional UI design
-class ModernHomeScreen extends StatefulWidget {
-  const ModernHomeScreen({super.key});
+class HomeScreen extends StatefulWidget {
+  const HomeScreen({super.key});
 
   @override
-  State<ModernHomeScreen> createState() => _ModernHomeScreenState();
+  State<HomeScreen> createState() => _HomeScreenState();
 }
 
-class _ModernHomeScreenState extends State<ModernHomeScreen>
+class _HomeScreenState extends State<HomeScreen>
     with TickerProviderStateMixin {
   late AnimationController _fadeController;
   late AnimationController _slideController;
@@ -108,59 +110,6 @@ class _ModernHomeScreenState extends State<ModernHomeScreen>
 
     return Scaffold(
       backgroundColor: colorScheme.surface,
-      appBar: AppBar(
-        title: Text(
-          'Spark',
-          style: theme.textTheme.headlineMedium?.copyWith(
-            fontWeight: FontWeight.w800,
-            color: colorScheme.primary,
-            letterSpacing: -0.5,
-          ),
-        ),
-        backgroundColor: colorScheme.surface,
-        elevation: 0,
-        actions: [
-          // Profile Avatar
-          Padding(
-            padding: const EdgeInsets.only(right: 16),
-            child: GestureDetector(
-              onTap: () => context.push('/profile'),
-              child: Container(
-                width: 40,
-                height: 40,
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    colors: [
-                      colorScheme.primary,
-                      colorScheme.secondary,
-                    ],
-                  ),
-                  shape: BoxShape.circle,
-                  boxShadow: [
-                    BoxShadow(
-                      color: colorScheme.primary.withOpacity(0.3),
-                      blurRadius: 8,
-                      offset: const Offset(0, 2),
-                    ),
-                  ],
-                ),
-                child: Center(
-                  child: Text(
-                    user.displayName.isNotEmpty
-                        ? user.displayName[0].toUpperCase()
-                        : 'U',
-                    style: TextStyle(
-                      color: colorScheme.onPrimary,
-                      fontWeight: FontWeight.bold,
-                      fontSize: 16,
-                    ),
-                  ),
-                ),
-              ),
-            ),
-          ),
-        ],
-      ),
       body: SingleChildScrollView(
         physics: const BouncingScrollPhysics(),
         child: FadeTransition(
@@ -169,10 +118,6 @@ class _ModernHomeScreenState extends State<ModernHomeScreen>
             position: _slideAnimation,
             child: Column(
               children: [
-                                // Admin Section (if admin)
-                if (user.role.isAdmin()) _buildAdminSection(context),
-        
-
                 // User Subscription Requests (if not admin)
                 if (!user.role.isAdmin())
                   _buildUserRequestsSection(context, user),
@@ -180,11 +125,8 @@ class _ModernHomeScreenState extends State<ModernHomeScreen>
                 // Features Grid
                 _buildFeaturesSection(context, user),
 
-                // Subscription Section (if not admin)
-                if (!user.role.isAdmin())
-                  _buildSubscriptionSection(context, user),
-
-
+                // Drill Categories Section
+                _buildCategoriesSection(context, user),
               ],
             ),
           ),
@@ -539,23 +481,6 @@ class _ModernHomeScreenState extends State<ModernHomeScreen>
 
     final features = [
       _FeatureItem(
-        name: 'Drills',
-        description: 'Practice exercises',
-        icon: Icons.fitness_center,
-        hasAccess: isAdmin || userSubscription.moduleAccess.contains('drills'),
-        route: '/drills',
-        color: colorScheme.primary,
-      ),
-      _FeatureItem(
-        name: 'Programs',
-        description: 'Training plans',
-        icon: Icons.schedule,
-        hasAccess:
-            isAdmin || userSubscription.moduleAccess.contains('programs'),
-        route: '/programs',
-        color: Colors.purple,
-      ),
-      _FeatureItem(
         name: 'Multiplayer',
         description: 'Train together',
         icon: Icons.group,
@@ -732,228 +657,215 @@ class _ModernHomeScreenState extends State<ModernHomeScreen>
     );
   }
 
-  Widget _buildAdminSection(BuildContext context) {
+  Widget _buildCategoriesSection(BuildContext context, AppUser user) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final categoryRepository = getIt<DrillCategoryRepository>();
+
+    return Container(
+      margin: const EdgeInsets.all(24),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(
+                Icons.category,
+                color: colorScheme.primary,
+                size: 20,
+              ),
+              const SizedBox(width: 8),
+              Text(
+                'Drill Categories',
+                style: theme.textTheme.titleLarge?.copyWith(
+                  fontWeight: FontWeight.bold,
+                  color: colorScheme.onSurface,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          FutureBuilder<List<DrillCategory>>(
+            future: categoryRepository.getActiveCategories(),
+            builder: (context, snapshot) {
+              if (snapshot.connectionState == ConnectionState.waiting) {
+                return Container(
+                  padding: const EdgeInsets.all(24),
+                  decoration: BoxDecoration(
+                    color: colorScheme.surfaceContainerHighest,
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      const CircularProgressIndicator(),
+                      const SizedBox(width: 16),
+                      Text(
+                        'Loading categories...',
+                        style: theme.textTheme.bodyMedium,
+                      ),
+                    ],
+                  ),
+                );
+              }
+
+              if (snapshot.hasError || !snapshot.hasData || snapshot.data!.isEmpty) {
+                return Container(
+                  padding: const EdgeInsets.all(20),
+                  decoration: BoxDecoration(
+                    color: colorScheme.surfaceContainerHighest,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                      color: colorScheme.outline.withOpacity(0.2),
+                    ),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(
+                        Icons.info_outline,
+                        color: colorScheme.onSurface.withOpacity(0.6),
+                        size: 20,
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Text(
+                          'No drill categories available',
+                          style: theme.textTheme.bodyMedium?.copyWith(
+                            color: colorScheme.onSurface.withOpacity(0.7),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                );
+              }
+
+              final categories = snapshot.data!;
+              return ListView.separated(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                itemCount: categories.length,
+                separatorBuilder: (context, index) => const SizedBox(height: 12),
+                itemBuilder: (context, index) {
+                  final category = categories[index];
+                  return TweenAnimationBuilder<double>(
+                    duration: Duration(milliseconds: 800 + (index * 100)),
+                    tween: Tween(begin: 0.0, end: 1.0),
+                    curve: Curves.easeOutBack,
+                    builder: (context, value, child) {
+                      return Transform.scale(
+                        scale: value,
+                        child: _buildCategoryCard(context, category),
+                      );
+                    },
+                  );
+                },
+              );
+            },
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildCategoryCard(BuildContext context, DrillCategory category) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
 
-    return Container(
-            margin: const EdgeInsets.all(24),
-      child: InkWell(
-        onTap: () => context.push('/admin'),
-        borderRadius: BorderRadius.circular(20),
-        child: Container(
-          padding: const EdgeInsets.all(24),
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              colors: [
-                Colors.red.shade400,
-                Colors.orange.shade400,
-              ],
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
+    // Define colors for different categories
+    final categoryColors = [
+      Colors.blue,
+      Colors.purple,
+      Colors.orange,
+      Colors.teal,
+      Colors.pink,
+      Colors.indigo,
+    ];
+    
+    final color = categoryColors[category.order % categoryColors.length];
+
+    return InkWell(
+      onTap: () {
+        // Navigate to drills screen with category filter
+        context.push('/drills?category=${category.name}');
+      },
+      borderRadius: BorderRadius.circular(16),
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            colors: [
+              color.withOpacity(0.1),
+              color.withOpacity(0.05),
+            ],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(
+            color: color.withOpacity(0.3),
+            width: 2,
+          ),
+        ),
+        child: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [color, color.withOpacity(0.8)],
+                ),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Icon(
+                Icons.fitness_center,
+                color: Colors.white,
+                size: 20,
+              ),
             ),
-            borderRadius: BorderRadius.circular(20),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.red.shade400.withOpacity(0.3),
-                blurRadius: 12,
-                offset: const Offset(0, 4),
-              ),
-            ],
-          ),
-          child: Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.2),
-                  borderRadius: BorderRadius.circular(16),
-                ),
-                child: const Icon(
-                  Icons.admin_panel_settings,
-                  color: Colors.white,
-                  size: 32,
-                ),
-              ),
-              const SizedBox(width: 20),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Admin Dashboard',
-                      style: theme.textTheme.titleLarge?.copyWith(
-                        color: Colors.white,
-                        fontWeight: FontWeight.bold,
-                      ),
+            const SizedBox(width: 16),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Text(
+                    category.displayName,
+                    style: theme.textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.bold,
+                      color: colorScheme.onSurface,
                     ),
-                    const SizedBox(height: 4),
-                    Text(
-                      'Manage users and platform settings',
-                      style: theme.textTheme.bodyMedium?.copyWith(
-                        color: Colors.white.withOpacity(0.9),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  const SizedBox(height: 4),
+                  Row(
+                    children: [
+                      Icon(
+                        Icons.arrow_forward,
+                        size: 14,
+                        color: color,
                       ),
-                    ),
-                  ],
-                ),
+                      const SizedBox(width: 4),
+                      Text(
+                        'View drills',
+                        style: theme.textTheme.labelSmall?.copyWith(
+                          color: color,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
               ),
-              Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.2),
-                  shape: BoxShape.circle,
-                ),
-                child: const Icon(
-                  Icons.arrow_forward,
-                  color: Colors.white,
-                  size: 20,
-                ),
-              ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );
   }
 
-  Widget _buildSubscriptionSection(BuildContext context, AppUser user) {
-    final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
-    final repository = SubscriptionPlanRepository();
-
-    return Container(
-      margin: const EdgeInsets.all(24),
-      child: FutureBuilder<SubscriptionPlan?>(
-        future: repository.getPlan(user.subscription.plan),
-        builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            return Container(
-              padding: const EdgeInsets.all(24),
-              decoration: BoxDecoration(
-                color: colorScheme.surfaceContainerHighest,
-                borderRadius: BorderRadius.circular(20),
-              ),
-              child: Row(
-                children: [
-                  const CircularProgressIndicator(),
-                  const SizedBox(width: 16),
-                  Text(
-                    'Loading subscription...',
-                    style: theme.textTheme.bodyMedium,
-                  ),
-                ],
-              ),
-            );
-          }
-
-          // If plan not found in database, show basic info from user data
-          final currentPlan = snapshot.data;
-          final planId = user.subscription.plan;
-          final planName = currentPlan?.name ?? planId.toUpperCase();
-          final planColor = AppTheme.getSubscriptionColor(planId);
-          final isFreePlan = planId.toLowerCase() == 'free';
-
-          return InkWell(
-            onTap: () => context.push('/subscription'),
-            borderRadius: BorderRadius.circular(20),
-            child: Container(
-              padding: const EdgeInsets.all(24),
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  colors: [
-                    planColor.withOpacity(0.1),
-                    planColor.withOpacity(0.05),
-                  ],
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                ),
-                borderRadius: BorderRadius.circular(20),
-                border: Border.all(
-                  color: planColor.withOpacity(0.3),
-                  width: 2,
-                ),
-              ),
-              child: Row(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        colors: [planColor, planColor.withOpacity(0.8)],
-                      ),
-                      borderRadius: BorderRadius.circular(16),
-                    ),
-                    child: Icon(
-                      Icons.workspace_premium,
-                      color: Colors.white,
-                      size: 28,
-                    ),
-                  ),
-                  const SizedBox(width: 20),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          '$planName Plan',
-                          style: theme.textTheme.titleLarge?.copyWith(
-                            fontWeight: FontWeight.bold,
-                            color: colorScheme.onSurface,
-                          ),
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          currentPlan?.description ??
-                              '${user.subscription.moduleAccess.length} modules unlocked',
-                          style: theme.textTheme.bodyMedium?.copyWith(
-                            color: colorScheme.onSurface.withOpacity(0.6),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  if (isFreePlan)
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 16,
-                        vertical: 8,
-                      ),
-                      decoration: BoxDecoration(
-                        gradient: LinearGradient(
-                          colors: [colorScheme.primary, colorScheme.secondary],
-                        ),
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Text(
-                            'Upgrade',
-                            style: theme.textTheme.labelMedium?.copyWith(
-                              color: Colors.white,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                          const SizedBox(width: 4),
-                          const Icon(Icons.arrow_forward,
-                              color: Colors.white, size: 16,),
-                        ],
-                      ),
-                    )
-                  else
-                    Icon(
-                      Icons.arrow_forward_ios,
-                      size: 16,
-                      color: colorScheme.onSurface.withOpacity(0.5),
-                    ),
-                ],
-              ),
-            ),
-          );
-        },
-      ),
-    );
-  }
+  
 
   Widget _buildLoadingHome() {
     return const Scaffold(
@@ -982,18 +894,3 @@ class _FeatureItem {
   });
 }
 
-class _QuickAction {
-  final String title;
-  final String subtitle;
-  final IconData icon;
-  final String route;
-  final Color color;
-
-  _QuickAction({
-    required this.title,
-    required this.subtitle,
-    required this.icon,
-    required this.route,
-    required this.color,
-  });
-}

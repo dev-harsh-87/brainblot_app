@@ -14,17 +14,35 @@ class CustomStimulusService {
 
   // Get all custom stimuli
   Future<List<CustomStimulus>> getAllCustomStimuli() async {
-    return await _repository.getAllCustomStimuli();
+    try {
+      return await _repository.getAllCustomStimuli();
+    } catch (e) {
+      print('Service: Error getting all custom stimuli: $e');
+      rethrow;
+    }
   }
 
   // Get custom stimuli by type
   Future<List<CustomStimulus>> getCustomStimuliByType(CustomStimulusType type) async {
-    return await _repository.getCustomStimuliByType(type);
+    try {
+      return await _repository.getCustomStimuliByType(type);
+    } catch (e) {
+      print('Service: Error getting custom stimuli by type: $e');
+      rethrow;
+    }
   }
 
   // Get custom stimulus by ID
   Future<CustomStimulus?> getCustomStimulusById(String id) async {
-    return await _repository.getCustomStimulusById(id);
+    try {
+      if (id.trim().isEmpty) {
+        throw Exception('Stimulus ID cannot be empty');
+      }
+      return await _repository.getCustomStimulusById(id);
+    } catch (e) {
+      print('Service: Error getting custom stimulus by ID: $e');
+      rethrow;
+    }
   }
 
   // Create new custom stimulus
@@ -63,15 +81,62 @@ class CustomStimulusService {
 
   // Update custom stimulus
   Future<void> updateCustomStimulus(CustomStimulus stimulus) async {
-    // Validate items based on type
-    _validateStimulusItems(stimulus.type, stimulus.items);
+    try {
+      // Validate basic requirements
+      if (stimulus.id.trim().isEmpty) {
+        throw Exception('Stimulus ID cannot be empty');
+      }
+      
+      if (stimulus.name.trim().isEmpty) {
+        throw Exception('Stimulus name cannot be empty');
+      }
 
-    await _repository.updateCustomStimulus(stimulus);
+      if (stimulus.name.trim().length < 3) {
+        throw Exception('Stimulus name must be at least 3 characters long');
+      }
+
+      if (stimulus.items.isEmpty) {
+        throw Exception('Stimulus must have at least one item');
+      }
+
+      // Validate items based on type
+      _validateStimulusItems(stimulus.type, stimulus.items);
+
+      // Check if name is unique (excluding current stimulus)
+      final isUnique = await isNameUnique(stimulus.name, excludeId: stimulus.id);
+      if (!isUnique) {
+        throw Exception('A stimulus with this name already exists');
+      }
+
+      await _repository.updateCustomStimulus(stimulus);
+      print('Service: Successfully updated stimulus: ${stimulus.id}');
+    } catch (e) {
+      print('Service: Error updating custom stimulus: $e');
+      rethrow;
+    }
   }
 
   // Delete custom stimulus
   Future<void> deleteCustomStimulus(String id) async {
-    await _repository.deleteCustomStimulus(id);
+    try {
+      if (id.trim().isEmpty) {
+        throw Exception('Stimulus ID cannot be empty');
+      }
+
+      // Check if stimulus exists before attempting to delete
+      final stimulus = await _repository.getCustomStimulusById(id);
+      if (stimulus == null) {
+        // If stimulus doesn't exist, consider it already deleted
+        print('Service: Stimulus with ID $id not found, considering it already deleted');
+        return; // Don't throw error, just return successfully
+      }
+
+      await _repository.deleteCustomStimulus(id);
+      print('Service: Successfully deleted stimulus: $id');
+    } catch (e) {
+      print('Service: Error deleting custom stimulus: $e');
+      rethrow;
+    }
   }
 
   // Pick image from gallery
@@ -218,12 +283,23 @@ class CustomStimulusService {
 
   // Search custom stimuli
   Future<List<CustomStimulus>> searchCustomStimuli(String searchTerm) async {
-    return await _repository.searchCustomStimuli(searchTerm);
+    try {
+      return await _repository.searchCustomStimuli(searchTerm);
+    } catch (e) {
+      print('Service: Error searching custom stimuli: $e');
+      rethrow;
+    }
   }
 
   // Get custom stimuli stream for real-time updates
   Stream<List<CustomStimulus>> getCustomStimuliStream() {
-    return _repository.streamCustomStimuli();
+    try {
+      return _repository.streamCustomStimuli();
+    } catch (e) {
+      print('Service: Error setting up custom stimuli stream: $e');
+      // Return a stream that emits an empty list on error
+      return Stream.value(<CustomStimulus>[]);
+    }
   }
 
   // Validate stimulus name uniqueness

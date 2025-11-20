@@ -1,4 +1,5 @@
 import 'package:spark_app/core/di/injection.dart';
+import 'package:spark_app/core/widgets/main_navigation.dart';
 import 'package:spark_app/features/drills/bloc/drill_library_bloc.dart';
 import 'package:spark_app/features/drills/data/drill_repository.dart';
 import 'package:spark_app/features/drills/data/drill_category_repository.dart';
@@ -10,17 +11,18 @@ import 'package:spark_app/features/sharing/services/sharing_service.dart';
 import 'package:spark_app/core/services/auto_refresh_service.dart';
 import 'package:spark_app/core/widgets/confirmation_dialog.dart';
 import 'package:spark_app/core/ui/edge_to_edge.dart';
-import 'package:spark_app/core/auth/services/session_management_service.dart';
-import 'package:spark_app/core/auth/services/subscription_permission_service.dart';
+import 'package:spark_app/features/auth/bloc/auth_bloc.dart';
+import 'package:spark_app/core/auth/models/user_role.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 
 class DrillLibraryScreen extends StatefulWidget {
-  const DrillLibraryScreen({super.key});
+  final String? initialCategory;
+  
+  const DrillLibraryScreen({super.key, this.initialCategory});
 
   @override
   State<DrillLibraryScreen> createState() => _DrillLibraryScreenState();
@@ -40,9 +42,6 @@ class _DrillLibraryScreenState extends State<DrillLibraryScreen>
   final ScrollController _scrollController = ScrollController();
   bool _showFab = true;
   final Map<String, bool> _ownershipCache = {};
-  bool _isAdmin = false;
-  bool _isLoading = true;
-  bool _hasDrillAccess = false;
 
   @override
   void initState() {
@@ -50,8 +49,16 @@ class _DrillLibraryScreenState extends State<DrillLibraryScreen>
     _sharingService = getIt<SharingService>();
     _drillRepository = getIt<DrillRepository>();
     
-    // Initialize with default length, will be updated after role check
-    _tabController = TabController(length: 2, vsync: this);
+    // Get permissions from AuthBloc to determine tab count
+    final authState = context.read<AuthBloc>().state;
+    final permissions = authState.permissions;
+    final hasDrillAccess = permissions?.hasDrillAccess ?? false;
+    
+    // Initialize tab controller with correct length based on permissions
+    _tabController = TabController(
+      length: hasDrillAccess ? 3 : 2,
+      vsync: this,
+    );
     
     _fabAnimationController = AnimationController(
       duration: const Duration(milliseconds: 300),
@@ -72,11 +79,21 @@ class _DrillLibraryScreenState extends State<DrillLibraryScreen>
     });
     _tabController.addListener(_onTabChanged);
     
-    // Check user role and update tab configuration
-    _checkUserRoleAndUpdateTabs();
-    
     // Load categories
     _loadCategories();
+    
+    // Apply initial category filter if provided - do this immediately, not in postFrameCallback
+    if (widget.initialCategory != null && widget.initialCategory!.isNotEmpty) {
+      _selectedCategory = widget.initialCategory!;
+      // Apply the filter to the bloc immediately
+      context.read<DrillLibraryBloc>().add(
+        DrillLibraryFiltersChanged(
+          category: widget.initialCategory,
+          difficulty: _selectedDifficulty,
+          searchQuery: _searchController.text,
+        ),
+      );
+    }
   }
 
   Future<void> _loadCategories() async {
@@ -93,128 +110,6 @@ class _DrillLibraryScreenState extends State<DrillLibraryScreen>
     }
   }
   
-  Future<void> _checkUserRoleAndUpdateTabs() async {
-    try {
-      final sessionService = getIt<SessionManagementService>();
-      final subscriptionService = getIt<SubscriptionPermissionService>();
-      
-      // Wait a bit for session to be fully established
-      await Future.delayed(const Duration(milliseconds: 500));
-      
-      // Debug session state
-      final currentSession = sessionService.getCurrentSession();
-      print('🔍 Current session: ${currentSession?.email}, role: ${currentSession?.role.value}');
-      print('🔍 Session isLoggedIn: ${sessionService.isLoggedIn()}');
-      
-      // Check if user is admin first with retry mechanism
-      bool isAdmin = sessionService.isAdmin();
-      print('🔍 sessionService.isAdmin() returned: $isAdmin');
-      
-      // If not admin initially, retry a few times as session might still be loading
-      if (!isAdmin) {
-        for (int i = 0; i < 3; i++) {
-          await Future.delayed(const Duration(milliseconds: 500));
-          final retrySession = sessionService.getCurrentSession();
-          isAdmin = sessionService.isAdmin();
-          print('🔍 Retry $i: session=${retrySession?.email}, role=${retrySession?.role.value}, isAdmin=$isAdmin');
-          if (isAdmin) break;
-        }
-      }
-      
-      // If still not admin, try direct Firestore check as fallback
-      if (!isAdmin) {
-        try {
-          final user = FirebaseAuth.instance.currentUser;
-          if (user != null) {
-            final userDoc = await FirebaseFirestore.instance
-                .collection('users')
-                .doc(user.uid)
-                .get();
-            
-            if (userDoc.exists) {
-              final userData = userDoc.data()!;
-              final role = userData['role'] as String?;
-              isAdmin = role == 'admin';
-              print('🔍 Direct Firestore check: role=$role, isAdmin=$isAdmin');
-            }
-          }
-        } catch (e) {
-          print('🔍 Error in direct Firestore check: $e');
-        }
-      }
-      
-      // For non-admin users, wait for subscription sync to complete
-      bool hasDrillAccess = false;
-      if (!isAdmin) {
-        print('🔍 User is not admin, checking drill access...');
-        // Retry mechanism for subscription access check
-        int retryCount = 0;
-        const maxRetries = 3;
-        
-        while (retryCount < maxRetries) {
-          try {
-            hasDrillAccess = await subscriptionService.hasModuleAccess('admin_drills');
-            print('🔍 hasModuleAccess(admin_drills) returned: $hasDrillAccess');
-            break; // Success, exit retry loop
-          } catch (e) {
-            retryCount++;
-            print('🔍 Error checking admin_drills access (attempt $retryCount): $e');
-            if (retryCount >= maxRetries) {
-              print('Failed to check admin_drills access after $maxRetries attempts: $e');
-              hasDrillAccess = false;
-            } else {
-              // Wait before retry with exponential backoff
-              await Future.delayed(Duration(milliseconds: 300 * retryCount));
-            }
-          }
-        }
-      } else {
-        print('🔍 User is admin, skipping drill access check');
-      }
-      
-      print('🔍 Final results: isAdmin=$isAdmin, hasDrillAccess=$hasDrillAccess');
-      
-      setState(() {
-        _isAdmin = isAdmin;
-        _hasDrillAccess = hasDrillAccess;
-        _isLoading = false;
-      });
-      
-      // Update tab controller length based on role and access
-      _tabController.removeListener(_onTabChanged);
-      _tabController.dispose();
-      
-      // Tab configuration:
-      // Admin: 3 tabs (My Drills, Admin Drills, Favorites) - admins can see admin drills
-      // User with drill access: 3 tabs (My Drills, Admin Drills, Favorites)
-      // User without drill access: 2 tabs (My Drills, Favorites)
-      int tabLength;
-      if (isAdmin || hasDrillAccess) {
-        tabLength = 3; // My Drills, Admin Drills, Favorites
-        print('🔍 Setting tabLength to 3 for ${isAdmin ? 'admin' : 'user with drill access'} (isAdmin=$isAdmin, hasDrillAccess=$hasDrillAccess)');
-      } else {
-        tabLength = 2; // My Drills, Favorites (no Admin Drills)
-        print('🔍 Setting tabLength to 2 for user without drill access');
-      }
-      
-      _tabController = TabController(
-        length: tabLength,
-        vsync: this,
-      );
-      _tabController.addListener(_onTabChanged);
-      
-      if (mounted) {
-        setState(() {});
-      }
-    } catch (e) {
-      print('Error checking user role and access: $e');
-      setState(() {
-        _isAdmin = false;
-        _hasDrillAccess = false;
-        _isLoading = false;
-      });
-    }
-  }
 
   void _refreshDrills() {
     if (mounted) {
@@ -225,13 +120,18 @@ class _DrillLibraryScreenState extends State<DrillLibraryScreen>
   void _onTabChanged() {
     if (!_tabController.indexIsChanging) return;
 
-    // Tab mapping based on role and access:
-    // Admin or User with drill access: 0=My Drills, 1=Admin Drills, 2=Favorites
-    // User without drill access: 0=My Drills, 1=Favorites
+    // Get permissions from AuthBloc
+    final authState = context.read<AuthBloc>().state;
+    final permissions = authState.permissions;
+    final hasDrillAccess = permissions?.hasDrillAccess ?? false;
+
+    // Tab mapping based on permissions:
+    // With drill access: 0=My Drills, 1=Admin Drills, 2=Favorites
+    // Without drill access: 0=My Drills, 1=Favorites
     DrillLibraryView view;
     
-    if (_isAdmin || _hasDrillAccess) {
-      // Admin or User with drill access: My Drills, Admin Drills, Favorites
+    if (hasDrillAccess) {
+      // User with drill access: My Drills, Admin Drills, Favorites
       view = switch (_tabController.index) {
         0 => DrillLibraryView.custom, // My Drills
         1 => DrillLibraryView.all, // Admin Drills
@@ -270,10 +170,14 @@ class _DrillLibraryScreenState extends State<DrillLibraryScreen>
   }
 
   List<Widget> _buildTabs() {
-    print('🔍 _buildTabs called: _isAdmin=$_isAdmin, _hasDrillAccess=$_hasDrillAccess');
-    if (_isAdmin || _hasDrillAccess) {
-      // Admin or User with drill access: My Drills, Admin Drills, Favorites
-      print('🔍 Building 3 tabs for ${_isAdmin ? 'admin' : 'user with drill access'} (My Drills, Admin Drills, Favorites)');
+    final authState = context.read<AuthBloc>().state;
+    final permissions = authState.permissions;
+    final hasDrillAccess = permissions?.hasDrillAccess ?? false;
+    
+    print('🔍 _buildTabs called: hasDrillAccess=$hasDrillAccess');
+    if (hasDrillAccess) {
+      // User with drill access: My Drills, Admin Drills, Favorites
+      print('🔍 Building 3 tabs (My Drills, Admin Drills, Favorites)');
       return [
         const Tab(text: 'My Drills'),
         const Tab(text: 'Admin Drills'),
@@ -281,7 +185,7 @@ class _DrillLibraryScreenState extends State<DrillLibraryScreen>
       ];
     } else {
       // User without drill access: My Drills, Favorites (no Admin Drills)
-      print('🔍 Building 2 tabs for user without drill access (My Drills, Favorites)');
+      print('🔍 Building 2 tabs (My Drills, Favorites)');
       return [
         const Tab(text: 'My Drills'),
         const Tab(text: 'Favorites'),
@@ -290,53 +194,22 @@ class _DrillLibraryScreenState extends State<DrillLibraryScreen>
   }
 
   List<Widget> _buildTabsWithCounts(DrillLibraryState state) {
-    final userId = FirebaseAuth.instance.currentUser?.uid;
+    final authState = context.read<AuthBloc>().state;
+    final permissions = authState.permissions;
+    final isAdmin = permissions?.role == UserRole.admin;
     
-    // Calculate counts for each tab based on current state
-    final myDrillsCount = state.all.where((drill) =>
-      !drill.isPreset && drill.createdBy == userId
-    ).length;
-    
-    if (_isAdmin || _hasDrillAccess) {
-      // Admin or User with drill access: My Drills, Admin Drills, Favorites
-      return [
-        Tab(
-          child: _buildTabWithCount('My Drills', myDrillsCount),
-        ),
-        Tab(
-          child: FutureBuilder<List<Drill>>(
-            future: _drillRepository.fetchAdminDrills(),
-            builder: (context, snapshot) {
-              final adminDrillsCount = snapshot.data?.length ?? 0;
-              return _buildTabWithCount('Admin Drills', adminDrillsCount);
-            },
-          ),
-        ),
-        Tab(
-          child: FutureBuilder<List<Drill>>(
-            future: _drillRepository.fetchFavoriteDrills(),
-            builder: (context, snapshot) {
-              final favoritesCount = snapshot.data?.length ?? 0;
-              return _buildTabWithCount('Favorites', favoritesCount);
-            },
-          ),
-        ),
+    if (isAdmin) {
+      // Admin users: My Drills, Favorites (no Admin Drills tab)
+      return const [
+        Tab(text: 'My Drills'),
+        Tab(text: 'Favorites'),
       ];
     } else {
-      // User without drill access: My Drills, Favorites (no Admin Drills)
-      return [
-        Tab(
-          child: _buildTabWithCount('My Drills', myDrillsCount),
-        ),
-        Tab(
-          child: FutureBuilder<List<Drill>>(
-            future: _drillRepository.fetchFavoriteDrills(),
-            builder: (context, snapshot) {
-              final favoritesCount = snapshot.data?.length ?? 0;
-              return _buildTabWithCount('Favorites', favoritesCount);
-            },
-          ),
-        ),
+      // Non-admin users: My Drills, Admin Drills, Favorites
+      return const [
+        Tab(text: 'My Drills'),
+        Tab(text: 'Admin Drills'),
+        Tab(text: 'Favorites'),
       ];
     }
   }
@@ -378,17 +251,21 @@ class _DrillLibraryScreenState extends State<DrillLibraryScreen>
   }
 
   List<Widget> _buildTabViews(DrillLibraryState state) {
-    if (_isAdmin || _hasDrillAccess) {
-      // Admin or User with drill access: My Drills, Admin Drills, Favorites
+    final authState = context.read<AuthBloc>().state;
+    final permissions = authState.permissions;
+    final isAdmin = permissions?.role == UserRole.admin;
+    
+    if (isAdmin) {
+      // Admin users: My Drills, Favorites (no Admin Drills view)
       return [
         _buildMyDrillsViewWithRefresh(state), // My drills only
-        _buildAdminDrillsViewWithRefresh(state), // Admin drills only
         _buildFavoriteDrillsViewWithRefresh(state), // Favorites
       ];
     } else {
-      // User without drill access: My Drills, Favorites (no Admin Drills)
+      // Non-admin users: My Drills, Admin Drills, Favorites
       return [
         _buildMyDrillsViewWithRefresh(state), // My drills only
+        _buildAdminDrillsViewWithRefresh(state), // Admin drills only
         _buildFavoriteDrillsViewWithRefresh(state), // Favorites
       ];
     }
@@ -402,90 +279,103 @@ class _DrillLibraryScreenState extends State<DrillLibraryScreen>
     // Set system UI for primary colored app bar
     EdgeToEdge.setPrimarySystemUI(context);
 
-    return EdgeToEdgeScaffold(
-      backgroundColor: colorScheme.surface,
-      appBar: _buildAppBar(context),
-      extendBodyBehindAppBar: false,
-      body: Column(
-        children: [
-          // Search and Filter Section
-          _buildSearchAndFilterSection(context),
-          // Drill Content
-          Expanded(
-            child: BlocBuilder<DrillLibraryBloc, DrillLibraryState>(
-              builder: (context, state) {
-                print('🔍 Drill Library State: ${state.status}, Items: ${state.items.length}');
-                
-                if (state.status == DrillLibraryStatus.loading) {
-                  return _buildLoadingState();
-                }
-                
-                if (state.status == DrillLibraryStatus.error) {
-                  return _buildErrorState(state.errorMessage ?? 'Unknown error');
-                }
+    return BlocBuilder<DrillLibraryBloc, DrillLibraryState>(
+      builder: (context, state) {
+        // Register TabBar with MainNavigation using current state
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          TabBarProvider.of(context)?.registerTabBar((context) {
+            return PreferredSize(
+              preferredSize: const Size.fromHeight(48),
+              child: TabBar(
+                controller: _tabController,
+                labelColor: Theme.of(context).colorScheme.primary,
+                unselectedLabelColor: Theme.of(context).colorScheme.onSurface.withOpacity(0.6),
+                indicatorColor: Theme.of(context).colorScheme.primary,
+                indicatorWeight: 3,
+                tabs: _buildTabsWithCounts(state),
+              ),
+            );
+          });
+        });
 
-                final drills = state.items;
-                print('📊 Loaded ${drills.length} drills');
-                
-                if (drills.isEmpty) {
-                  return _buildEmptyState();
-                }
+        return EdgeToEdgeScaffold(
+          backgroundColor: colorScheme.surface,
+          body: Column(
+            children: [
+              // Search and Filter Section
+              _buildSearchAndFilterSection(context),
+              // Drill Content
+              Expanded(
+                child: Builder(
+                  builder: (context) {
+                    print('🔍 Drill Library State: ${state.status}, Items: ${state.items.length}');
+                    
+                    if (state.status == DrillLibraryStatus.loading) {
+                      return _buildLoadingState();
+                    }
+                    
+                    if (state.status == DrillLibraryStatus.error) {
+                      return _buildErrorState(state.errorMessage ?? 'Unknown error');
+                    }
 
-                return Stack(
-                  children: [
-                    TabBarView(
-                      controller: _tabController,
-                      children: _buildTabViews(state),
-                    ),
-                    // Show refreshing indicator
-                    if (state.isRefreshing)
-                      Positioned(
-                        top: 0,
-                        left: 0,
-                        right: 0,
-                        child: SizedBox(
-                          height: 4,
-                          child: LinearProgressIndicator(
-                            backgroundColor: Colors.transparent,
-                            valueColor: AlwaysStoppedAnimation<Color>(
-                              Theme.of(context).colorScheme.primary,
+                    final drills = state.items;
+                    print('📊 Loaded ${drills.length} drills');
+                    
+                    if (drills.isEmpty) {
+                      return _buildEmptyState();
+                    }
+
+                    return Stack(
+                      children: [
+                        TabBarView(
+                          controller: _tabController,
+                          children: _buildTabViews(state),
+                        ),
+                        // Show refreshing indicator
+                        if (state.isRefreshing)
+                          Positioned(
+                            top: 0,
+                            left: 0,
+                            right: 0,
+                            child: SizedBox(
+                              height: 4,
+                              child: LinearProgressIndicator(
+                                backgroundColor: Colors.transparent,
+                                valueColor: AlwaysStoppedAnimation<Color>(
+                                  Theme.of(context).colorScheme.primary,
+                                ),
+                              ),
                             ),
                           ),
-                        ),
-                      ),
-                  ],
-                );
+                      ],
+                    );
+                  },
+                ),
+              ),
+            ],
+          ),
+          floatingActionButton: ScaleTransition(
+            scale: _fabAnimation,
+            child: FloatingActionButton.extended(
+              onPressed: () async {
+                HapticFeedback.mediumImpact();
+                final result = await context.push('/drill-builder');
+                // Drill is already saved by DrillCreationService in drill_builder_screen
+                // Auto-refresh will be triggered automatically
+                if (result is Drill && mounted) {
+                  // No need to save again - just trigger refresh if needed
+                  context.read<DrillLibraryBloc>().add(const DrillLibraryRefreshRequested());
+                }
               },
+              icon: const Icon(Icons.add),
+              label: const Text('Create Drill'),
+              backgroundColor: colorScheme.primary,
+              foregroundColor: colorScheme.onPrimary,
+              elevation: 8,
             ),
           ),
-        ],
-      ),
-      floatingActionButton: ScaleTransition(
-        scale: _fabAnimation,
-        child: FloatingActionButton.extended(
-          onPressed: () async {
-            HapticFeedback.mediumImpact();
-            final result = await context.push('/drill-builder');
-            if (result is Drill && mounted) {
-              await getIt<DrillRepository>().upsert(result);
-              if (mounted) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text('Drill "${result.name}" created successfully!'),
-                    backgroundColor: colorScheme.primary,
-                    behavior: SnackBarBehavior.floating,
-                  ),
-                );
-              }
-            }
-          },
-          icon: const Icon(Icons.add),
-          label: const Text('Create Drill'),
-          backgroundColor: colorScheme.primary,
-          foregroundColor: colorScheme.onPrimary,
-          elevation: 8,
-        ),
-      ),
+        );
+      },
     );
   }
 
@@ -548,9 +438,52 @@ class _DrillLibraryScreenState extends State<DrillLibraryScreen>
       ),
       child: Padding(
         padding: const EdgeInsets.all(16),
-        child: Column(
+        child: Row(
           children: [
             // Search Bar
+            Expanded(
+              child: Container(
+                decoration: BoxDecoration(
+                  color: colorScheme.surface,
+                  borderRadius: BorderRadius.circular(16),
+                  boxShadow: [
+                    BoxShadow(
+                      color: colorScheme.shadow.withOpacity(0.08),
+                      blurRadius: 12,
+                      offset: const Offset(0, 3),
+                    ),
+                  ],
+                  border: Border.all(
+                    color: colorScheme.outline.withOpacity(0.08),
+                  ),
+                ),
+                child: TextField(
+                  controller: _searchController,
+                  decoration: InputDecoration(
+                    hintText: 'Search drills...',
+                    prefixIcon: Icon(Icons.search, color: colorScheme.primary),
+                    suffixIcon: _searchController.text.isNotEmpty
+                        ? IconButton(
+                            icon: Icon(Icons.clear, color: colorScheme.onSurface.withOpacity(0.6)),
+                            onPressed: () {
+                              _searchController.clear();
+                              context.read<DrillLibraryBloc>().add(const DrillLibraryQueryChanged(''));
+                            },
+                          )
+                        : null,
+                    border: InputBorder.none,
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+                  ),
+                  onChanged: (query) {
+                    setState(() {});
+                    print('🔍 Search query changed: "$query"');
+                    context.read<DrillLibraryBloc>().add(DrillLibraryQueryChanged(query));
+                  },
+                ),
+              ),
+            ),
+            const SizedBox(width: 12),
+            // Filter Button
             Container(
               decoration: BoxDecoration(
                 color: colorScheme.surface,
@@ -566,63 +499,8 @@ class _DrillLibraryScreenState extends State<DrillLibraryScreen>
                   color: colorScheme.outline.withOpacity(0.08),
                 ),
               ),
-              child: TextField(
-                controller: _searchController,
-                decoration: InputDecoration(
-                  hintText: 'Search drills...',
-                  prefixIcon: Icon(Icons.search, color: colorScheme.primary),
-                  suffixIcon: _searchController.text.isNotEmpty
-                      ? IconButton(
-                          icon: Icon(Icons.clear, color: colorScheme.onSurface.withOpacity(0.6)),
-                          onPressed: () {
-                            _searchController.clear();
-                            context.read<DrillLibraryBloc>().add(const DrillLibraryQueryChanged(''));
-                          },
-                        )
-                      : null,
-                  border: InputBorder.none,
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-                ),
-                onChanged: (query) {
-                  setState(() {});
-                  print('🔍 Search query changed: "$query"');
-                  context.read<DrillLibraryBloc>().add(DrillLibraryQueryChanged(query));
-                },
-              ),
+              child: _buildFilterButton(colorScheme),
             ),
-            const SizedBox(height: 16),
-            
-            // Filter Tabs
-            Container(
-              decoration: BoxDecoration(
-                color: colorScheme.surface,
-                borderRadius: BorderRadius.circular(12),
-                boxShadow: [
-                  BoxShadow(
-                    color: colorScheme.shadow.withOpacity(0.04),
-                    blurRadius: 8,
-                    offset: const Offset(0, 2),
-                  ),
-                ],
-              ),
-              child: BlocBuilder<DrillLibraryBloc, DrillLibraryState>(
-                builder: (context, state) {
-                  return TabBar(
-                    controller: _tabController,
-                    labelColor: colorScheme.primary,
-                    unselectedLabelColor: colorScheme.onSurface.withOpacity(0.6),
-                    indicatorColor: colorScheme.primary,
-                    indicatorWeight: 3,
-                    indicatorSize: TabBarIndicatorSize.tab,
-                    dividerColor: Colors.transparent,
-                    tabs: _buildTabsWithCounts(state),
-                  );
-                },
-              ),
-            ),
-            const SizedBox(height: 16),
-
-
           ],
         ),
       ),
@@ -1186,81 +1064,41 @@ Widget _buildCompactStatChip(IconData icon, String text, Color color) {
   }
 
   Widget _buildAdminDrillsView() {
-    // Admin users have inherent access to admin drills, skip module access check
-    if (_isAdmin) {
-      print('🔍 Admin user detected - bypassing module access check');
-      return BlocBuilder<DrillLibraryBloc, DrillLibraryState>(
-        builder: (context, state) {
-          // Filter admin drills from the BLoC state
-          final adminDrills = state.items.where((drill) => drill.createdByRole == 'admin').toList();
-          print('🔍 Admin drills from BLoC: ${adminDrills.length} drills (filtered)');
-          
-          if (state.status == DrillLibraryStatus.loading || state.status == DrillLibraryStatus.filtering) {
-            return const Center(child: CircularProgressIndicator());
-          }
-
-          if (state.status == DrillLibraryStatus.error) {
-            print('🔴 Error in BLoC state: ${state.errorMessage}');
-            return Center(
-              child: Text('Error loading admin drills: ${state.errorMessage}'),
-            );
-          }
-          
-          if (adminDrills.isEmpty) {
-            print('🔍 No admin drills found - showing empty state');
-            return _buildEmptyAdminDrillsState();
-          }
-
-          print('🔍 Showing ${adminDrills.length} admin drills');
-          return _buildDrillView(adminDrills);
-        },
-      );
+    final authState = context.read<AuthBloc>().state;
+    final permissions = authState.permissions;
+    final hasDrillAccess = permissions?.hasDrillAccess ?? false;
+    
+    // Check if user has drill access from pre-loaded permissions
+    if (!hasDrillAccess) {
+      print('🔴 User does not have admin_drills access - showing no access state');
+      return _buildNoAccessState();
     }
-
-    // For non-admin users, check module access
-    return FutureBuilder<bool>(
-      future: getIt<SubscriptionPermissionService>().hasModuleAccess('admin_drills'),
-      builder: (context, moduleAccessSnapshot) {
-        if (moduleAccessSnapshot.connectionState == ConnectionState.waiting) {
+    
+    print('🔍 User has drill access - showing admin drills');
+    return BlocBuilder<DrillLibraryBloc, DrillLibraryState>(
+      builder: (context, state) {
+        // Filter admin drills from the BLoC state
+        final adminDrills = state.items.where((drill) => drill.createdByRole == 'admin').toList();
+        print('🔍 Admin drills from BLoC: ${adminDrills.length} drills (filtered)');
+        
+        if (state.status == DrillLibraryStatus.loading || state.status == DrillLibraryStatus.filtering) {
           return const Center(child: CircularProgressIndicator());
         }
 
-        final hasAccess = moduleAccessSnapshot.data ?? false;
-        print('🔍 Admin drills module access check: $hasAccess');
+        if (state.status == DrillLibraryStatus.error) {
+          print('🔴 Error in BLoC state: ${state.errorMessage}');
+          return Center(
+            child: Text('Error loading admin drills: ${state.errorMessage}'),
+          );
+        }
         
-        if (!hasAccess) {
-          print('🔴 User does not have admin_drills module access - showing no access state');
-          return _buildNoAccessState();
+        if (adminDrills.isEmpty) {
+          print('🔍 No admin drills found - showing empty state');
+          return _buildEmptyAdminDrillsState();
         }
 
-        print('✅ User has admin_drills module access - proceeding to show drills');
-
-        return BlocBuilder<DrillLibraryBloc, DrillLibraryState>(
-          builder: (context, state) {
-            // Filter admin drills from the BLoC state
-            final adminDrills = state.items.where((drill) => drill.createdByRole == 'admin').toList();
-            print('🔍 Admin drills from BLoC: ${adminDrills.length} drills (filtered)');
-            
-            if (state.status == DrillLibraryStatus.loading || state.status == DrillLibraryStatus.filtering) {
-              return const Center(child: CircularProgressIndicator());
-            }
-
-            if (state.status == DrillLibraryStatus.error) {
-              print('🔴 Error in BLoC state: ${state.errorMessage}');
-              return Center(
-                child: Text('Error loading admin drills: ${state.errorMessage}'),
-              );
-            }
-            
-            if (adminDrills.isEmpty) {
-              print('🔍 No admin drills found - showing empty state');
-              return _buildEmptyAdminDrillsState();
-            }
-
-            print('🔍 Showing ${adminDrills.length} admin drills');
-            return _buildDrillView(adminDrills);
-          },
-        );
+        print('🔍 Showing ${adminDrills.length} admin drills');
+        return _buildDrillView(adminDrills);
       },
     );
   }

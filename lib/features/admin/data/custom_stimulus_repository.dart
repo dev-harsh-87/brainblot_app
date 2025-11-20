@@ -9,16 +9,26 @@ class CustomStimulusRepository {
   Future<List<CustomStimulus>> getAllCustomStimuli() async {
     try {
       // Use simpler query to avoid index requirement
+      // Force fresh data from server, not cache
       final querySnapshot = await _firestore
           .collection(_collection)
           .where('isActive', isEqualTo: true)
-          .get();
+          .get(const GetOptions(source: Source.server));
 
       final stimuli = querySnapshot.docs
-          .map((doc) => CustomStimulus.fromJson({
+          .map((doc) {
+            try {
+              return CustomStimulus.fromJson({
                 'id': doc.id,
                 ...doc.data(),
-              }))
+              });
+            } catch (e) {
+              print('Error parsing stimulus document ${doc.id}: $e');
+              return null;
+            }
+          })
+          .where((stimulus) => stimulus != null)
+          .cast<CustomStimulus>()
           .toList();
       
       // Sort in memory instead of using Firestore orderBy
@@ -27,7 +37,7 @@ class CustomStimulusRepository {
       return stimuli;
     } catch (e) {
       print('Error getting custom stimuli: $e');
-      return [];
+      throw Exception('Failed to fetch custom stimuli: $e');
     }
   }
 
@@ -38,13 +48,22 @@ class CustomStimulusRepository {
           .collection(_collection)
           .where('type', isEqualTo: type.name)
           .where('isActive', isEqualTo: true)
-          .get();
+          .get(const GetOptions(source: Source.server));
 
       final stimuli = querySnapshot.docs
-          .map((doc) => CustomStimulus.fromJson({
+          .map((doc) {
+            try {
+              return CustomStimulus.fromJson({
                 'id': doc.id,
                 ...doc.data(),
-              }))
+              });
+            } catch (e) {
+              print('Error parsing stimulus document ${doc.id}: $e');
+              return null;
+            }
+          })
+          .where((stimulus) => stimulus != null)
+          .cast<CustomStimulus>()
           .toList();
       
       // Sort in memory instead of using Firestore orderBy
@@ -53,25 +72,37 @@ class CustomStimulusRepository {
       return stimuli;
     } catch (e) {
       print('Error getting custom stimuli by type: $e');
-      return [];
+      throw Exception('Failed to fetch custom stimuli by type: $e');
     }
   }
 
   // Get custom stimulus by ID
   Future<CustomStimulus?> getCustomStimulusById(String id) async {
     try {
-      final doc = await _firestore.collection(_collection).doc(id).get();
+      if (id.isEmpty) {
+        throw Exception('Stimulus ID cannot be empty');
+      }
+
+      final doc = await _firestore.collection(_collection).doc(id).get(const GetOptions(source: Source.server));
       
-      if (doc.exists) {
-        return CustomStimulus.fromJson({
-          'id': doc.id,
-          ...doc.data()!,
-        });
+      if (doc.exists && doc.data() != null) {
+        try {
+          return CustomStimulus.fromJson({
+            'id': doc.id,
+            ...doc.data()!,
+          });
+        } catch (e) {
+          print('Error parsing stimulus document $id: $e');
+          throw Exception('Failed to parse stimulus data: $e');
+        }
       }
       return null;
     } catch (e) {
       print('Error getting custom stimulus by ID: $e');
-      return null;
+      if (e is Exception) {
+        rethrow;
+      }
+      throw Exception('Failed to fetch stimulus: $e');
     }
   }
 
@@ -93,13 +124,36 @@ class CustomStimulusRepository {
   // Update custom stimulus
   Future<void> updateCustomStimulus(CustomStimulus stimulus) async {
     try {
-      // Use set with merge to handle cases where document might not exist
-      await _firestore
-          .collection(_collection)
-          .doc(stimulus.id)
-          .set(stimulus.copyWith(updatedAt: DateTime.now()).toJson(), SetOptions(merge: true));
+      if (stimulus.id.isEmpty) {
+        throw Exception('Stimulus ID cannot be empty');
+      }
+
+      if (stimulus.name.trim().isEmpty) {
+        throw Exception('Stimulus name cannot be empty');
+      }
+
+      if (stimulus.items.isEmpty) {
+        throw Exception('Stimulus must have at least one item');
+      }
+
+      // First check if document exists
+      final docRef = _firestore.collection(_collection).doc(stimulus.id);
+      final docSnapshot = await docRef.get();
+      
+      if (!docSnapshot.exists) {
+        throw Exception('Stimulus with ID ${stimulus.id} does not exist');
+      }
+
+      // Update the document
+      final updatedStimulus = stimulus.copyWith(updatedAt: DateTime.now());
+      await docRef.set(updatedStimulus.toJson(), SetOptions(merge: true));
+      
+      print('Successfully updated custom stimulus: ${stimulus.id}');
     } catch (e) {
       print('Error updating custom stimulus: $e');
+      if (e is Exception) {
+        rethrow;
+      }
       throw Exception('Failed to update custom stimulus: $e');
     }
   }
@@ -186,39 +240,82 @@ class CustomStimulusRepository {
         .snapshots()
         .map((snapshot) {
           final stimuli = snapshot.docs
-              .map((doc) => CustomStimulus.fromJson({
+              .map((doc) {
+                try {
+                  return CustomStimulus.fromJson({
                     'id': doc.id,
                     ...doc.data(),
-                  }))
+                  });
+                } catch (e) {
+                  print('Error parsing stimulus document ${doc.id} in stream: $e');
+                  return null;
+                }
+              })
+              .where((stimulus) => stimulus != null)
+              .cast<CustomStimulus>()
               .toList();
           
           // Sort in memory instead of using Firestore orderBy to avoid index requirement
           stimuli.sort((a, b) => b.createdAt.compareTo(a.createdAt));
           
           return stimuli;
+        })
+        .handleError((error) {
+          print('Error in custom stimuli stream: $error');
+          // Return empty list on error to prevent stream from breaking
+          return <CustomStimulus>[];
         });
   }
 
   // Search custom stimuli by name
   Future<List<CustomStimulus>> searchCustomStimuli(String searchTerm) async {
     try {
+      if (searchTerm.trim().isEmpty) {
+        return await getAllCustomStimuli();
+      }
+
       final querySnapshot = await _firestore
           .collection(_collection)
           .where('isActive', isEqualTo: true)
-          .get();
+          .get(const GetOptions(source: Source.server));
 
-      return querySnapshot.docs
-          .map((doc) => CustomStimulus.fromJson({
+      final searchTermLower = searchTerm.toLowerCase().trim();
+      
+      final results = querySnapshot.docs
+          .map((doc) {
+            try {
+              return CustomStimulus.fromJson({
                 'id': doc.id,
                 ...doc.data(),
-              }))
-          .where((stimulus) => 
-              stimulus.name.toLowerCase().contains(searchTerm.toLowerCase()) ||
-              stimulus.description.toLowerCase().contains(searchTerm.toLowerCase()))
+              });
+            } catch (e) {
+              print('Error parsing stimulus document ${doc.id} in search: $e');
+              return null;
+            }
+          })
+          .where((stimulus) => stimulus != null)
+          .cast<CustomStimulus>()
+          .where((stimulus) =>
+              stimulus.name.toLowerCase().contains(searchTermLower) ||
+              stimulus.description.toLowerCase().contains(searchTermLower))
           .toList();
+
+      // Sort results by relevance (name matches first, then description matches)
+      results.sort((a, b) {
+        final aNameMatch = a.name.toLowerCase().contains(searchTermLower);
+        final bNameMatch = b.name.toLowerCase().contains(searchTermLower);
+        
+        if (aNameMatch && !bNameMatch) return -1;
+        if (!aNameMatch && bNameMatch) return 1;
+        
+        // If both match or both don't match, sort by creation date
+        return b.createdAt.compareTo(a.createdAt);
+      });
+
+      return results;
     } catch (e) {
       print('Error searching custom stimuli: $e');
-      return [];
+      throw Exception('Failed to search custom stimuli: $e');
     }
   }
 }

@@ -7,6 +7,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 
 import 'package:spark_app/core/di/injection.dart';
 import 'package:spark_app/core/utils/app_logger.dart';
+import 'package:spark_app/core/widgets/main_navigation.dart';
 import 'package:spark_app/features/drills/data/drill_category_repository.dart';
 import 'package:spark_app/features/drills/domain/drill_category.dart';
 import 'package:spark_app/features/programs/bloc/programs_bloc.dart';
@@ -97,13 +98,29 @@ class _ProgramsScreenState extends State<ProgramsScreen>
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
 
+    // Register TabBar with MainNavigation
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      TabBarProvider.of(context)?.registerTabBar((context) {
+        return TabBar(
+          controller: _tabController,
+          labelColor: Theme.of(context).colorScheme.primary,
+          unselectedLabelColor: Theme.of(context).colorScheme.onSurface.withOpacity(0.6),
+          indicatorColor: Theme.of(context).colorScheme.primary,
+          indicatorWeight: 3,
+          tabs: const [
+            Tab(text: 'Active'),
+            Tab(text: 'Browse'),
+            Tab(text: 'Completed'),
+          ],
+        );
+      });
+    });
+
     // Set system UI for primary colored app bar
     EdgeToEdge.setPrimarySystemUI(context);
 
     return EdgeToEdgeScaffold(
       backgroundColor: colorScheme.surface,
-      appBar: _buildAppBar(context),
-      extendBodyBehindAppBar: false,
       body: Column(
         children: [
           // Search and Filter Section
@@ -393,36 +410,7 @@ class _ProgramsScreenState extends State<ProgramsScreen>
                 },
               ),
             ),
-            const SizedBox(height: 16),
-
-            // Filter Tabs
-            Container(
-              decoration: BoxDecoration(
-                color: colorScheme.surface,
-                borderRadius: BorderRadius.circular(12),
-                boxShadow: [
-                  BoxShadow(
-                    color: colorScheme.shadow.withOpacity(0.04),
-                    blurRadius: 8,
-                    offset: const Offset(0, 2),
-                  ),
-                ],
-              ),
-              child: TabBar(
-                controller: _tabController,
-                labelColor: colorScheme.primary,
-                unselectedLabelColor: colorScheme.onSurface.withOpacity(0.6),
-                indicatorColor: colorScheme.primary,
-                indicatorWeight: 3,
-                indicatorSize: TabBarIndicatorSize.tab,
-                dividerColor: Colors.transparent,
-                tabs: const [
-                  Tab(text: 'Active'),
-                  Tab(text: 'Browse'),
-                  Tab(text: 'Completed'),
-                ],
-              ),
-            ),
+            const SizedBox(height: 8),
           ],
         ),
       ),

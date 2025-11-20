@@ -35,28 +35,66 @@ class _StimulusManagementScreenState extends State<StimulusManagementScreen> {
   }
 
   @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // Force refresh when returning to this screen
+    _forceRefresh();
+  }
+
+  @override
   void dispose() {
     _searchController.dispose();
     _streamSubscription?.cancel();
     super.dispose();
   }
 
+  // Force refresh data from database
+  Future<void> _forceRefresh() async {
+    print('UI: Force refreshing stimulus data...');
+    
+    // Cancel existing stream and restart
+    _streamSubscription?.cancel();
+    
+    // Clear current data
+    setState(() {
+      _allStimuli.clear();
+      _filteredStimuli.clear();
+      _isLoading = true;
+    });
+    
+    // Reload data from database
+    await _loadStimuli();
+    
+    // Restart real-time listener
+    _setupRealtimeListener();
+  }
+
   Future<void> _loadStimuli() async {
+    if (!mounted) return;
+    
     setState(() => _isLoading = true);
     try {
       final stimuli = await _stimulusService.getAllCustomStimuli();
-      setState(() {
-        _allStimuli = stimuli;
-        _filteredStimuli = stimuli;
-        _isLoading = false;
-      });
-    } catch (e) {
-      setState(() => _isLoading = false);
       if (mounted) {
+        setState(() {
+          _allStimuli = stimuli;
+          _filteredStimuli = stimuli;
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      print('UI: Error loading stimuli: $e');
+      if (mounted) {
+        setState(() => _isLoading = false);
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Error loading stimuli: $e'),
+            content: Text('Failed to load stimuli. Please try again.'),
             backgroundColor: Colors.red,
+            action: SnackBarAction(
+              label: 'Retry',
+              textColor: Colors.white,
+              onPressed: _loadStimuli,
+            ),
           ),
         );
       }
@@ -78,27 +116,64 @@ class _StimulusManagementScreenState extends State<StimulusManagementScreen> {
   }
 
   void _setupRealtimeListener() {
-    _stimuliStream = _stimulusService.getCustomStimuliStream();
-    _streamSubscription = _stimuliStream?.listen((stimuli) {
-      if (mounted) {
-        setState(() {
-          _allStimuli = stimuli;
-          _isLoading = false;
-          // Reapply current filter
-          _filterStimuli(_searchQuery);
-        });
-      }
-    }, onError: (error) {
+    try {
+      _stimuliStream = _stimulusService.getCustomStimuliStream();
+      _streamSubscription = _stimuliStream?.listen(
+        (stimuli) {
+          if (mounted) {
+            print('UI: Received ${stimuli.length} stimuli from stream');
+            setState(() {
+              _allStimuli = stimuli;
+              _isLoading = false;
+              // Reapply current filter
+              _filterStimuli(_searchQuery);
+            });
+          }
+        },
+        onError: (error) {
+          print('UI: Error in stimuli stream: $error');
+          if (mounted) {
+            setState(() => _isLoading = false);
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text('Connection lost. Refreshing data...'),
+                backgroundColor: Colors.orange,
+                action: SnackBarAction(
+                  label: 'Reconnect',
+                  textColor: Colors.white,
+                  onPressed: () {
+                    _streamSubscription?.cancel();
+                    _setupRealtimeListener();
+                  },
+                ),
+                duration: Duration(seconds: 5),
+              ),
+            );
+            
+            // Try to fallback to manual loading
+            _loadStimuli();
+          }
+        },
+        onDone: () {
+          print('UI: Stimuli stream completed');
+          if (mounted) {
+            // Try to reconnect after a delay
+            Future.delayed(Duration(seconds: 2), () {
+              if (mounted) {
+                _setupRealtimeListener();
+              }
+            });
+          }
+        },
+      );
+    } catch (e) {
+      print('UI: Error setting up realtime listener: $e');
       if (mounted) {
         setState(() => _isLoading = false);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error loading stimuli: $error'),
-            backgroundColor: Colors.red,
-          ),
-        );
+        // Fallback to manual loading
+        _loadStimuli();
       }
-    });
+    }
   }
 
   @override
@@ -120,6 +195,13 @@ class _StimulusManagementScreenState extends State<StimulusManagementScreen> {
           ),
         ),
         centerTitle: true,
+        actions: [
+          IconButton(
+            onPressed: _forceRefresh,
+            icon: const Icon(Icons.refresh),
+            tooltip: 'Refresh Data',
+          ),
+        ],
         flexibleSpace: Container(
           decoration: BoxDecoration(
             gradient: LinearGradient(
@@ -203,9 +285,9 @@ class _StimulusManagementScreenState extends State<StimulusManagementScreen> {
                 ? const Center(child: CircularProgressIndicator())
                 : _filteredStimuli.isEmpty
                     ? _buildEmptyState()
-                    : RefreshIndicator(
-                        onRefresh: _loadStimuli,
-                        child: ListView.builder(
+                     : RefreshIndicator(
+                         onRefresh: _forceRefresh,
+                         child: ListView.builder(
                           padding: const EdgeInsets.all(20),
                           itemCount: _filteredStimuli.length,
                           itemBuilder: (context, index) {
@@ -587,6 +669,27 @@ class _StimulusManagementScreenState extends State<StimulusManagementScreen> {
   }
 
   void _duplicateStimulus(CustomStimulus stimulus) async {
+    // Show loading indicator
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Row(
+            children: [
+              SizedBox(
+                width: 20,
+                height: 20,
+                child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+              ),
+              SizedBox(width: 12),
+              Text('Duplicating stimulus...'),
+            ],
+          ),
+          backgroundColor: Colors.blue,
+          duration: Duration(seconds: 30), // Long duration, will be dismissed manually
+        ),
+      );
+    }
+
     try {
       await _stimulusService.createCustomStimulus(
         name: '${stimulus.name} (Copy)',
@@ -596,22 +699,62 @@ class _StimulusManagementScreenState extends State<StimulusManagementScreen> {
         createdBy: stimulus.createdBy,
       );
       
-      // No need to manually reload - real-time stream will handle it
-      
+      // Dismiss loading snackbar
       if (mounted) {
+        ScaffoldMessenger.of(context).hideCurrentSnackBar();
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Stimulus duplicated successfully'),
+          SnackBar(
+            content: Row(
+              children: [
+                Icon(Icons.check_circle, color: Colors.white),
+                SizedBox(width: 8),
+                Text('Stimulus duplicated successfully'),
+              ],
+            ),
             backgroundColor: Colors.green,
+            duration: Duration(seconds: 3),
           ),
         );
       }
     } catch (e) {
+      print('UI: Error duplicating stimulus: $e');
+      
+      // Check if it's a network connectivity issue
+      String errorMessage = 'Failed to duplicate stimulus. Please try again.';
+      Color backgroundColor = Colors.red;
+      IconData iconData = Icons.error;
+      
+      if (e.toString().contains('unavailable') ||
+          e.toString().contains('Unable to resolve host') ||
+          e.toString().contains('network') ||
+          e.toString().contains('connection') ||
+          e.toString().contains('firestore.googleapis.com')) {
+        errorMessage = 'No internet connection. Please check your network and try again.';
+        backgroundColor = Colors.orange;
+        iconData = Icons.wifi_off;
+      }
+      
+      // Dismiss loading snackbar and show error
       if (mounted) {
+        ScaffoldMessenger.of(context).hideCurrentSnackBar();
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Error duplicating stimulus: $e'),
-            backgroundColor: Colors.red,
+            content: Row(
+              children: [
+                Icon(iconData, color: Colors.white),
+                SizedBox(width: 8),
+                Expanded(
+                  child: Text(errorMessage),
+                ),
+              ],
+            ),
+            backgroundColor: backgroundColor,
+            duration: Duration(seconds: 8),
+            action: SnackBarAction(
+              label: 'Retry',
+              textColor: Colors.white,
+              onPressed: () => _duplicateStimulus(stimulus),
+            ),
           ),
         );
       }
@@ -643,31 +786,123 @@ class _StimulusManagementScreenState extends State<StimulusManagementScreen> {
   }
 
   Future<void> _deleteStimulus(CustomStimulus stimulus) async {
+    // Show loading indicator
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Row(
+            children: [
+              SizedBox(
+                width: 20,
+                height: 20,
+                child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+              ),
+              SizedBox(width: 12),
+              Text('Deleting stimulus...'),
+            ],
+          ),
+          backgroundColor: Colors.blue,
+          duration: Duration(seconds: 30), // Long duration, will be dismissed manually
+        ),
+      );
+    }
+
     try {
       await _stimulusService.deleteCustomStimulus(stimulus.id);
       
-      // No need to manually update local state - real-time stream will handle it
-      // This ensures consistency with the database
-      
+      // Dismiss loading snackbar
       if (mounted) {
+        ScaffoldMessenger.of(context).hideCurrentSnackBar();
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Stimulus removed successfully'),
+          SnackBar(
+            content: Row(
+              children: [
+                Icon(Icons.check_circle, color: Colors.white),
+                SizedBox(width: 8),
+                Text('Stimulus "${stimulus.name}" removed successfully'),
+              ],
+            ),
             backgroundColor: Colors.green,
+            duration: Duration(seconds: 3),
           ),
         );
       }
       
-    } catch (e) {
-      // If there's an actual error, show error message
-      // The real-time stream will handle state synchronization
+      // Force refresh the UI to ensure synchronization
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error deleting stimulus: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
+        setState(() {
+          _allStimuli.removeWhere((s) => s.id == stimulus.id);
+          _filterStimuli(_searchQuery);
+        });
+      }
+      
+    } catch (e) {
+      print('UI: Error deleting stimulus: $e');
+      
+      // Check if it's a "not found" error - this means it was already deleted
+      if (e.toString().contains('not found') || e.toString().contains('not exist')) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).hideCurrentSnackBar();
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Row(
+                children: [
+                  Icon(Icons.info, color: Colors.white),
+                  SizedBox(width: 8),
+                  Text('Stimulus was already removed'),
+                ],
+              ),
+              backgroundColor: Colors.orange,
+              duration: Duration(seconds: 3),
+            ),
+          );
+          
+          // Remove from local state since it's already gone from database
+          setState(() {
+            _allStimuli.removeWhere((s) => s.id == stimulus.id);
+            _filterStimuli(_searchQuery);
+          });
+        }
+      } else {
+        // Check if it's a network connectivity issue
+        String errorMessage = 'Failed to delete stimulus. Please try again.';
+        Color backgroundColor = Colors.red;
+        IconData iconData = Icons.error;
+        
+        if (e.toString().contains('unavailable') ||
+            e.toString().contains('Unable to resolve host') ||
+            e.toString().contains('network') ||
+            e.toString().contains('connection') ||
+            e.toString().contains('firestore.googleapis.com')) {
+          errorMessage = 'No internet connection. Please check your network and try again.';
+          backgroundColor = Colors.orange;
+          iconData = Icons.wifi_off;
+        }
+        
+        // Dismiss loading snackbar and show error for other types of errors
+        if (mounted) {
+          ScaffoldMessenger.of(context).hideCurrentSnackBar();
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Row(
+                children: [
+                  Icon(iconData, color: Colors.white),
+                  SizedBox(width: 8),
+                  Expanded(
+                    child: Text(errorMessage),
+                  ),
+                ],
+              ),
+              backgroundColor: backgroundColor,
+              duration: Duration(seconds: 8),
+              action: SnackBarAction(
+                label: 'Retry',
+                textColor: Colors.white,
+                onPressed: () => _deleteStimulus(stimulus),
+              ),
+            ),
+          );
+        }
       }
     }
   }

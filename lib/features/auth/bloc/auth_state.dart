@@ -8,18 +8,35 @@ class AuthState extends Equatable {
   final String? error;
   final String? message;
   final List<dynamic>? existingSessions;
-  const AuthState({required this.status, this.user, this.error, this.message, this.existingSessions});
+  final UserPermissions? permissions;
+  
+  const AuthState({
+    required this.status,
+    this.user,
+    this.error,
+    this.message,
+    this.existingSessions,
+    this.permissions,
+  });
 
   const AuthState.initial() : this(status: AuthStatus.initial);
 
-  AuthState copyWith({AuthStatus? status, User? user, String? error, String? message, List<dynamic>? existingSessions}) => AuthState(
+  AuthState copyWith({
+    AuthStatus? status,
+    User? user,
+    String? error,
+    String? message,
+    List<dynamic>? existingSessions,
+    UserPermissions? permissions,
+  }) => AuthState(
         status: status ?? this.status,
         user: user ?? this.user,
         error: error,
         message: message,
         existingSessions: existingSessions,
+        permissions: permissions ?? this.permissions,
       );
 
   @override
-  List<Object?> get props => [status, user, error, message, existingSessions];
+  List<Object?> get props => [status, user, error, message, existingSessions, permissions];
 }

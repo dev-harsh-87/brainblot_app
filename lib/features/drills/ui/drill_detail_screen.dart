@@ -667,6 +667,8 @@ class _DrillDetailScreenState extends State<DrillDetailScreen> {
       ),
       child: Column(
         children: [
+          _buildConfigRow(context, 'Drill Mode', _currentDrill.drillMode.name.toUpperCase()),
+          const Divider(),
           _buildConfigRow(context, 'Number of Stimuli', '${_currentDrill.numberOfStimuli}'),
           const Divider(),
           _buildConfigRow(context, 'Colors Used', '${_currentDrill.colors.length} colors'),
