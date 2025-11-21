@@ -535,13 +535,13 @@ class _MultiplayerSelectionScreenState extends State<MultiplayerSelectionScreen>
                             ],
                           ),
                           SizedBox(height: isSmallScreen ? 10 : 12),
-                          _buildRequirementItem('📱 Bluetooth enabled on both devices'),
-                          _buildRequirementItem('📍 Location permission granted'),
-                          _buildRequirementItem('🔄 Devices within Bluetooth range (~10m)'),
-                          _buildRequirementItem('⚡ Stable connection for best experience'),
+                          _buildRequirementItem('📱 Internet connection on all devices'),
+                          _buildRequirementItem('🔗 Firebase connectivity enabled'),
+                          _buildRequirementItem('⚡ Stable network for best experience'),
+                          _buildRequirementItem('🔄 Real-time synchronization across devices'),
                           SizedBox(height: isSmallScreen ? 6 : 8),
                           Text(
-                            'Note: Permissions will be requested when you start hosting or joining.',
+                            'Note: No special permissions required - works over internet connection.',
                             style: theme.textTheme.bodySmall?.copyWith(
                               fontSize: isSmallScreen ? 11 : null,
                               color: Colors.blue.withOpacity(0.8),

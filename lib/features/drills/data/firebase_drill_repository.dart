@@ -847,6 +847,24 @@ class FirebaseDrillRepository implements DrillRepository {
                 radix: 16,
               )))
           .toList(),
+      arrows: (data['configuration']?['arrows'] as List? ?? data['arrows'] as List? ?? ['up', 'down', 'left', 'right'])
+          .map((e) => ArrowDirection.values.firstWhere(
+                (a) => a.name == e,
+                orElse: () => ArrowDirection.up,
+              ))
+          .toList(),
+      shapes: (data['configuration']?['shapes'] as List? ?? data['shapes'] as List? ?? ['circle', 'square', 'triangle'])
+          .map((e) => ShapeType.values.firstWhere(
+                (s) => s.name == e,
+                orElse: () => ShapeType.circle,
+              ))
+          .toList(),
+      numberRange: (data['configuration']?['numberRange'] ?? data['numberRange']) != null
+          ? NumberRange.values.firstWhere(
+              (n) => n.name == (data['configuration']?['numberRange'] ?? data['numberRange']),
+              orElse: () => NumberRange.oneToFive,
+            )
+          : NumberRange.oneToFive,
       presentationMode: data['configuration']?['presentationMode'] != null
           ? PresentationMode.values.firstWhere(
               (p) => p.name == data['configuration']['presentationMode'],
@@ -858,6 +876,20 @@ class FirebaseDrillRepository implements DrillRepository {
                   orElse: () => PresentationMode.visual,
                 )
               : PresentationMode.visual,
+      drillMode: data['configuration']?['drillMode'] != null
+          ? DrillMode.values.firstWhere(
+              (m) => m.name == data['configuration']['drillMode'],
+              orElse: () => DrillMode.touch,
+            )
+          : data['drillMode'] != null
+              ? DrillMode.values.firstWhere(
+                  (m) => m.name == data['drillMode'],
+                  orElse: () => DrillMode.touch,
+                )
+              : DrillMode.touch,
+      stimulusLengthMs: data['configuration']?['stimulusLengthMs'] as int? ?? data['stimulusLengthMs'] as int? ?? 1000,
+      delayBetweenStimuliMs: data['configuration']?['delayBetweenStimuliMs'] as int? ?? data['delayBetweenStimuliMs'] as int? ?? 500,
+      customStimuliIds: List<String>.from((data['configuration']?['customStimuliIds'] as List<dynamic>?)?.cast<String>() ?? <String>[]),
       
       // Media
       videoUrl: data['media']?['videoUrl'] as String? ?? data['videoUrl'] as String?,

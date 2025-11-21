@@ -24,8 +24,8 @@ import 'package:spark_app/features/profile/services/profile_service.dart';
 import 'package:spark_app/core/services/auto_refresh_service.dart';
 import 'package:spark_app/features/drills/services/drill_creation_service.dart';
 import 'package:spark_app/features/programs/services/program_creation_service.dart';
-import 'package:spark_app/features/multiplayer/services/bluetooth_connection_service.dart';
 import 'package:spark_app/features/multiplayer/services/session_sync_service.dart';
+import 'package:spark_app/features/multiplayer/services/firebase_session_sync_service.dart';
 import 'package:spark_app/core/auth/services/permission_service.dart';
 import 'package:spark_app/core/auth/services/subscription_permission_service.dart';
 import 'package:spark_app/features/subscription/data/subscription_plan_repository.dart';
@@ -138,9 +138,8 @@ Future<void> configureDependencies() async {
   // Admin Services
   getIt.registerLazySingleton<CustomStimulusService>(() => CustomStimulusService());
 
-  // Multiplayer Services
-  getIt.registerLazySingleton<BluetoothConnectionService>(() => BluetoothConnectionService());
-  getIt.registerLazySingleton<SessionSyncService>(() => SessionSyncService(getIt<BluetoothConnectionService>()));
+  // Multiplayer Services - Firebase-based (replaces Bluetooth)
+  getIt.registerLazySingleton<SessionSyncService>(() => FirebaseSessionSyncService());
   
   // RBAC Services
   AppLogger.debug('Registering RBAC services');

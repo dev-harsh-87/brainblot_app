@@ -32,7 +32,7 @@ class EnhancedSubscriptionCard extends StatelessWidget {
         child: Container(
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(AppTheme.radiusLarge),
-            gradient: _getPlanGradient(planColor),
+            color: planColor,
             border: Border.all(
               color: planColor.withOpacity(0.3),
               width: 1.5,
@@ -148,7 +148,7 @@ class EnhancedSubscriptionCard extends StatelessWidget {
                     if (isFreePlan && onUpgrade != null)
                       Container(
                         decoration: BoxDecoration(
-                          gradient: AppTheme.primaryGradient,
+                          color: AppTheme.primaryColor,
                           borderRadius: BorderRadius.circular(AppTheme.radiusSmall),
                           boxShadow: [
                             BoxShadow(
@@ -305,7 +305,7 @@ class EnhancedSubscriptionCard extends StatelessWidget {
     );
   }
 
-  LinearGradient _getPlanGradient(Color planColor) {
+  LinearGradient _getPlanColor(Color planColor) {
     switch (currentPlan.id) {
       case 'institute':
         return LinearGradient(

@@ -29,7 +29,7 @@ class SubscriptionPlanCard extends StatelessWidget {
       child: Container(
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(AppTheme.radiusLarge),
-          gradient: _getPlanGradient(),
+          color: AppTheme.neutral800,
           border: isCurrentPlan ? Border.all(
             color: AppTheme.primaryColor,
             width: 2,
@@ -160,7 +160,7 @@ class SubscriptionPlanCard extends StatelessWidget {
 
   LinearGradient? _getPlanGradient() {
     if (plan.id == 'institute') {
-      return AppTheme.premiumGradient;
+      return null;
     }
     return null;
   }

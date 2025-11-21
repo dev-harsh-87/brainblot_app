@@ -1,6 +1,5 @@
 import 'dart:async';
 
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
@@ -10,8 +9,6 @@ import 'package:spark_app/features/drills/domain/drill.dart';
 import 'package:spark_app/features/drills/ui/drill_runner_screen.dart';
 import 'package:spark_app/features/multiplayer/domain/connection_session.dart';
 import 'package:spark_app/features/multiplayer/services/session_sync_service.dart';
-import 'package:spark_app/features/multiplayer/services/professional_permission_manager.dart';
-import 'package:spark_app/features/multiplayer/ui/widgets/multiplayer_permission_dialog.dart';
 
 /// Screen for joining a multiplayer training session
 class JoinSessionScreen extends StatefulWidget {
@@ -38,7 +35,7 @@ class _JoinSessionScreenState extends State<JoinSessionScreen>
   
   StreamSubscription<ConnectionSession>? _sessionSubscription;
   StreamSubscription<String>? _statusSubscription;
-  StreamSubscription? _drillEventSubscription;
+  StreamSubscription<dynamic>? _drillEventSubscription;
 
   @override
   void initState() {
@@ -83,9 +80,14 @@ class _JoinSessionScreenState extends State<JoinSessionScreen>
   Future<void> _initialize() async {
     try {
       await _syncService.initialize();
-      await _checkPermissions();
       _setupListeners();
-      _animationController.forward();
+      await _animationController.forward();
+      
+      if (mounted) {
+        setState(() {
+          _statusMessage = 'Ready to join session';
+        });
+      }
     } catch (e) {
       setState(() {
         _statusMessage = 'Initialization failed: $e';
@@ -93,42 +95,6 @@ class _JoinSessionScreenState extends State<JoinSessionScreen>
     }
   }
 
-  Future<void> _checkPermissions() async {
-    try {
-      debugPrint('🔐 JOIN: Checking permissions using Professional Permission Manager...');
-      
-      // Use the professional permission manager for consistent permission checking
-      final hasPermissions = await ProfessionalPermissionManager.areAllPermissionsGranted();
-      
-      debugPrint('🔐 JOIN: All permissions granted: $hasPermissions');
-      
-      if (!hasPermissions) {
-        // Get detailed status for better error messages
-        final status = await ProfessionalPermissionManager.getPermissionStatus();
-        
-        if (status.hasPermissionIssues) {
-          setState(() {
-            _statusMessage = 'Some permissions are permanently denied. Please enable them in Settings.';
-          });
-        } else {
-          setState(() {
-            _statusMessage = 'Permissions required for multiplayer features. Tap "Check Permissions" to grant them.';
-          });
-        }
-        
-        debugPrint('🔐 JOIN: Permission status: $status');
-      } else {
-        setState(() {
-          _statusMessage = 'Ready to join session';
-        });
-      }
-    } catch (e) {
-      debugPrint('🔐 JOIN: ❌ Error checking permissions: $e');
-      setState(() {
-        _statusMessage = 'Error checking permissions: $e';
-      });
-    }
-  }
 
   void _setupListeners() {
     _sessionSubscription = _syncService.getSessionStream().listen((session) {
@@ -169,15 +135,25 @@ class _JoinSessionScreenState extends State<JoinSessionScreen>
         // Host stopped the drill - return to join screen if in drill runner
         _returnFromDrillRunner();
         
+        // Update UI to show stopped state
+        setState(() {
+          // Force UI refresh to show updated drill status
+        });
+        
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('Drill stopped by host'),
-            backgroundColor: Colors.orange,
-            duration: Duration(seconds: 2),
+            backgroundColor: Colors.red,
+            duration: Duration(seconds: 3),
           ),
         );
         
       } else if (event is DrillPausedEvent) {
+        // Update UI to show paused state
+        setState(() {
+          // Force UI refresh to show updated drill status
+        });
+        
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('Drill paused by host'),
@@ -187,6 +163,11 @@ class _JoinSessionScreenState extends State<JoinSessionScreen>
         );
         
       } else if (event is DrillResumedEvent) {
+        // Update UI to show resumed state
+        setState(() {
+          // Force UI refresh to show updated drill status
+        });
+        
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('Drill resumed by host'),
@@ -212,7 +193,7 @@ class _JoinSessionScreenState extends State<JoinSessionScreen>
   void _navigateToDrillRunner(Drill drill) {
     // Navigate to drill runner with multiplayer context
     Navigator.of(context).push(
-      MaterialPageRoute(
+      MaterialPageRoute<void>(
         settings: const RouteSettings(name: '/drill-runner-multiplayer'),
         builder: (context) => DrillRunnerScreen(
           drill: drill,
@@ -221,7 +202,14 @@ class _JoinSessionScreenState extends State<JoinSessionScreen>
           onDrillComplete: (result) {
             // Handle drill completion in multiplayer context
             if (mounted) {
+              // Pop back to join session screen
               Navigator.of(context).pop();
+              
+              // Force UI refresh to show updated drill status
+              setState(() {
+                // This will trigger a rebuild and show the updated drill status
+              });
+              
               // Show completion feedback with stats
               ScaffoldMessenger.of(context).showSnackBar(
                 SnackBar(
@@ -231,12 +219,13 @@ class _JoinSessionScreenState extends State<JoinSessionScreen>
                     children: [
                       Text('Drill completed: ${drill.name}'),
                       Text(
-                        'Score: ${result.hits}/${result.totalStimuli} (${(result.accuracy * 100).toStringAsFixed(1)}%)',
+                        'Your Score: ${result.hits}/${result.totalStimuli} (${(result.accuracy * 100).toStringAsFixed(1)}%)',
                         style: const TextStyle(fontSize: 12),
                       ),
                     ],
                   ),
                   backgroundColor: Colors.green,
+                  duration: const Duration(seconds: 4),
                 ),
               );
             }
@@ -248,8 +237,19 @@ class _JoinSessionScreenState extends State<JoinSessionScreen>
 
   void _returnFromDrillRunner() {
     // Return to join screen if currently in drill runner
-    if (ModalRoute.of(context)?.settings.name == '/drill-runner-multiplayer') {
-      Navigator.of(context).pop();
+    try {
+      // Force UI refresh to show updated drill status
+      if (mounted) {
+        setState(() {
+          // This will trigger a rebuild and show the updated drill status
+        });
+      }
+      
+      // Check if we need to navigate back from drill runner
+      // This is handled automatically by the drill completion callback
+      debugPrint('Drill runner returned to join session screen');
+    } catch (e) {
+      debugPrint('Error returning from drill runner: $e');
     }
   }
 
@@ -325,10 +325,6 @@ class _JoinSessionScreenState extends State<JoinSessionScreen>
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // WiFi Warning Banner
-          _buildWiFiWarningBanner(context),
-          SizedBox(height: isSmallScreen ? 16 : 20),
-
           // Header
           _buildHeader(context),
           SizedBox(height: isSmallScreen ? 24 : 32),
@@ -339,10 +335,6 @@ class _JoinSessionScreenState extends State<JoinSessionScreen>
 
           // Join Button
           _buildJoinButton(context),
-          SizedBox(height: isSmallScreen ? 12 : 16),
-
-          // Permission Button (if needed)
-          _buildPermissionButton(context),
           SizedBox(height: isSmallScreen ? 24 : 32),
 
           // Status
@@ -447,77 +439,7 @@ class _JoinSessionScreenState extends State<JoinSessionScreen>
     );
   }
 
-  Widget _buildWiFiWarningBanner(BuildContext context) {
-    final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
-    final size = MediaQuery.of(context).size;
-    final isSmallScreen = size.width < 360;
-
-    return Container(
-      width: double.infinity,
-      padding: EdgeInsets.all(isSmallScreen ? 12 : 16),
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: [
-            Colors.orange.withOpacity(0.1),
-            Colors.red.withOpacity(0.1),
-          ],
-          begin: Alignment.centerLeft,
-          end: Alignment.centerRight,
-        ),
-        borderRadius: BorderRadius.circular(isSmallScreen ? 10 : 12),
-        border: Border.all(
-          color: Colors.orange.withOpacity(0.3),
-          width: 1.5,
-        ),
-      ),
-      child: Row(
-        children: [
-          Container(
-            padding: const EdgeInsets.all(8),
-            decoration: BoxDecoration(
-              color: Colors.orange.withOpacity(0.2),
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: Icon(
-              Icons.wifi_rounded,
-              color: Colors.orange.shade700,
-              size: isSmallScreen ? 20 : 24,
-            ),
-          ),
-          SizedBox(width: isSmallScreen ? 10 : 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Same WiFi Required',
-                  style: theme.textTheme.titleSmall?.copyWith(
-                    fontWeight: FontWeight.bold,
-                    fontSize: isSmallScreen ? 13 : 14,
-                    color: Colors.orange.shade800,
-                  ),
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  'Both devices must be on the same WiFi network',
-                  style: theme.textTheme.bodySmall?.copyWith(
-                    fontSize: isSmallScreen ? 11 : 12,
-                    color: Colors.orange.shade700,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          Icon(
-            Icons.priority_high_rounded,
-            color: Colors.orange.shade600,
-            size: isSmallScreen ? 18 : 20,
-          ),
-        ],
-      ),
-    );
-  }
+  // Removed WiFi warning since Firebase works over the internet
 
   Widget _buildCodeInput(BuildContext context) {
     final theme = Theme.of(context);
@@ -588,8 +510,6 @@ class _JoinSessionScreenState extends State<JoinSessionScreen>
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
     final isCodeValid = _codeController.text.length == 6;
-    final hasPermissions = _statusMessage.contains('Ready to join') ||
-                          _statusMessage.contains('All permissions granted');
 
     return SizedBox(
       width: double.infinity,
@@ -616,13 +536,13 @@ class _JoinSessionScreenState extends State<JoinSessionScreen>
             : Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Icon(
-                    hasPermissions ? Icons.login_rounded : Icons.security_rounded,
+                  const Icon(
+                    Icons.login_rounded,
                     size: 24,
                   ),
                   const SizedBox(width: 8),
                   Text(
-                    hasPermissions ? 'Join Session' : 'Request Permissions & Join',
+                    'Join Session',
                     style: theme.textTheme.titleMedium?.copyWith(
                       fontWeight: FontWeight.bold,
                       color: Colors.white,
@@ -634,51 +554,7 @@ class _JoinSessionScreenState extends State<JoinSessionScreen>
     );
   }
 
-  Widget _buildPermissionButton(BuildContext context) {
-    final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
-    
-    // Only show if permissions are needed
-    if (_statusMessage.contains('Ready to join') || _statusMessage.contains('All permissions granted')) {
-      return const SizedBox.shrink();
-    }
-    
-    // Show if permissions are required or denied
-    if (_statusMessage.contains('permission') ||
-        _statusMessage.contains('Permission') ||
-        _statusMessage.contains('Settings') ||
-        _statusMessage.contains('denied')) {
-      return SizedBox(
-        width: double.infinity,
-        child: OutlinedButton(
-          onPressed: _showPermissionDialog,
-          style: OutlinedButton.styleFrom(
-            foregroundColor: colorScheme.primary,
-            side: BorderSide(color: colorScheme.primary, width: 2),
-            padding: const EdgeInsets.symmetric(vertical: 12),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(16),
-            ),
-          ),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              const Icon(Icons.security_rounded, size: 20),
-              const SizedBox(width: 8),
-              Text(
-                'Check Permissions',
-                style: theme.textTheme.titleSmall?.copyWith(
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-            ],
-          ),
-        ),
-      );
-    }
-    
-    return const SizedBox.shrink();
-  }
+  // Removed permission button since Firebase doesn't need special permissions
 
   Widget _buildStatusCard(BuildContext context) {
     final theme = Theme.of(context);
@@ -747,7 +623,7 @@ class _JoinSessionScreenState extends State<JoinSessionScreen>
           decoration: BoxDecoration(
             gradient: LinearGradient(
               colors: [
-                colorScheme.errorContainer.withOpacity(0.1),
+                colorScheme.primaryContainer.withOpacity(0.1),
                 colorScheme.secondaryContainer.withOpacity(0.1),
               ],
               begin: Alignment.topLeft,
@@ -755,7 +631,7 @@ class _JoinSessionScreenState extends State<JoinSessionScreen>
             ),
             borderRadius: BorderRadius.circular(isSmallScreen ? 12 : 16),
             border: Border.all(
-              color: colorScheme.error.withOpacity(0.2),
+              color: colorScheme.primary.withOpacity(0.2),
               width: 1.5,
             ),
           ),
@@ -767,12 +643,12 @@ class _JoinSessionScreenState extends State<JoinSessionScreen>
                   Container(
                     padding: const EdgeInsets.all(8),
                     decoration: BoxDecoration(
-                      color: colorScheme.error.withOpacity(0.1),
+                      color: colorScheme.primary.withOpacity(0.1),
                       borderRadius: BorderRadius.circular(8),
                     ),
                     child: Icon(
-                      Icons.warning_rounded,
-                      color: colorScheme.error,
+                      Icons.cloud_rounded,
+                      color: colorScheme.primary,
                       size: isSmallScreen ? 18 : 20,
                     ),
                   ),
@@ -783,7 +659,7 @@ class _JoinSessionScreenState extends State<JoinSessionScreen>
                       style: theme.textTheme.titleMedium?.copyWith(
                         fontWeight: FontWeight.bold,
                         fontSize: isSmallScreen ? 15 : null,
-                        color: colorScheme.error,
+                        color: colorScheme.primary,
                       ),
                     ),
                   ),
@@ -793,27 +669,27 @@ class _JoinSessionScreenState extends State<JoinSessionScreen>
               _buildRequirementItem(
                 context,
                 Icons.wifi_rounded,
-                'Same WiFi Network',
-                'Both devices must be connected to the same WiFi network',
-                colorScheme.error,
+                'Internet Connection',
+                'Both devices need internet access to connect via Firebase',
+                colorScheme.primary,
                 isSmallScreen,
               ),
               SizedBox(height: isSmallScreen ? 8 : 12),
               _buildRequirementItem(
                 context,
-                Icons.bluetooth_rounded,
-                'Bluetooth & Location',
-                'Enable Bluetooth and Location services on both devices',
-                colorScheme.error,
+                Icons.cloud_sync_rounded,
+                'Firebase Sync',
+                'Real-time synchronization works anywhere with internet',
+                colorScheme.primary,
                 isSmallScreen,
               ),
               SizedBox(height: isSmallScreen ? 8 : 12),
               _buildRequirementItem(
                 context,
-                Icons.location_on_rounded,
-                'Physical Proximity',
-                'Stay within 10-15 meters of the host device',
-                colorScheme.error,
+                Icons.security_rounded,
+                'Secure Connection',
+                'All data is encrypted and synced through Firebase',
+                colorScheme.primary,
                 isSmallScreen,
               ),
             ],
@@ -853,12 +729,12 @@ class _JoinSessionScreenState extends State<JoinSessionScreen>
                 ],
               ),
               SizedBox(height: isSmallScreen ? 12 : 16),
-              _buildStepItem(context, '1', 'Verify WiFi Connection', 'Ensure both devices are on the same WiFi network', isSmallScreen),
-              _buildStepItem(context, '2', 'Enable Permissions', 'Allow Bluetooth, Location, and Nearby Devices access', isSmallScreen),
-              _buildStepItem(context, '3', 'Get Session Code', 'Ask the host for the 6-digit session code', isSmallScreen),
-              _buildStepItem(context, '4', 'Enter Code', 'Type the code in the field above', isSmallScreen),
-              _buildStepItem(context, '5', 'Join Session', 'Tap "Join Session" and wait for connection', isSmallScreen),
-              _buildStepItem(context, '6', 'Start Training', 'Wait for host to begin synchronized drills', isSmallScreen),
+              _buildStepItem(context, '1', 'Check Internet', 'Ensure your device has internet connection', isSmallScreen),
+              _buildStepItem(context, '2', 'Get Session Code', 'Ask the host for the 6-digit session code', isSmallScreen),
+              _buildStepItem(context, '3', 'Enter Code', 'Type the code in the field above', isSmallScreen),
+              _buildStepItem(context, '4', 'Join Session', 'Tap "Join Session" and wait for connection', isSmallScreen),
+              _buildStepItem(context, '5', 'Start Training', 'Wait for host to begin synchronized drills', isSmallScreen),
+              _buildStepItem(context, '6', 'Follow Host', 'Your device will automatically sync with host actions', isSmallScreen),
             ],
           ),
         ),
@@ -900,21 +776,21 @@ class _JoinSessionScreenState extends State<JoinSessionScreen>
               _buildTroubleshootItem(
                 context,
                 'Session Not Found',
-                '• Check WiFi connection\n• Verify session code\n• Move closer to host\n• Restart Bluetooth',
+                '• Check internet connection\n• Verify session code is correct\n• Ensure host has created the session\n• Try refreshing the app',
                 isSmallScreen,
               ),
               SizedBox(height: isSmallScreen ? 8 : 12),
               _buildTroubleshootItem(
                 context,
                 'Connection Failed',
-                '• Check app permissions\n• Ensure location is enabled\n• Try turning WiFi off/on\n• Restart the app',
+                '• Check internet connectivity\n• Verify Firebase services are working\n• Try switching networks (WiFi/Mobile)\n• Restart the app',
                 isSmallScreen,
               ),
               SizedBox(height: isSmallScreen ? 8 : 12),
               _buildTroubleshootItem(
                 context,
-                'Frequent Disconnections',
-                '• Stay within range of host\n• Keep devices charged\n• Avoid interference sources\n• Use 5GHz WiFi if available',
+                'Sync Issues',
+                '• Check internet stability\n• Ensure both devices are online\n• Try rejoining the session\n• Contact host to restart session',
                 isSmallScreen,
               ),
             ],
@@ -1446,15 +1322,8 @@ class _JoinSessionScreenState extends State<JoinSessionScreen>
 
     debugPrint('🔗 JOIN: Attempting to join session with code: $code');
 
-    // Check permissions first using Professional Permission Manager
-    final hasPermissions = await ProfessionalPermissionManager.areAllPermissionsGranted();
-    if (!hasPermissions) {
-      debugPrint('🔗 JOIN: Permissions not granted, requesting...');
-      _showPermissionDialog();
-      return;
-    }
-
-    debugPrint('🔗 JOIN: Permissions granted, proceeding with join...');
+    // Firebase doesn't require special permissions like Bluetooth
+    debugPrint('🔗 JOIN: Using Firebase - no special permissions needed');
 
     try {
       setState(() {
@@ -1493,14 +1362,14 @@ class _JoinSessionScreenState extends State<JoinSessionScreen>
       
       final errorString = e.toString().toLowerCase();
       if (errorString.contains('timeout') || errorString.contains('timed out')) {
-        errorMessage = 'Session not found - check the code and try again';
+        errorMessage = 'Session not found - check the code and internet connection';
         statusMessage = 'Session not found';
-      } else if (errorString.contains('permission')) {
-        errorMessage = 'Bluetooth permissions required';
-        statusMessage = 'Permissions needed';
-      } else if (errorString.contains('bluetooth')) {
-        errorMessage = 'Bluetooth connection failed - ensure it\'s enabled';
-        statusMessage = 'Bluetooth issue';
+      } else if (errorString.contains('network') || errorString.contains('internet')) {
+        errorMessage = 'Network connection failed - check your internet';
+        statusMessage = 'Network issue';
+      } else if (errorString.contains('firebase')) {
+        errorMessage = 'Firebase connection failed - try again later';
+        statusMessage = 'Firebase issue';
       } else if (errorString.contains('full')) {
         errorMessage = 'Session is full - cannot join';
         statusMessage = 'Session full';
@@ -1528,100 +1397,7 @@ class _JoinSessionScreenState extends State<JoinSessionScreen>
       }
     }
   }
-
-  void _showPermissionDialog() async {
-    debugPrint('🔐 JOIN: Showing user-friendly permission dialog...');
-    
-    if (!mounted) return;
-    
-    showDialog<void>(
-      context: context,
-      barrierDismissible: false,
-      builder: (context) => MultiplayerPermissionDialog(
-        onPermissionsGranted: () async {
-          debugPrint('🔐 JOIN: Permissions granted via dialog');
-          await _checkPermissions();
-          if (mounted) {
-            setState(() {
-              _statusMessage = 'All permissions granted! Ready to join sessions.';
-            });
-          }
-        },
-        onDismiss: () {
-          debugPrint('🔐 JOIN: Permission dialog dismissed');
-          if (mounted) {
-            setState(() {
-              _statusMessage = 'Permissions are required to join multiplayer sessions.';
-            });
-          }
-        },
-      ),
-    );
-  }
   
-  void _showSettingsDialog() {
-    if (!mounted) return;
-    
-    final isIOS = defaultTargetPlatform == TargetPlatform.iOS;
-    
-    // Use standard dialog for settings guidance
-    showDialog<void>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Permissions Required'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'To join a multiplayer session, we need:',
-              style: Theme.of(context).textTheme.bodyMedium,
-            ),
-            const SizedBox(height: 12),
-            _buildPermissionItem('📱 Bluetooth - To connect with the host'),
-            _buildPermissionItem('📍 Location - To discover nearby devices'),
-            if (defaultTargetPlatform == TargetPlatform.android)
-              _buildPermissionItem('📶 Nearby WiFi Devices - For device discovery'),
-            const SizedBox(height: 12),
-            Text(
-              'Please grant all permissions to join multiplayer sessions.',
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                fontStyle: FontStyle.italic,
-              ),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: const Text('Cancel'),
-          ),
-          ElevatedButton(
-            onPressed: () async {
-              Navigator.of(context).pop();
-              final granted = await _syncService.requestPermissions();
-              setState(() {
-                _statusMessage = granted
-                    ? 'Permissions granted - ready to join'
-                    : 'Some permissions were denied';
-              });
-            },
-            child: const Text('Grant Permissions'),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildPermissionItem(String text) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 4),
-      child: Text(
-        text,
-        style: Theme.of(context).textTheme.bodySmall,
-      ),
-    );
-  }
 
   Future<void> _disconnectSession() async {
     try {
@@ -1644,39 +1420,9 @@ class _JoinSessionScreenState extends State<JoinSessionScreen>
     }
   }
 
-  /// Handle join button press - request permissions first if needed, then join session
+  /// Handle join button press - Firebase doesn't need special permissions
   Future<void> _handleJoinButtonPress() async {
-    final hasPermissions = _statusMessage.contains('Ready to join') ||
-                          _statusMessage.contains('All permissions granted');
-    
-    if (!hasPermissions) {
-      // First request permissions
-      _showPermissionDialog();
-      
-      // Wait a bit for the dialog to complete and check permissions again
-      await Future.delayed(const Duration(milliseconds: 500));
-      await _checkPermissions();
-      
-      // Check if permissions were granted after the request
-      final updatedHasPermissions = _statusMessage.contains('Ready to join') ||
-                                   _statusMessage.contains('All permissions granted');
-      
-      if (!updatedHasPermissions) {
-        // Permissions still not granted, show message
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Permissions are required to join a session. Please grant them and try again.'),
-              backgroundColor: Colors.orange,
-              duration: Duration(seconds: 3),
-            ),
-          );
-        }
-        return;
-      }
-    }
-    
-    // Permissions are granted, join session
     await _joinSession();
   }
+
 }

@@ -194,12 +194,27 @@ class _DrillRunnerScreenState extends State<DrillRunnerScreen>
     // Debug: Print drill configuration to verify values
     AppLogger.debug('Drill Runner - Enhanced Drill Configuration: ${validatedDrill.name}, Sets: ${validatedDrill.sets}, Reps: ${validatedDrill.reps}, Duration: ${validatedDrill.durationSec}s, Rest: ${validatedDrill.restSec}s, Stimuli: ${validatedDrill.numberOfStimuli}');
     
-    // Preload custom stimuli if needed
-    _preloadCustomStimuli(validatedDrill);
-    
-    _schedule = _generateSchedule(validatedDrill);
+    // Initialize async operations
+    _initializeAsync(validatedDrill);
     _initializeAnimations();
     _initializeTts();
+  }
+  
+  Future<void> _initializeAsync(Drill validatedDrill) async {
+    // Preload custom stimuli if needed - MUST complete before schedule generation
+    await _preloadCustomStimuli(validatedDrill);
+    
+    // Generate schedule after custom stimuli are loaded
+    _schedule = _generateSchedule(validatedDrill);
+    
+    AppLogger.success('Drill initialization complete - schedule has ${_schedule.length} stimuli', tag: 'DrillRunner');
+    
+    // Update UI to reflect that initialization is complete
+    if (mounted) {
+      setState(() {
+        // Trigger rebuild now that everything is initialized
+      });
+    }
   }
   
   /// Validates and enhances drill configuration to ensure proper functionality
@@ -537,14 +552,14 @@ class _DrillRunnerScreenState extends State<DrillRunnerScreen>
           _startDrillFromSync();
         }
       } else if (event is DrillStoppedEvent) {
-        // Host stopped the drill - stop locally
+        // Host stopped the drill - stop locally and handle completion
         if (_state == DrillRunnerState.running || _state == DrillRunnerState.paused) {
           AppLogger.info('Stopping drill from multiplayer sync', tag: 'Multiplayer');
           _stopDrillFromSync();
         }
       } else if (event is DrillPausedEvent) {
         // Host paused the drill - pause locally
-        if (_state == DrillRunnerState.running) {
+        if (_state == DrillRunnerState.running && !_isMultiplayerPaused) {
           AppLogger.info('Pausing drill from multiplayer sync', tag: 'Multiplayer');
           _pauseDrillFromSync();
         }
@@ -556,7 +571,7 @@ class _DrillRunnerScreenState extends State<DrillRunnerScreen>
         }
       } else if (event is StimulusEvent) {
         // Participant receiving stimulus data from host
-        if (!widget.isHost && _state == DrillRunnerState.running) {
+        if (!widget.isHost && _state == DrillRunnerState.running && !_isMultiplayerPaused) {
           _handleStimulusFromHost(event.data);
         }
       }
@@ -575,11 +590,20 @@ class _DrillRunnerScreenState extends State<DrillRunnerScreen>
 
   void _handleStimulusFromHost(Map<String, dynamic> stimulusData) {
     try {
-      // Extract stimulus data
-      final stimulusTypeStr = stimulusData['type'] as String;
+      // Only participants should handle stimulus from host
+      if (widget.isHost) {
+        AppLogger.debug('Host ignoring own stimulus broadcast', tag: 'Multiplayer');
+        return;
+      }
+      
+      // Extract stimulus data from host broadcast
+      final stimulusTypeStr = stimulusData['stimulusType'] as String;
       final label = stimulusData['label'] as String;
       final colorValue = stimulusData['colorValue'] as int;
       final index = stimulusData['index'] as int;
+      final hostTimeMs = stimulusData['timeMs'] as int;
+      final hostTimestamp = stimulusData['timestamp'] as int?;
+      final customStimulusItemId = stimulusData['customStimulusItemId'] as String?;
       
       // Parse stimulus type
       final stimulusType = StimulusType.values.firstWhere(
@@ -587,17 +611,44 @@ class _DrillRunnerScreenState extends State<DrillRunnerScreen>
         orElse: () => StimulusType.color,
       );
       
-      // Update current stimulus
+      // Calculate network delay compensation
+      int adjustedTimeMs = hostTimeMs;
+      if (hostTimestamp != null) {
+        final networkDelay = DateTime.now().millisecondsSinceEpoch - hostTimestamp;
+        adjustedTimeMs = hostTimeMs + networkDelay;
+        AppLogger.debug('Network delay compensation: ${networkDelay}ms', tag: 'Multiplayer');
+      }
+      
+      // Update current stimulus state to match host exactly
       _currentIndex = index;
       if (_currentIndex < _schedule.length) {
         _current = _schedule[_currentIndex];
+        // Update the custom stimulus item ID if provided
+        if (customStimulusItemId != null) {
+          _current = _Stimulus(
+            index: _current!.index,
+            timeMs: _current!.timeMs,
+            type: _current!.type,
+            label: _current!.label,
+            customStimulusItemId: customStimulusItemId,
+          );
+        }
+      } else {
+        // Create a temporary stimulus object for this broadcast
+        _current = _Stimulus(
+          index: index,
+          timeMs: hostTimeMs,
+          type: stimulusType,
+          label: label,
+          customStimulusItemId: customStimulusItemId,
+        );
       }
       
-      // Display the stimulus with the exact color from host
+      // Display the exact stimulus data from host (same color, same label)
       final color = Color(colorValue);
       _showStimulus(label, color, stimulusType);
       
-      AppLogger.debug('Participant received stimulus: type=$stimulusTypeStr, color=${color.value}, index=$index', tag: 'Multiplayer');
+      AppLogger.debug('Participant synchronized stimulus: type=$stimulusTypeStr, label="$label", color=${color.value.toRadixString(16)}, index=$index, customItemId=$customStimulusItemId', tag: 'Multiplayer');
     } catch (e) {
       AppLogger.error('Error handling stimulus from host', error: e, tag: 'Multiplayer');
     }
@@ -648,13 +699,18 @@ class _DrillRunnerScreenState extends State<DrillRunnerScreen>
       
       setState(() {
         _state = DrillRunnerState.finished;
+        _isMultiplayerPaused = false; // Reset pause state
       });
       
       _showFeedback('Stopped by Host', Colors.red);
       HapticFeedback.mediumImpact();
       
-      // Complete the drill and navigate back
-      _completeMultiplayerDrill();
+      // Complete the drill and navigate back with proper delay
+      Future.delayed(const Duration(milliseconds: 1500), () {
+        if (mounted) {
+          _completeMultiplayerDrill();
+        }
+      });
       
       AppLogger.success('Drill stopped from multiplayer sync', tag: 'Multiplayer');
     } catch (e) {
@@ -673,17 +729,46 @@ class _DrillRunnerScreenState extends State<DrillRunnerScreen>
         events: List.from(_events),
       );
       
+      AppLogger.info('Completing multiplayer drill: ${widget.drill.name}', tag: 'Multiplayer');
+      
       // Call completion callback if provided
       if (widget.onDrillComplete != null) {
+        AppLogger.debug('Using drill completion callback', tag: 'Multiplayer');
         widget.onDrillComplete!(sessionResult);
-      }
-      
-      // Navigate back after a short delay with proper navigation guard
-      Future.delayed(const Duration(seconds: 1), () {
-        if (mounted && Navigator.of(context).canPop()) {
-          Navigator.of(context).pop();
+      } else {
+        // If no callback provided, show completion feedback and navigate back
+        AppLogger.debug('No completion callback, handling navigation manually', tag: 'Multiplayer');
+        
+        if (mounted) {
+          // Show completion feedback
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('Drill completed: ${widget.drill.name}'),
+                  Text(
+                    'Your Score: ${sessionResult.hits}/${sessionResult.totalStimuli} (${(sessionResult.accuracy * 100).toStringAsFixed(1)}%)',
+                    style: const TextStyle(fontSize: 12),
+                  ),
+                ],
+              ),
+              backgroundColor: Colors.green,
+              duration: const Duration(seconds: 2),
+            ),
+          );
+          
+          // Navigate back to join session screen immediately
+          // Use popUntil to ensure we go back to the correct screen
+          Navigator.of(context).popUntil((route) {
+            // Pop until we reach the join session screen or multiplayer selection
+            return route.settings.name == '/join-session' ||
+                   route.settings.name == '/multiplayer-selection' ||
+                   route.isFirst;
+          });
         }
-      });
+      }
     } catch (e) {
       AppLogger.error('Error completing multiplayer drill', error: e, tag: 'Multiplayer');
       // Still navigate back on error with proper navigation guard
@@ -694,35 +779,65 @@ class _DrillRunnerScreenState extends State<DrillRunnerScreen>
   }
 
   void _pauseDrillFromSync() {
-    if (_state != DrillRunnerState.running) return;
+    if (_state != DrillRunnerState.running) {
+      AppLogger.warning('Cannot pause drill from sync in state: $_state', tag: 'Multiplayer');
+      return;
+    }
     
-    _ticker?.cancel();
-    _stopwatch.stop();
-    _isMultiplayerPaused = true;
+    AppLogger.info('Pausing drill from multiplayer sync', tag: 'Multiplayer');
     
-    setState(() {
-      _state = DrillRunnerState.paused;
-      _feedbackText = 'Paused by Host';
-      _feedbackColor = Colors.orange;
-    });
-    
-    _showFeedback('Paused by Host', Colors.orange);
-    HapticFeedback.mediumImpact();
+    try {
+      // Cancel ticker and stop stopwatch
+      _ticker?.cancel();
+      _ticker = null;
+      _stopwatch.stop();
+      _isMultiplayerPaused = true;
+      
+      // Clear current stimulus display
+      setState(() {
+        _state = DrillRunnerState.paused;
+        _display = 'PAUSED BY HOST';
+        _displayColor = Colors.orange;
+        _current = null; // Clear current stimulus
+      });
+      
+      _showFeedback('Paused by Host', Colors.orange);
+      HapticFeedback.mediumImpact();
+      
+      AppLogger.success('Drill paused from multiplayer sync', tag: 'Multiplayer');
+    } catch (e) {
+      AppLogger.error('Error pausing drill from sync', error: e, tag: 'Multiplayer');
+    }
   }
 
   void _resumeDrillFromSync() {
-    if (_state != DrillRunnerState.paused && !_isMultiplayerPaused) return;
+    if (_state != DrillRunnerState.paused && !_isMultiplayerPaused) {
+      AppLogger.warning('Cannot resume drill from sync in state: $_state, isMultiplayerPaused: $_isMultiplayerPaused', tag: 'Multiplayer');
+      return;
+    }
     
-    _isMultiplayerPaused = false;
-    _stopwatch.start();
-    _ticker = Timer.periodic(const Duration(milliseconds: 8), _onTick);
+    AppLogger.info('Resuming drill from multiplayer sync', tag: 'Multiplayer');
     
-    setState(() {
-      _state = DrillRunnerState.running;
-    });
-    
-    _showFeedback('Resumed by Host', Colors.green);
-    HapticFeedback.mediumImpact();
+    try {
+      _isMultiplayerPaused = false;
+      
+      // Restart the stopwatch and ticker
+      _stopwatch.start();
+      _ticker = Timer.periodic(const Duration(milliseconds: 8), _onTick);
+      
+      setState(() {
+        _state = DrillRunnerState.running;
+        _display = 'Ready'; // Reset display
+        _displayColor = Colors.white;
+      });
+      
+      _showFeedback('Resumed by Host', Colors.green);
+      HapticFeedback.mediumImpact();
+      
+      AppLogger.success('Drill resumed from multiplayer sync', tag: 'Multiplayer');
+    } catch (e) {
+      AppLogger.error('Error resuming drill from sync', error: e, tag: 'Multiplayer');
+    }
   }
 
   void _resumeDrill() {
@@ -820,18 +935,47 @@ class _DrillRunnerScreenState extends State<DrillRunnerScreen>
   }
 
   List<_Stimulus> _generateSchedule(Drill drill) {
-    final totalMs = drill.durationSec * 1000;
-    final rnd = Random();
-    // Spread evenly, add small jitter to avoid predictability
-    final baseInterval = (totalMs / max(1, drill.numberOfStimuli)).floor();
     final types = drill.stimulusTypes.isEmpty ? [StimulusType.color] : drill.stimulusTypes;
     final out = <_Stimulus>[];
+    
+    // Calculate timing based on drill mode
+    int currentTime = 0;
+    
     for (int i = 0; i < drill.numberOfStimuli; i++) {
       final t = types[i % types.length];
-      final targetMs = min(totalMs - 1, (i * baseInterval) + rnd.nextInt(max(1, baseInterval ~/ 3)));
-      out.add(_Stimulus(index: i, timeMs: targetMs, type: t, label: _labelFor(t, drill)));
+      
+      if (drill.drillMode == DrillMode.touch) {
+        // Touch mode: stimuli appear with delay between them
+        // First stimulus appears immediately, subsequent ones appear after delay
+        currentTime = i * drill.delayBetweenStimuliMs;
+      } else {
+        // Timed mode: stimuli appear and stay for stimulusLength, then delay before next
+        currentTime = i * (drill.stimulusLengthMs + drill.delayBetweenStimuliMs);
+      }
+      
+      // Handle custom stimuli differently to store the item ID
+      String? customStimulusItemId;
+      String label;
+      
+      if (t == StimulusType.custom) {
+        final customData = _generateCustomStimulusData(drill);
+        label = customData['label'] ?? '';
+        customStimulusItemId = customData['itemId'];
+      } else {
+        label = _labelFor(t, drill);
+      }
+      
+      out.add(_Stimulus(
+        index: i,
+        timeMs: currentTime,
+        type: t,
+        label: label,
+        customStimulusItemId: customStimulusItemId,
+      ));
     }
-    out.sort((a, b) => a.timeMs.compareTo(b.timeMs));
+    
+    AppLogger.debug('Generated schedule: ${out.length} stimuli, mode: ${drill.drillMode.name}, total duration: ${drill.durationSec}s', tag: 'DrillRunner');
+    
     return out;
   }
 
@@ -916,7 +1060,9 @@ class _DrillRunnerScreenState extends State<DrillRunnerScreen>
           }
         }
         AppLogger.warning('Falling back to Custom - no items found', tag: 'DrillRunner');
-        return 'Custom'; // Fallback if no custom stimuli available
+        // For visual mode, return empty string so the stimulus content builder can handle it
+        // For audio mode, return 'Custom' as fallback
+        return widget.drill.presentationMode == PresentationMode.audio ? 'Custom' : '';
       case StimulusType.color:
       default:
         // Enhanced color selection with validation
@@ -940,6 +1086,84 @@ class _DrillRunnerScreenState extends State<DrillRunnerScreen>
         
         return ''; // Empty for visual color display
     }
+  }
+
+  Map<String, String?> _generateCustomStimulusData(Drill drill) {
+    final rnd = Random();
+    
+    AppLogger.debug('Custom stimulus generation - customStimuliIds: ${drill.customStimuliIds}', tag: 'DrillRunner');
+    AppLogger.debug('Custom stimulus generation - cache size: ${_customStimuliCache.length}', tag: 'DrillRunner');
+    
+    if (drill.customStimuliIds.isNotEmpty && _customStimuliCache.isNotEmpty) {
+      // Find all selected custom stimulus items from all cached stimuli
+      final availableItems = <CustomStimulusItem>[];
+      final itemToStimulusMap = <String, CustomStimulus>{};
+      
+      for (final customStimulus in _customStimuliCache.values) {
+        AppLogger.debug('Checking stimulus: ${customStimulus.name} with ${customStimulus.items.length} items', tag: 'DrillRunner');
+        for (final item in customStimulus.items) {
+          AppLogger.debug('Checking item: ${item.id} (${item.name})', tag: 'DrillRunner');
+          if (drill.customStimuliIds.contains(item.id)) {
+            availableItems.add(item);
+            itemToStimulusMap[item.id] = customStimulus;
+            AppLogger.debug('Added item to available: ${item.name}', tag: 'DrillRunner');
+          }
+        }
+      }
+      
+      AppLogger.debug('Available items count: ${availableItems.length}', tag: 'DrillRunner');
+      
+      if (availableItems.isNotEmpty) {
+        // Get a random item from the selected ones
+        final randomItem = availableItems[rnd.nextInt(availableItems.length)];
+        final parentStimulus = itemToStimulusMap[randomItem.id]!;
+        
+        AppLogger.debug('Selected random item: ${randomItem.name} from ${parentStimulus.name}', tag: 'DrillRunner');
+        
+        // Return appropriate label based on item type
+        String label;
+        switch (parentStimulus.type) {
+          case CustomStimulusType.text:
+            label = randomItem.textValue ?? randomItem.name;
+            AppLogger.debug('Returning text value: $label', tag: 'DrillRunner');
+            break;
+          case CustomStimulusType.image:
+            label = randomItem.name; // Use name as label for images
+            AppLogger.debug('Returning image name: $label', tag: 'DrillRunner');
+            break;
+          case CustomStimulusType.shape:
+            label = randomItem.shapeType ?? randomItem.name;
+            AppLogger.debug('Returning shape value: $label', tag: 'DrillRunner');
+            break;
+          case CustomStimulusType.color:
+            // For colors, we might want to set the display color
+            if (randomItem.color != null) {
+              _displayColor = randomItem.color!;
+              label = drill.presentationMode == PresentationMode.audio
+                  ? randomItem.name
+                  : '';
+              AppLogger.debug('Returning color value: $label', tag: 'DrillRunner');
+            } else {
+              label = randomItem.name;
+              AppLogger.debug('Returning color name: $label', tag: 'DrillRunner');
+            }
+            break;
+        }
+        
+        return {
+          'label': label,
+          'itemId': randomItem.id,
+        };
+      }
+    }
+    
+    AppLogger.warning('Falling back to Custom - no items found', tag: 'DrillRunner');
+    // For visual mode, return empty string so the stimulus content builder can handle it
+    // For audio mode, return 'Custom' as fallback
+    return {
+      'label': drill.presentationMode == PresentationMode.audio ? 'Custom' : '',
+      'itemId': null,
+    };
   }
 
   void _start() {
@@ -1035,37 +1259,122 @@ class _DrillRunnerScreenState extends State<DrillRunnerScreen>
   void _onTick(Timer timer) {
     final ms = _stopwatch.elapsedMilliseconds;
     
-    // Check for missed stimuli (stimuli that were shown but not responded to)
-    if (_current != null && ms > _current!.timeMs + 1500) { // 1.5s timeout for response
-      _handleMissedStimulus(_current!);
-      _current = null;
+    // Handle stimulus hiding in timed mode
+    if (widget.drill.drillMode == DrillMode.timed && _current != null) {
+      // Check if stimulus should be hidden (after stimulusLengthMs)
+      if (ms > _current!.timeMs + widget.drill.stimulusLengthMs) {
+        // Hide the stimulus by clearing the display
+        setState(() {
+          _display = '';
+          _displayColor = Colors.transparent;
+        });
+        _current = null;
+      }
+    } else if (widget.drill.drillMode == DrillMode.touch && _current != null) {
+      // Touch mode: Check if next stimulus is about to appear
+      // Mark current as missed only if next stimulus is coming and user hasn't tapped
+      if (_currentIndex + 1 < _schedule.length &&
+          ms >= _schedule[_currentIndex + 1].timeMs - 100) { // 100ms buffer before next stimulus
+        _handleMissedStimulus(_current!);
+        _current = null;
+      }
     }
     
     // Advance stimulus when time passes
     // In multiplayer mode, only the host generates and broadcasts stimuli
     if (_currentIndex + 1 < _schedule.length && ms >= _schedule[_currentIndex + 1].timeMs) {
-      _currentIndex++;
-      _current = _schedule[_currentIndex];
       
-      // Generate display color for color stimuli
-      Color stimulusColor = Colors.white;
-      if (_current!.type == StimulusType.color) {
-        stimulusColor = _getRandomColor();
+      // In multiplayer mode, completely separate host and participant behavior
+      if (widget.isMultiplayerMode) {
+        if (widget.isHost && _syncService != null) {
+          // Host: Generate stimulus data and broadcast to participants
+          _currentIndex++;
+          _current = _schedule[_currentIndex];
+          
+          Color stimulusColor = Colors.white;
+          String stimulusLabel = _current!.label;
+          
+          // Generate the actual stimulus data based on type
+          if (_current!.type == StimulusType.color) {
+            stimulusColor = _getRandomColor();
+            // For color stimuli, regenerate label if needed for audio mode
+            if (widget.drill.presentationMode == PresentationMode.audio) {
+              stimulusLabel = _getColorName(stimulusColor);
+            }
+          } else if (_current!.type == StimulusType.custom) {
+            // For custom stimuli, ensure we have the proper data
+            if (_current!.customStimulusItemId != null) {
+              // Find the custom stimulus item to get proper display data
+              for (final customStimulus in _customStimuliCache.values) {
+                for (final item in customStimulus.items) {
+                  if (item.id == _current!.customStimulusItemId) {
+                    // Update stimulus data based on custom stimulus type
+                    switch (customStimulus.type) {
+                      case CustomStimulusType.color:
+                        if (item.color != null) {
+                          stimulusColor = item.color!;
+                          stimulusLabel = widget.drill.presentationMode == PresentationMode.audio
+                              ? item.name
+                              : '';
+                        }
+                        break;
+                      case CustomStimulusType.text:
+                        stimulusLabel = item.textValue ?? item.name;
+                        break;
+                      case CustomStimulusType.shape:
+                        stimulusLabel = item.shapeType ?? item.name;
+                        break;
+                      case CustomStimulusType.image:
+                        stimulusLabel = item.name;
+                        break;
+                    }
+                    break;
+                  }
+                }
+              }
+            }
+          }
+          
+          // Broadcast the exact stimulus data to participants
+          final stimulusData = {
+            'stimulusType': _current!.type.name,
+            'label': stimulusLabel,
+            'colorValue': stimulusColor.value,
+            'timeMs': _current!.timeMs,
+            'index': _current!.index,
+            'timestamp': DateTime.now().millisecondsSinceEpoch,
+          };
+          
+          // Add custom stimulus item ID if it's a custom stimulus
+          if (_current!.type == StimulusType.custom && _current!.customStimulusItemId != null) {
+            stimulusData['customStimulusItemId'] = _current!.customStimulusItemId!;
+            AppLogger.debug('Broadcasting custom stimulus with itemId: ${_current!.customStimulusItemId}', tag: 'Multiplayer');
+          }
+          
+          _syncService!.broadcastStimulus(stimulusData);
+          
+          // Show the stimulus locally on host
+          _showStimulus(stimulusLabel, stimulusColor, _current!.type);
+        }
+        // Participants: Do NOTHING here - they only respond to broadcasts
+        // This prevents participants from generating their own stimuli
+      } else {
+        // Single player mode: Generate and show stimulus normally
+        _currentIndex++;
+        _current = _schedule[_currentIndex];
+        
+        Color stimulusColor = Colors.white;
+        String stimulusLabel = _current!.label;
+        
+        if (_current!.type == StimulusType.color) {
+          stimulusColor = _getRandomColor();
+          if (widget.drill.presentationMode == PresentationMode.audio) {
+            stimulusLabel = _getColorName(stimulusColor);
+          }
+        }
+        
+        _showStimulus(stimulusLabel, stimulusColor, _current!.type);
       }
-      
-      // If host in multiplayer mode, broadcast the stimulus to participants
-      if (widget.isMultiplayerMode && widget.isHost && _syncService != null) {
-        _syncService!.broadcastStimulus(
-          stimulusType: _current!.type.name,
-          label: _current!.label,
-          colorValue: stimulusColor.value,
-          timeMs: _current!.timeMs,
-          index: _current!.index,
-        );
-      }
-      
-      // Show the stimulus locally
-      _showStimulus(_current!.label, stimulusColor, _current!.type);
     }
 
     // End of current rep
@@ -1133,6 +1442,9 @@ class _DrillRunnerScreenState extends State<DrillRunnerScreen>
   void _registerTap() {
     if (_state != DrillRunnerState.running) return;
     
+    // Disable tap interaction for timed mode drills
+    if (widget.drill.drillMode == DrillMode.timed) return;
+    
     final current = _current;
     if (current == null) return;
     
@@ -1152,13 +1464,17 @@ class _DrillRunnerScreenState extends State<DrillRunnerScreen>
     
     if (correct) {
       _score++;
-      _showFeedback('Great!', Colors.green);
-      SystemSound.play(SystemSoundType.click);
-      HapticFeedback.mediumImpact();
+      if (widget.drill.drillMode == DrillMode.touch) {
+        _showFeedback('Great!', Colors.green);
+        SystemSound.play(SystemSoundType.click);
+        HapticFeedback.mediumImpact();
+      }
     } else {
-      _showFeedback('Too slow!', Colors.red);
-      SystemSound.play(SystemSoundType.alert);
-      HapticFeedback.heavyImpact();
+      if (widget.drill.drillMode == DrillMode.touch) {
+        _showFeedback('Too slow!', Colors.red);
+        SystemSound.play(SystemSoundType.alert);
+        HapticFeedback.heavyImpact();
+      }
     }
     
     // Move to next stimulus quickly to avoid double hits
@@ -1179,9 +1495,12 @@ class _DrillRunnerScreenState extends State<DrillRunnerScreen>
     _events.add(event);
     _currentRepEvents.add(event);
     
-    _showFeedback('Missed!', Colors.orange);
-    SystemSound.play(SystemSoundType.alert);
-    HapticFeedback.lightImpact();
+    // Only show missed feedback in touch mode
+    if (widget.drill.drillMode == DrillMode.touch) {
+      _showFeedback('Missed!', Colors.orange);
+      SystemSound.play(SystemSoundType.alert);
+      HapticFeedback.lightImpact();
+    }
   }
 
   Color _getRandomColor() {
@@ -1254,11 +1573,12 @@ void _completeRep() {
       AppLogger.debug('Updated set ${_setResults.last.setNumber}: ${_setResults.last.repResults.length} reps', tag: 'DrillRunner');
     }
     
-    HapticFeedback.heavyImpact();
-    SystemSound.play(SystemSoundType.click);
-    
-    // Show set completion feedback
-    _showFeedback('Set $_currentSet Complete!', Colors.green);
+    // Only show set completion feedback in touch mode
+    if (widget.drill.drillMode == DrillMode.touch) {
+      HapticFeedback.heavyImpact();
+      SystemSound.play(SystemSoundType.click);
+      _showFeedback('Set $_currentSet Complete!', Colors.green);
+    }
     
     // Check if all sets are complete
     if (_currentSet >= _safeSetCount) {
@@ -1267,6 +1587,12 @@ void _completeRep() {
       setState(() {
         _state = DrillRunnerState.finished;
       });
+      
+      // In multiplayer mode, host should notify participants that drill is complete
+      if (widget.isMultiplayerMode && widget.isHost && _syncService != null) {
+        _syncService!.stopDrill(); // This will notify participants
+      }
+      
       Future.delayed(const Duration(milliseconds: 1500), () {
         _finish();
       });
@@ -1503,9 +1829,9 @@ void _completeRep() {
           // Check drill mode
           if (widget.drill.drillMode == DrillMode.timed) {
             // For Timed mode: skip results and go directly to drill library
+            AppLogger.info('Timed mode drill completed, navigating to /drills', tag: 'DrillRunner');
             if (mounted && context.mounted) {
-              context.go('/drills');
-              // Show completion message
+              // Show completion message first
               ScaffoldMessenger.of(context).showSnackBar(
                 SnackBar(
                   content: const Text('Drill completed! 🎉'),
@@ -1513,6 +1839,12 @@ void _completeRep() {
                   duration: const Duration(seconds: 2),
                 ),
               );
+              // Navigate after a small delay to allow snackbar to show
+              Future.delayed(const Duration(milliseconds: 100), () {
+                if (mounted && context.mounted) {
+                  context.go('/drills');
+                }
+              });
             }
           } else {
             // For Touch mode: Navigate to drill results screen with detailed set results
@@ -1717,16 +2049,19 @@ void _completeRep() {
                 '$_currentRep/${widget.drill.reps}',
                 Icons.repeat,
               ),
-              _buildStatItem(
-                'Score',
-                '$_score/${widget.drill.numberOfStimuli}',
-                Icons.star,
-              ),
-              _buildStatItem(
-                'Accuracy',
-                _events.isEmpty ? '0%' : '${((_score / _events.length) * 100).toStringAsFixed(0)}%',
-                Icons.gps_fixed,
-              ),
+              // Only show score and accuracy in touch mode
+              if (widget.drill.drillMode == DrillMode.touch) ...[
+                _buildStatItem(
+                  'Score',
+                  '$_score/${widget.drill.numberOfStimuli}',
+                  Icons.star,
+                ),
+                _buildStatItem(
+                  'Accuracy',
+                  _events.isEmpty ? '0%' : '${((_score / _events.length) * 100).toStringAsFixed(0)}%',
+                  Icons.gps_fixed,
+                ),
+              ],
             ],
           ),
           
@@ -1823,178 +2158,211 @@ void _completeRep() {
     
     final isActive = _current != null && _getCurrentZone() == zone;
     
-    // Calculate size based on available space - much larger for better visibility
-    final availableSize = constraints.maxHeight.clamp(200.0, 600.0);
-    final stimulusSize = availableSize * 0.6; // 60% of available height
-    final fontSize = stimulusSize * 0.4; // 40% of stimulus size
-    final iconSize = stimulusSize * 0.25; // 25% of stimulus size
+    // Use full screen for stimulus display
+    final fontSize = constraints.maxHeight * 0.3; // 30% of screen height for text
+    final iconSize = constraints.maxHeight * 0.15; // 15% of screen height for icons
     
-    return Positioned(
-      left: (constraints.maxWidth - stimulusSize) / 2,
-      top: (constraints.maxHeight - stimulusSize) / 2,
-      child: GestureDetector(
-        onTap: () => _registerZoneTap(zone),
-        child: AnimatedBuilder(
-          animation: _stimulusScaleAnimation,
-          builder: (context, child) {
-            return Transform.scale(
-              scale: isActive ? _stimulusScaleAnimation.value : 0.8,
-              child: AnimatedBuilder(
-                animation: _pulseAnimation,
-                builder: (context, child) {
-                  return Transform.scale(
-                    scale: isActive ? _pulseAnimation.value : 1.0,
-                    child: Container(
-                      width: stimulusSize,
-                      height: stimulusSize,
-                      alignment: Alignment.center,
-                      decoration: BoxDecoration(
-                        color: isActive
-                            ? (_current?.type == StimulusType.color || _current?.type == StimulusType.custom ? _displayColor : Colors.white.withOpacity(0.9))
-                            : Colors.white.withOpacity(0.1),
-                        borderRadius: BorderRadius.circular(stimulusSize / 2),
-                        border: Border.all(
-                          color: isActive
-                              ? Colors.white.withOpacity(0.9)
-                              : Colors.white.withOpacity(0.3),
-                          width: isActive ? 6 : 3,
-                        ),
-                        boxShadow: isActive ? [
-                          BoxShadow(
-                            color: (_current?.type == StimulusType.color || _current?.type == StimulusType.custom
-                                ? _displayColor
-                                : Colors.white).withOpacity(0.5),
-                            blurRadius: 40,
-                            spreadRadius: 15,
-                          ),
-                        ] : null,
-                      ),
-                      child: isActive ? _buildStimulusContent(fontSize) : Icon(
-                        _getZoneIcon(zone),
-                        color: Colors.white.withOpacity(0.5),
-                        size: iconSize,
-                      ),
-                    ),
-                  );
-                },
-              ),
-            );
-          },
+    return Positioned.fill(
+      child: Padding(
+        padding: const EdgeInsets.all(10),
+        child: GestureDetector(
+          onTap: () => _registerZoneTap(zone),
+          child: Container(
+            width: constraints.maxWidth - 20,
+            height: constraints.maxHeight - 20,
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+              color: isActive
+                  ? (_current?.type == StimulusType.color || _current?.type == StimulusType.custom ? _displayColor : Colors.white)
+                  : Colors.transparent,
+            ),
+            child: isActive ? _buildStimulusContent(fontSize) : Icon(
+              _getZoneIcon(zone),
+              color: Colors.white.withOpacity(0.3),
+              size: iconSize,
+            ),
+          ),
         ),
       ),
     );
   }
 
   Widget _buildStimulusContent(double fontSize) {
+    AppLogger.debug('_buildStimulusContent called - current type: ${_current?.type}, fontSize: $fontSize', tag: 'DrillRunner');
+    
     if (_current?.type == StimulusType.custom) {
       // Handle custom stimulus display
       final drill = widget.drill;
       AppLogger.debug('Building custom stimulus content - customStimuliIds: ${drill.customStimuliIds.length}, cache: ${_customStimuliCache.length}', tag: 'DrillRunner');
-      AppLogger.debug('Current stimulus label: "${_current?.label}", display: "$_display"', tag: 'DrillRunner');
+      AppLogger.debug('Current stimulus customStimulusItemId: "${_current?.customStimulusItemId}", label: "${_current?.label}"', tag: 'DrillRunner');
+      AppLogger.debug('Cache keys: ${_customStimuliCache.keys.toList()}', tag: 'DrillRunner');
       
       if (drill.customStimuliIds.isNotEmpty && _customStimuliCache.isNotEmpty) {
-        // Find the current stimulus item based on the current stimulus label
         CustomStimulusItem? currentItem;
         CustomStimulus? parentStimulus;
         
-        // Search through all cached stimuli to find the item that matches current display
-        for (final customStimulus in _customStimuliCache.values) {
-          AppLogger.debug('Checking stimulus: ${customStimulus.name} (${customStimulus.type}) with ${customStimulus.items.length} items', tag: 'DrillRunner');
-          for (final item in customStimulus.items) {
-            if (drill.customStimuliIds.contains(item.id)) {
-              // Check if this item matches the current display
-              bool isMatch = false;
-              
-              switch (customStimulus.type) {
-                case CustomStimulusType.text:
-                  isMatch = (item.textValue ?? item.name) == _current?.label;
-                  AppLogger.debug('Text match check: "${item.textValue ?? item.name}" == "${_current?.label}" = $isMatch', tag: 'DrillRunner');
-                  break;
-                case CustomStimulusType.image:
-                  isMatch = item.name == _current?.label;
-                  AppLogger.debug('Image match check: "${item.name}" == "${_current?.label}" = $isMatch', tag: 'DrillRunner');
-                  break;
-                case CustomStimulusType.shape:
-                  isMatch = (item.shapeType ?? item.name) == _current?.label;
-                  AppLogger.debug('Shape match check: "${item.shapeType ?? item.name}" == "${_current?.label}" = $isMatch', tag: 'DrillRunner');
-                  break;
-                case CustomStimulusType.color:
-                  isMatch = item.name == _current?.label ||
-                           (item.color != null && item.color == _displayColor);
-                  AppLogger.debug('Color match check: "${item.name}" == "${_current?.label}" OR color match = $isMatch', tag: 'DrillRunner');
-                  break;
-              }
-              
-              if (isMatch) {
+        // First, try to find the item by the stored customStimulusItemId
+        if (_current?.customStimulusItemId != null) {
+          AppLogger.debug('Looking for custom stimulus item by ID: ${_current!.customStimulusItemId}', tag: 'DrillRunner');
+          
+          for (final customStimulus in _customStimuliCache.values) {
+            for (final item in customStimulus.items) {
+              if (item.id == _current!.customStimulusItemId) {
                 currentItem = item;
                 parentStimulus = customStimulus;
-                AppLogger.success('Found matching custom stimulus item: ${item.name} (${customStimulus.type})', tag: 'DrillRunner');
+                AppLogger.success('Found custom stimulus item by ID: ${item.name} (${customStimulus.type})', tag: 'DrillRunner');
                 break;
               }
             }
+            if (currentItem != null) break;
           }
-          if (currentItem != null) break;
+        }
+        
+        // If no item found by ID, fall back to any available custom stimulus item
+        if (currentItem == null) {
+          AppLogger.debug('No item found by ID, trying to get any available custom stimulus item', tag: 'DrillRunner');
+          for (final customStimulus in _customStimuliCache.values) {
+            for (final item in customStimulus.items) {
+              if (drill.customStimuliIds.contains(item.id)) {
+                currentItem = item;
+                parentStimulus = customStimulus;
+                AppLogger.success('Using available custom stimulus item: ${item.name} (${customStimulus.type})', tag: 'DrillRunner');
+                break;
+              }
+            }
+            if (currentItem != null) break;
+          }
         }
         
         // Display the found custom stimulus item
         if (currentItem != null && parentStimulus != null) {
+          AppLogger.success('Displaying custom stimulus: ${currentItem.name} (${parentStimulus.type})', tag: 'DrillRunner');
           switch (parentStimulus.type) {
             case CustomStimulusType.image:
-              if (currentItem.imageBase64 != null) {
+              if (currentItem.imageBase64 != null && currentItem.imageBase64!.isNotEmpty) {
+                AppLogger.debug('Processing custom image: ${currentItem.name}', tag: 'DrillRunner');
+                AppLogger.debug('Base64 string length: ${currentItem.imageBase64!.length}', tag: 'DrillRunner');
+                AppLogger.debug('Base64 string starts with: ${currentItem.imageBase64!.substring(0, currentItem.imageBase64!.length > 50 ? 50 : currentItem.imageBase64!.length)}...', tag: 'DrillRunner');
+                
                 try {
                   // Handle both data URL format and plain base64
-                  String base64String = currentItem.imageBase64!;
+                  String base64String = currentItem.imageBase64!.trim();
+                  
+                  // Remove data URL prefix if present
                   if (base64String.startsWith('data:')) {
-                    // Extract base64 part from data URL (e.g., "data:image/png;base64,...")
+                    AppLogger.debug('Detected data URL format, extracting base64 part', tag: 'DrillRunner');
                     final commaIndex = base64String.indexOf(',');
                     if (commaIndex != -1) {
                       base64String = base64String.substring(commaIndex + 1);
+                      AppLogger.debug('Extracted base64 part, new length: ${base64String.length}', tag: 'DrillRunner');
                     }
                   }
                   
+                  // Clean up the base64 string - remove any whitespace or newlines
+                  base64String = base64String.replaceAll(RegExp(r'\s+'), '');
+                  AppLogger.debug('Cleaned base64 string length: ${base64String.length}', tag: 'DrillRunner');
+                  
+                  // Validate base64 string
+                  if (base64String.isEmpty) {
+                    throw Exception('Base64 string is empty after processing');
+                  }
+                  
+                  // Ensure proper base64 padding
+                  while (base64String.length % 4 != 0) {
+                    base64String += '=';
+                  }
+                  
+                  AppLogger.debug('Attempting to decode base64 string...', tag: 'DrillRunner');
                   final bytes = base64Decode(base64String);
+                  AppLogger.success('Successfully decoded custom image: ${bytes.length} bytes', tag: 'DrillRunner');
+                  
+                  AppLogger.success('Creating Image.memory widget with ${bytes.length} bytes', tag: 'DrillRunner');
                   return ClipRRect(
-                    borderRadius: BorderRadius.circular(8),
+                    borderRadius: BorderRadius.circular(16),
                     child: Image.memory(
                       bytes,
-                      width: fontSize * 2,
-                      height: fontSize * 2,
-                      fit: BoxFit.cover,
+                      width: fontSize * 3,
+                      height: fontSize * 3,
+                      fit: BoxFit.contain,
+                      gaplessPlayback: true,
+                      filterQuality: FilterQuality.medium,
                       errorBuilder: (context, error, stackTrace) {
-                        AppLogger.error('Failed to display custom image', error: error, tag: 'DrillRunner');
+                        AppLogger.error('Image.memory failed to display image', error: error, stackTrace: stackTrace, tag: 'DrillRunner');
                         return Container(
-                          width: fontSize * 2,
-                          height: fontSize * 2,
+                          width: fontSize * 3,
+                          height: fontSize * 3,
                           decoration: BoxDecoration(
-                            color: Colors.grey[300],
-                            borderRadius: BorderRadius.circular(8),
+                            color: Colors.orange[300],
+                            borderRadius: BorderRadius.circular(16),
+                            border: Border.all(color: Colors.orange[600]!, width: 2),
                           ),
-                          child: Icon(
-                            Icons.broken_image,
-                            size: fontSize,
-                            color: Colors.grey[600],
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(
+                                Icons.broken_image,
+                                size: fontSize * 0.8,
+                                color: Colors.orange[800],
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                'Image Error',
+                                style: TextStyle(
+                                  color: Colors.orange[800],
+                                  fontSize: fontSize * 0.2,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                            ],
                           ),
                         );
                       },
                     ),
                   );
-                } catch (e) {
-                  AppLogger.error('Failed to decode custom image', error: e, tag: 'DrillRunner');
-                  // Return error placeholder instead of breaking
+                } catch (e, stackTrace) {
+                  AppLogger.error('Failed to decode/display custom image: ${currentItem.name}', error: e, stackTrace: stackTrace, tag: 'DrillRunner');
+                  // Return detailed error placeholder
                   return Container(
-                    width: fontSize * 2,
-                    height: fontSize * 2,
+                    width: fontSize * 3,
+                    height: fontSize * 3,
                     decoration: BoxDecoration(
                       color: Colors.red[100],
-                      borderRadius: BorderRadius.circular(8),
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(color: Colors.red[400]!, width: 2),
                     ),
-                    child: Icon(
-                      Icons.error,
-                      size: fontSize,
-                      color: Colors.red,
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(
+                          Icons.error_outline,
+                          size: fontSize * 0.8,
+                          color: Colors.red[700],
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          'Decode Error',
+                          style: TextStyle(
+                            color: Colors.red[700],
+                            fontSize: fontSize * 0.2,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                        Text(
+                          currentItem.name,
+                          style: TextStyle(
+                            color: Colors.red[600],
+                            fontSize: fontSize * 0.15,
+                          ),
+                          textAlign: TextAlign.center,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ],
                     ),
                   );
                 }
+              } else {
+                AppLogger.warning('Custom image item has no imageBase64 data', tag: 'DrillRunner');
               }
               break;
             case CustomStimulusType.color:
@@ -2027,39 +2395,231 @@ void _completeRep() {
                   : (currentItem.shapeType ?? currentItem.name);
               return Text(
                 displayText,
+                textAlign: TextAlign.center,
                 style: TextStyle(
                   color: Colors.white,
-                  fontSize: fontSize,
+                  fontSize: fontSize * 1.2,
                   fontWeight: FontWeight.bold,
+                  letterSpacing: 2.0,
                   shadows: [
                     Shadow(
-                      color: Colors.black.withOpacity(0.7),
-                      blurRadius: 15,
+                      color: Colors.black.withOpacity(0.8),
+                      blurRadius: 20,
+                      offset: const Offset(0, 4),
                     ),
                   ],
                 ),
               );
           }
+        } else {
+          AppLogger.warning('No matching custom stimulus item found', tag: 'DrillRunner');
         }
       } else {
         AppLogger.warning('No custom stimuli IDs or cache is empty', tag: 'DrillRunner');
       }
+      
+      // If we reach here and it's a custom stimulus, try to get any available custom stimulus item
+      if (_current?.type == StimulusType.custom && drill.customStimuliIds.isNotEmpty && _customStimuliCache.isNotEmpty) {
+        AppLogger.debug('Attempting to display any available custom stimulus item as fallback', tag: 'DrillRunner');
+        
+        // Get any available custom stimulus item as fallback
+        for (final customStimulus in _customStimuliCache.values) {
+          for (final item in customStimulus.items) {
+            if (drill.customStimuliIds.contains(item.id)) {
+              AppLogger.success('Using fallback custom stimulus item: ${item.name} (${customStimulus.type})', tag: 'DrillRunner');
+              
+              switch (customStimulus.type) {
+                case CustomStimulusType.image:
+                  if (item.imageBase64 != null && item.imageBase64!.isNotEmpty) {
+                    try {
+                      // Handle both data URL format and plain base64
+                      String base64String = item.imageBase64!;
+                      if (base64String.startsWith('data:')) {
+                        final commaIndex = base64String.indexOf(',');
+                        if (commaIndex != -1) {
+                          base64String = base64String.substring(commaIndex + 1);
+                        }
+                      }
+                      
+                      final bytes = base64Decode(base64String);
+                      return ClipRRect(
+                        borderRadius: BorderRadius.circular(16),
+                        child: Image.memory(
+                          bytes,
+                          width: fontSize * 3,
+                          height: fontSize * 3,
+                          fit: BoxFit.contain,
+                          errorBuilder: (context, error, stackTrace) {
+                            AppLogger.error('Failed to display fallback custom image', error: error, tag: 'DrillRunner');
+                            return Container(
+                              width: fontSize * 3,
+                              height: fontSize * 3,
+                              decoration: BoxDecoration(
+                                color: Colors.grey[800],
+                                borderRadius: BorderRadius.circular(16),
+                                border: Border.all(color: Colors.grey[600]!, width: 2),
+                              ),
+                              child: Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Icon(
+                                    Icons.image_outlined,
+                                    size: fontSize,
+                                    color: Colors.grey[400],
+                                  ),
+                                  const SizedBox(height: 8),
+                                  Text(
+                                    'Custom',
+                                    style: TextStyle(
+                                      color: Colors.grey[400],
+                                      fontSize: fontSize * 0.3,
+                                      fontWeight: FontWeight.w500,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            );
+                          },
+                        ),
+                      );
+                    } catch (e) {
+                      AppLogger.error('Failed to decode fallback custom image', error: e, tag: 'DrillRunner');
+                    }
+                  }
+                  break;
+                case CustomStimulusType.color:
+                  // For color stimuli, the background color is already set via _displayColor
+                  if (widget.drill.presentationMode == PresentationMode.audio) {
+                    return Text(
+                      item.name,
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: fontSize,
+                        fontWeight: FontWeight.bold,
+                        shadows: [
+                          Shadow(
+                            color: Colors.black.withOpacity(0.7),
+                            blurRadius: 15,
+                          ),
+                        ],
+                      ),
+                    );
+                  } else {
+                    return const SizedBox.shrink();
+                  }
+                case CustomStimulusType.text:
+                case CustomStimulusType.shape:
+                  final displayText = customStimulus.type == CustomStimulusType.text
+                      ? (item.textValue ?? item.name)
+                      : (item.shapeType ?? item.name);
+                  return Text(
+                    displayText,
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: fontSize * 1.2,
+                      fontWeight: FontWeight.bold,
+                      letterSpacing: 2.0,
+                      shadows: [
+                        Shadow(
+                          color: Colors.black.withOpacity(0.8),
+                          blurRadius: 20,
+                          offset: const Offset(0, 4),
+                        ),
+                      ],
+                    ),
+                  );
+              }
+              break; // Exit after finding first available item
+            }
+          }
+          break; // Exit after finding first available item
+        }
+      }
+      
+      // For custom stimuli that couldn't be found, show a placeholder in visual mode
+      AppLogger.warning('Custom stimulus not found, showing placeholder', tag: 'DrillRunner');
+      return Container(
+        width: fontSize * 3,
+        height: fontSize * 3,
+        decoration: BoxDecoration(
+          color: Colors.grey[800],
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: Colors.grey[600]!, width: 2),
+        ),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              Icons.image_outlined,
+              size: fontSize,
+              color: Colors.grey[400],
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Custom',
+              style: TextStyle(
+                color: Colors.grey[400],
+                fontSize: fontSize * 0.3,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ],
+        ),
+      );
     }
     
-    // Default text display for all other cases
-    AppLogger.debug('Falling back to default text display: "$_display"', tag: 'DrillRunner');
+    // Default text display for all other cases (non-custom stimuli)
+    AppLogger.debug('Falling back to default text display: "$_display", current type: ${_current?.type}', tag: 'DrillRunner');
+    
+    // If _display is empty and it's a custom stimulus, show a fallback
+    if ((_display.isEmpty || _display == '') && _current?.type == StimulusType.custom) {
+      AppLogger.warning('Empty display for custom stimulus, showing fallback', tag: 'DrillRunner');
+      return Container(
+        width: fontSize * 3,
+        height: fontSize * 3,
+        decoration: BoxDecoration(
+          color: Colors.orange[800],
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: Colors.orange[600]!, width: 2),
+        ),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              Icons.help_outline,
+              size: fontSize,
+              color: Colors.white,
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Custom',
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: fontSize * 0.3,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+    
     return Text(
       _display,
+      textAlign: TextAlign.center,
       style: TextStyle(
         color: _current?.type == StimulusType.color || _current?.type == StimulusType.custom
             ? Colors.white
             : Colors.black,
-        fontSize: fontSize,
+        fontSize: fontSize * 1.2,
         fontWeight: FontWeight.bold,
+        letterSpacing: 2.0,
         shadows: [
           Shadow(
-            color: Colors.black.withOpacity(0.7),
-            blurRadius: 15,
+            color: Colors.black.withOpacity(0.8),
+            blurRadius: 20,
+            offset: const Offset(0, 4),
           ),
         ],
       ),
@@ -2105,9 +2665,11 @@ void _completeRep() {
     final isCorrectZone = zone == correctZone;
     
     if (!isCorrectZone) {
-      _showFeedback('Wrong Zone!', Colors.orange);
-      SystemSound.play(SystemSoundType.alert);
-      HapticFeedback.heavyImpact();
+      if (widget.drill.drillMode == DrillMode.touch) {
+        _showFeedback('Wrong Zone!', Colors.orange);
+        SystemSound.play(SystemSoundType.alert);
+        HapticFeedback.heavyImpact();
+      }
       return;
     }
     
@@ -2576,6 +3138,11 @@ void _completeRep() {
           ),
           TextButton.icon(
             onPressed: () {
+              // If in multiplayer mode and participant, notify host about stopping
+              if (widget.isMultiplayerMode && !widget.isHost && _syncService != null) {
+                _syncService!.stopDrill();
+              }
+              
               if (Navigator.of(context).canPop()) {
                 Navigator.of(context).pop();
               }
@@ -2637,7 +3204,14 @@ class _Stimulus {
   final int timeMs;
   final StimulusType type;
   final String label;
-  _Stimulus({required this.index, required this.timeMs, required this.type, required this.label});
+  final String? customStimulusItemId; // Store the actual custom stimulus item ID
+  _Stimulus({
+    required this.index,
+    required this.timeMs,
+    required this.type,
+    required this.label,
+    this.customStimulusItemId,
+  });
 }
 
 enum DrillRunnerState {
