@@ -81,13 +81,18 @@ class SyncMessage extends Equatable {
     required String senderId,
     required String senderName,
     String? targetId,
+    int? currentTimeMs,
+    int? currentIndex,
   }) {
     return SyncMessage(
       type: SyncMessageType.drillPause,
       senderId: senderId,
       senderName: senderName,
       targetId: targetId,
-      data: {},
+      data: {
+        if (currentTimeMs != null) 'currentTimeMs': currentTimeMs,
+        if (currentIndex != null) 'currentIndex': currentIndex,
+      },
       timestamp: DateTime.now(),
       messageId: DateTime.now().millisecondsSinceEpoch.toString(),
     );
@@ -98,13 +103,18 @@ class SyncMessage extends Equatable {
     required String senderId,
     required String senderName,
     String? targetId,
+    int? currentTimeMs,
+    int? currentIndex,
   }) {
     return SyncMessage(
       type: SyncMessageType.drillResume,
       senderId: senderId,
       senderName: senderName,
       targetId: targetId,
-      data: {},
+      data: {
+        if (currentTimeMs != null) 'currentTimeMs': currentTimeMs,
+        if (currentIndex != null) 'currentIndex': currentIndex,
+      },
       timestamp: DateTime.now(),
       messageId: DateTime.now().millisecondsSinceEpoch.toString(),
     );

@@ -13,6 +13,10 @@ import 'package:spark_app/features/admin/services/custom_stimulus_service.dart';
 import 'package:image_picker/image_picker.dart';
 import 'dart:io';
 import 'dart:convert';
+import 'package:spark_app/core/theme/app_theme.dart';
+import 'package:spark_app/core/widgets/profile_avatar.dart';
+import 'package:spark_app/features/profile/services/profile_service.dart';
+import 'package:spark_app/features/sharing/domain/user_profile.dart';
 
 class DrillBuilderScreen extends StatefulWidget {
   final Drill? initial;
@@ -27,6 +31,8 @@ class _DrillBuilderScreenState extends State<DrillBuilderScreen>
   final _formKey = GlobalKey<FormState>();
   final _uuid = const Uuid();
   final _pageController = PageController();
+  late ProfileService _profileService;
+  UserProfile? _userProfile;
 
   late TextEditingController _name;
   late TextEditingController _description;
@@ -41,7 +47,7 @@ class _DrillBuilderScreenState extends State<DrillBuilderScreen>
   int _duration = 60;
   int _rest = 30;
   int _sets = 1;
-  int _reps = 3;
+  int _reps = 1; // Fixed to 1, no longer configurable
   int _numberOfStimuli = 30;
   int _stimulusLengthMs = 1000; // 1 second default for Timed mode
   int _delayBetweenStimuliMs = 500; // 500ms default delay between stimuli
@@ -82,6 +88,9 @@ class _DrillBuilderScreenState extends State<DrillBuilderScreen>
   @override
   void initState() {
     super.initState();
+
+    _profileService = getIt<ProfileService>();
+    _loadUserProfile();
 
     _animationController = AnimationController(
       duration: const Duration(milliseconds: 300),
@@ -384,15 +393,7 @@ class _DrillBuilderScreenState extends State<DrillBuilderScreen>
       centerTitle: true,
       flexibleSpace: Container(
         decoration: BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [
-              colorScheme.primary,
-              colorScheme.primary.withOpacity(0.9),
-              colorScheme.secondary.withOpacity(0.8),
-            ],
-          ),
+          color: AppTheme.goldPrimary,
         ),
       ),
       actions: [
@@ -409,6 +410,19 @@ class _DrillBuilderScreenState extends State<DrillBuilderScreen>
         const SizedBox(width: 8),
       ],
     );
+  }
+
+  Future<void> _loadUserProfile() async {
+    try {
+      final profile = await _profileService.getCurrentUserProfile();
+      if (mounted) {
+        setState(() {
+          _userProfile = profile;
+        });
+      }
+    } catch (e) {
+      print('❌ Error loading user profile: $e');
+    }
   }
 
   Widget _buildProgressIndicator() {
@@ -916,17 +930,9 @@ class _DrillBuilderScreenState extends State<DrillBuilderScreen>
       
         padding: const EdgeInsets.all(20),
         decoration: BoxDecoration(
-          gradient: isSelected
-              ? LinearGradient(
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                  colors: [
-                    colorScheme.primaryContainer.withOpacity(0.4),
-                    colorScheme.primaryContainer.withOpacity(0.2),
-                  ],
-                )
-              : null,
-          color: isSelected ? null : colorScheme.surfaceContainerHighest,
+          color: isSelected
+              ? AppTheme.goldPrimary.withOpacity(0.3)
+              : AppTheme.neutral100,
           borderRadius: BorderRadius.circular(16),
           border: Border.all(
             color: isSelected
@@ -1011,26 +1017,57 @@ class _DrillBuilderScreenState extends State<DrillBuilderScreen>
               ),
             ),
           if (_currentStep > 0) const SizedBox(width: 12),
-          Expanded(
-            flex: _currentStep == 0 ? 1 : 1,
-            child: FilledButton.icon(
-              onPressed:
-                  _currentStep < _totalSteps - 1 ? _nextStep : _saveDrill,
-              icon: Icon(_currentStep < _totalSteps - 1
-                  ? Icons.arrow_forward
-                  : Icons.save),
-              label:
-                  Text(_currentStep < _totalSteps - 1 ? 'Next' : 'Save Drill'),
-              style: FilledButton.styleFrom(
-                backgroundColor: colorScheme.primary,
-                foregroundColor: colorScheme.onPrimary,
-                padding: const EdgeInsets.symmetric(vertical: 16),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
+          // Show different buttons based on current step
+          if (_currentStep < _totalSteps - 1) ...[
+            // Next button for non-final steps
+            Expanded(
+              child: FilledButton.icon(
+                onPressed: _nextStep,
+                icon: const Icon(Icons.arrow_forward),
+                label: const Text('Next'),
+                style: FilledButton.styleFrom(
+                  backgroundColor: colorScheme.primary,
+                  foregroundColor: colorScheme.onPrimary,
+                  padding: const EdgeInsets.symmetric(vertical: 16),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
                 ),
               ),
             ),
-          ),
+          ] else ...[
+            // Save Drill button for final step
+            Expanded(
+              child: OutlinedButton.icon(
+                onPressed: _saveDrill,
+                icon: const Icon(Icons.save),
+                label: const Text('Save Drill'),
+                style: OutlinedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(vertical: 16),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(width: 12),
+            // Save & Run button for final step
+            Expanded(
+              child: FilledButton.icon(
+                onPressed: _saveAndRunDrill,
+                icon: const Icon(Icons.play_arrow),
+                label: const Text('Save & Run'),
+                style: FilledButton.styleFrom(
+                  backgroundColor: colorScheme.primary,
+                  foregroundColor: colorScheme.onPrimary,
+                  padding: const EdgeInsets.symmetric(vertical: 16),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+              ),
+            ),
+          ],
         ],
       ),
     );
@@ -1266,22 +1303,6 @@ class _DrillBuilderScreenState extends State<DrillBuilderScreen>
                         (value) => setState(() => _sets = value.round()),
                         '$_sets sets',
                         description: 'Number of sets to complete in this drill',
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 16),
-                Row(
-                  children: [
-                    Expanded(
-                      child: _buildSliderField(
-                        'Set repetition count',
-                        _reps.toDouble(),
-                        1.0,
-                        10.0,
-                        (value) => setState(() => _reps = value.round()),
-                        '$_reps reps',
-                        description: 'Number of times to repeat each set',
                       ),
                     ),
                   ],
@@ -1647,7 +1668,7 @@ class _DrillBuilderScreenState extends State<DrillBuilderScreen>
                   children: [
                     Icon(
                       Icons.preview,
-                      color: colorScheme.primary,
+                      color: colorScheme.onPrimaryContainer,
                       size: 28,
                     ),
                     const SizedBox(width: 12),
@@ -1656,7 +1677,7 @@ class _DrillBuilderScreenState extends State<DrillBuilderScreen>
                         'Review Your Drill',
                         style: theme.textTheme.headlineSmall?.copyWith(
                           fontWeight: FontWeight.bold,
-                          color: colorScheme.primary,
+                          color: colorScheme.onPrimaryContainer,
                         ),
                       ),
                     ),
@@ -1705,10 +1726,9 @@ class _DrillBuilderScreenState extends State<DrillBuilderScreen>
               if (_drillMode == DrillMode.touch) ...[
                 _buildReviewItem('Delay time', '${(_delayBetweenStimuliMs / 1000).toStringAsFixed(1)}s'),
               ],
-              _buildReviewItem('Total duration per rep', '${_calculateDuration()}s'),
+              _buildReviewItem('Total duration per set', '${_calculateDuration()}s'),
               _buildReviewItem('Rest time between sets', '${_rest}s'),
               _buildReviewItem('Set count', '$_sets'),
-              _buildReviewItem('Set repetition count', '$_reps'),
               _buildReviewItem('Stimuli count', '$_numberOfStimuli'),
             ],
           ),
@@ -1994,7 +2014,7 @@ class _DrillBuilderScreenState extends State<DrillBuilderScreen>
             Icon(
               getIcon(),
               color: isSelected
-                  ? colorScheme.primary
+                  ? colorScheme.onPrimaryContainer
                   : colorScheme.onSurface.withOpacity(0.7),
               size: 32,
             ),
@@ -2003,7 +2023,7 @@ class _DrillBuilderScreenState extends State<DrillBuilderScreen>
               getLabel(),
               style: theme.textTheme.titleSmall?.copyWith(
                 fontWeight: FontWeight.w600,
-                color: isSelected ? colorScheme.primary : colorScheme.onSurface,
+                color: isSelected ? colorScheme.onPrimaryContainer : colorScheme.onSurface,
               ),
             ),
             const SizedBox(height: 4),
@@ -2049,13 +2069,13 @@ class _DrillBuilderScreenState extends State<DrillBuilderScreen>
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Icon(icon, color: colorScheme.primary, size: 22),
+                  Icon(icon, color: colorScheme.onSurface.withOpacity(0.8), size: 22,),
                   const SizedBox(width: 10),
                   Text(
                     title,
                     style: theme.textTheme.titleMedium?.copyWith(
                       fontWeight: FontWeight.bold,
-                      color: colorScheme.primary,
+                      color: colorScheme.onSurface.withOpacity(0.8),
                       letterSpacing: 0.5,
                     ),
                   ),
@@ -2178,9 +2198,6 @@ class _DrillBuilderScreenState extends State<DrillBuilderScreen>
         if (_duration < 60) {
           errors.add('Duration must be at least 60 seconds');
         }
-        if (_reps < 1) {
-          errors.add('Repetitions must be at least 1');
-        }
         if (_rest < 0) {
           errors.add('Rest time cannot be negative');
         }
@@ -2228,6 +2245,14 @@ class _DrillBuilderScreenState extends State<DrillBuilderScreen>
   }
 
   void _saveDrill() async {
+    await _saveDrillInternal(runAfterSave: false);
+  }
+
+  void _saveAndRunDrill() async {
+    await _saveDrillInternal(runAfterSave: true);
+  }
+
+  Future<void> _saveDrillInternal({required bool runAfterSave}) async {
     final errors = _getValidationErrors();
     if (errors.isEmpty) {
       final drill = _build();
@@ -2257,8 +2282,13 @@ class _DrillBuilderScreenState extends State<DrillBuilderScreen>
             ),
           );
           
-          // Navigate back to drill library
-          context.go('/drills');
+          if (runAfterSave) {
+            // Navigate to drill runner screen
+            context.go('/drill-runner', extra: drill);
+          } else {
+            // Navigate back to drill library
+            context.go('/drills');
+          }
         }
       } catch (e) {
         if (mounted) {

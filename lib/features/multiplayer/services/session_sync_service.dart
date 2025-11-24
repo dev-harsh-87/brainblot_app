@@ -52,10 +52,16 @@ abstract class SessionSyncService {
   Future<void> startDrill(Drill drill);
 
   /// Pause the current drill (host only)
-  Future<void> pauseDrill();
+  Future<void> pauseDrill({
+    int? currentTimeMs,
+    int? currentIndex,
+  });
 
   /// Resume the current drill (host only)
-  Future<void> resumeDrill();
+  Future<void> resumeDrill({
+    int? currentTimeMs,
+    int? currentIndex,
+  });
 
   /// Stop the current drill (host only)
   Future<void> stopDrill();
@@ -83,10 +89,26 @@ class DrillStartedEvent extends DrillSyncEvent {
 }
 
 /// Event fired when a drill is paused
-class DrillPausedEvent extends DrillSyncEvent {}
+class DrillPausedEvent extends DrillSyncEvent {
+  final int? currentTimeMs;
+  final int? currentIndex;
+  
+  DrillPausedEvent({
+    this.currentTimeMs,
+    this.currentIndex,
+  });
+}
 
 /// Event fired when a drill is resumed
-class DrillResumedEvent extends DrillSyncEvent {}
+class DrillResumedEvent extends DrillSyncEvent {
+  final int? currentTimeMs;
+  final int? currentIndex;
+  
+  DrillResumedEvent({
+    this.currentTimeMs,
+    this.currentIndex,
+  });
+}
 
 /// Event fired when a drill is stopped
 class DrillStoppedEvent extends DrillSyncEvent {}

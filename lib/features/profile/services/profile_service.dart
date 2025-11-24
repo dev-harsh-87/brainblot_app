@@ -125,17 +125,6 @@ class ProfileService {
         .update(updates);
   }
 
-  /// Generate user initials from display name
-  String getUserInitials(String displayName) {
-    if (displayName.isEmpty) return 'U';
-    
-    final words = displayName.trim().split(' ');
-    if (words.length == 1) {
-      return words[0].substring(0, 1).toUpperCase();
-    } else {
-      return '${words[0].substring(0, 1)}${words[1].substring(0, 1)}'.toUpperCase();
-    }
-  }
 
   /// Delete user profile and all associated data
   Future<void> deleteProfile() async {

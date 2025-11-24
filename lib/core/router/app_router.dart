@@ -34,6 +34,7 @@ import 'package:spark_app/features/programs/bloc/programs_bloc.dart';
 import 'package:spark_app/features/programs/domain/program.dart';
 import 'package:spark_app/features/programs/programs_screen.dart';
 import 'package:spark_app/features/programs/services/program_progress_service.dart';
+import 'package:spark_app/features/programs/ui/program_creation_dialog.dart';
 import 'package:spark_app/features/programs/ui/program_day_screen.dart';
 import 'package:spark_app/features/programs/ui/program_stats_screen.dart';
 import 'package:spark_app/features/settings/bloc/settings_bloc.dart';
@@ -367,6 +368,17 @@ class AppRouter {
   /// Program-related routes
   List<GoRoute> _buildProgramRoutes() {
     return [
+      GoRoute(
+        path: '/program-builder',
+        name: 'program-builder',
+        builder: (context, state) {
+          final program = state.extra as Program?;
+          return BlocProvider.value(
+            value: getIt<ProgramsBloc>(),
+            child: ProgramCreationScreen(initial: program),
+          );
+        },
+      ),
       GoRoute(
         path: '/program-day',
         name: 'program-day',

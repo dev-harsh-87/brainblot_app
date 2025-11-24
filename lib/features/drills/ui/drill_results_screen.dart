@@ -7,6 +7,7 @@ import 'package:go_router/go_router.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:spark_app/core/utils/app_logger.dart';
 import 'dart:math' as math;
+import 'package:spark_app/core/theme/app_theme.dart';
 
 // Data class to hold rep performance information
 class RepPerformanceData {
@@ -128,15 +129,7 @@ class _DrillResultsScreenState extends State<DrillResultsScreen>
               ),
               background: Container(
                 decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    colors: [
-                      _getPerformanceColor(widget.result.accuracy).withOpacity(0.9),
-                      _getPerformanceColor(widget.result.accuracy).withOpacity(0.6),
-                      _getPerformanceColor(widget.result.accuracy).withOpacity(0.3),
-                    ],
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                  ),
+                  color: _getPerformanceColor(widget.result.accuracy).withOpacity(0.6),
                 ),
                 child: Stack(
                   children: [
@@ -296,12 +289,7 @@ class _DrillResultsScreenState extends State<DrillResultsScreen>
                 width: 56,
                 height: 56,
                 decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    colors: [
-                      colorScheme.primary,
-                      colorScheme.primary.withOpacity(0.8),
-                    ],
-                  ),
+                  color: AppTheme.goldPrimary,
                   borderRadius: BorderRadius.circular(16),
                   boxShadow: [
                     BoxShadow(

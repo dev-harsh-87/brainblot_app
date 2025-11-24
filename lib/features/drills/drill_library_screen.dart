@@ -8,6 +8,8 @@ import 'package:spark_app/features/drills/domain/drill.dart';
 import 'package:spark_app/features/drills/domain/drill_category.dart';
 import 'package:spark_app/features/sharing/ui/privacy_control_widget.dart';
 import 'package:spark_app/features/sharing/services/sharing_service.dart';
+import 'package:spark_app/features/sharing/domain/user_profile.dart';
+import 'package:spark_app/features/profile/services/profile_service.dart';
 import 'package:spark_app/core/services/auto_refresh_service.dart';
 import 'package:spark_app/core/widgets/confirmation_dialog.dart';
 import 'package:spark_app/core/ui/edge_to_edge.dart';
@@ -18,6 +20,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
+import 'package:spark_app/core/theme/app_theme.dart';
+import 'package:spark_app/core/widgets/profile_avatar.dart';
+import 'package:spark_app/features/profile/services/profile_service.dart';
+import 'package:spark_app/features/sharing/domain/user_profile.dart';
 
 class DrillLibraryScreen extends StatefulWidget {
   final String? initialCategory;
@@ -35,6 +41,7 @@ class _DrillLibraryScreenState extends State<DrillLibraryScreen>
   late Animation<double> _fabAnimation;
   late SharingService _sharingService;
   late DrillRepository _drillRepository;
+  late ProfileService _profileService;
   String _selectedCategory = '';
   Difficulty? _selectedDifficulty;
   List<DrillCategory> _availableCategories = [];
@@ -42,11 +49,13 @@ class _DrillLibraryScreenState extends State<DrillLibraryScreen>
   final ScrollController _scrollController = ScrollController();
   bool _showFab = true;
   final Map<String, bool> _ownershipCache = {};
+  UserProfile? _userProfile;
 
   @override
   void initState() {
     super.initState();
     _sharingService = getIt<SharingService>();
+    _profileService = getIt<ProfileService>();
     _drillRepository = getIt<DrillRepository>();
     
     // Get permissions from AuthBloc to determine tab count
@@ -79,8 +88,9 @@ class _DrillLibraryScreenState extends State<DrillLibraryScreen>
     });
     _tabController.addListener(_onTabChanged);
     
-    // Load categories
+    // Load categories and user profile
     _loadCategories();
+    _loadUserProfile();
     
     // Apply initial category filter if provided - do this immediately, not in postFrameCallback
     if (widget.initialCategory != null && widget.initialCategory!.isNotEmpty) {
@@ -109,7 +119,19 @@ class _DrillLibraryScreenState extends State<DrillLibraryScreen>
       print('❌ Error loading categories: $e');
     }
   }
-  
+
+  Future<void> _loadUserProfile() async {
+    try {
+      final profile = await _profileService.getCurrentUserProfile();
+      if (mounted) {
+        setState(() {
+          _userProfile = profile;
+        });
+      }
+    } catch (e) {
+      print('❌ Error loading user profile: $e');
+    }
+  }
 
   void _refreshDrills() {
     if (mounted) {
@@ -398,15 +420,7 @@ class _DrillLibraryScreenState extends State<DrillLibraryScreen>
       centerTitle: true,
       flexibleSpace: Container(
         decoration: BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [
-              colorScheme.primary,
-              colorScheme.primary.withOpacity(0.9),
-              colorScheme.secondary.withOpacity(0.8),
-            ],
-          ),
+          color: AppTheme.goldPrimary,
         ),
       ),
       actions: [
@@ -422,14 +436,7 @@ class _DrillLibraryScreenState extends State<DrillLibraryScreen>
 
     return Container(
       decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [
-            colorScheme.primaryContainer.withOpacity(0.3),
-            colorScheme.secondaryContainer.withOpacity(0.2),
-          ],
-        ),
+        color: AppTheme.neutral100.withOpacity(0.5),
         border: Border(
           bottom: BorderSide(
             color: colorScheme.outline.withOpacity(0.1),
@@ -703,14 +710,7 @@ Widget _buildCompactStatChip(IconData icon, String text, Color color) {
       margin: const EdgeInsets.only(bottom: 12),
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(16),
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [
-            colorScheme.surface,
-            colorScheme.surface.withOpacity(0.8),
-          ],
-        ),
+        color: AppTheme.whitePure,
         boxShadow: [
           BoxShadow(
             color: colorScheme.shadow.withOpacity(0.08),
@@ -876,24 +876,41 @@ Widget _buildCompactStatChip(IconData icon, String text, Color color) {
                                 ],
                               ),
                             ),
-                          if (drill.sharedWith.isNotEmpty && !drill.isPreset)
+                          if (drill.sharedWith.isNotEmpty)
                             const SizedBox(width: 6),
-                          if (!drill.isPreset)
-                            Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                              decoration: BoxDecoration(
-                                color: Colors.orange.withOpacity(0.1),
-                                borderRadius: BorderRadius.circular(4),
-                              ),
-                              child: Text(
-                                'CUSTOM',
-                                style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                                  color: Colors.orange,
-                                  fontSize: 8,
-                                  fontWeight: FontWeight.w600,
-                                ),
+                          // Present Mode chip - showing actual data
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: AppTheme.infoColor.withOpacity(0.1),
+                              borderRadius: BorderRadius.circular(4),
+                            ),
+                            child: Text(
+                              drill.presentationMode.name.toUpperCase(),
+                              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                color: AppTheme.infoColor,
+                                fontSize: 8,
+                                fontWeight: FontWeight.w600,
                               ),
                             ),
+                          ),
+                          const SizedBox(width: 6),
+                          // Drill Mode chip - showing actual data
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: AppTheme.successColor.withOpacity(0.1),
+                              borderRadius: BorderRadius.circular(4),
+                            ),
+                            child: Text(
+                              drill.drillMode.name.toUpperCase(),
+                              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                color: AppTheme.successColor,
+                                fontSize: 8,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ),
                         ],
                       ),
                     ],

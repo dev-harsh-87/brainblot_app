@@ -41,7 +41,7 @@ class _SubscriptionManagementScreenState
         onPressed: _showCreatePlanDialog,
         icon: const Icon(Icons.add),
         label: const Text('Create Plan'),
-        backgroundColor: AppTheme.primaryColor,
+        backgroundColor: context.colors.primary,
       ),
     );
   }
@@ -166,11 +166,11 @@ class _SubscriptionManagementScreenState
                 child: Column(
                   children: [
                     Icon(Icons.card_membership,
-                        size: 64, color: Colors.grey[400],),
+                        size: 64, color: context.colors.onSurface.withOpacity(0.4)),
                     const SizedBox(height: 16),
                     Text(
                       'No subscription plans found',
-                      style: TextStyle(fontSize: 18, color: Colors.grey[600]),
+                      style: TextStyle(fontSize: 18, color: context.colors.onSurface.withOpacity(0.6)),
                     ),
                   ],
                 ),
@@ -240,13 +240,13 @@ class _SubscriptionManagementScreenState
                                   horizontal: 8, vertical: 4,),
                               decoration: BoxDecoration(
                                 color: plan.isActive
-                                    ? Colors.green.withOpacity(0.1)
-                                    : Colors.grey.withOpacity(0.1),
+                                    ? AppTheme.successColor.withOpacity(0.1)
+                                    : context.colors.onSurface.withOpacity(0.1),
                                 borderRadius: BorderRadius.circular(8),
                                 border: Border.all(
                                   color: plan.isActive
-                                      ? Colors.green
-                                      : Colors.grey,
+                                      ? AppTheme.successColor
+                                      : context.colors.onSurface.withOpacity(0.5),
                                 ),
                               ),
                               child: Text(
@@ -254,8 +254,9 @@ class _SubscriptionManagementScreenState
                                 style: TextStyle(
                                   fontSize: 12,
                                   fontWeight: FontWeight.w600,
-                                  color:
-                                      plan.isActive ? Colors.green : Colors.grey,
+                                  color: plan.isActive
+                                      ? AppTheme.successColor
+                                      : context.colors.onSurface.withOpacity(0.5),
                                 ),
                               ),
                             ),
@@ -266,7 +267,7 @@ class _SubscriptionManagementScreenState
                           plan.description,
                           style: TextStyle(
                             fontSize: 14,
-                            color: Colors.grey[600],
+                            color: context.colors.onSurface.withOpacity(0.6),
                           ),
                         ),
                       ],
@@ -304,10 +305,10 @@ class _SubscriptionManagementScreenState
                         value: 'delete',
                         child: Row(
                           children: [
-                            Icon(Icons.delete, size: 20, color: Colors.red),
+                            Icon(Icons.delete, size: 20, color: AppTheme.errorColor),
                             SizedBox(width: 8),
                             Text('Delete',
-                                style: TextStyle(color: Colors.red),),
+                                style: TextStyle(color: AppTheme.errorColor)),
                           ],
                         ),
                       ),
@@ -370,7 +371,7 @@ class _SubscriptionManagementScreenState
             label,
             style: TextStyle(
               fontSize: 10,
-              color: Colors.grey[600],
+              color: context.colors.onSurface.withOpacity(0.6),
               fontWeight: FontWeight.w600,
             ),
           ),
@@ -428,7 +429,7 @@ class _SubscriptionManagementScreenState
                     padding: const EdgeInsets.only(left: 16, top: 4),
                     child: Row(
                       children: [
-                        const Icon(Icons.check, size: 16, color: Colors.green),
+                        Icon(Icons.check, size: 16, color: AppTheme.successColor),
                         const SizedBox(width: 8),
                         Expanded(child: Text(f)),
                       ],
@@ -522,7 +523,7 @@ class _SubscriptionManagementScreenState
           SnackBar(
             content: Text(
                 "Plan ${plan.isActive ? "deactivated" : "activated"} successfully",),
-            backgroundColor: Colors.green,
+            backgroundColor: AppTheme.successColor,
           ),
         );
       }
@@ -531,7 +532,7 @@ class _SubscriptionManagementScreenState
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Failed to toggle plan: ${e.toString()}'),
-            backgroundColor: Colors.red,
+            backgroundColor: AppTheme.errorColor,
           ),
         );
       }
@@ -554,7 +555,7 @@ class _SubscriptionManagementScreenState
               Navigator.pop(context);
               await _deletePlan(plan.id);
             },
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+            style: ElevatedButton.styleFrom(backgroundColor: AppTheme.errorColor),
             child: const Text('Delete'),
           ),
         ],
@@ -570,7 +571,7 @@ class _SubscriptionManagementScreenState
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('Plan deleted successfully'),
-            backgroundColor: Colors.green,
+            backgroundColor: AppTheme.successColor,
           ),
         );
       }
@@ -579,7 +580,7 @@ class _SubscriptionManagementScreenState
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Failed to delete plan: ${e.toString()}'),
-            backgroundColor: Colors.red,
+            backgroundColor: AppTheme.errorColor,
           ),
         );
       }

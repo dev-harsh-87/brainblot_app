@@ -11,9 +11,12 @@ import 'package:spark_app/features/drills/domain/drill_category.dart';
 import 'package:spark_app/features/programs/bloc/programs_bloc.dart';
 import 'package:spark_app/features/programs/domain/program.dart';
 import 'package:spark_app/features/programs/services/program_creation_service.dart';
+import 'package:spark_app/core/theme/app_theme.dart';
 
 class ProgramCreationScreen extends StatefulWidget {
-  const ProgramCreationScreen({super.key});
+  final Program? initial;
+  
+  const ProgramCreationScreen({super.key, this.initial});
 
   @override
   State<ProgramCreationScreen> createState() => _ProgramCreationScreenState();
@@ -122,15 +125,7 @@ class _ProgramCreationScreenState extends State<ProgramCreationScreen>
       centerTitle: true,
       flexibleSpace: Container(
         decoration: BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [
-              colorScheme.primary,
-              colorScheme.primary.withOpacity(0.9),
-              colorScheme.secondary.withOpacity(0.8),
-            ],
-          ),
+          color: AppTheme.goldPrimary,
         ),
       ),
       actions: [
@@ -156,7 +151,7 @@ class _ProgramCreationScreenState extends State<ProgramCreationScreen>
     final colorScheme = theme.colorScheme;
 
     return Scaffold(
-        backgroundColor: colorScheme.surface,
+        backgroundColor: AppTheme.whiteSoft,
         appBar: _buildAppBar(context),
         body: Column(
           children: [
@@ -344,19 +339,19 @@ class _ProgramCreationScreenState extends State<ProgramCreationScreen>
       duration: const Duration(milliseconds: 300),
       padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [
-            _getCategoryColor(_selectedCategory).withValues(alpha: 0.1),
-            colorScheme.surfaceContainerHighest,
-          ],
-        ),
+        color: AppTheme.whitePure,
         borderRadius: BorderRadius.circular(16),
         border: Border.all(
-          color: _getCategoryColor(_selectedCategory).withValues(alpha: 0.3),
-          width: 2,
+          color: _getCategoryColor(_selectedCategory).withOpacity(0.2),
+          width: 1,
         ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.08),
+            blurRadius: 16,
+            offset: const Offset(0, 4),
+          ),
+        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -1306,17 +1301,19 @@ class _ProgramCreationScreenState extends State<ProgramCreationScreen>
   Color _getCategoryColor(String category) {
     switch (category.toLowerCase()) {
       case 'fitness':
-        return Colors.blue;
+        return AppTheme.playerColor;
       case 'soccer':
-        return Colors.green;
+        return AppTheme.successColor;
       case 'basketball':
-        return Colors.orange;
+        return AppTheme.errorColor;
       case 'tennis':
-        return Colors.purple;
+        return AppTheme.infoColor;
       case 'hockey':
-        return Colors.red;
+        return AppTheme.warningColor;
+      case 'agility':
+        return AppTheme.warningColor;
       default:
-        return Colors.grey;
+        return AppTheme.goldPrimary;
     }
   }
 

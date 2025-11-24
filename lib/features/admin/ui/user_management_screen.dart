@@ -43,7 +43,7 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
         onPressed: _showCreateUserDialog,
         icon: const Icon(Icons.person_add),
         label: const Text('Add User'),
-        backgroundColor: AppTheme.primaryColor,
+        backgroundColor: context.colors.primary,
       ),
     );
   }

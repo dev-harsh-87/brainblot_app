@@ -25,7 +25,7 @@ class RoleBasedNavigation extends StatelessWidget {
         color: theme.bottomNavigationBarTheme.backgroundColor,
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.1),
+            color: context.colors.onSurface.withOpacity(0.1),
             blurRadius: 8,
             offset: const Offset(0, -2),
           ),
@@ -141,7 +141,7 @@ class _NavItem extends StatelessWidget {
     final effectiveColor = item.isAdminOnly 
         ? AppTheme.adminColor 
         : isSelected 
-            ? AppTheme.primaryColor 
+            ? AppTheme.goldPrimary 
             : AppTheme.neutral400;
 
     return InkWell(
@@ -185,7 +185,7 @@ class _NavItem extends StatelessWidget {
                 width: 4,
                 height: 4,
                 decoration: BoxDecoration(
-                  color: AppTheme.accentColor,
+                  color: AppTheme.goldBright,
                   shape: BoxShape.circle,
                 ),
               ),

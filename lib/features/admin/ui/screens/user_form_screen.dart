@@ -180,7 +180,7 @@ class _UserFormScreenState extends State<UserFormScreen> {
       children: [
         Row(
           children: [
-            Icon(icon, size: 20, color: AppTheme.primaryColor),
+            Icon(icon, size: 20, color: AppTheme.goldPrimary),
             const SizedBox(width: 8),
             Text(
               title,
@@ -217,7 +217,7 @@ class _UserFormScreenState extends State<UserFormScreen> {
           borderRadius: BorderRadius.circular(12),
         ),
         filled: true,
-        fillColor: enabled ? Colors.white : Colors.grey[100],
+        fillColor: enabled ? context.colors.surface : context.colors.surfaceContainerHighest,
       ),
     );
   }
@@ -337,18 +337,18 @@ class _UserFormScreenState extends State<UserFormScreen> {
       return Container(
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          color: Colors.orange[50],
+          color: AppTheme.warningColor.withOpacity(0.1),
           borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: Colors.orange[200]!),
+          border: Border.all(color: AppTheme.warningColor.withOpacity(0.3)),
         ),
         child: Row(
           children: [
-            Icon(Icons.warning_amber, color: Colors.orange[700]),
+            Icon(Icons.warning_amber, color: AppTheme.warningColor),
             const SizedBox(width: 12),
             Expanded(
               child: Text(
                 'No subscription plans available. Please create plans first.',
-                style: TextStyle(color: Colors.orange[900]),
+                style: TextStyle(color: AppTheme.warningColor),
               ),
             ),
           ],
@@ -358,7 +358,7 @@ class _UserFormScreenState extends State<UserFormScreen> {
 
     return Container(
       decoration: BoxDecoration(
-        border: Border.all(color: Colors.grey[300]!),
+        border: Border.all(color: context.colors.outline),
         borderRadius: BorderRadius.circular(12),
       ),
       child: Column(
@@ -390,12 +390,12 @@ class _UserFormScreenState extends State<UserFormScreen> {
                       shape: BoxShape.circle,
                       color: isSelected ? planColor : Colors.transparent,
                       border: Border.all(
-                        color: isSelected ? planColor : Colors.grey[400]!,
+                        color: isSelected ? planColor : context.colors.outline,
                         width: 2,
                       ),
                     ),
                     child: isSelected
-                        ? const Icon(Icons.check, size: 16, color: Colors.white)
+                        ? Icon(Icons.check, size: 16, color: AppTheme.whitePure)
                         : null,
                   ),
                   const SizedBox(width: 12),
@@ -409,7 +409,7 @@ class _UserFormScreenState extends State<UserFormScreen> {
                               plan.name.toUpperCase(),
                               style: TextStyle(
                                 fontWeight: FontWeight.w600,
-                                color: isSelected ? planColor : Colors.black87,
+                                color: isSelected ? planColor : context.colors.onSurface,
                               ),
                             ),
                             const SizedBox(width: 8),
@@ -438,7 +438,7 @@ class _UserFormScreenState extends State<UserFormScreen> {
                           plan.description,
                           style: TextStyle(
                             fontSize: 12,
-                            color: Colors.grey[600],
+                            color: context.colors.onSurface.withOpacity(0.6),
                           ),
                           maxLines: 2,
                           overflow: TextOverflow.ellipsis,
@@ -455,14 +455,14 @@ class _UserFormScreenState extends State<UserFormScreen> {
                                   vertical: 2,
                                 ),
                                 decoration: BoxDecoration(
-                                  color: Colors.grey[100],
+                                  color: context.colors.surfaceContainerHighest,
                                   borderRadius: BorderRadius.circular(4),
                                 ),
                                 child: Text(
                                   feature,
                                   style: TextStyle(
                                     fontSize: 10,
-                                    color: Colors.grey[700],
+                                    color: context.colors.onSurface.withOpacity(0.7),
                                   ),
                                 ),
                               );
@@ -508,7 +508,7 @@ class _UserFormScreenState extends State<UserFormScreen> {
             onPressed: _isLoading ? null : _handleSubmit,
             style: ElevatedButton.styleFrom(
               padding: const EdgeInsets.symmetric(vertical: 16),
-              backgroundColor: AppTheme.primaryColor,
+              backgroundColor: AppTheme.goldPrimary,
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(12),
               ),
@@ -519,14 +519,14 @@ class _UserFormScreenState extends State<UserFormScreen> {
                     width: 20,
                     child: CircularProgressIndicator(
                       strokeWidth: 2,
-                      valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                      valueColor: AlwaysStoppedAnimation<Color>(AppTheme.whitePure),
                     ),
                   )
                 : Text(
                     widget.isEdit ? 'Update User' : 'Create User',
                     style: const TextStyle(
                       fontWeight: FontWeight.bold,
-                      color: Colors.white,
+                      color: AppTheme.whitePure,
                     ),
                   ),
           ),
@@ -553,7 +553,7 @@ class _UserFormScreenState extends State<UserFormScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('Please select a subscription plan'),
-          backgroundColor: Colors.red,
+          backgroundColor: AppTheme.errorColor,
         ),
       );
       return;
@@ -581,7 +581,7 @@ class _UserFormScreenState extends State<UserFormScreen> {
                   ? 'User updated successfully'
                   : 'User created successfully',
             ),
-            backgroundColor: Colors.green,
+            backgroundColor: AppTheme.successColor,
           ),
         );
       }
@@ -590,7 +590,7 @@ class _UserFormScreenState extends State<UserFormScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Error: ${e.toString()}'),
-            backgroundColor: Colors.red,
+            backgroundColor: AppTheme.errorColor,
           ),
         );
       }

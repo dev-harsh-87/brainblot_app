@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 
 import 'package:spark_app/core/di/injection.dart';
+import 'package:spark_app/core/theme/app_theme.dart';
 import 'package:spark_app/features/drills/domain/drill.dart';
 import 'package:spark_app/features/drills/data/firebase_drill_repository.dart';
 import 'package:spark_app/features/drills/ui/drill_runner_screen.dart';
@@ -702,9 +703,22 @@ class _HostSessionScreenState extends State<HostSessionScreen>
             if (mounted) {
               Navigator.of(context).pop();
               
-              // Reset selected drill state
-              setState(() {
-                _selectedDrill = null;
+              // Stop the drill for all participants and reset sync service state
+              _syncService.stopDrill().then((_) {
+                // Reset selected drill state after stopping
+                if (mounted) {
+                  setState(() {
+                    _selectedDrill = null;
+                  });
+                }
+              }).catchError((e) {
+                debugPrint('Error stopping drill after completion: $e');
+                // Still reset the selected drill even if stop fails
+                if (mounted) {
+                  setState(() {
+                    _selectedDrill = null;
+                  });
+                }
               });
               
               // Show completion feedback with stats
@@ -767,6 +781,14 @@ class _HostSessionScreenState extends State<HostSessionScreen>
   Future<void> _stopDrill() async {
     try {
       await _syncService.stopDrill();
+      
+      // Reset selected drill state after stopping
+      if (mounted) {
+        setState(() {
+          _selectedDrill = null;
+        });
+      }
+      
       HapticFeedback.mediumImpact();
     } catch (e) {
       if (mounted) {

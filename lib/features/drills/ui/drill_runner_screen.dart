@@ -18,6 +18,8 @@ import 'package:go_router/go_router.dart';
 import 'package:uuid/uuid.dart';
 import 'package:flutter_tts/flutter_tts.dart';
 import 'package:spark_app/core/utils/app_logger.dart';
+import 'package:spark_app/core/theme/app_theme.dart';
+import 'package:spark_app/core/services/audio_service.dart';
 
 // Data structures for detailed results tracking
 class RepResult {
@@ -115,6 +117,9 @@ class _DrillRunnerScreenState extends State<DrillRunnerScreen>
   // Text-to-Speech
   final FlutterTts _flutterTts = FlutterTts();
   bool _isTtsInitialized = false;
+  
+  // Audio service
+  final AudioService _audioService = AudioService();
 
   late DateTime _startedAt;
   DateTime? _endedAt;
@@ -122,6 +127,7 @@ class _DrillRunnerScreenState extends State<DrillRunnerScreen>
   // Pre-generated schedule of stimuli times (ms) within duration
   late final List<_Stimulus> _schedule;
   int _currentIndex = -1;
+  bool _isInitializationComplete = false;
   _Stimulus? _current;
 
   // Stats
@@ -201,19 +207,56 @@ class _DrillRunnerScreenState extends State<DrillRunnerScreen>
   }
   
   Future<void> _initializeAsync(Drill validatedDrill) async {
-    // Preload custom stimuli if needed - MUST complete before schedule generation
-    await _preloadCustomStimuli(validatedDrill);
-    
-    // Generate schedule after custom stimuli are loaded
-    _schedule = _generateSchedule(validatedDrill);
-    
-    AppLogger.success('Drill initialization complete - schedule has ${_schedule.length} stimuli', tag: 'DrillRunner');
-    
-    // Update UI to reflect that initialization is complete
-    if (mounted) {
+    try {
+      AppLogger.info('Starting drill initialization for: ${validatedDrill.name}', tag: 'DrillRunner');
+      
+      // Preload custom stimuli if needed - MUST complete before schedule generation
+      if (validatedDrill.customStimuliIds.isNotEmpty) {
+        AppLogger.info('Preloading ${validatedDrill.customStimuliIds.length} custom stimuli items', tag: 'DrillRunner');
+        await _preloadCustomStimuli(validatedDrill);
+        
+        // Verify custom stimuli were loaded successfully
+        if (_customStimuliCache.isEmpty) {
+          AppLogger.error('Failed to load custom stimuli - cache is empty', tag: 'DrillRunner');
+          throw Exception('Failed to load custom stimuli');
+        }
+        
+        AppLogger.success('Custom stimuli preloaded successfully: ${_customStimuliCache.length} stimuli cached', tag: 'DrillRunner');
+      }
+      
+      // Generate schedule after custom stimuli are loaded
+      _schedule = _generateSchedule(validatedDrill);
+      
+      if (_schedule.isEmpty) {
+        AppLogger.error('Generated schedule is empty', tag: 'DrillRunner');
+        throw Exception('Failed to generate drill schedule');
+      }
+      AppLogger.success('Drill initialization complete - schedule has ${_schedule.length} stimuli', tag: 'DrillRunner');
+      
+      // Mark initialization as complete
       setState(() {
-        // Trigger rebuild now that everything is initialized
+        _isInitializationComplete = true;
       });
+      
+      
+      // Update UI to reflect that initialization is complete
+      if (mounted) {
+        setState(() {
+          // Trigger rebuild now that everything is initialized
+        });
+      }
+    } catch (e) {
+      AppLogger.error('Drill initialization failed', error: e, tag: 'DrillRunner');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to initialize drill: $e'),
+            backgroundColor: Colors.red,
+            duration: const Duration(seconds: 5),
+          ),
+        );
+      }
+      rethrow;
     }
   }
   
@@ -512,15 +555,11 @@ class _DrillRunnerScreenState extends State<DrillRunnerScreen>
       AppLogger.debug('Checking multiplayer drill state: active=$isDrillActive, paused=$isDrillPaused', tag: 'Multiplayer');
       
       if (isDrillActive && !isDrillPaused) {
-        // Drill is already running, start it immediately for this participant
+        // Drill is already running, start it for this participant after initialization
         AppLogger.info('Drill already active, auto-starting for participant', tag: 'Multiplayer');
         
-        // Use a post-frame callback to ensure the widget is fully built
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          if (mounted && _state == DrillRunnerState.ready) {
-            _startDrillFromSync();
-          }
-        });
+        // Wait for initialization to complete before starting
+        _waitForInitializationAndStart();
       } else if (isDrillActive && isDrillPaused) {
         // Drill is paused, set the paused state
         AppLogger.info('Drill is paused, setting paused state for participant', tag: 'Multiplayer');
@@ -549,7 +588,9 @@ class _DrillRunnerScreenState extends State<DrillRunnerScreen>
         // Host started the drill - start locally if not already running
         if (_state == DrillRunnerState.ready || _state == DrillRunnerState.paused) {
           AppLogger.info('Starting drill from multiplayer sync', tag: 'Multiplayer');
-          _startDrillFromSync();
+          _waitForInitializationAndStart();
+        } else {
+          AppLogger.warning('Ignoring drill start event - already in state: $_state', tag: 'Multiplayer');
         }
       } else if (event is DrillStoppedEvent) {
         // Host stopped the drill - stop locally and handle completion
@@ -561,13 +602,17 @@ class _DrillRunnerScreenState extends State<DrillRunnerScreen>
         // Host paused the drill - pause locally
         if (_state == DrillRunnerState.running && !_isMultiplayerPaused) {
           AppLogger.info('Pausing drill from multiplayer sync', tag: 'Multiplayer');
-          _pauseDrillFromSync();
+          _pauseDrillFromSync(event);
+        } else {
+          AppLogger.warning('Ignoring drill pause event - state: $_state, isMultiplayerPaused: $_isMultiplayerPaused', tag: 'Multiplayer');
         }
       } else if (event is DrillResumedEvent) {
         // Host resumed the drill - resume locally
         if (_state == DrillRunnerState.paused || _isMultiplayerPaused) {
           AppLogger.info('Resuming drill from multiplayer sync', tag: 'Multiplayer');
-          _resumeDrillFromSync();
+          _resumeDrillFromSync(event);
+        } else {
+          AppLogger.warning('Ignoring drill resume event - state: $_state, isMultiplayerPaused: $_isMultiplayerPaused', tag: 'Multiplayer');
         }
       } else if (event is StimulusEvent) {
         // Participant receiving stimulus data from host
@@ -619,6 +664,50 @@ class _DrillRunnerScreenState extends State<DrillRunnerScreen>
         AppLogger.debug('Network delay compensation: ${networkDelay}ms', tag: 'Multiplayer');
       }
       
+      // Handle custom stimuli reconstruction for participants
+      Color displayColor = Color(colorValue);
+      String displayLabel = label;
+      
+      if (stimulusType == StimulusType.custom && customStimulusItemId != null) {
+        // Try to reconstruct custom stimulus from broadcast data
+        final customStimulusType = stimulusData['customStimulusType'] as String?;
+        final imageBase64 = stimulusData['imageBase64'] as String?;
+        final textValue = stimulusData['textValue'] as String?;
+        final customColorValue = stimulusData['customColorValue'] as int?;
+        final shapeType = stimulusData['shapeType'] as String?;
+        
+        AppLogger.debug('Reconstructing custom stimulus: type=$customStimulusType, itemId=$customStimulusItemId', tag: 'Multiplayer');
+        
+        // Update display based on custom stimulus type
+        if (customStimulusType != null) {
+          switch (customStimulusType) {
+            case 'image':
+              // For images, keep the label as the item name
+              displayLabel = label;
+              break;
+            case 'text':
+              // For text, use the text value if available
+              if (textValue != null) {
+                displayLabel = textValue;
+              }
+              break;
+            case 'color':
+              // For colors, use custom color if available
+              if (customColorValue != null) {
+                displayColor = Color(customColorValue);
+                displayLabel = widget.drill.presentationMode == PresentationMode.audio ? label : '';
+              }
+              break;
+            case 'shape':
+              // For shapes, use shape type if available
+              if (shapeType != null) {
+                displayLabel = shapeType;
+              }
+              break;
+          }
+        }
+      }
+      
       // Update current stimulus state to match host exactly
       _currentIndex = index;
       if (_currentIndex < _schedule.length) {
@@ -629,7 +718,7 @@ class _DrillRunnerScreenState extends State<DrillRunnerScreen>
             index: _current!.index,
             timeMs: _current!.timeMs,
             type: _current!.type,
-            label: _current!.label,
+            label: displayLabel,
             customStimulusItemId: customStimulusItemId,
           );
         }
@@ -639,18 +728,65 @@ class _DrillRunnerScreenState extends State<DrillRunnerScreen>
           index: index,
           timeMs: hostTimeMs,
           type: stimulusType,
-          label: label,
+          label: displayLabel,
           customStimulusItemId: customStimulusItemId,
         );
       }
       
       // Display the exact stimulus data from host (same color, same label)
-      final color = Color(colorValue);
-      _showStimulus(label, color, stimulusType);
+      _showStimulus(displayLabel, displayColor, stimulusType);
       
-      AppLogger.debug('Participant synchronized stimulus: type=$stimulusTypeStr, label="$label", color=${color.value.toRadixString(16)}, index=$index, customItemId=$customStimulusItemId', tag: 'Multiplayer');
+      AppLogger.debug('Participant synchronized stimulus: type=$stimulusTypeStr, label="$displayLabel", color=${displayColor.value.toRadixString(16)}, index=$index, customItemId=$customStimulusItemId', tag: 'Multiplayer');
     } catch (e) {
       AppLogger.error('Error handling stimulus from host', error: e, tag: 'Multiplayer');
+    }
+  }
+
+  void _waitForInitializationAndStart() {
+    // If already initialized, start immediately
+    if (_isInitializationComplete) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted && _state == DrillRunnerState.ready) {
+          _startDrillFromSync();
+        }
+      });
+      return;
+    }
+    
+    // Otherwise, wait for initialization to complete
+    AppLogger.info('Waiting for drill initialization to complete before starting from sync', tag: 'Multiplayer');
+    
+    // Check periodically for initialization completion
+    Timer.periodic(const Duration(milliseconds: 100), (timer) {
+      if (_isInitializationComplete) {
+        timer.cancel();
+        AppLogger.info('Initialization complete, starting drill from sync', tag: 'Multiplayer');
+        
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted && _state == DrillRunnerState.ready) {
+            _startDrillFromSync();
+          }
+        });
+      } else if (!mounted) {
+        // Widget was disposed, cancel the timer
+        timer.cancel();
+      }
+    });
+  }
+
+  bool _isScheduleInitialized() {
+    // Use the completion flag for reliable initialization check
+    if (!_isInitializationComplete) {
+      return false;
+    }
+    
+    try {
+      // Double-check that schedule is actually accessible and not empty
+      return _schedule.isNotEmpty;
+    } catch (e) {
+      // LateInitializationError means the schedule hasn't been set yet
+      AppLogger.warning('Schedule access failed despite completion flag: $e', tag: 'DrillRunner');
+      return false;
     }
   }
 
@@ -663,6 +799,12 @@ class _DrillRunnerScreenState extends State<DrillRunnerScreen>
     
     try {
       AppLogger.info('Starting drill from sync in state: $_state', tag: 'Multiplayer');
+      
+      // Critical: Ensure schedule is initialized before starting timer
+      if (!_isScheduleInitialized()) {
+        AppLogger.warning('Schedule not initialized, cannot start drill from sync', tag: 'Multiplayer');
+        return;
+      }
       
       // Start the drill without countdown for sync
       _startedAt = DateTime.now();
@@ -778,13 +920,13 @@ class _DrillRunnerScreenState extends State<DrillRunnerScreen>
     }
   }
 
-  void _pauseDrillFromSync() {
+  void _pauseDrillFromSync(DrillPausedEvent event) {
     if (_state != DrillRunnerState.running) {
       AppLogger.warning('Cannot pause drill from sync in state: $_state', tag: 'Multiplayer');
       return;
     }
     
-    AppLogger.info('Pausing drill from multiplayer sync', tag: 'Multiplayer');
+    AppLogger.info('Pausing drill from multiplayer sync with timing: ${event.currentTimeMs}ms, index: ${event.currentIndex}', tag: 'Multiplayer');
     
     try {
       // Cancel ticker and stop stopwatch
@@ -793,7 +935,21 @@ class _DrillRunnerScreenState extends State<DrillRunnerScreen>
       _stopwatch.stop();
       _isMultiplayerPaused = true;
       
-      // Clear current stimulus display
+      // Synchronize timing with host if provided
+      if (event.currentTimeMs != null) {
+        // Reset stopwatch to match host timing
+        _stopwatch.reset();
+        // Note: We can't directly set elapsed time, so we'll track the offset
+        AppLogger.debug('Host timing: ${event.currentTimeMs}ms, participant will sync on resume', tag: 'Multiplayer');
+      }
+      
+      // Synchronize current index with host if provided
+      if (event.currentIndex != null && event.currentIndex! >= 0 && event.currentIndex! < _schedule.length) {
+        _currentIndex = event.currentIndex!;
+        AppLogger.debug('Synchronized current index to: $_currentIndex', tag: 'Multiplayer');
+      }
+      
+      // Clear current stimulus display and show pause message
       setState(() {
         _state = DrillRunnerState.paused;
         _display = 'PAUSED BY HOST';
@@ -804,25 +960,51 @@ class _DrillRunnerScreenState extends State<DrillRunnerScreen>
       _showFeedback('Paused by Host', Colors.orange);
       HapticFeedback.mediumImpact();
       
+      // Stop any ongoing TTS
+      if (_isTtsInitialized) {
+        _flutterTts.stop();
+      }
+      
       AppLogger.success('Drill paused from multiplayer sync', tag: 'Multiplayer');
     } catch (e) {
       AppLogger.error('Error pausing drill from sync', error: e, tag: 'Multiplayer');
     }
   }
 
-  void _resumeDrillFromSync() {
+  void _resumeDrillFromSync(DrillResumedEvent event) {
     if (_state != DrillRunnerState.paused && !_isMultiplayerPaused) {
       AppLogger.warning('Cannot resume drill from sync in state: $_state, isMultiplayerPaused: $_isMultiplayerPaused', tag: 'Multiplayer');
       return;
     }
     
-    AppLogger.info('Resuming drill from multiplayer sync', tag: 'Multiplayer');
+    AppLogger.info('Resuming drill from multiplayer sync with timing: ${event.currentTimeMs}ms, index: ${event.currentIndex}', tag: 'Multiplayer');
     
     try {
       _isMultiplayerPaused = false;
       
-      // Restart the stopwatch and ticker
-      _stopwatch.start();
+      // Synchronize timing with host if provided
+      if (event.currentTimeMs != null) {
+        // Reset and start stopwatch to match host timing
+        _stopwatch.reset();
+        _stopwatch.start();
+        
+        // Calculate how much time should have elapsed to match host
+        final targetTimeMs = event.currentTimeMs!;
+        AppLogger.debug('Synchronizing participant timing to match host: ${targetTimeMs}ms', tag: 'Multiplayer');
+        
+        // We'll let the _onTick method handle the timing synchronization
+        // by checking against the schedule times
+      } else {
+        // Restart the stopwatch normally
+        _stopwatch.start();
+      }
+      
+      // Synchronize current index with host if provided
+      if (event.currentIndex != null && event.currentIndex! >= 0 && event.currentIndex! < _schedule.length) {
+        _currentIndex = event.currentIndex!;
+        AppLogger.debug('Synchronized current index to: $_currentIndex', tag: 'Multiplayer');
+      }
+      
       _ticker = Timer.periodic(const Duration(milliseconds: 8), _onTick);
       
       setState(() {
@@ -839,9 +1021,84 @@ class _DrillRunnerScreenState extends State<DrillRunnerScreen>
       AppLogger.error('Error resuming drill from sync', error: e, tag: 'Multiplayer');
     }
   }
+void _broadcastStimulusToParticipants(String label, Color color, StimulusType type) {
+    if (!widget.isMultiplayerMode || !widget.isHost || _syncService == null || _current == null) {
+      return;
+    }
+    
+    try {
+      // Prepare stimulus data for broadcasting with enhanced custom stimuli support
+      final stimulusData = {
+        'stimulusType': type.name,
+        'label': label,
+        'colorValue': color.value,
+        'timeMs': _stopwatch.elapsedMilliseconds,
+        'index': _currentIndex,
+        'timestamp': DateTime.now().millisecondsSinceEpoch,
+        'priority': 'high', // Mark stimulus messages as high priority
+      };
+      
+      // Include custom stimulus item ID and metadata if applicable
+      if (type == StimulusType.custom && _current!.customStimulusItemId != null) {
+        stimulusData['customStimulusItemId'] = _current!.customStimulusItemId!;
+        
+        // Find and include custom stimulus metadata for participants
+        for (final customStimulus in _customStimuliCache.values) {
+          for (final item in customStimulus.items) {
+            if (item.id == _current!.customStimulusItemId) {
+              stimulusData['customStimulusType'] = customStimulus.type.name;
+              stimulusData['customStimulusName'] = customStimulus.name;
+              stimulusData['customItemName'] = item.name;
+              
+              // Include type-specific data with null safety
+              switch (customStimulus.type) {
+                case CustomStimulusType.image:
+                  if (item.imageBase64 != null) {
+                    stimulusData['imageBase64'] = item.imageBase64!;
+                  }
+                  break;
+                case CustomStimulusType.text:
+                  if (item.textValue != null) {
+                    stimulusData['textValue'] = item.textValue!;
+                  }
+                  break;
+                case CustomStimulusType.color:
+                  if (item.color != null) {
+                    stimulusData['customColorValue'] = item.color!.value;
+                  }
+                  break;
+                case CustomStimulusType.shape:
+                  if (item.shapeType != null) {
+                    stimulusData['shapeType'] = item.shapeType!;
+                  }
+                  break;
+              }
+              break;
+            }
+          }
+        }
+      }
+      
+      // Broadcast to all participants
+      _syncService!.broadcastStimulus(stimulusData);
+      
+      AppLogger.debug('Broadcasted stimulus to participants: type=$type, label="$label", color=${color.value.toRadixString(16)}, customItemId=${_current!.customStimulusItemId}', tag: 'Multiplayer');
+    } catch (e) {
+      AppLogger.error('Failed to broadcast stimulus to participants', error: e, tag: 'Multiplayer');
+    }
+  }
 
   void _resumeDrill() {
     if (_state != DrillRunnerState.paused) return;
+    
+    // If host in multiplayer mode, resume for all devices with timing info
+    if (widget.isMultiplayerMode && widget.isHost && _syncService != null) {
+      final currentTimeMs = _stopwatch.elapsedMilliseconds;
+      _syncService!.resumeDrill(
+        currentTimeMs: currentTimeMs,
+        currentIndex: _currentIndex,
+      );
+    }
     
     _stopwatch.start();
     _ticker = Timer.periodic(const Duration(milliseconds: 8), _onTick);
@@ -1195,20 +1452,34 @@ class _DrillRunnerScreenState extends State<DrillRunnerScreen>
   void _startCountdown() {
     setState(() {
       _state = DrillRunnerState.countdown;
-      _countdown = 3;
+      _countdown = 5;
     });
+    
+    // Play initial countdown tick
+    _audioService.playCountdownTick();
     
     _countdownTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
       if (_countdown > 1) {
         setState(() {
           _countdown--;
         });
-        HapticFeedback.lightImpact();
+        // Play countdown tick sound
+        _audioService.playCountdownTick();
       } else {
         timer.cancel();
-        _startDrill();
+        _playWhistleAndStartDrill();
       }
     });
+  }
+  
+  void _playWhistleAndStartDrill() async {
+    // Play whistle sound
+    await _audioService.playWhistle();
+    
+    // Add a small delay for the whistle sound effect
+    await Future.delayed(const Duration(milliseconds: 300));
+    
+    _startDrill();
   }
   
   void _startDrill() {
@@ -1257,6 +1528,13 @@ class _DrillRunnerScreenState extends State<DrillRunnerScreen>
   }
 
   void _onTick(Timer timer) {
+    // Safety check: Ensure schedule is initialized before proceeding
+    if (!_isScheduleInitialized()) {
+      AppLogger.warning('Schedule not initialized in _onTick, stopping timer', tag: 'DrillRunner');
+      timer.cancel();
+      return;
+    }
+    
     final ms = _stopwatch.elapsedMilliseconds;
     
     // Handle stimulus hiding in timed mode
@@ -1405,6 +1683,11 @@ class _DrillRunnerScreenState extends State<DrillRunnerScreen>
     
     AppLogger.debug('Stimulus shown: type=$type, mode=${widget.drill.presentationMode.name}', tag: 'DrillRunner');
     
+    // Broadcast stimulus to participants if host in multiplayer mode
+    if (widget.isMultiplayerMode && widget.isHost && _syncService != null && _current != null) {
+      _broadcastStimulusToParticipants(label, color, type);
+    }
+    
     // Speak the stimulus if in audio mode
     if (widget.drill.presentationMode == PresentationMode.audio) {
       final textToSpeak = _getStimulusTextForTts(_Stimulus(
@@ -1509,11 +1792,11 @@ class _DrillRunnerScreenState extends State<DrillRunnerScreen>
     return colors[Random().nextInt(colors.length)];
   }
 void _completeRep() {
-    AppLogger.debug('_completeRep called: Set $_currentSet, Rep $_currentRep', tag: 'DrillRunner');
+    AppLogger.debug('_completeRep called: Set $_currentSet (no reps)', tag: 'DrillRunner');
     _ticker?.cancel();
     _stopwatch.stop();
     
-    // Save current rep results
+    // Save current set results (no more rep logic)
     if (_currentRepStartTime != null) {
       final repScore = _currentRepEvents.where((e) => e.correct).length;
       final validReactions = _currentRepEvents.where((e) => e.reactionTimeMs != null).toList();
@@ -1525,7 +1808,7 @@ void _completeRep() {
           : (_currentRepEvents.where((e) => e.correct).length / _currentRepEvents.length);
       
       final repResult = RepResult(
-        repNumber: _currentRep,
+        repNumber: 1, // Always 1 since no reps
         events: List.from(_currentRepEvents),
         startTime: _currentRepStartTime!,
         endTime: DateTime.now(),
@@ -1534,33 +1817,18 @@ void _completeRep() {
         accuracy: accuracy,
       );
       
-      AppLogger.debug('Rep result: score=$repScore, events=${_currentRepEvents.length}', tag: 'DrillRunner');
+      AppLogger.debug('Set result: score=$repScore, events=${_currentRepEvents.length}', tag: 'DrillRunner');
       
       // Add to current set's rep results
       if (_setResults.isNotEmpty) {
         _setResults.last.repResults.add(repResult);
-        AppLogger.debug('Added to set ${_setResults.last.setNumber}, total reps now: ${_setResults.last.repResults.length}', tag: 'DrillRunner');
+        AppLogger.debug('Added to set ${_setResults.last.setNumber}', tag: 'DrillRunner');
       }
     }
     
-    // Check if set is complete
-    AppLogger.debug('Checking: _currentRep=$_currentRep >= widget.drill.reps=${widget.drill.reps}?', tag: 'DrillRunner');
-    if (_currentRep >= widget.drill.reps) {
-      AppLogger.success('Set complete! Calling _completeSet()', tag: 'DrillRunner');
-      _completeSet();
-    } else {
-      AppLogger.debug('More reps needed', tag: 'DrillRunner');
-      // Increment rep counter for next rep
-      _currentRep++;
-      AppLogger.debug('Incremented _currentRep to $_currentRep', tag: 'DrillRunner');
-      
-      // Start rest period between reps if rest time is configured
-      if (widget.drill.restSec > 0) {
-        _startRestPeriod();
-      } else {
-        _startNextRep();
-      }
-    }
+    // Set is complete (no reps to check)
+    AppLogger.success('Set complete! Calling _completeSet()', tag: 'DrillRunner');
+    _completeSet();
   }
 
   void _completeSet() {
@@ -1600,7 +1868,7 @@ void _completeRep() {
       AppLogger.info('Moving to next set...', tag: 'DrillRunner');
       // Move to next set
       _currentSet++;
-      _currentRep = 1; // Initialize rep counter for new set
+      _currentRep = 1; // Keep at 1 (no reps)
       AppLogger.debug('New values: _currentSet=$_currentSet, _currentRep=$_currentRep', tag: 'DrillRunner');
       
       Future.delayed(const Duration(milliseconds: 1500), () {
@@ -1923,13 +2191,7 @@ void _completeRep() {
             // Background gradient
             Container(
               decoration: BoxDecoration(
-                gradient: RadialGradient(
-                  radius: 1.5,
-                  colors: [
-                    Colors.grey.shade900,
-                    Colors.black,
-                  ],
-                ),
+                color: AppTheme.neutral900,
               ),
             ),
             
@@ -2022,12 +2284,7 @@ void _completeRep() {
               widthFactor: progress.clamp(0.0, 1.0),
               child: Container(
                 decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    colors: [
-                      Colors.blue.shade400,
-                      Colors.purple.shade400,
-                    ],
-                  ),
+                  color: AppTheme.playerColor,
                   borderRadius: BorderRadius.circular(4),
                 ),
               ),
@@ -2045,9 +2302,9 @@ void _completeRep() {
                 Icons.layers,
               ),
               _buildStatItem(
-                'Rep',
-                '$_currentRep/${widget.drill.reps}',
-                Icons.repeat,
+                'Set',
+                '$_currentSet/${widget.drill.sets}',
+                Icons.layers,
               ),
               // Only show score and accuracy in touch mode
               if (widget.drill.drillMode == DrillMode.touch) ...[
@@ -2685,17 +2942,10 @@ void _completeRep() {
         child: Container(
           padding: const EdgeInsets.all(20),
           decoration: BoxDecoration(
-            gradient: LinearGradient(
-              colors: [
-                Colors.blue.withOpacity(0.15),
-                Colors.blue.withOpacity(0.25),
-              ],
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-            ),
+            color: AppTheme.playerColor.withOpacity(0.1),
             borderRadius: BorderRadius.circular(16),
             border: Border.all(
-              color: Colors.blue.withOpacity(0.4),
+              color: AppTheme.playerColor.withOpacity(0.4),
               width: 1.5,
             ),
           ),
@@ -2772,20 +3022,14 @@ void _completeRep() {
                 onPressed: _start,
                 icon: Icons.play_arrow_rounded,
                 label: 'START DRILL',
-                color: Colors.green,
-                gradient: LinearGradient(
-                  colors: [Colors.green.shade400, Colors.green.shade600],
-                ),
+                color: AppTheme.successColor,
               ),
             ] else if (_state == DrillRunnerState.countdown) ...[
               _buildPrimaryButton(
                 onPressed: null,
                 icon: Icons.timer,
                 label: 'STARTING...',
-                color: Colors.orange,
-                gradient: LinearGradient(
-                  colors: [Colors.orange.shade400, Colors.orange.shade600],
-                ),
+                color: AppTheme.warningColor,
               ),
             ] else if (_state == DrillRunnerState.running) ...[
               Row(
@@ -2852,10 +3096,7 @@ void _completeRep() {
                 onPressed: null,
                 icon: Icons.check_circle_rounded,
                 label: 'COMPLETED!',
-                color: Colors.green,
-                gradient: LinearGradient(
-                  colors: [Colors.green.shade400, Colors.green.shade600],
-                ),
+                color: AppTheme.successColor,
               ),
             ],
             
@@ -3076,12 +3317,27 @@ void _completeRep() {
               ),
             ),
             const SizedBox(height: 32),
-            Text(
-              '$_countdown',
-              style: TextStyle(
-                color: Colors.white,
-                fontSize: 120,
-                fontWeight: FontWeight.bold,
+            // Circular countdown display
+            Container(
+              width: 200,
+              height: 200,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: Colors.white.withOpacity(0.1),
+                border: Border.all(
+                  color: Colors.white,
+                  width: 4,
+                ),
+              ),
+              child: Center(
+                child: Text(
+                  '$_countdown',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 120,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
               ),
             ),
           ],
@@ -3094,6 +3350,15 @@ void _completeRep() {
     // Pause the drill immediately
     _ticker?.cancel();
     _stopwatch.stop();
+    
+    // If host in multiplayer mode, pause for all devices with timing info
+    if (widget.isMultiplayerMode && widget.isHost && _syncService != null) {
+      final currentTimeMs = _stopwatch.elapsedMilliseconds;
+      _syncService!.pauseDrill(
+        currentTimeMs: currentTimeMs,
+        currentIndex: _currentIndex,
+      );
+    }
     
     setState(() {
       _state = DrillRunnerState.paused;

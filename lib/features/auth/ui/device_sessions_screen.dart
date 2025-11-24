@@ -3,6 +3,10 @@ import 'package:flutter/services.dart';
 import 'package:spark_app/features/auth/domain/device_session.dart';
 import 'package:spark_app/features/auth/services/multi_device_session_service.dart';
 import 'package:spark_app/core/di/injection.dart';
+import 'package:spark_app/core/theme/app_theme.dart';
+import 'package:spark_app/core/widgets/profile_avatar.dart';
+import 'package:spark_app/features/profile/services/profile_service.dart';
+import 'package:spark_app/features/sharing/domain/user_profile.dart';
 
 /// Screen to manage active device sessions
 /// Shows all devices where the user is logged in and allows logout from other devices
@@ -15,18 +19,22 @@ class DeviceSessionsScreen extends StatefulWidget {
 
 class _DeviceSessionsScreenState extends State<DeviceSessionsScreen> with TickerProviderStateMixin {
   late final MultiDeviceSessionService _sessionService;
+  late final ProfileService _profileService;
   late AnimationController _animationController;
   late Animation<double> _fadeAnimation;
   late Animation<Offset> _slideAnimation;
   
   bool _isLoading = false;
   String? _error;
+  UserProfile? _userProfile;
 
   @override
   void initState() {
     super.initState();
     _sessionService = getIt<MultiDeviceSessionService>();
+    _profileService = getIt<ProfileService>();
     _initializeAnimations();
+    _loadUserProfile();
     HapticFeedback.lightImpact();
   }
 
@@ -54,6 +62,19 @@ class _DeviceSessionsScreenState extends State<DeviceSessionsScreen> with Ticker
   void dispose() {
     _animationController.dispose();
     super.dispose();
+  }
+
+  Future<void> _loadUserProfile() async {
+    try {
+      final profile = await _profileService.getCurrentUserProfile();
+      if (mounted) {
+        setState(() {
+          _userProfile = profile;
+        });
+      }
+    } catch (e) {
+      print('❌ Error loading user profile: $e');
+    }
   }
 
   Future<void> _logoutFromDevice(DeviceSession session) async {
@@ -424,9 +445,21 @@ class _DeviceSessionsScreenState extends State<DeviceSessionsScreen> with Ticker
     return Scaffold(
       backgroundColor: colorScheme.surface,
       appBar: AppBar(
-        title: const Text('Device Sessions'),
-        backgroundColor: Colors.transparent,
+        title: Text(
+          'Device Sessions',
+          style: TextStyle(
+            color: theme.colorScheme.onPrimary,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+        backgroundColor: theme.colorScheme.primary,
+        foregroundColor: theme.colorScheme.onPrimary,
         elevation: 0,
+        flexibleSpace: Container(
+          decoration: BoxDecoration(
+            color: AppTheme.goldPrimary,
+          ),
+        ),
         actions: [
           StreamBuilder<List<DeviceSession>>(
             stream: _sessionService.watchActiveSessions(),

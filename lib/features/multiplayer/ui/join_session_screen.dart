@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 
 import 'package:spark_app/core/di/injection.dart';
+import 'package:spark_app/core/theme/app_theme.dart';
 import 'package:spark_app/features/drills/domain/drill.dart';
 import 'package:spark_app/features/drills/ui/drill_runner_screen.dart';
 import 'package:spark_app/features/multiplayer/domain/connection_session.dart';
@@ -228,6 +229,9 @@ class _JoinSessionScreenState extends State<JoinSessionScreen>
                   duration: const Duration(seconds: 4),
                 ),
               );
+              
+              // Ensure we're back on the join session screen
+              _returnToJoinSessionScreen();
             }
           },
         ),
@@ -250,6 +254,21 @@ class _JoinSessionScreenState extends State<JoinSessionScreen>
       debugPrint('Drill runner returned to join session screen');
     } catch (e) {
       debugPrint('Error returning from drill runner: $e');
+    }
+  }
+
+  void _returnToJoinSessionScreen() {
+    try {
+      // Force UI refresh to show updated drill status
+      if (mounted) {
+        setState(() {
+          // This will trigger a rebuild and show the updated drill status
+        });
+      }
+      
+      debugPrint('Returned to join session screen after drill completion');
+    } catch (e) {
+      debugPrint('Error returning to join session screen: $e');
     }
   }
 

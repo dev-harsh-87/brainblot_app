@@ -4,6 +4,9 @@ import 'package:spark_app/features/sharing/domain/user_profile.dart';
 import 'package:spark_app/features/sharing/services/sharing_service.dart';
 import 'package:spark_app/core/di/injection.dart';
 import 'package:spark_app/core/widgets/confirmation_dialog.dart';
+import 'package:spark_app/core/theme/app_theme.dart';
+import 'package:spark_app/core/widgets/profile_avatar.dart';
+import 'package:spark_app/features/profile/services/profile_service.dart';
 
 class SharingScreen extends StatefulWidget {
   final String itemType; // 'drill' or 'program'
@@ -23,11 +26,13 @@ class SharingScreen extends StatefulWidget {
 
 class _SharingScreenState extends State<SharingScreen> with SingleTickerProviderStateMixin {
   late final SharingService _sharingService;
+  late final ProfileService _profileService;
   late final TabController _tabController;
 
   final _searchController = TextEditingController();
   final _emailController = TextEditingController();
   final _messageController = TextEditingController();
+  UserProfile? _userProfile;
 
   List<UserProfile> _searchResults = [];
   List<UserProfile> _sharedUsers = [];
@@ -41,8 +46,23 @@ class _SharingScreenState extends State<SharingScreen> with SingleTickerProvider
   void initState() {
     super.initState();
     _sharingService = getIt<SharingService>();
+    _profileService = getIt<ProfileService>();
     _tabController = TabController(length: 3, vsync: this);
     _loadInitialData();
+    _loadUserProfile();
+  }
+
+  Future<void> _loadUserProfile() async {
+    try {
+      final profile = await _profileService.getCurrentUserProfile();
+      if (mounted) {
+        setState(() {
+          _userProfile = profile;
+        });
+      }
+    } catch (e) {
+      print('❌ Error loading user profile: $e');
+    }
   }
 
   @override
@@ -303,9 +323,22 @@ class _SharingScreenState extends State<SharingScreen> with SingleTickerProvider
     return Scaffold(
       resizeToAvoidBottomInset: true, // Handle keyboard properly
       appBar: AppBar(
+        backgroundColor: Theme.of(context).colorScheme.primary,
+        foregroundColor: Theme.of(context).colorScheme.onPrimary,
+        flexibleSpace: Container(
+          decoration: BoxDecoration(
+            color: AppTheme.goldPrimary,
+          ),
+        ),
         title: FittedBox(
           fit: BoxFit.scaleDown,
-          child: Text('Share ${widget.itemType.toUpperCase()}'),
+          child: Text(
+            'Share ${widget.itemType.toUpperCase()}',
+            style: TextStyle(
+              color: Theme.of(context).colorScheme.onPrimary,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
         ),
         elevation: 0,
         bottom: PreferredSize(

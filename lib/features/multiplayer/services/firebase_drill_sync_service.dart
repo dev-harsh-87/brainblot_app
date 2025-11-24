@@ -115,7 +115,8 @@ class FirebaseDrillSyncService {
         maxParticipants: maxParticipants,
       );
 
-      // Create session document in Firestore
+      // Create session document in Firestore with proper timestamp handling
+      final now = DateTime.now();
       await _firestore
           .collection('multiplayer_sessions')
           .doc(sessionId)
@@ -124,6 +125,9 @@ class FirebaseDrillSyncService {
         'fcmTokens': {_deviceId!: _fcmToken},
         'createdAt': FieldValue.serverTimestamp(),
         'lastActivity': FieldValue.serverTimestamp(),
+        // Add client timestamp as backup
+        'clientCreatedAt': now.toIso8601String(),
+        'clientLastActivity': now.toIso8601String(),
       });
 
       _isHost = true;
@@ -176,7 +180,7 @@ class FirebaseDrillSyncService {
         throw Exception('Session is full');
       }
 
-      // Add participant to session
+      // Add participant to session with proper timestamp handling
       await _firestore
           .collection('multiplayer_sessions')
           .doc(sessionCode)
@@ -185,6 +189,7 @@ class FirebaseDrillSyncService {
         'participantNames': FieldValue.arrayUnion([_deviceName!]),
         'fcmTokens.${_deviceId!}': _fcmToken,
         'lastActivity': FieldValue.serverTimestamp(),
+        'clientLastActivity': DateTime.now().toIso8601String(),
       });
 
       _isHost = false;
@@ -217,11 +222,15 @@ class FirebaseDrillSyncService {
     }
 
     try {
+      debugPrint('🚀 Starting drill for all devices: ${drill.name}');
+      
       _currentDrill = drill;
       _isDrillActive = true;
       _isDrillPaused = false;
       _drillStartTime = DateTime.now();
       _totalPausedDuration = Duration.zero;
+      
+      debugPrint('📊 Drill state set: active=$_isDrillActive, paused=$_isDrillPaused');
 
       // Update session with active drill
       await _updateSessionDrillState(drill.id, SessionStatus.active);
@@ -246,6 +255,9 @@ class FirebaseDrillSyncService {
         'stimulusLengthMs': drill.stimulusLengthMs,
         'delayBetweenStimuliMs': drill.delayBetweenStimuliMs,
         'customStimuliIds': drill.customStimuliIds,
+        // Add custom stimuli metadata for proper sync
+        'hasCustomStimuli': drill.customStimuliIds.isNotEmpty,
+        'customStimuliCount': drill.customStimuliIds.length,
       };
 
       // Send drill start message
@@ -306,29 +318,42 @@ class FirebaseDrillSyncService {
   }
 
   /// Pause the current drill for all devices (host only)
-  Future<void> pauseDrillForAll() async {
+  Future<void> pauseDrillForAll({
+    int? currentTimeMs,
+    int? currentIndex,
+  }) async {
     if (!_isHost) {
       throw Exception('Only the host can pause drills');
     }
 
-    if (!_isDrillActive || _isDrillPaused) {
-      debugPrint('⚠️ Cannot pause drill: active=$_isDrillActive, paused=$_isDrillPaused');
+    if (!_isDrillActive) {
+      debugPrint('⚠️ Cannot pause drill: drill is not active (active=$_isDrillActive)');
+      return;
+    }
+    
+    if (_isDrillPaused) {
+      debugPrint('⚠️ Drill is already paused (paused=$_isDrillPaused)');
       return;
     }
 
     try {
       debugPrint('🔄 Host pausing drill for all devices...');
+      debugPrint('📊 Before pause: active=$_isDrillActive, paused=$_isDrillPaused');
       
       _isDrillPaused = true;
       _drillPauseTime = DateTime.now();
+      
+      debugPrint('📊 After pause state change: active=$_isDrillActive, paused=$_isDrillPaused');
 
       // Update session status first
       await _updateSessionDrillState(_currentDrill?.id, SessionStatus.paused);
 
-      // Send drill pause message with high priority
+      // Send drill pause message with high priority and timing data
       await _sendMessage(SyncMessage.drillPause(
         senderId: _deviceId!,
         senderName: _deviceName!,
+        currentTimeMs: currentTimeMs,
+        currentIndex: currentIndex,
       ));
       
       // Emit local event
@@ -344,18 +369,27 @@ class FirebaseDrillSyncService {
   }
 
   /// Resume the current drill for all devices (host only)
-  Future<void> resumeDrillForAll() async {
+  Future<void> resumeDrillForAll({
+    int? currentTimeMs,
+    int? currentIndex,
+  }) async {
     if (!_isHost) {
       throw Exception('Only the host can resume drills');
     }
 
-    if (!_isDrillActive || !_isDrillPaused) {
-      debugPrint('⚠️ Cannot resume drill: active=$_isDrillActive, paused=$_isDrillPaused');
+    if (!_isDrillActive) {
+      debugPrint('⚠️ Cannot resume drill: drill is not active (active=$_isDrillActive)');
+      return;
+    }
+    
+    if (!_isDrillPaused) {
+      debugPrint('⚠️ Cannot resume drill: drill is not paused (paused=$_isDrillPaused)');
       return;
     }
 
     try {
       debugPrint('🔄 Host resuming drill for all devices...');
+      debugPrint('📊 Before resume: active=$_isDrillActive, paused=$_isDrillPaused');
       
       // Calculate paused duration
       if (_drillPauseTime != null) {
@@ -366,14 +400,18 @@ class FirebaseDrillSyncService {
 
       _isDrillPaused = false;
       _drillPauseTime = null;
+      
+      debugPrint('📊 After resume state change: active=$_isDrillActive, paused=$_isDrillPaused');
 
       // Update session status first
       await _updateSessionDrillState(_currentDrill?.id, SessionStatus.active);
 
-      // Send drill resume message with high priority
+      // Send drill resume message with high priority and timing data
       await _sendMessage(SyncMessage.drillResume(
         senderId: _deviceId!,
         senderName: _deviceName!,
+        currentTimeMs: currentTimeMs,
+        currentIndex: currentIndex,
       ));
       
       // Emit local event
@@ -395,6 +433,7 @@ class FirebaseDrillSyncService {
     required int colorValue,
     required int timeMs,
     required int index,
+    String? customStimulusItemId,
   }) async {
     if (!_isHost) {
       return; // Only host can broadcast stimuli
@@ -410,6 +449,11 @@ class FirebaseDrillSyncService {
         'timestamp': DateTime.now().millisecondsSinceEpoch,
         'priority': 'high', // Mark stimulus messages as high priority
       };
+      
+      // Include custom stimulus item ID if provided
+      if (customStimulusItemId != null) {
+        stimulusData['customStimulusItemId'] = customStimulusItemId;
+      }
 
       // Send stimulus message with high priority
       final message = SyncMessage.drillStimulus(
@@ -421,7 +465,7 @@ class FirebaseDrillSyncService {
       // Send immediately for better performance
       _sendMessage(message);
       
-      debugPrint('✅ Broadcasted stimulus: $stimulusType (${label}) color=${colorValue.toRadixString(16)} at $timeMs ms');
+      debugPrint('✅ Broadcasted stimulus: $stimulusType (${label}) color=${colorValue.toRadixString(16)} at $timeMs ms${customStimulusItemId != null ? ' customItemId=$customStimulusItemId' : ''}');
     } catch (e) {
       debugPrint('❌ Failed to broadcast stimulus: $e');
     }
@@ -518,14 +562,19 @@ class FirebaseDrillSyncService {
         try {
           final data = snapshot.data()!;
           
-          // Validate required fields before parsing
+          // Validate essential required fields before parsing
           if (data['sessionId'] == null ||
               data['hostId'] == null ||
               data['hostName'] == null ||
-              data['createdAt'] == null ||
-              data['lastActivity'] == null) {
-            debugPrint('❌ Session data missing required fields: $data');
+              data['createdAt'] == null) {
+            debugPrint('❌ Session data missing essential required fields: $data');
             return;
+          }
+          
+          // lastActivity can be null initially, so we'll handle it gracefully
+          if (data['lastActivity'] == null) {
+            debugPrint('⚠️ Session lastActivity is null, using createdAt as fallback');
+            data['lastActivity'] = data['createdAt'];
           }
           
           final convertedData = _convertTimestampsForJson(data);
@@ -554,22 +603,39 @@ class FirebaseDrillSyncService {
           try {
             final messageData = change.doc.data()!;
             
-            // Validate required fields before parsing
+            // Validate essential required fields before parsing
             if (messageData['senderId'] == null ||
                 messageData['senderName'] == null ||
-                messageData['timestamp'] == null ||
                 messageData['messageId'] == null) {
-              debugPrint('❌ Message data missing required fields: $messageData');
+              debugPrint('❌ Message data missing essential required fields: $messageData');
               continue;
+            }
+            
+            // Handle timestamp - can be null when using FieldValue.serverTimestamp()
+            if (messageData['timestamp'] == null) {
+              // Use clientTimestamp as fallback or current time
+              final clientTime = messageData['clientTimestamp'];
+              final fallbackTime = (clientTime is int) ? clientTime : DateTime.now().millisecondsSinceEpoch;
+              messageData['timestamp'] = Timestamp.fromMillisecondsSinceEpoch(fallbackTime);
+              debugPrint('⚠️ Message timestamp was null, using fallback: $fallbackTime');
             }
             
             // Convert timestamps if needed
             final convertedData = _convertTimestampsForJson(messageData);
-            final message = SyncMessage.fromJson(convertedData);
             
-            // Don't process our own messages
-            if (message.senderId != _deviceId) {
-              _handleIncomingMessage(message);
+            try {
+              final message = SyncMessage.fromJson(convertedData);
+              
+              // Don't process our own messages
+              if (message.senderId != _deviceId) {
+                debugPrint('📨 Processing message: ${message.type.displayName} from ${message.senderName}');
+                _handleIncomingMessage(message);
+              } else {
+                debugPrint('🔄 Skipping own message: ${message.type.displayName}');
+              }
+            } catch (e) {
+              debugPrint('❌ Error parsing SyncMessage: $e');
+              debugPrint('❌ Raw converted data: $convertedData');
             }
           } catch (e) {
             debugPrint('❌ Error processing message: $e');
@@ -596,11 +662,19 @@ class FirebaseDrillSyncService {
         // Drill stopped by host
         _handleDrillStop();
       } else if (status == SessionStatus.paused && !_isDrillPaused) {
-        // Drill paused by host
-        _handleDrillPause();
+        // Drill paused by host - create a synthetic message for session status changes
+        final syntheticPauseMessage = SyncMessage.drillPause(
+          senderId: 'session',
+          senderName: 'Session',
+        );
+        _handleDrillPause(syntheticPauseMessage);
       } else if (status == SessionStatus.active && _isDrillPaused) {
-        // Drill resumed by host
-        _handleDrillResume();
+        // Drill resumed by host - create a synthetic message for session status changes
+        final syntheticResumeMessage = SyncMessage.drillResume(
+          senderId: 'session',
+          senderName: 'Session',
+        );
+        _handleDrillResume(syntheticResumeMessage);
       }
     }
   }
@@ -635,11 +709,13 @@ class FirebaseDrillSyncService {
     if (_currentSession == null) return;
 
     try {
-      // Add client timestamp for better synchronization
+      // Add client timestamp for better synchronization with retry logic
+      final clientTimestamp = DateTime.now().millisecondsSinceEpoch;
       final messageData = {
         ...message.toJson(),
-        'clientTimestamp': DateTime.now().millisecondsSinceEpoch,
+        'clientTimestamp': clientTimestamp,
         'timestamp': FieldValue.serverTimestamp(),
+        'priority': message.type.isDrillControl ? 'high' : 'normal',
       };
       
       // Store message in Firestore
@@ -713,10 +789,10 @@ class FirebaseDrillSyncService {
         _handleDrillStop();
         break;
       case SyncMessageType.drillPause:
-        _handleDrillPause();
+        _handleDrillPause(message);
         break;
       case SyncMessageType.drillResume:
-        _handleDrillResume();
+        _handleDrillResume(message);
         break;
       case SyncMessageType.drillStimulus:
         _handleDrillStimulus(message);
@@ -784,24 +860,31 @@ class FirebaseDrillSyncService {
     }
   }
 
-  void _handleDrillPause() {
+  void _handleDrillPause(SyncMessage message) {
     if (_isHost) return;
     
     try {
       _isDrillPaused = true;
       _drillPauseTime = DateTime.now();
 
-      _drillEventController.add(DrillPausedEvent());
+      // Extract timing data from message
+      final currentTimeMs = message.data['currentTimeMs'] as int?;
+      final currentIndex = message.data['currentIndex'] as int?;
+
+      _drillEventController.add(DrillPausedEvent(
+        currentTimeMs: currentTimeMs,
+        currentIndex: currentIndex,
+      ));
       _statusController.add('Drill paused by host');
       
-      debugPrint('✅ Received drill pause');
+      debugPrint('✅ Received drill pause${currentTimeMs != null ? ' at ${currentTimeMs}ms' : ''}${currentIndex != null ? ' index $currentIndex' : ''}');
     } catch (e) {
       debugPrint('❌ Error handling drill pause: $e');
       _statusController.add('Error pausing drill: $e');
     }
   }
 
-  void _handleDrillResume() {
+  void _handleDrillResume(SyncMessage message) {
     if (_isHost) return;
     
     try {
@@ -813,10 +896,17 @@ class FirebaseDrillSyncService {
       _isDrillPaused = false;
       _drillPauseTime = null;
 
-      _drillEventController.add(DrillResumedEvent());
+      // Extract timing data from message
+      final currentTimeMs = message.data['currentTimeMs'] as int?;
+      final currentIndex = message.data['currentIndex'] as int?;
+
+      _drillEventController.add(DrillResumedEvent(
+        currentTimeMs: currentTimeMs,
+        currentIndex: currentIndex,
+      ));
       _statusController.add('Drill resumed by host');
       
-      debugPrint('✅ Received drill resume');
+      debugPrint('✅ Received drill resume${currentTimeMs != null ? ' at ${currentTimeMs}ms' : ''}${currentIndex != null ? ' index $currentIndex' : ''}');
     } catch (e) {
       debugPrint('❌ Error handling drill resume: $e');
       _statusController.add('Error resuming drill: $e');
@@ -890,10 +980,13 @@ class FirebaseDrillSyncService {
     if (_currentSession == null) return;
 
     try {
+      final now = DateTime.now();
       final updateData = <String, dynamic>{
         'activeDrillId': drillId,
         'status': status.name,
         'lastActivity': FieldValue.serverTimestamp(),
+        'clientLastActivity': now.toIso8601String(),
+        'statusUpdatedAt': now.millisecondsSinceEpoch,
       };
 
       // Include drill data if starting a drill
@@ -917,6 +1010,9 @@ class FirebaseDrillSyncService {
           'delayBetweenStimuliMs': _currentDrill!.delayBetweenStimuliMs,
           'customStimuliIds': _currentDrill!.customStimuliIds,
           'startTime': _drillStartTime?.millisecondsSinceEpoch,
+          // Add custom stimuli metadata for proper participant sync
+          'hasCustomStimuli': _currentDrill!.customStimuliIds.isNotEmpty,
+          'customStimuliCount': _currentDrill!.customStimuliIds.length,
         };
       }
 
@@ -1001,12 +1097,22 @@ class FirebaseDrillSyncService {
     if (data is Map<String, dynamic>) {
       data.forEach((key, value) {
         if (value is Timestamp) {
-          data[key] = value.toDate().toIso8601String();
+          try {
+            data[key] = value.toDate().toIso8601String();
+          } catch (e) {
+            debugPrint('⚠️ Error converting timestamp for key $key: $e');
+            // Use current time as fallback
+            data[key] = DateTime.now().toIso8601String();
+          }
+        } else if (value == null && key == 'timestamp') {
+          // Only handle null timestamp for message data, not drill or session data
+          debugPrint('⚠️ Null timestamp field detected, using current time');
+          data[key] = DateTime.now().toIso8601String();
         } else if (value is Map<String, dynamic>) {
           _convertTimestampsRecursively(value);
         } else if (value is List) {
-          _convertTimestampsRecursively(value);
-        }
+         _convertTimestampsRecursively(value);
+       }
       });
     } else if (data is List) {
       for (int i = 0; i < data.length; i++) {

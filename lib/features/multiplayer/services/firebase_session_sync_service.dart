@@ -9,8 +9,9 @@ import 'package:spark_app/features/multiplayer/services/firebase_drill_sync_serv
 import 'package:spark_app/features/multiplayer/services/session_sync_service.dart';
 
 
-/// Firebase-based implementation of SessionSyncService
+/// Enhanced Firebase-based implementation of SessionSyncService
 /// This replaces the Bluetooth-based implementation with Firebase Firestore + FCM
+/// Includes enhanced custom stimuli support and improved synchronization
 class FirebaseSessionSyncService implements SessionSyncService {
   final FirebaseDrillSyncService _firebaseService = FirebaseDrillSyncService();
   
@@ -70,17 +71,25 @@ class FirebaseSessionSyncService implements SessionSyncService {
   @override
   Future<void> startDrill(Drill drill) async {
     try {
+      // Enhanced drill start with custom stimuli support
       await _firebaseService.startDrillForAll(drill);
+      debugPrint('✅ Enhanced drill started: ${drill.name} with ${drill.customStimuliIds.length} custom stimuli');
     } catch (e) {
-      debugPrint('❌ Failed to start drill: $e');
+      debugPrint('❌ Failed to start enhanced drill: $e');
       rethrow;
     }
   }
 
   @override
-  Future<void> pauseDrill() async {
+  Future<void> pauseDrill({
+    int? currentTimeMs,
+    int? currentIndex,
+  }) async {
     try {
-      await _firebaseService.pauseDrillForAll();
+      await _firebaseService.pauseDrillForAll(
+        currentTimeMs: currentTimeMs,
+        currentIndex: currentIndex,
+      );
     } catch (e) {
       debugPrint('❌ Failed to pause drill: $e');
       rethrow;
@@ -88,9 +97,15 @@ class FirebaseSessionSyncService implements SessionSyncService {
   }
 
   @override
-  Future<void> resumeDrill() async {
+  Future<void> resumeDrill({
+    int? currentTimeMs,
+    int? currentIndex,
+  }) async {
     try {
-      await _firebaseService.resumeDrillForAll();
+      await _firebaseService.resumeDrillForAll(
+        currentTimeMs: currentTimeMs,
+        currentIndex: currentIndex,
+      );
     } catch (e) {
       debugPrint('❌ Failed to resume drill: $e');
       rethrow;
@@ -118,15 +133,19 @@ class FirebaseSessionSyncService implements SessionSyncService {
   @override
   Future<void> broadcastStimulus(Map<String, dynamic> stimulusData) async {
     try {
+      // Enhanced stimulus broadcasting with comprehensive custom stimuli data
       await _firebaseService.broadcastStimulus(
         stimulusType: stimulusData['stimulusType'] as String,
         label: stimulusData['label'] as String,
         colorValue: stimulusData['colorValue'] as int,
         timeMs: stimulusData['timeMs'] as int,
         index: stimulusData['index'] as int,
+        customStimulusItemId: stimulusData['customStimulusItemId'] as String?,
       );
+      
+      debugPrint('✅ Enhanced stimulus broadcast: ${stimulusData['stimulusType']} with custom data');
     } catch (e) {
-      debugPrint('❌ Failed to broadcast stimulus: $e');
+      debugPrint('❌ Failed to broadcast enhanced stimulus: $e');
     }
   }
 

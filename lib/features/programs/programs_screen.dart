@@ -18,11 +18,17 @@ import 'package:spark_app/features/programs/ui/program_creation_dialog.dart';
 import 'package:spark_app/features/programs/ui/program_day_screen.dart';
 import 'package:spark_app/features/programs/ui/program_details_screen.dart';
 import 'package:spark_app/features/programs/ui/program_stats_screen.dart';
+import 'package:spark_app/features/profile/services/profile_service.dart';
+import 'package:spark_app/features/sharing/domain/user_profile.dart';
 import 'package:spark_app/features/sharing/services/sharing_service.dart';
 import 'package:spark_app/features/sharing/ui/sharing_screen.dart';
 import 'package:spark_app/core/services/auto_refresh_service.dart';
 import 'package:spark_app/core/widgets/confirmation_dialog.dart';
 import 'package:spark_app/core/ui/edge_to_edge.dart';
+import 'package:spark_app/core/theme/app_theme.dart';
+import 'package:spark_app/core/widgets/profile_avatar.dart';
+import 'package:spark_app/features/profile/services/profile_service.dart';
+import 'package:spark_app/features/sharing/domain/user_profile.dart';
 
 class ProgramsScreen extends StatefulWidget {
   const ProgramsScreen({super.key});
@@ -36,11 +42,13 @@ class _ProgramsScreenState extends State<ProgramsScreen>
   late TabController _tabController;
   late AnimationController _headerAnimationController;
   late SharingService _sharingService;
+  late ProfileService _profileService;
   String _selectedCategory = '';
   String _selectedLevel = '';
   List<DrillCategory> _availableCategories = [];
   final Map<String, bool> _ownershipCache = {};
   final TextEditingController _searchController = TextEditingController();
+  UserProfile? _userProfile;
 
   @override
   void initState() {
@@ -76,6 +84,19 @@ class _ProgramsScreenState extends State<ProgramsScreen>
       }
     } catch (e) {
       print('❌ Error loading categories: $e');
+    }
+  }
+
+  Future<void> _loadUserProfile() async {
+    try {
+      final profile = await _profileService.getCurrentUserProfile();
+      if (mounted) {
+        setState(() {
+          _userProfile = profile;
+        });
+      }
+    } catch (e) {
+      print('❌ Error loading user profile: $e');
     }
   }
 
@@ -226,15 +247,7 @@ class _ProgramsScreenState extends State<ProgramsScreen>
       centerTitle: true,
       flexibleSpace: Container(
         decoration: BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [
-              colorScheme.primary,
-              colorScheme.primary.withOpacity(0.9),
-              colorScheme.secondary.withOpacity(0.8),
-            ],
-          ),
+          color: AppTheme.goldPrimary,
         ),
       ),
       actions: [
@@ -349,14 +362,7 @@ class _ProgramsScreenState extends State<ProgramsScreen>
 
     return Container(
       decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [
-            colorScheme.primaryContainer.withOpacity(0.3),
-            colorScheme.secondaryContainer.withOpacity(0.2),
-          ],
-        ),
+        color: AppTheme.neutral100.withOpacity(0.5),
         border: Border(
           bottom: BorderSide(
             color: colorScheme.outline.withOpacity(0.1),
@@ -785,14 +791,7 @@ class _ProgramsScreenState extends State<ProgramsScreen>
             height: 200,
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(16),
-              gradient: LinearGradient(
-                colors: [
-                  colorScheme.primaryContainer.withOpacity(0.3),
-                  colorScheme.secondaryContainer.withOpacity(0.2),
-                ],
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-              ),
+              color: AppTheme.neutral100,
             ),
             child: Center(
               child: Column(
@@ -1101,26 +1100,26 @@ class _ProgramsScreenState extends State<ProgramsScreen>
       Program program, ActiveProgram active) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
+    final categoryColor = _getCategoryColor(program.category);
+    final categoryIcon = _getCategoryIcon(program.category);
 
     return Container(
       margin: const EdgeInsets.only(bottom: 16),
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(16),
-        gradient: LinearGradient(
-          colors: [
-            colorScheme.primary.withOpacity(0.08),
-            colorScheme.secondary.withOpacity(0.04),
-          ],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
+        color: AppTheme.whitePure,
         border: Border.all(
-          color: colorScheme.primary.withOpacity(0.15),
+          color: categoryColor.withOpacity(0.1),
           width: 1,
         ),
         boxShadow: [
           BoxShadow(
-            color: colorScheme.primary.withOpacity(0.08),
+            color: colorScheme.shadow.withOpacity(0.08),
+            blurRadius: 16,
+            offset: const Offset(0, 4),
+          ),
+          BoxShadow(
+            color: categoryColor.withOpacity(0.15),
             blurRadius: 12,
             offset: const Offset(0, 4),
             spreadRadius: 0,
@@ -1139,26 +1138,19 @@ class _ProgramsScreenState extends State<ProgramsScreen>
                   width: 48,
                   height: 48,
                   decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      colors: [
-                        colorScheme.primary,
-                        colorScheme.primary.withOpacity(0.8),
-                      ],
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                    ),
+                    color: categoryColor,
                     borderRadius: BorderRadius.circular(14),
                     boxShadow: [
                       BoxShadow(
-                        color: colorScheme.primary.withOpacity(0.25),
+                        color: categoryColor.withOpacity(0.3),
                         blurRadius: 8,
                         offset: const Offset(0, 3),
                       ),
                     ],
                   ),
                   child: Icon(
-                    Icons.psychology_rounded,
-                    color: colorScheme.onPrimary,
+                    categoryIcon,
+                    color: Colors.white,
                     size: 24,
                   ),
                 ),
@@ -1181,18 +1173,46 @@ class _ProgramsScreenState extends State<ProgramsScreen>
                               overflow: TextOverflow.ellipsis,
                             ),
                           ),
+                          // Admin tag for admin programs
+                          if (program.createdByRole == 'admin' || program.createdByRole == null)
+                            Container(
+                              margin: const EdgeInsets.only(right: 8),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 8,
+                                vertical: 4,
+                              ),
+                              decoration: BoxDecoration(
+                                color: Colors.orange.shade600,
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(
+                                    Icons.admin_panel_settings,
+                                    color: Colors.white,
+                                    size: 12,
+                                  ),
+                                  const SizedBox(width: 4),
+                                  Text(
+                                    'ADMIN',
+                                    style: TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 9,
+                                      fontWeight: FontWeight.w700,
+                                      letterSpacing: 0.5,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
                           Container(
                             padding: const EdgeInsets.symmetric(
                               horizontal: 8,
                               vertical: 4,
                             ),
                             decoration: BoxDecoration(
-                              gradient: LinearGradient(
-                                colors: [
-                                  Colors.green.shade400,
-                                  Colors.green.shade600,
-                                ],
-                              ),
+                              color: AppTheme.successColor,
                               borderRadius: BorderRadius.circular(12),
                             ),
                             child: Row(
@@ -1227,14 +1247,13 @@ class _ProgramsScreenState extends State<ProgramsScreen>
                               vertical: 3,
                             ),
                             decoration: BoxDecoration(
-                              color:
-                                  colorScheme.primaryContainer.withOpacity(0.6),
+                              color: categoryColor.withOpacity(0.15),
                               borderRadius: BorderRadius.circular(8),
                             ),
                             child: Text(
                               program.category.toUpperCase(),
                               style: theme.textTheme.labelSmall?.copyWith(
-                                color: colorScheme.primary,
+                                color: categoryColor,
                                 fontWeight: FontWeight.w600,
                                 fontSize: 9,
                                 letterSpacing: 0.3,
@@ -1297,14 +1316,7 @@ class _ProgramsScreenState extends State<ProgramsScreen>
       margin: const EdgeInsets.only(bottom: 12),
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [
-            colorScheme.primaryContainer.withOpacity(0.3),
-            colorScheme.secondaryContainer.withOpacity(0.2),
-          ],
-        ),
+        color: colorScheme.primaryContainer.withOpacity(0.2),
         borderRadius: BorderRadius.circular(16),
         border: Border.all(
           color: colorScheme.outline.withOpacity(0.1),
@@ -1364,13 +1376,7 @@ class _ProgramsScreenState extends State<ProgramsScreen>
               widthFactor: progress.clamp(0.0, 1.0),
               child: Container(
                 decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    colors: [
-                      colorScheme.primary,
-                      colorScheme.secondary,
-                      colorScheme.tertiary,
-                    ],
-                  ),
+                  color: colorScheme.primary,
                   borderRadius: BorderRadius.circular(6),
                   boxShadow: [
                     BoxShadow(
@@ -1527,19 +1533,9 @@ class _ProgramsScreenState extends State<ProgramsScreen>
       margin: const EdgeInsets.only(bottom: 12),
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: hasDrill
-              ? [
-                  colorScheme.secondaryContainer.withOpacity(0.4),
-                  colorScheme.tertiaryContainer.withOpacity(0.3),
-                ]
-              : [
-                  colorScheme.surfaceContainerHighest.withOpacity(0.5),
-                  colorScheme.surfaceContainer.withOpacity(0.3),
-                ],
-        ),
+        color: hasDrill
+            ? colorScheme.secondaryContainer.withOpacity(0.3)
+            : colorScheme.surfaceContainerHighest.withOpacity(0.4),
         borderRadius: BorderRadius.circular(16),
         border: Border.all(
           color: hasDrill
@@ -1562,14 +1558,9 @@ class _ProgramsScreenState extends State<ProgramsScreen>
               Container(
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    colors: hasDrill
-                        ? [colorScheme.secondary, colorScheme.tertiary]
-                        : [
-                            colorScheme.outline,
-                            colorScheme.outline.withOpacity(0.7)
-                          ],
-                  ),
+                  color: hasDrill
+                      ? colorScheme.secondary
+                      : colorScheme.outline,
                   borderRadius: BorderRadius.circular(16),
                   boxShadow: [
                     BoxShadow(
@@ -1849,14 +1840,7 @@ class _ProgramsScreenState extends State<ProgramsScreen>
                   width: double.infinity,
                   padding: const EdgeInsets.all(20),
                   decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      colors: [
-                        categoryColor.withOpacity(0.1),
-                        categoryColor.withOpacity(0.05),
-                      ],
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                    ),
+                    color: categoryColor.withOpacity(0.08),
                   ),
                   child: Row(
                     children: [
@@ -1865,14 +1849,7 @@ class _ProgramsScreenState extends State<ProgramsScreen>
                         width: 60,
                         height: 60,
                         decoration: BoxDecoration(
-                          gradient: LinearGradient(
-                            colors: [
-                              categoryColor,
-                              categoryColor.withOpacity(0.8),
-                            ],
-                            begin: Alignment.topLeft,
-                            end: Alignment.bottomRight,
-                          ),
+                          color: categoryColor,
                           borderRadius: BorderRadius.circular(18),
                           boxShadow: [
                             BoxShadow(
@@ -2431,17 +2408,8 @@ class _ProgramsScreenState extends State<ProgramsScreen>
   }
 
   void _showCreateProgramScreen() {
-    // Get the bloc from the parent context before navigating
-    final programsBloc = context.read<ProgramsBloc>();
-
-    Navigator.of(context).push(
-      MaterialPageRoute<void>(
-        builder: (context) => BlocProvider.value(
-          value: programsBloc,
-          child: const ProgramCreationScreen(),
-        ),
-      ),
-    );
+    HapticFeedback.mediumImpact();
+    context.push('/program-builder');
   }
 
   Widget _buildDayOverviewCard(

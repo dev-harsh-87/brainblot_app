@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:uuid/uuid.dart';
 import 'package:spark_app/features/drills/domain/drill_category.dart';
 import 'package:spark_app/features/drills/data/drill_category_repository.dart';
+import 'package:spark_app/core/theme/app_theme.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
 class CategoryManagementScreen extends StatefulWidget {
@@ -211,7 +212,7 @@ class _CategoryManagementScreenState extends State<CategoryManagementScreen> {
           FilledButton(
             onPressed: () => Navigator.pop(context, true),
             style: FilledButton.styleFrom(
-              backgroundColor: Colors.red,
+              backgroundColor: AppTheme.errorColor,
             ),
             child: const Text('Delete'),
           ),
@@ -247,8 +248,8 @@ class _CategoryManagementScreenState extends State<CategoryManagementScreen> {
       appBar: AppBar(
         title: const Text('Category Management'),
         elevation: 0,
-        backgroundColor: colorScheme.primary,
-        foregroundColor: colorScheme.onPrimary,
+        backgroundColor: colorScheme.surface,
+        foregroundColor: colorScheme.onSurface,
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
@@ -392,11 +393,11 @@ class _CategoryManagementScreenState extends State<CategoryManagementScreen> {
                                   value: 'delete',
                                   child: Row(
                                     children: [
-                                      Icon(Icons.delete, color: Colors.red),
+                                      Icon(Icons.delete, color: AppTheme.errorColor),
                                       SizedBox(width: 8),
                                       Text(
                                         'Delete',
-                                        style: TextStyle(color: Colors.red),
+                                        style: TextStyle(color: AppTheme.errorColor),
                                       ),
                                     ],
                                   ),

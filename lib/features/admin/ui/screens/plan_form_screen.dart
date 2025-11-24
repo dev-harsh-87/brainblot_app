@@ -195,7 +195,7 @@ class _PlanFormScreenState extends State<PlanFormScreen> {
               'Add features that will be displayed to users',
               style: TextStyle(
                 fontSize: 13,
-                color: Colors.grey[600],
+                color: context.colors.onSurface.withOpacity(0.6),
               ),
             ),
             const SizedBox(height: 16),
@@ -229,18 +229,18 @@ class _PlanFormScreenState extends State<PlanFormScreen> {
                 child: Container(
                   padding: const EdgeInsets.all(16),
                   decoration: BoxDecoration(
-                    color: Colors.orange[50],
+                    color: AppTheme.warningColor.withOpacity(0.1),
                     borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: Colors.orange.withOpacity(0.3)),
+                    border: Border.all(color: AppTheme.warningColor.withOpacity(0.3)),
                   ),
                   child: Row(
                     children: [
-                      Icon(Icons.info_outline, color: Colors.orange[800], size: 20),
+                      Icon(Icons.info_outline, color: AppTheme.warningColor, size: 20),
                       const SizedBox(width: 8),
                       Expanded(
                         child: Text(
                           'No features added yet. Add at least one feature.',
-                          style: TextStyle(color: Colors.orange[900], fontSize: 13),
+                          style: TextStyle(color: AppTheme.warningColor, fontSize: 13),
                         ),
                       ),
                     ],
@@ -262,8 +262,8 @@ class _PlanFormScreenState extends State<PlanFormScreen> {
                           _features.remove(feature);
                         });
                       },
-                      backgroundColor: AppTheme.primaryColor.withOpacity(0.1),
-                      side: BorderSide(color: AppTheme.primaryColor.withOpacity(0.3)),
+                      backgroundColor: AppTheme.goldPrimary.withOpacity(0.1),
+                      side: BorderSide(color: AppTheme.goldPrimary.withOpacity(0.3)),
                     );
                   }).toList(),
                 ),
@@ -294,7 +294,7 @@ class _PlanFormScreenState extends State<PlanFormScreen> {
               'Select which modules users can access with this plan',
               style: TextStyle(
                 fontSize: 13,
-                color: Colors.grey[600],
+                color: context.colors.onSurface.withOpacity(0.6),
               ),
             ),
             const SizedBox(height: 16),
@@ -302,18 +302,18 @@ class _PlanFormScreenState extends State<PlanFormScreen> {
               Container(
                 padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
-                  color: Colors.orange[50],
+                  color: AppTheme.warningColor.withOpacity(0.1),
                   borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: Colors.orange.withOpacity(0.3)),
+                  border: Border.all(color: AppTheme.warningColor.withOpacity(0.3)),
                 ),
                 child: Row(
                   children: [
-                    Icon(Icons.info_outline, color: Colors.orange[800], size: 20),
+                    Icon(Icons.info_outline, color: AppTheme.warningColor, size: 20),
                     const SizedBox(width: 8),
                     Expanded(
                       child: Text(
                         'No modules selected. Select at least one module.',
-                        style: TextStyle(color: Colors.orange[900], fontSize: 13),
+                        style: TextStyle(color: AppTheme.warningColor, fontSize: 13),
                       ),
                     ),
                   ],
@@ -331,7 +331,7 @@ class _PlanFormScreenState extends State<PlanFormScreen> {
                     style: TextStyle(
                       fontSize: 12,
                       fontWeight: FontWeight.w600,
-                      color: isSelected ? AppTheme.primaryColor : Colors.grey[700],
+                      color: isSelected ? AppTheme.goldPrimary : context.colors.onSurface.withOpacity(0.7),
                     ),
                   ),
                   selected: isSelected,
@@ -344,13 +344,13 @@ class _PlanFormScreenState extends State<PlanFormScreen> {
                       }
                     });
                   },
-                  selectedColor: AppTheme.primaryColor.withOpacity(0.2),
-                  checkmarkColor: AppTheme.primaryColor,
-                  backgroundColor: Colors.grey[100],
+                  selectedColor: AppTheme.goldPrimary.withOpacity(0.2),
+                  checkmarkColor: AppTheme.goldPrimary,
+                  backgroundColor: context.colors.surfaceContainerHighest,
                   side: BorderSide(
                     color: isSelected
-                        ? AppTheme.primaryColor
-                        : Colors.grey.withOpacity(0.3),
+                        ? AppTheme.goldPrimary
+                        : context.colors.onSurface.withOpacity(0.3),
                   ),
                 );
               }).toList(),
@@ -389,7 +389,7 @@ class _PlanFormScreenState extends State<PlanFormScreen> {
                 _isActive
                     ? 'Plan is visible and available for users'
                     : 'Plan is hidden from users',
-                style: TextStyle(fontSize: 13, color: Colors.grey[600]),
+                style: TextStyle(fontSize: 13, color: context.colors.onSurface.withOpacity(0.6)),
               ),
               contentPadding: EdgeInsets.zero,
             ),
@@ -424,7 +424,7 @@ class _PlanFormScreenState extends State<PlanFormScreen> {
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(12),
               ),
-              backgroundColor: AppTheme.primaryColor,
+              backgroundColor: AppTheme.goldPrimary,
             ),
             child: _isLoading
                 ? const SizedBox(
@@ -432,7 +432,7 @@ class _PlanFormScreenState extends State<PlanFormScreen> {
                     width: 20,
                     child: CircularProgressIndicator(
                       strokeWidth: 2,
-                      valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                      valueColor: AlwaysStoppedAnimation<Color>(AppTheme.whitePure),
                     ),
                   )
                 : Text(
@@ -467,7 +467,7 @@ class _PlanFormScreenState extends State<PlanFormScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('Please add at least one feature'),
-          backgroundColor: Colors.red,
+          backgroundColor: AppTheme.errorColor,
         ),
       );
       return;
@@ -477,7 +477,7 @@ class _PlanFormScreenState extends State<PlanFormScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('Please select at least one module'),
-          backgroundColor: Colors.red,
+          backgroundColor: AppTheme.errorColor,
         ),
       );
       return;
@@ -508,7 +508,7 @@ class _PlanFormScreenState extends State<PlanFormScreen> {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
               content: Text('Plan updated successfully'),
-              backgroundColor: Colors.green,
+              backgroundColor: AppTheme.successColor,
             ),
           );
           Navigator.pop(context, true);

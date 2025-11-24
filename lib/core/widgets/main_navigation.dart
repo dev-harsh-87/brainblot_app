@@ -5,6 +5,10 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:spark_app/features/auth/bloc/auth_bloc.dart';
 import 'package:spark_app/core/auth/models/user_role.dart';
 import 'package:spark_app/core/auth/models/app_user.dart';
+import 'package:spark_app/core/widgets/profile_avatar.dart';
+import 'package:spark_app/features/sharing/domain/user_profile.dart';
+import 'package:spark_app/features/profile/services/profile_service.dart';
+import 'package:spark_app/core/di/injection.dart';
 
 /// Callback to provide TabBar from child screens
 typedef TabBarBuilder = PreferredSizeWidget? Function(BuildContext context);
@@ -46,11 +50,28 @@ class MainNavigation extends StatefulWidget {
 class _MainNavigationState extends State<MainNavigation> {
   int _currentIndex = 0;
   TabBarBuilder? _tabBarBuilder;
+  late final ProfileService _profileService;
+  UserProfile? _userProfile;
 
   @override
   void initState() {
     super.initState();
+    _profileService = getIt<ProfileService>();
     _updateIndexFromPath();
+    _loadUserProfile();
+  }
+
+  Future<void> _loadUserProfile() async {
+    try {
+      final profile = await _profileService.getCurrentUserProfile();
+      if (mounted) {
+        setState(() {
+          _userProfile = profile;
+        });
+      }
+    } catch (e) {
+      // Handle error silently
+    }
   }
 
   @override
@@ -182,23 +203,16 @@ class _MainNavigationState extends State<MainNavigation> {
               appBar: AppBar(
                 title: Text(_getAppBarTitle()),
                 actions: [
-                  // Profile button in app bar
-                  IconButton(
-                    icon: CircleAvatar(
-                      radius: 16,
-                      backgroundColor: colorScheme.primaryContainer,
-                      child: Icon(
-                        Icons.person,
-                        size: 20,
-                        color: colorScheme.primary,
+                  // Profile Avatar button in app bar
+                  Padding(
+                    padding: const EdgeInsets.only(right: 8.0),
+                    child: Center(
+                      child: ProfileAvatar(
+                        userProfile: _userProfile,
+                        size: 32,
                       ),
                     ),
-                    onPressed: () {
-                      context.push('/profile');
-                    },
-                    tooltip: 'Profile',
                   ),
-                  const SizedBox(width: 8),
                 ],
                 bottom: _tabBarBuilder?.call(context),
               ),

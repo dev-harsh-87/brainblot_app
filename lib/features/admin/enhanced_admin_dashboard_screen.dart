@@ -3,6 +3,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:spark_app/core/auth/services/permission_service.dart';
 import 'package:spark_app/core/auth/guards/admin_guard.dart';
 import 'package:spark_app/core/auth/models/user_role.dart';
+import 'package:spark_app/core/theme/app_theme.dart';
 import 'package:spark_app/features/admin/ui/user_management_screen.dart';
 import 'package:spark_app/features/admin/ui/subscription_management_screen.dart';
 import 'package:spark_app/features/admin/ui/plan_requests_screen.dart';
@@ -25,7 +26,7 @@ class EnhancedAdminDashboardScreen extends StatelessWidget {
       permissionService: permissionService,
       requiredRole: UserRole.admin,
       child: Scaffold(
-        backgroundColor: Colors.grey[50],
+        backgroundColor: context.colors.background,
         body: RefreshIndicator(
           onRefresh: () async {
             // Trigger rebuild to refresh statistics
@@ -73,8 +74,8 @@ class EnhancedAdminDashboardScreen extends StatelessWidget {
         const SizedBox(height: 8),
         Text(
           'Manage your platform from this central hub',
-          style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                color: Colors.grey[600],
+          style: context.textStyles.bodyLarge?.copyWith(
+                color: AppTheme.neutral600,
               ),
         ),
       ],
@@ -125,28 +126,28 @@ class EnhancedAdminDashboardScreen extends StatelessWidget {
                   title: 'Total Users',
                   value: totalUsers.toString(),
                   icon: Icons.people,
-                  color: Colors.blue,
+                  color: AppTheme.infoColor,
                 ),
                 _buildStatCard(
                   context,
                   title: 'Active Users',
                   value: activeUsers.toString(),
                   icon: Icons.trending_up,
-                  color: Colors.green,
+                  color: AppTheme.successColor,
                 ),
                 _buildStatCard(
                   context,
                   title: 'Administrators',
                   value: adminCount.toString(),
                   icon: Icons.admin_panel_settings,
-                  color: Colors.red,
+                  color: AppTheme.adminColor,
                 ),
                 _buildStatCard(
                   context,
                   title: 'Active Plans',
                   value: activePlans.toString(),
                   icon: Icons.card_membership,
-                  color: Colors.purple,
+                  color: AppTheme.instituteColor,
                 ),
               ],
             );
@@ -167,13 +168,13 @@ Widget _buildStatCard(
   final theme = Theme.of(context);
 
   return Container(
-    padding: const EdgeInsets.all(20),
+    padding: const EdgeInsets.all(AppTheme.spacing20),
     decoration: BoxDecoration(
-      color: theme.cardColor,
-      borderRadius: BorderRadius.circular(20),
+      color: context.colors.surface,
+      borderRadius: BorderRadius.circular(AppTheme.radiusLarge),
       boxShadow: [
         BoxShadow(
-          color: Colors.black.withOpacity(0.04),
+          color: context.colors.onSurface.withOpacity(0.04),
           blurRadius: 12,
           offset: const Offset(0, 6),
         ),
@@ -184,10 +185,10 @@ Widget _buildStatCard(
       children: [
         // Icon container
         Container(
-          padding: const EdgeInsets.all(12),
+          padding: const EdgeInsets.all(AppTheme.spacing12),
           decoration: BoxDecoration(
             color: color.withOpacity(0.12),
-            borderRadius: BorderRadius.circular(12),
+            borderRadius: BorderRadius.circular(AppTheme.radiusMedium),
           ),
           child: Icon(
             icon,
@@ -213,7 +214,7 @@ Widget _buildStatCard(
               Text(
                 title,
                 style: theme.textTheme.bodyMedium?.copyWith(
-                  color: Colors.grey[700],
+                  color: context.colors.onSurface.withOpacity(0.7),
                   fontWeight: FontWeight.w600,
                 ),
               ),
@@ -222,7 +223,7 @@ Widget _buildStatCard(
                 Text(
                   subtitle,
                   style: theme.textTheme.bodySmall?.copyWith(
-                    color: Colors.grey[500],
+                    color: context.colors.onSurface.withOpacity(0.5),
                   ),
                 ),
               ],
@@ -259,7 +260,7 @@ Widget _buildStatCard(
               title: 'User Management',
               description: 'Manage users, roles & permissions',
               icon: Icons.people_outline,
-              color: Colors.blue,
+              color: AppTheme.infoColor,
               onTap: () => Navigator.push(
                 context,
                 MaterialPageRoute(
@@ -272,7 +273,7 @@ Widget _buildStatCard(
               title: 'Subscriptions',
               description: 'Manage plans & pricing',
               icon: Icons.card_membership_outlined,
-              color: Colors.green,
+              color: AppTheme.successColor,
               onTap: () => Navigator.push(
                 context,
                 MaterialPageRoute(
@@ -285,7 +286,7 @@ Widget _buildStatCard(
               title: 'Drill Categories',
               description: 'Manage drill categories',
               icon: Icons.category_outlined,
-              color: Colors.teal,
+              color: AppTheme.infoColor,
               onTap: () => Navigator.push(
                 context,
                 MaterialPageRoute(
@@ -298,7 +299,7 @@ Widget _buildStatCard(
               title: 'Plan Requests',
               description: 'Review subscription requests',
               icon: Icons.receipt_long_outlined,
-              color: Colors.orange,
+              color: AppTheme.warningColor,
               onTap: () => Navigator.push(
                 context,
                 MaterialPageRoute(
@@ -311,7 +312,7 @@ Widget _buildStatCard(
               title: 'Stimulus Management',
               description: 'Manage custom stimuli',
               icon: Icons.auto_awesome_outlined,
-              color: Colors.purple,
+              color: AppTheme.instituteColor,
               onTap: () => Navigator.push(
                 context,
                 MaterialPageRoute(
@@ -343,15 +344,14 @@ Widget _buildManagementCard(
     child: Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: theme.cardColor,
+        color: context.colors.surface,
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
-          if (theme.brightness == Brightness.light)
-            BoxShadow(
-              color: Colors.black.withOpacity(0.04),
-              blurRadius: 8,
-              offset: const Offset(0, 3),
-            ),
+          BoxShadow(
+            color: context.colors.onSurface.withOpacity(0.04),
+            blurRadius: 8,
+            offset: const Offset(0, 3),
+          ),
         ],
       ),
       child: Column(
@@ -387,7 +387,7 @@ Widget _buildManagementCard(
             description,
             style: theme.textTheme.bodySmall?.copyWith(
               fontSize: 11,
-              color: Colors.grey[600],
+              color: context.colors.onSurface.withOpacity(0.6),
               height: 1.3,
             ),
             maxLines: 2,
@@ -412,10 +412,10 @@ Widget _buildManagementCard(
                 Container(
                   padding: const EdgeInsets.all(8),
                   decoration: BoxDecoration(
-                    color: Colors.blue.withOpacity(0.1),
+                    color: AppTheme.infoColor.withOpacity(0.1),
                     borderRadius: BorderRadius.circular(8),
                   ),
-                  child: const Icon(Icons.timeline, color: Colors.blue, size: 20),
+                  child: Icon(Icons.timeline, color: AppTheme.infoColor, size: 20),
                 ),
                 const SizedBox(width: 12),
                 Text(
@@ -452,11 +452,11 @@ Widget _buildManagementCard(
               return Container(
                 padding: const EdgeInsets.all(32),
                 decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(16),
+                  color: context.colors.surface,
+                  borderRadius: BorderRadius.circular(AppTheme.radiusLarge),
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.black.withOpacity(0.05),
+                      color: context.colors.onSurface.withOpacity(0.05),
                       blurRadius: 10,
                       offset: const Offset(0, 4),
                     ),
@@ -465,12 +465,12 @@ Widget _buildManagementCard(
                 child: Center(
                   child: Column(
                     children: [
-                      Icon(Icons.inbox_outlined, size: 48, color: Colors.grey[400]),
+                      Icon(Icons.inbox_outlined, size: 48, color: context.colors.onSurface.withOpacity(0.4)),
                       const SizedBox(height: 12),
                       Text(
                         'No recent activity',
                         style: TextStyle(
-                          color: Colors.grey[600],
+                          color: context.colors.onSurface.withOpacity(0.6),
                           fontSize: 16,
                           fontWeight: FontWeight.w500,
                         ),
@@ -483,11 +483,11 @@ Widget _buildManagementCard(
 
             return Container(
               decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(16),
+                color: context.colors.surface,
+                borderRadius: BorderRadius.circular(AppTheme.radiusLarge),
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black.withOpacity(0.05),
+                    color: context.colors.onSurface.withOpacity(0.05),
                     blurRadius: 10,
                     offset: const Offset(0, 4),
                   ),
@@ -509,9 +509,9 @@ Widget _buildManagementCard(
                   return Container(
                     margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                     decoration: BoxDecoration(
-                      color: Colors.grey[50],
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: Colors.blue.withOpacity(0.1)),
+                      color: context.colors.surfaceContainerHighest,
+                      borderRadius: BorderRadius.circular(AppTheme.radiusMedium),
+                      border: Border.all(color: AppTheme.infoColor.withOpacity(0.1)),
                     ),
                     child: ListTile(
                       contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
@@ -522,21 +522,21 @@ Widget _buildManagementCard(
                           shape: BoxShape.circle,
                           gradient: LinearGradient(
                             colors: [
-                              Colors.blue.withOpacity(0.8),
-                              Colors.blue,
+                              AppTheme.infoColor.withOpacity(0.8),
+                              AppTheme.infoColor,
                             ],
                             begin: Alignment.topLeft,
                             end: Alignment.bottomRight,
                           ),
                           boxShadow: [
                             BoxShadow(
-                              color: Colors.blue.withOpacity(0.3),
+                              color: AppTheme.infoColor.withOpacity(0.3),
                               blurRadius: 8,
                               offset: const Offset(0, 4),
                             ),
                           ],
                         ),
-                        child: const Icon(Icons.person_add, color: Colors.white, size: 24),
+                        child: const Icon(Icons.person_add, color: AppTheme.whitePure, size: 24),
                       ),
                       title: Row(
                         children: [
@@ -554,14 +554,14 @@ Widget _buildManagementCard(
                           Container(
                             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                             decoration: BoxDecoration(
-                              color: Colors.green.withOpacity(0.1),
+                              color: AppTheme.successColor.withOpacity(0.1),
                               borderRadius: BorderRadius.circular(6),
-                              border: Border.all(color: Colors.green.withOpacity(0.3)),
+                              border: Border.all(color: AppTheme.successColor.withOpacity(0.3)),
                             ),
-                            child: const Text(
+                            child: Text(
                               'NEW',
                               style: TextStyle(
-                                color: Colors.green,
+                                color: AppTheme.successColor,
                                 fontSize: 10,
                                 fontWeight: FontWeight.bold,
                               ),
@@ -577,7 +577,7 @@ Widget _buildManagementCard(
                             'New user registration',
                             style: TextStyle(
                               fontSize: 13,
-                              color: Colors.grey[600],
+                              color: context.colors.onSurface.withOpacity(0.6),
                             ),
                           ),
                           if (email.isNotEmpty) ...[
@@ -586,7 +586,7 @@ Widget _buildManagementCard(
                               email,
                               style: TextStyle(
                                 fontSize: 12,
-                                color: Colors.grey[500],
+                                color: context.colors.onSurface.withOpacity(0.5),
                               ),
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
@@ -595,7 +595,7 @@ Widget _buildManagementCard(
                           const SizedBox(height: 6),
                           Row(
                             children: [
-                              Icon(Icons.access_time, size: 12, color: Colors.grey[500]),
+                              Icon(Icons.access_time, size: 12, color: context.colors.onSurface.withOpacity(0.5)),
                               const SizedBox(width: 4),
                               Text(
                                 createdAt != null
@@ -603,7 +603,7 @@ Widget _buildManagementCard(
                                     : 'Recently',
                                 style: TextStyle(
                                   fontSize: 11,
-                                  color: Colors.grey[500],
+                                  color: context.colors.onSurface.withOpacity(0.5),
                                 ),
                               ),
                             ],

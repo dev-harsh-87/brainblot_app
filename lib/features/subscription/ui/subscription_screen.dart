@@ -5,6 +5,10 @@ import 'package:spark_app/features/subscription/domain/subscription_plan.dart';
 import 'package:spark_app/core/auth/models/app_user.dart';
 import 'package:spark_app/features/subscription/services/subscription_request_service.dart';
 import 'package:spark_app/features/subscription/domain/subscription_request.dart';
+import 'package:spark_app/core/theme/app_theme.dart';
+import 'package:spark_app/features/profile/services/profile_service.dart';
+import 'package:spark_app/features/sharing/domain/user_profile.dart';
+import 'package:spark_app/core/di/injection.dart';
 
 class SubscriptionScreen extends StatefulWidget {
   const SubscriptionScreen({super.key});
@@ -19,11 +23,28 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
   List<SubscriptionPlan> _plans = [];
   final List<SubscriptionRequest> _userRequests = [];
   String? _error;
+  late ProfileService _profileService;
+  UserProfile? _userProfile;
 
   @override
   void initState() {
     super.initState();
+    _profileService = getIt<ProfileService>();
     _loadData();
+    _loadUserProfile();
+  }
+
+  Future<void> _loadUserProfile() async {
+    try {
+      final profile = await _profileService.getCurrentUserProfile();
+      if (mounted) {
+        setState(() {
+          _userProfile = profile;
+        });
+      }
+    } catch (e) {
+      print('❌ Error loading user profile: $e');
+    }
   }
 
   Future<void> _loadData() async {
@@ -73,7 +94,27 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
     final colorScheme = theme.colorScheme;
 
     return Scaffold(
-      backgroundColor: colorScheme.surface,
+      backgroundColor: AppTheme.whiteSoft,
+      appBar: AppBar(
+        backgroundColor: colorScheme.primary,
+        foregroundColor: colorScheme.onPrimary,
+        elevation: 0,
+        flexibleSpace: Container(
+          decoration: BoxDecoration(
+            color: AppTheme.goldPrimary,
+          ),
+        ),
+        title: Text(
+          'Subscription',
+          style: theme.textTheme.headlineSmall?.copyWith(
+            color: colorScheme.onPrimary,
+            fontWeight: FontWeight.w700,
+            letterSpacing: 0.5,
+          ),
+        ),
+        centerTitle: true,
+        actions: [],
+      ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
           : _error != null
@@ -195,19 +236,16 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
     return Container(
       padding: EdgeInsets.all(isSmallScreen ? 20.0 : 24.0),
       decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: [
-            colorScheme.primaryContainer,
-            colorScheme.secondaryContainer,
-          ],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
+        color: AppTheme.whitePure,
         borderRadius: BorderRadius.circular(20),
+        border: Border.all(
+          color: AppTheme.goldPrimary.withOpacity(0.2),
+          width: 1,
+        ),
         boxShadow: [
           BoxShadow(
-            color: colorScheme.primary.withOpacity(0.1),
-            blurRadius: 10,
+            color: Colors.black.withOpacity(0.08),
+            blurRadius: 16,
             offset: const Offset(0, 4),
           ),
         ],
@@ -220,12 +258,12 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
               Container(
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
-                  color: colorScheme.primary.withOpacity(0.2),
+                  color: AppTheme.goldPrimary.withOpacity(0.1),
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: Icon(
                   Icons.workspace_premium,
-                  color: colorScheme.primary,
+                  color: AppTheme.goldPrimary,
                   size: isSmallScreen ? 24 : 28,
                 ),
               ),
@@ -359,17 +397,9 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
       width: double.infinity,
       padding: EdgeInsets.all(isSmallScreen ? 20.0 : 24.0),
       decoration: BoxDecoration(
-        gradient: isCurrentPlan
-            ? LinearGradient(
-                colors: [
-                  colorScheme.primaryContainer,
-                  colorScheme.secondaryContainer,
-                ],
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-              )
-            : null,
-        color: isCurrentPlan ? null : colorScheme.surfaceContainerHighest,
+        color: isCurrentPlan
+            ? AppTheme.goldPrimary.withOpacity(0.05)
+            : AppTheme.neutral50,
         borderRadius: const BorderRadius.only(
           topLeft: Radius.circular(15),
           topRight: Radius.circular(15),

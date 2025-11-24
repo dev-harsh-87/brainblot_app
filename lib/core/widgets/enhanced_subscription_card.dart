@@ -107,7 +107,7 @@ class EnhancedSubscriptionCard extends StatelessWidget {
                       child: Text(
                         'ACTIVE',
                         style: theme.textTheme.labelSmall?.copyWith(
-                          color: Colors.white,
+                          color: AppTheme.whitePure,
                           fontWeight: FontWeight.bold,
                           letterSpacing: 0.5,
                         ),
@@ -148,18 +148,18 @@ class EnhancedSubscriptionCard extends StatelessWidget {
                     if (isFreePlan && onUpgrade != null)
                       Container(
                         decoration: BoxDecoration(
-                          color: AppTheme.primaryColor,
+                          color: AppTheme.goldPrimary,
                           borderRadius: BorderRadius.circular(AppTheme.radiusSmall),
                           boxShadow: [
                             BoxShadow(
-                              color: AppTheme.primaryColor.withOpacity(0.3),
+                              color: AppTheme.goldPrimary.withOpacity(0.3),
                               blurRadius: 8,
                               offset: const Offset(0, 4),
                             ),
                           ],
                         ),
                         child: Material(
-                          color: Colors.transparent,
+                          color: AppTheme.whitePure.withOpacity(0.0),
                           child: InkWell(
                             onTap: onUpgrade,
                             borderRadius: BorderRadius.circular(AppTheme.radiusSmall),
@@ -173,7 +173,7 @@ class EnhancedSubscriptionCard extends StatelessWidget {
                                 children: [
                                   const Icon(
                                     Icons.upgrade,
-                                    color: Colors.white,
+                                    color: AppTheme.whitePure,
                                     size: 16,
                                   ),
                                   const SizedBox(width: AppTheme.spacing4),
@@ -305,39 +305,7 @@ class EnhancedSubscriptionCard extends StatelessWidget {
     );
   }
 
-  LinearGradient _getPlanColor(Color planColor) {
-    switch (currentPlan.id) {
-      case 'institute':
-        return LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [
-            planColor.withOpacity(0.15),
-            planColor.withOpacity(0.05),
-            Colors.white.withOpacity(0.8),
-          ],
-        );
-      case 'player':
-        return LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [
-            planColor.withOpacity(0.1),
-            planColor.withOpacity(0.03),
-            Colors.white,
-          ],
-        );
-      default: // free
-        return LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [
-            Colors.grey.withOpacity(0.05),
-            Colors.white,
-          ],
-        );
-    }
-  }
+  // Removed unused gradient method - using solid colors from theme
 
   Color _getTextColor() {
     switch (currentPlan.id) {

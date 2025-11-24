@@ -1,4 +1,5 @@
 import 'package:spark_app/features/drills/domain/drill.dart';
+import 'package:spark_app/core/theme/app_theme.dart';
 import 'package:spark_app/features/drills/data/drill_repository.dart';
 import 'package:spark_app/features/drills/bloc/drill_library_bloc.dart';
 import 'package:spark_app/features/sharing/ui/sharing_screen.dart';
@@ -14,6 +15,9 @@ import 'package:share_plus/share_plus.dart';
 import 'package:uuid/uuid.dart';
 import 'package:youtube_player_flutter/youtube_player_flutter.dart';
 import 'dart:convert';
+import 'package:spark_app/core/widgets/profile_avatar.dart';
+import 'package:spark_app/features/profile/services/profile_service.dart';
+import 'package:spark_app/features/sharing/domain/user_profile.dart';
 
 class DrillDetailScreen extends StatefulWidget {
   final Drill drill;
@@ -26,7 +30,9 @@ class DrillDetailScreen extends StatefulWidget {
 class _DrillDetailScreenState extends State<DrillDetailScreen> {
   late DrillRepository _drillRepository;
   late SharingService _sharingService;
+  late ProfileService _profileService;
   late Drill _currentDrill;
+  UserProfile? _userProfile;
   bool _isLoading = false;
   bool _isOwner = false;
 
@@ -35,8 +41,23 @@ class _DrillDetailScreenState extends State<DrillDetailScreen> {
     super.initState();
     _drillRepository = getIt<DrillRepository>();
     _sharingService = getIt<SharingService>();
+    _profileService = getIt<ProfileService>();
     _currentDrill = widget.drill;
     _loadOwnershipInfo();
+    _loadUserProfile();
+  }
+
+  Future<void> _loadUserProfile() async {
+    try {
+      final profile = await _profileService.getCurrentUserProfile();
+      if (mounted) {
+        setState(() {
+          _userProfile = profile;
+        });
+      }
+    } catch (e) {
+      print('❌ Error loading user profile: $e');
+    }
   }
 
   Future<void> _loadOwnershipInfo() async {
@@ -59,14 +80,21 @@ class _DrillDetailScreenState extends State<DrillDetailScreen> {
     final hasMedia = _currentDrill.videoUrl != null || _currentDrill.stepImageUrl != null;
 
     return Scaffold(
-      backgroundColor: colorScheme.surface,
+      backgroundColor: AppTheme.whiteSoft,
       appBar: AppBar(
-        backgroundColor: colorScheme.surface,
+        backgroundColor: colorScheme.primary,
+        foregroundColor: colorScheme.onPrimary,
         elevation: 0,
+        flexibleSpace: Container(
+          decoration: BoxDecoration(
+            color: AppTheme.goldPrimary,
+          ),
+        ),
         title: Text(
           _currentDrill.name,
           style: theme.textTheme.titleLarge?.copyWith(
             fontWeight: FontWeight.bold,
+            color: colorScheme.onPrimary,
           ),
         ),
         actions: [
@@ -277,6 +305,47 @@ class _DrillDetailScreenState extends State<DrillDetailScreen> {
                       ),
                       const SizedBox(height: 12),
                       _buildConfigurationCard(context),
+                      const SizedBox(height: 24),
+                      
+                      // Tags Section
+                      if (_currentDrill.tags.isNotEmpty) ...[
+                        Text(
+                          'Tags',
+                          style: theme.textTheme.titleLarge?.copyWith(
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        Wrap(
+                          spacing: 8,
+                          runSpacing: 8,
+                          children: _currentDrill.tags.map((tag) => _buildTagChip(context, tag)).toList(),
+                        ),
+                        const SizedBox(height: 24),
+                      ],
+                      
+                      // Sharing Information
+                      if (_currentDrill.sharedWith.isNotEmpty) ...[
+                        Text(
+                          'Sharing Information',
+                          style: theme.textTheme.titleLarge?.copyWith(
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        _buildSharingInfoCard(context),
+                        const SizedBox(height: 24),
+                      ],
+                      
+                      // Creation Details
+                      Text(
+                        'Creation Details',
+                        style: theme.textTheme.titleLarge?.copyWith(
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      _buildCreationDetailsCard(context),
                       const SizedBox(height: 32),
                       
                       // Action Buttons
@@ -669,9 +738,31 @@ class _DrillDetailScreenState extends State<DrillDetailScreen> {
         children: [
           _buildConfigRow(context, 'Drill Mode', _currentDrill.drillMode.name.toUpperCase()),
           const Divider(),
+          _buildConfigRow(context, 'Presentation Mode', _currentDrill.presentationMode.name.toUpperCase()),
+          const Divider(),
+          _buildConfigRow(context, 'Number of Sets', '${_currentDrill.sets}'),
+          const Divider(),
           _buildConfigRow(context, 'Number of Stimuli', '${_currentDrill.numberOfStimuli}'),
           const Divider(),
+          _buildConfigRow(context, 'Stimulus Length', '${_currentDrill.stimulusLengthMs}ms'),
+          const Divider(),
+          _buildConfigRow(context, 'Delay Between Stimuli', '${_currentDrill.delayBetweenStimuliMs}ms'),
+          const Divider(),
           _buildConfigRow(context, 'Colors Used', '${_currentDrill.colors.length} colors'),
+          const Divider(),
+          _buildConfigRow(context, 'Arrow Directions', '${_currentDrill.arrows.length} directions'),
+          const Divider(),
+          _buildConfigRow(context, 'Shape Types', '${_currentDrill.shapes.length} shapes'),
+          const Divider(),
+          _buildConfigRow(context, 'Number Range', _currentDrill.numberRange.name.toUpperCase()),
+          const Divider(),
+          _buildConfigRow(context, 'Drill Type', _currentDrill.type.toUpperCase()),
+          const Divider(),
+          _buildConfigRow(context, 'Visibility', _currentDrill.visibility.toUpperCase()),
+          const Divider(),
+          _buildConfigRow(context, 'Status', _currentDrill.status.toUpperCase()),
+          const Divider(),
+          _buildConfigRow(context, 'Created By Role', _currentDrill.createdByRole.toUpperCase()),
           const Divider(),
           _buildConfigRow(context, 'Total Duration', '${(_currentDrill.durationSec * _currentDrill.reps + _currentDrill.restSec * (_currentDrill.reps - 1))}s'),
         ],
@@ -904,6 +995,77 @@ class _DrillDetailScreenState extends State<DrillDetailScreen> {
       case StimulusType.custom:
         return Icons.extension;
     }
+  }
+
+  Widget _buildTagChip(BuildContext context, String tag) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      decoration: BoxDecoration(
+        color: AppTheme.infoColor.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: AppTheme.infoColor.withOpacity(0.3),
+        ),
+      ),
+      child: Text(
+        tag.toUpperCase(),
+        style: theme.textTheme.bodySmall?.copyWith(
+          color: AppTheme.infoColor,
+          fontWeight: FontWeight.w600,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSharingInfoCard(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: colorScheme.surfaceContainerHighest,
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Column(
+        children: [
+          _buildConfigRow(context, 'Shared With', '${_currentDrill.sharedWith.length} users'),
+          const Divider(),
+          _buildConfigRow(context, 'Visibility', _currentDrill.visibility.toUpperCase()),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildCreationDetailsCard(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: colorScheme.surfaceContainerHighest,
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Column(
+        children: [
+          _buildConfigRow(context, 'Created By', _currentDrill.createdBy ?? 'Unknown'),
+          const Divider(),
+          _buildConfigRow(context, 'Creator Role', _currentDrill.createdByRole.toUpperCase()),
+          const Divider(),
+          _buildConfigRow(context, 'Created At', _formatDate(_currentDrill.createdAt)),
+          const Divider(),
+          _buildConfigRow(context, 'Status', _currentDrill.status.toUpperCase()),
+        ],
+      ),
+    );
+  }
+
+  String _formatDate(DateTime date) {
+    return '${date.day}/${date.month}/${date.year} ${date.hour}:${date.minute.toString().padLeft(2, '0')}';
   }
 }
 

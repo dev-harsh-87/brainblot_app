@@ -19,6 +19,7 @@ import 'package:spark_app/features/auth/ui/device_sessions_screen.dart';
 import 'package:spark_app/core/ui/edge_to_edge.dart';
 import 'package:spark_app/core/services/auto_refresh_service.dart';
 import 'package:spark_app/core/utils/app_logger.dart';
+import 'package:spark_app/core/theme/app_theme.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -99,7 +100,7 @@ class _ProfileScreenState extends State<ProfileScreen> with AutoRefreshMixin {
     EdgeToEdge.setPrimarySystemUI(context);
 
     return EdgeToEdgeScaffold(
-      backgroundColor: colorScheme.surface,
+      backgroundColor: AppTheme.whiteSoft,
       appBar: _buildAppBar(context),
       extendBodyBehindAppBar: false,
       body: RefreshIndicator(
@@ -135,15 +136,7 @@ class _ProfileScreenState extends State<ProfileScreen> with AutoRefreshMixin {
       centerTitle: true,
       flexibleSpace: Container(
         decoration: BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [
-              colorScheme.primary,
-              colorScheme.primary.withOpacity(0.9),
-              colorScheme.secondary.withOpacity(0.8),
-            ],
-          ),
+          color: AppTheme.goldPrimary,
         ),
       ),
       actions: [
@@ -231,20 +224,27 @@ class _ProfileScreenState extends State<ProfileScreen> with AutoRefreshMixin {
             Container(
               padding: const EdgeInsets.all(24),
               decoration: BoxDecoration(
-                color: colorScheme.surfaceContainerHighest,
+                color: AppTheme.whitePure,
                 borderRadius: BorderRadius.circular(16),
+                boxShadow: [
+                  BoxShadow(
+                    color: AppTheme.neutral900.withOpacity(0.08),
+                    blurRadius: 16,
+                    offset: const Offset(0, 6),
+                  ),
+                ],
               ),
               child: Column(
                 children: [
                   CircularProgressIndicator(
-                    color: colorScheme.primary,
+                    color: AppTheme.goldPrimary,
                     strokeWidth: 3,
                   ),
                   const SizedBox(height: 16),
                   Text(
                     'Loading profile...',
                     style: theme.textTheme.bodyLarge?.copyWith(
-                      color: colorScheme.onSurface.withOpacity(0.7),
+                      color: AppTheme.neutral700,
                       fontWeight: FontWeight.w500,
                     ),
                   ),
@@ -252,7 +252,7 @@ class _ProfileScreenState extends State<ProfileScreen> with AutoRefreshMixin {
                   Text(
                     'Getting your account information',
                     style: theme.textTheme.bodySmall?.copyWith(
-                      color: colorScheme.onSurface.withOpacity(0.5),
+                      color: AppTheme.neutral500,
                     ),
                   ),
                 ],
@@ -277,20 +277,20 @@ class _ProfileScreenState extends State<ProfileScreen> with AutoRefreshMixin {
               width: 120,
               height: 120,
               decoration: BoxDecoration(
-                color: colorScheme.errorContainer,
+                color: AppTheme.errorColor.withOpacity(0.1),
                 shape: BoxShape.circle,
               ),
               child: Icon(
                 Icons.error_outline,
                 size: 60,
-                color: colorScheme.onErrorContainer,
+                color: AppTheme.errorColor,
               ),
             ),
             const SizedBox(height: 24),
             Text(
               'Failed to load profile',
               style: theme.textTheme.headlineSmall?.copyWith(
-                color: colorScheme.onSurface,
+                color: AppTheme.neutral900,
                 fontWeight: FontWeight.w600,
               ),
             ),
@@ -298,7 +298,7 @@ class _ProfileScreenState extends State<ProfileScreen> with AutoRefreshMixin {
             Text(
               _error ?? 'Unknown error occurred',
               style: theme.textTheme.bodyMedium?.copyWith(
-                color: colorScheme.onSurface.withOpacity(0.7),
+                color: AppTheme.neutral700,
               ),
               textAlign: TextAlign.center,
             ),
@@ -347,23 +347,14 @@ class _ProfileScreenState extends State<ProfileScreen> with AutoRefreshMixin {
     return Container(
       margin: const EdgeInsets.fromLTRB(20, 20, 20, 0),
       decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [
-            colorScheme.primaryContainer.withOpacity(0.8),
-            colorScheme.secondaryContainer.withOpacity(0.6),
-            colorScheme.tertiaryContainer.withOpacity(0.4),
-          ],
-          stops: const [0.0, 0.6, 1.0],
-        ),
+        color: AppTheme.whitePure,
         borderRadius: BorderRadius.circular(20),
         border: Border.all(
-          color: colorScheme.outline.withOpacity(0.1),
+          color: AppTheme.goldPrimary.withOpacity(0.2),
         ),
         boxShadow: [
           BoxShadow(
-            color: colorScheme.shadow.withOpacity(0.08),
+            color: AppTheme.neutral900.withOpacity(0.08),
             blurRadius: 16,
             offset: const Offset(0, 6),
           ),
@@ -373,51 +364,6 @@ class _ProfileScreenState extends State<ProfileScreen> with AutoRefreshMixin {
         padding: const EdgeInsets.all(20),
         child: Row(
           children: [
-            // Compact Profile Avatar
-            Container(
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                gradient: LinearGradient(
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                  colors: [
-                    colorScheme.primary,
-                    colorScheme.primary.withOpacity(0.8),
-                  ],
-                ),
-                boxShadow: [
-                  BoxShadow(
-                    color: colorScheme.primary.withOpacity(0.3),
-                    blurRadius: 12,
-                    offset: const Offset(0, 4),
-                  ),
-                ],
-              ),
-              child: Container(
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  border: Border.all(
-                    color: colorScheme.surface,
-                    width: 3,
-                  ),
-                ),
-                child: CircleAvatar(
-                  radius: 32,
-                  backgroundColor: Colors.transparent,
-                  child: Text(
-                    _profileService.getUserInitials(profile.displayName),
-                    style: theme.textTheme.headlineMedium?.copyWith(
-                      color: colorScheme.onPrimary,
-                      fontWeight: FontWeight.w700,
-                      fontSize: 24,
-                      letterSpacing: 0.5,
-                    ),
-                  ),
-                ),
-              ),
-            ),
-            const SizedBox(width: 16),
-
             // Profile Info
             Expanded(
               child: Column(
@@ -427,7 +373,7 @@ class _ProfileScreenState extends State<ProfileScreen> with AutoRefreshMixin {
                     profile.displayName,
                     style: theme.textTheme.titleLarge?.copyWith(
                       fontWeight: FontWeight.w700,
-                      color: colorScheme.onSurface,
+                      color: AppTheme.neutral900,
                       letterSpacing: 0.3,
                     ),
                   ),
@@ -435,7 +381,7 @@ class _ProfileScreenState extends State<ProfileScreen> with AutoRefreshMixin {
                   Text(
                     profile.email,
                     style: theme.textTheme.bodyMedium?.copyWith(
-                      color: colorScheme.onSurface.withOpacity(0.7),
+                      color: AppTheme.neutral700,
                       fontWeight: FontWeight.w500,
                     ),
                   ),
@@ -444,15 +390,10 @@ class _ProfileScreenState extends State<ProfileScreen> with AutoRefreshMixin {
                     padding:
                         const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                     decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        colors: [
-                          Colors.blue.withOpacity(0.15),
-                          Colors.blue.withOpacity(0.05)
-                        ],
-                      ),
+                      color: AppTheme.successColor.withOpacity(0.1),
                       borderRadius: BorderRadius.circular(16),
                       border: Border.all(
-                        color: Colors.blue.withOpacity(0.2),
+                        color: AppTheme.successColor.withOpacity(0.2),
                       ),
                     ),
                     child: Row(
@@ -460,21 +401,21 @@ class _ProfileScreenState extends State<ProfileScreen> with AutoRefreshMixin {
                       children: [
                         Container(
                           padding: const EdgeInsets.all(4),
-                          decoration: const BoxDecoration(
-                            color: Colors.blue,
+                          decoration: BoxDecoration(
+                            color: AppTheme.successColor,
                             shape: BoxShape.circle,
                           ),
-                          child: const Icon(
+                          child: Icon(
                             Icons.person_rounded,
                             size: 12,
-                            color: Colors.white,
+                            color: AppTheme.whitePure,
                           ),
                         ),
                         const SizedBox(width: 6),
                         Text(
                           'Active User',
                           style: theme.textTheme.labelSmall?.copyWith(
-                            color: Colors.blue.shade700,
+                            color: AppTheme.successColor,
                             fontWeight: FontWeight.w600,
                           ),
                         ),
@@ -508,20 +449,15 @@ class _ProfileScreenState extends State<ProfileScreen> with AutoRefreshMixin {
               Container(
                 padding: const EdgeInsets.all(8),
                 decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    colors: [
-                      colorScheme.primary.withOpacity(0.15),
-                      colorScheme.primary.withOpacity(0.05),
-                    ],
-                  ),
+                  color: AppTheme.goldPrimary.withOpacity(0.1),
                   borderRadius: BorderRadius.circular(10),
                   border: Border.all(
-                    color: colorScheme.primary.withOpacity(0.2),
+                    color: AppTheme.goldPrimary.withOpacity(0.2),
                   ),
                 ),
                 child: Icon(
                   Icons.person_rounded,
-                  color: colorScheme.primary,
+                  color: AppTheme.goldPrimary,
                   size: 18,
                 ),
               ),
@@ -539,14 +475,14 @@ class _ProfileScreenState extends State<ProfileScreen> with AutoRefreshMixin {
           // Compact Horizontal Layout
           Container(
             decoration: BoxDecoration(
-              color: colorScheme.surface,
+              color: AppTheme.whitePure,
               borderRadius: BorderRadius.circular(16),
               border: Border.all(
-                color: colorScheme.outline.withOpacity(0.08),
+                color: AppTheme.neutral200.withOpacity(0.5),
               ),
               boxShadow: [
                 BoxShadow(
-                  color: colorScheme.shadow.withOpacity(0.04),
+                  color: AppTheme.neutral900.withOpacity(0.04),
                   blurRadius: 12,
                   offset: const Offset(0, 3),
                 ),
@@ -640,12 +576,7 @@ class _ProfileScreenState extends State<ProfileScreen> with AutoRefreshMixin {
         Container(
           padding: const EdgeInsets.all(8),
           decoration: BoxDecoration(
-            gradient: LinearGradient(
-              colors: [
-                iconColor.withOpacity(0.15),
-                iconColor.withOpacity(0.05),
-              ],
-            ),
+            color: iconColor.withOpacity(0.1),
             borderRadius: BorderRadius.circular(10),
             border: Border.all(
               color: iconColor.withOpacity(0.2),
@@ -665,7 +596,7 @@ class _ProfileScreenState extends State<ProfileScreen> with AutoRefreshMixin {
               Text(
                 title,
                 style: theme.textTheme.bodySmall?.copyWith(
-                  color: colorScheme.onSurface.withOpacity(0.6),
+                  color: AppTheme.neutral600,
                   fontSize: 11,
                 ),
               ),
@@ -674,7 +605,7 @@ class _ProfileScreenState extends State<ProfileScreen> with AutoRefreshMixin {
                 value,
                 style: theme.textTheme.bodyMedium?.copyWith(
                   fontWeight: FontWeight.w600,
-                  color: colorScheme.onSurface,
+                  color: AppTheme.neutral900,
                 ),
               ),
             ],
@@ -697,14 +628,7 @@ class _ProfileScreenState extends State<ProfileScreen> with AutoRefreshMixin {
     return Container(
       padding: const EdgeInsets.all(10),
       decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [
-            iconColor.withOpacity(0.08),
-            iconColor.withOpacity(0.02),
-          ],
-        ),
+        color: iconColor.withOpacity(0.05),
         borderRadius: BorderRadius.circular(12),
         border: Border.all(
           color: iconColor.withOpacity(0.15),
@@ -724,12 +648,7 @@ class _ProfileScreenState extends State<ProfileScreen> with AutoRefreshMixin {
           Container(
             padding: const EdgeInsets.all(6),
             decoration: BoxDecoration(
-              gradient: LinearGradient(
-                colors: [
-                  iconColor.withOpacity(0.2),
-                  iconColor.withOpacity(0.1),
-                ],
-              ),
+              color: iconColor.withOpacity(0.15),
               borderRadius: BorderRadius.circular(8),
               border: Border.all(
                 color: iconColor.withOpacity(0.3),
@@ -745,7 +664,7 @@ class _ProfileScreenState extends State<ProfileScreen> with AutoRefreshMixin {
           Text(
             title,
             style: theme.textTheme.bodySmall?.copyWith(
-              color: colorScheme.onSurface.withOpacity(0.7),
+              color: AppTheme.neutral700,
               fontSize: 10,
               fontWeight: FontWeight.w500,
             ),
@@ -757,7 +676,7 @@ class _ProfileScreenState extends State<ProfileScreen> with AutoRefreshMixin {
             value,
             style: theme.textTheme.bodyMedium?.copyWith(
               fontWeight: FontWeight.w700,
-              color: colorScheme.onSurface,
+              color: AppTheme.neutral900,
               fontSize: 15,
             ),
             maxLines: 1,
@@ -1026,12 +945,7 @@ class _ProfileScreenState extends State<ProfileScreen> with AutoRefreshMixin {
                 Container(
                   padding: const EdgeInsets.all(8),
                   decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      colors: [
-                        Colors.amber.withOpacity(0.15),
-                        Colors.amber.withOpacity(0.05),
-                      ],
-                    ),
+                    color: Colors.amber.withOpacity(0.1),
                     borderRadius: BorderRadius.circular(10),
                     border: Border.all(
                       color: Colors.amber.withOpacity(0.2),
@@ -1092,22 +1006,14 @@ class _ProfileScreenState extends State<ProfileScreen> with AutoRefreshMixin {
         width: 105,
         padding: const EdgeInsets.all(10),
         decoration: BoxDecoration(
-          gradient: isUnlocked
-              ? LinearGradient(
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                  colors: [
-                    Colors.amber.withOpacity(0.15),
-                    Colors.amber.withOpacity(0.05),
-                  ],
-                )
-              : null,
-          color: isUnlocked ? null : colorScheme.surfaceContainerHighest,
+          color: isUnlocked
+              ? Colors.amber.withOpacity(0.1)
+              : AppTheme.neutral100,
           borderRadius: BorderRadius.circular(12),
           border: Border.all(
             color: isUnlocked
                 ? Colors.amber.withOpacity(0.3)
-                : colorScheme.outline.withOpacity(0.3),
+                : AppTheme.neutral300,
             width: 1.5,
           ),
           boxShadow: isUnlocked
@@ -1126,22 +1032,16 @@ class _ProfileScreenState extends State<ProfileScreen> with AutoRefreshMixin {
             Container(
               padding: const EdgeInsets.all(8),
               decoration: BoxDecoration(
-                gradient: isUnlocked
-                    ? LinearGradient(
-                        colors: [
-                          Colors.amber.withOpacity(0.3),
-                          Colors.amber.withOpacity(0.1),
-                        ],
-                      )
-                    : null,
-                color: isUnlocked ? null : colorScheme.outline.withOpacity(0.1),
+                color: isUnlocked
+                    ? Colors.amber.withOpacity(0.2)
+                    : AppTheme.neutral200,
                 shape: BoxShape.circle,
               ),
               child: Icon(
                 icon,
                 color: isUnlocked
                     ? Colors.amber.shade700
-                    : colorScheme.onSurface.withOpacity(0.5),
+                    : AppTheme.neutral500,
                 size: 22,
               ),
             ),
@@ -1372,12 +1272,7 @@ class _ProfileScreenState extends State<ProfileScreen> with AutoRefreshMixin {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                 decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    colors: [
-                      Colors.blue.withOpacity(0.15),
-                      Colors.blue.withOpacity(0.05),
-                    ],
-                  ),
+                  color: Colors.blue.withOpacity(0.1),
                   borderRadius: BorderRadius.circular(6),
                   border: Border.all(
                     color: Colors.blue.withOpacity(0.2),
@@ -1396,12 +1291,7 @@ class _ProfileScreenState extends State<ProfileScreen> with AutoRefreshMixin {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                 decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    colors: [
-                      Colors.green.withOpacity(0.15),
-                      Colors.green.withOpacity(0.05),
-                    ],
-                  ),
+                  color: Colors.green.withOpacity(0.1),
                   borderRadius: BorderRadius.circular(6),
                   border: Border.all(
                     color: Colors.green.withOpacity(0.2),
@@ -1493,6 +1383,7 @@ class _ProfileScreenState extends State<ProfileScreen> with AutoRefreshMixin {
     }
   }
 
+
   // Dialog Methods (keeping original simple versions)
   void _showEditProfileDialog() {
     final profile = _userProfile;
@@ -1512,7 +1403,7 @@ class _ProfileScreenState extends State<ProfileScreen> with AutoRefreshMixin {
           title: Row(
             children: [
               Icon(Icons.edit_rounded,
-                  color: Theme.of(context).colorScheme.primary),
+                  color: AppTheme.goldPrimary),
               const SizedBox(width: 12),
               const Text('Edit Profile'),
             ],
@@ -1616,7 +1507,7 @@ class _ProfileScreenState extends State<ProfileScreen> with AutoRefreshMixin {
           title: Row(
             children: [
               Icon(Icons.lock_rounded,
-                  color: Theme.of(context).colorScheme.primary),
+                  color: AppTheme.goldPrimary),
               const SizedBox(width: 12),
               const Text('Change Password'),
             ],

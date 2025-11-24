@@ -7,6 +7,11 @@ import 'package:spark_app/core/ui/edge_to_edge.dart';
 import 'package:spark_app/features/auth/bloc/auth_bloc.dart';
 import 'package:spark_app/features/settings/bloc/settings_bloc.dart';
 import 'package:spark_app/features/settings/data/settings_repository.dart';
+import 'package:spark_app/core/theme/app_theme.dart';
+import 'package:spark_app/core/widgets/profile_avatar.dart';
+import 'package:spark_app/features/profile/services/profile_service.dart';
+import 'package:spark_app/features/sharing/domain/user_profile.dart';
+import 'package:spark_app/core/di/injection.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
@@ -16,17 +21,36 @@ class SettingsScreen extends StatefulWidget {
 }
 
 class _SettingsScreenState extends State<SettingsScreen> with AutoRefreshMixin {
+  late ProfileService _profileService;
+  UserProfile? _userProfile;
+
   @override
   void initState() {
     super.initState();
+    _profileService = getIt<ProfileService>();
+    _loadUserProfile();
     
     // Setup auto-refresh listeners for settings changes
     listenToAutoRefresh(AutoRefreshService.profile, () {
       // Refresh settings when profile changes
       if (mounted) {
         context.read<SettingsBloc>().add(const SettingsStarted());
+        _loadUserProfile();
       }
     });
+  }
+
+  Future<void> _loadUserProfile() async {
+    try {
+      final profile = await _profileService.getCurrentUserProfile();
+      if (mounted) {
+        setState(() {
+          _userProfile = profile;
+        });
+      }
+    } catch (e) {
+      print('❌ Error loading user profile: $e');
+    }
   }
 
   @override
@@ -89,15 +113,7 @@ class _SettingsScreenState extends State<SettingsScreen> with AutoRefreshMixin {
       centerTitle: true,
       flexibleSpace: Container(
         decoration: BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [
-              colorScheme.primary,
-              colorScheme.primary.withOpacity(0.9),
-              colorScheme.secondary.withOpacity(0.8),
-            ],
-          ),
+          color: AppTheme.goldPrimary,
         ),
       ),
     );

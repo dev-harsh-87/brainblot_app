@@ -165,7 +165,7 @@ class _ComprehensiveActivityScreenState extends State<ComprehensiveActivityScree
   Widget _buildFilterChips() {
     return Container(
       padding: const EdgeInsets.all(16),
-      color: Colors.grey[50],
+      color: context.colors.surfaceContainerHighest,
       child: SingleChildScrollView(
         scrollDirection: Axis.horizontal,
         child: Row(
@@ -190,7 +190,7 @@ class _ComprehensiveActivityScreenState extends State<ComprehensiveActivityScree
       label: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, size: 16, color: isSelected ? Colors.white : AppTheme.primaryColor),
+          Icon(icon, size: 16, color: isSelected ? AppTheme.whitePure : AppTheme.goldPrimary),
           const SizedBox(width: 6),
           Text(label),
         ],
@@ -201,16 +201,16 @@ class _ComprehensiveActivityScreenState extends State<ComprehensiveActivityScree
           _selectedFilter = value;
         });
       },
-      selectedColor: AppTheme.primaryColor,
-      checkmarkColor: Colors.white,
-      backgroundColor: Colors.white,
+      selectedColor: AppTheme.goldPrimary,
+      checkmarkColor: AppTheme.whitePure,
+      backgroundColor: context.colors.surface,
       labelStyle: TextStyle(
-        color: isSelected ? Colors.white : AppTheme.primaryColor,
+        color: isSelected ? AppTheme.whitePure : AppTheme.goldPrimary,
         fontWeight: FontWeight.w600,
         fontSize: 13,
       ),
       side: BorderSide(
-        color: isSelected ? AppTheme.primaryColor : AppTheme.primaryColor.withOpacity(0.3),
+        color: isSelected ? AppTheme.goldPrimary : AppTheme.goldPrimary.withOpacity(0.3),
       ),
     );
   }
@@ -223,11 +223,11 @@ class _ComprehensiveActivityScreenState extends State<ComprehensiveActivityScree
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(Icons.inbox_outlined, size: 64, color: Colors.grey[400]),
+            Icon(Icons.inbox_outlined, size: 64, color: context.colors.onSurface.withOpacity(0.4)),
             const SizedBox(height: 16),
             Text(
               'No activity found',
-              style: TextStyle(fontSize: 18, color: Colors.grey[600]),
+              style: TextStyle(fontSize: 18, color: context.colors.onSurface.withOpacity(0.6)),
             ),
           ],
         ),
@@ -296,7 +296,7 @@ class _ComprehensiveActivityScreenState extends State<ComprehensiveActivityScree
               ),
             ],
           ),
-          child: Icon(config.icon, color: Colors.white, size: 24),
+          child: Icon(config.icon, color: AppTheme.whitePure, size: 24),
         ),
         title: Text(
           activity.title,
@@ -321,7 +321,7 @@ class _ComprehensiveActivityScreenState extends State<ComprehensiveActivityScree
             const SizedBox(height: 8),
             Row(
               children: [
-                Icon(Icons.access_time, size: 14, color: Colors.grey[500]),
+                Icon(Icons.access_time, size: 14, color: context.colors.onSurface.withOpacity(0.5)),
                 const SizedBox(width: 4),
                 Text(
                   _formatTimeAgo(activity.timestamp),
@@ -360,7 +360,7 @@ class _ComprehensiveActivityScreenState extends State<ComprehensiveActivityScree
       case ActivityType.userUpdated:
         return ActivityConfig(
           icon: Icons.person,
-          color: Colors.blue,
+          color: AppTheme.infoColor,
           label: 'USER',
         );
       case ActivityType.planCreated:
@@ -368,13 +368,13 @@ class _ComprehensiveActivityScreenState extends State<ComprehensiveActivityScree
       case ActivityType.planDeleted:
         return ActivityConfig(
           icon: Icons.card_membership,
-          color: Colors.purple,
+          color: AppTheme.instituteColor,
           label: 'PLAN',
         );
       case ActivityType.planRequest:
         return ActivityConfig(
           icon: Icons.receipt_long,
-          color: Colors.amber,
+          color: AppTheme.warningColor,
           label: 'REQUEST',
         );
     }

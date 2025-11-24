@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'dart:io';
 import 'package:spark_app/features/admin/domain/custom_stimulus.dart';
 import 'package:spark_app/features/admin/services/custom_stimulus_service.dart';
+import 'package:spark_app/core/theme/app_theme.dart';
 
 class CreateStimulusScreen extends StatefulWidget {
   final VoidCallback onStimulusCreated;
@@ -395,7 +396,7 @@ class _CreateStimulusScreenState extends State<CreateStimulusScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('Maximum $_maxImages images allowed'),
-          backgroundColor: Colors.orange,
+          backgroundColor: AppTheme.warningColor,
         ),
       );
       return;

@@ -8,6 +8,11 @@ import 'package:intl/intl.dart';
 import 'package:spark_app/core/services/auto_refresh_service.dart';
 import 'package:spark_app/features/drills/domain/session_result.dart';
 import 'package:spark_app/features/stats/bloc/stats_bloc.dart';
+import 'package:spark_app/core/theme/app_theme.dart';
+import 'package:spark_app/core/widgets/profile_avatar.dart';
+import 'package:spark_app/features/profile/services/profile_service.dart';
+import 'package:spark_app/features/sharing/domain/user_profile.dart';
+import 'package:spark_app/core/di/injection.dart';
 
 class StatsScreen extends StatefulWidget {
   const StatsScreen({super.key});
@@ -18,13 +23,18 @@ class StatsScreen extends StatefulWidget {
 
 class _StatsScreenState extends State<StatsScreen> with SingleTickerProviderStateMixin, AutoRefreshMixin {
   late TabController _tabController;
+  late ProfileService _profileService;
   String _selectedPeriod = '7d';
   bool _disposed = false;
+  UserProfile? _userProfile;
 
   @override
   void initState() {
     super.initState();
     _tabController = TabController(length: 3, vsync: this);
+    _profileService = getIt<ProfileService>();
+    _loadUserProfile();
+    
     listenToAutoRefresh('sessions', () {
       if (mounted && !_disposed) {
         context.read<StatsBloc>().add(const StatsStarted());
@@ -35,6 +45,19 @@ class _StatsScreenState extends State<StatsScreen> with SingleTickerProviderStat
         context.read<StatsBloc>().add(const StatsStarted());
       }
     });
+  }
+
+  Future<void> _loadUserProfile() async {
+    try {
+      final profile = await _profileService.getCurrentUserProfile();
+      if (mounted) {
+        setState(() {
+          _userProfile = profile;
+        });
+      }
+    } catch (e) {
+      print('❌ Error loading user profile: $e');
+    }
   }
 
   @override
@@ -61,11 +84,16 @@ class _StatsScreenState extends State<StatsScreen> with SingleTickerProviderStat
             letterSpacing: -0.5,
           ),
         ),
-        backgroundColor: Colors.white,
-        foregroundColor: const Color(0xFF1F2937),
+        backgroundColor: theme.colorScheme.primary,
+        foregroundColor: theme.colorScheme.onPrimary,
         elevation: 0,
         shadowColor: Colors.transparent,
         surfaceTintColor: Colors.transparent,
+        flexibleSpace: Container(
+          decoration: BoxDecoration(
+            color: AppTheme.goldPrimary,
+          ),
+        ),
         bottom: PreferredSize(
           preferredSize: const Size.fromHeight(60),
           child: Container(

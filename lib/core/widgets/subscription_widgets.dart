@@ -25,13 +25,13 @@ class SubscriptionPlanCard extends StatelessWidget {
     final colorScheme = theme.colorScheme;
     
     return Card(
-      elevation: isCurrentPlan ? AppTheme.elevationHigh : AppTheme.elevationMedium,
+      elevation: isCurrentPlan ? 8 : 4,
       child: Container(
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(AppTheme.radiusLarge),
-          color: AppTheme.neutral800,
+          color: context.colors.surface,
           border: isCurrentPlan ? Border.all(
-            color: AppTheme.primaryColor,
+            color: AppTheme.goldPrimary,
             width: 2,
           ) : null,
         ),
@@ -78,7 +78,7 @@ class SubscriptionPlanCard extends StatelessWidget {
                       child: Text(
                         'CURRENT',
                         style: theme.textTheme.labelSmall?.copyWith(
-                          color: Colors.white,
+                          color: AppTheme.whitePure,
                           fontWeight: FontWeight.bold,
                         ),
                       ),
@@ -158,23 +158,18 @@ class SubscriptionPlanCard extends StatelessWidget {
     );
   }
 
-  LinearGradient? _getPlanGradient() {
-    if (plan.id == 'institute') {
-      return null;
-    }
-    return null;
-  }
+  // Removed gradient method - using solid colors from theme
 
   Color _getTextColor() {
     if (plan.id == 'institute') {
-      return Colors.white;
+      return AppTheme.whitePure;
     }
     return AppTheme.neutral900;
   }
 
   Color _getSecondaryTextColor() {
     if (plan.id == 'institute') {
-      return Colors.white70;
+      return AppTheme.whitePure.withOpacity(0.7);
     }
     return AppTheme.neutral600;
   }
@@ -332,7 +327,7 @@ class SubscriptionStatusWidget extends StatelessWidget {
                 value: percentage,
                 backgroundColor: AppTheme.neutral200,
                 valueColor: AlwaysStoppedAnimation<Color>(
-                  isNearLimit ? AppTheme.warningColor : AppTheme.primaryColor,
+                  isNearLimit ? AppTheme.warningColor : AppTheme.goldPrimary,
                 ),
               ),
             ],
@@ -378,12 +373,12 @@ class FeatureAccessWidget extends StatelessWidget {
                 width: 48,
                 height: 48,
                 decoration: BoxDecoration(
-                  color: hasAccess ? AppTheme.primaryColor : AppTheme.neutral300,
+                  color: hasAccess ? AppTheme.goldPrimary : AppTheme.neutral300,
                   borderRadius: BorderRadius.circular(AppTheme.radiusSmall),
                 ),
                 child: Icon(
                   icon,
-                  color: Colors.white,
+                  color: AppTheme.whitePure,
                   size: 24,
                 ),
               ),
@@ -420,13 +415,13 @@ class FeatureAccessWidget extends StatelessWidget {
                     vertical: AppTheme.spacing4,
                   ),
                   decoration: BoxDecoration(
-                    color: AppTheme.accentColor,
+                    color: AppTheme.goldBright,
                     borderRadius: BorderRadius.circular(AppTheme.radiusSmall),
                   ),
                   child: Text(
                     'UPGRADE',
                     style: theme.textTheme.labelSmall?.copyWith(
-                      color: Colors.white,
+                      color: AppTheme.whitePure,
                       fontWeight: FontWeight.bold,
                     ),
                   ),
@@ -477,14 +472,7 @@ class AdminFeatureWidget extends StatelessWidget {
           padding: const EdgeInsets.all(AppTheme.spacing16),
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(AppTheme.radiusLarge),
-            gradient: LinearGradient(
-              colors: [
-                effectiveColor.withOpacity(0.1),
-                effectiveColor.withOpacity(0.05),
-              ],
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-            ),
+            color: effectiveColor.withOpacity(0.08),
           ),
           child: Row(
             children: [
@@ -497,7 +485,7 @@ class AdminFeatureWidget extends StatelessWidget {
                 ),
                 child: Icon(
                   icon,
-                  color: Colors.white,
+                  color: AppTheme.whitePure,
                   size: 24,
                 ),
               ),
@@ -539,7 +527,7 @@ class AdminFeatureWidget extends StatelessWidget {
                 child: Text(
                   'ADMIN',
                   style: theme.textTheme.labelSmall?.copyWith(
-                    color: Colors.white,
+                    color: AppTheme.whitePure,
                     fontWeight: FontWeight.bold,
                   ),
                 ),
