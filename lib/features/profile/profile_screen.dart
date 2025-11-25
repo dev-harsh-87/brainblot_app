@@ -6,6 +6,7 @@ import 'package:intl/intl.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
 import 'package:spark_app/core/di/injection.dart';
+import 'package:spark_app/core/widgets/app_loader.dart';
 import 'package:spark_app/features/auth/bloc/auth_bloc.dart';
 import 'package:spark_app/features/settings/bloc/settings_bloc.dart';
 import 'package:spark_app/core/auth/services/session_management_service.dart';
@@ -100,7 +101,7 @@ class _ProfileScreenState extends State<ProfileScreen> with AutoRefreshMixin {
     EdgeToEdge.setPrimarySystemUI(context);
 
     return EdgeToEdgeScaffold(
-      backgroundColor: AppTheme.whiteSoft,
+      backgroundColor: colorScheme.surface,
       appBar: _buildAppBar(context),
       extendBodyBehindAppBar: false,
       body: RefreshIndicator(
@@ -136,7 +137,7 @@ class _ProfileScreenState extends State<ProfileScreen> with AutoRefreshMixin {
       centerTitle: true,
       flexibleSpace: Container(
         decoration: BoxDecoration(
-          color: AppTheme.goldPrimary,
+          color: colorScheme.primary,
         ),
       ),
       actions: [
@@ -169,7 +170,7 @@ class _ProfileScreenState extends State<ProfileScreen> with AutoRefreshMixin {
                           context.go('/auth');
                         },
                         style: FilledButton.styleFrom(
-                          backgroundColor: Colors.red,
+                          backgroundColor: AppTheme.errorColor,
                         ),
                         child: const Text('Logout'),
                       ),
@@ -198,11 +199,11 @@ class _ProfileScreenState extends State<ProfileScreen> with AutoRefreshMixin {
               ),
             ),
             PopupMenuDivider(),
-              const PopupMenuItem(
+              PopupMenuItem(
               value: 'logout',
               child: ListTile(
-                leading: Icon(Icons.settings_rounded, color: Colors.red,),
-                title: Text('Logout', style: TextStyle(color: Colors.red),),
+                leading: Icon(Icons.logout_rounded, color: AppTheme.errorColor,),
+                title: Text('Logout', style: TextStyle(color: AppTheme.errorColor),),
                 contentPadding: EdgeInsets.zero,
               ),
             ),
@@ -213,54 +214,8 @@ class _ProfileScreenState extends State<ProfileScreen> with AutoRefreshMixin {
   }
 
   Widget _buildLoadingState(BuildContext context) {
-    final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
-
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(64),
-        child: Column(
-          children: [
-            Container(
-              padding: const EdgeInsets.all(24),
-              decoration: BoxDecoration(
-                color: AppTheme.whitePure,
-                borderRadius: BorderRadius.circular(16),
-                boxShadow: [
-                  BoxShadow(
-                    color: AppTheme.neutral900.withOpacity(0.08),
-                    blurRadius: 16,
-                    offset: const Offset(0, 6),
-                  ),
-                ],
-              ),
-              child: Column(
-                children: [
-                  CircularProgressIndicator(
-                    color: AppTheme.goldPrimary,
-                    strokeWidth: 3,
-                  ),
-                  const SizedBox(height: 16),
-                  Text(
-                    'Loading profile...',
-                    style: theme.textTheme.bodyLarge?.copyWith(
-                      color: AppTheme.neutral700,
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    'Getting your account information',
-                    style: theme.textTheme.bodySmall?.copyWith(
-                      color: AppTheme.neutral500,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
-      ),
+    return const AppLoader.fullScreen(
+      message: 'Loading profile...',
     );
   }
 
@@ -290,7 +245,7 @@ class _ProfileScreenState extends State<ProfileScreen> with AutoRefreshMixin {
             Text(
               'Failed to load profile',
               style: theme.textTheme.headlineSmall?.copyWith(
-                color: AppTheme.neutral900,
+                color: colorScheme.onSurface,
                 fontWeight: FontWeight.w600,
               ),
             ),
@@ -298,7 +253,7 @@ class _ProfileScreenState extends State<ProfileScreen> with AutoRefreshMixin {
             Text(
               _error ?? 'Unknown error occurred',
               style: theme.textTheme.bodyMedium?.copyWith(
-                color: AppTheme.neutral700,
+                color: colorScheme.onSurface.withOpacity(0.7),
               ),
               textAlign: TextAlign.center,
             ),
@@ -347,14 +302,14 @@ class _ProfileScreenState extends State<ProfileScreen> with AutoRefreshMixin {
     return Container(
       margin: const EdgeInsets.fromLTRB(20, 20, 20, 0),
       decoration: BoxDecoration(
-        color: AppTheme.whitePure,
+        color: colorScheme.surface,
         borderRadius: BorderRadius.circular(20),
         border: Border.all(
-          color: AppTheme.goldPrimary.withOpacity(0.2),
+          color: colorScheme.primary.withOpacity(0.2),
         ),
         boxShadow: [
           BoxShadow(
-            color: AppTheme.neutral900.withOpacity(0.08),
+            color: colorScheme.shadow.withOpacity(0.08),
             blurRadius: 16,
             offset: const Offset(0, 6),
           ),
@@ -373,7 +328,7 @@ class _ProfileScreenState extends State<ProfileScreen> with AutoRefreshMixin {
                     profile.displayName,
                     style: theme.textTheme.titleLarge?.copyWith(
                       fontWeight: FontWeight.w700,
-                      color: AppTheme.neutral900,
+                      color: colorScheme.onSurface,
                       letterSpacing: 0.3,
                     ),
                   ),
@@ -381,7 +336,7 @@ class _ProfileScreenState extends State<ProfileScreen> with AutoRefreshMixin {
                   Text(
                     profile.email,
                     style: theme.textTheme.bodyMedium?.copyWith(
-                      color: AppTheme.neutral700,
+                      color: colorScheme.onSurface.withOpacity(0.7),
                       fontWeight: FontWeight.w500,
                     ),
                   ),
@@ -408,7 +363,7 @@ class _ProfileScreenState extends State<ProfileScreen> with AutoRefreshMixin {
                           child: Icon(
                             Icons.person_rounded,
                             size: 12,
-                            color: AppTheme.whitePure,
+                            color: colorScheme.onPrimary,
                           ),
                         ),
                         const SizedBox(width: 6),
@@ -449,15 +404,15 @@ class _ProfileScreenState extends State<ProfileScreen> with AutoRefreshMixin {
               Container(
                 padding: const EdgeInsets.all(8),
                 decoration: BoxDecoration(
-                  color: AppTheme.goldPrimary.withOpacity(0.1),
+                  color: colorScheme.primary.withOpacity(0.1),
                   borderRadius: BorderRadius.circular(10),
                   border: Border.all(
-                    color: AppTheme.goldPrimary.withOpacity(0.2),
+                    color: colorScheme.primary.withOpacity(0.2),
                   ),
                 ),
                 child: Icon(
                   Icons.person_rounded,
-                  color: AppTheme.goldPrimary,
+                  color: colorScheme.primary,
                   size: 18,
                 ),
               ),
@@ -475,14 +430,14 @@ class _ProfileScreenState extends State<ProfileScreen> with AutoRefreshMixin {
           // Compact Horizontal Layout
           Container(
             decoration: BoxDecoration(
-              color: AppTheme.whitePure,
+              color: colorScheme.surface,
               borderRadius: BorderRadius.circular(16),
               border: Border.all(
-                color: AppTheme.neutral200.withOpacity(0.5),
+                color: colorScheme.outline.withOpacity(0.2),
               ),
               boxShadow: [
                 BoxShadow(
-                  color: AppTheme.neutral900.withOpacity(0.04),
+                  color: colorScheme.shadow.withOpacity(0.04),
                   blurRadius: 12,
                   offset: const Offset(0, 3),
                 ),
@@ -596,7 +551,7 @@ class _ProfileScreenState extends State<ProfileScreen> with AutoRefreshMixin {
               Text(
                 title,
                 style: theme.textTheme.bodySmall?.copyWith(
-                  color: AppTheme.neutral600,
+                  color: colorScheme.onSurface.withOpacity(0.6),
                   fontSize: 11,
                 ),
               ),
@@ -605,7 +560,7 @@ class _ProfileScreenState extends State<ProfileScreen> with AutoRefreshMixin {
                 value,
                 style: theme.textTheme.bodyMedium?.copyWith(
                   fontWeight: FontWeight.w600,
-                  color: AppTheme.neutral900,
+                  color: colorScheme.onSurface,
                 ),
               ),
             ],
@@ -664,7 +619,7 @@ class _ProfileScreenState extends State<ProfileScreen> with AutoRefreshMixin {
           Text(
             title,
             style: theme.textTheme.bodySmall?.copyWith(
-              color: AppTheme.neutral700,
+              color: colorScheme.onSurface.withOpacity(0.7),
               fontSize: 10,
               fontWeight: FontWeight.w500,
             ),
@@ -676,7 +631,7 @@ class _ProfileScreenState extends State<ProfileScreen> with AutoRefreshMixin {
             value,
             style: theme.textTheme.bodyMedium?.copyWith(
               fontWeight: FontWeight.w700,
-              color: AppTheme.neutral900,
+              color: colorScheme.onSurface,
               fontSize: 15,
             ),
             maxLines: 1,
@@ -1008,12 +963,12 @@ class _ProfileScreenState extends State<ProfileScreen> with AutoRefreshMixin {
         decoration: BoxDecoration(
           color: isUnlocked
               ? Colors.amber.withOpacity(0.1)
-              : AppTheme.neutral100,
+              : colorScheme.surfaceContainerHighest,
           borderRadius: BorderRadius.circular(12),
           border: Border.all(
             color: isUnlocked
                 ? Colors.amber.withOpacity(0.3)
-                : AppTheme.neutral300,
+                : colorScheme.outline.withOpacity(0.3),
             width: 1.5,
           ),
           boxShadow: isUnlocked
@@ -1034,14 +989,14 @@ class _ProfileScreenState extends State<ProfileScreen> with AutoRefreshMixin {
               decoration: BoxDecoration(
                 color: isUnlocked
                     ? Colors.amber.withOpacity(0.2)
-                    : AppTheme.neutral200,
+                    : colorScheme.surfaceContainerHighest,
                 shape: BoxShape.circle,
               ),
               child: Icon(
                 icon,
                 color: isUnlocked
                     ? Colors.amber.shade700
-                    : AppTheme.neutral500,
+                    : colorScheme.onSurface.withOpacity(0.5),
                 size: 22,
               ),
             ),
@@ -1455,7 +1410,7 @@ class _ProfileScreenState extends State<ProfileScreen> with AutoRefreshMixin {
                             ScaffoldMessenger.of(context).showSnackBar(
                               const SnackBar(
                                 content: Text('✅ Profile updated successfully'),
-                                backgroundColor: Colors.green,
+                                backgroundColor: AppTheme.successColor,
                               ),
                             );
                             _loadUserData();
@@ -1465,7 +1420,7 @@ class _ProfileScreenState extends State<ProfileScreen> with AutoRefreshMixin {
                             ScaffoldMessenger.of(context).showSnackBar(
                               SnackBar(
                                 content: Text('❌ Failed to update profile: $e'),
-                                backgroundColor: Colors.red,
+                                backgroundColor: AppTheme.errorColor,
                               ),
                             );
                           }
@@ -1618,7 +1573,7 @@ class _ProfileScreenState extends State<ProfileScreen> with AutoRefreshMixin {
                               const SnackBar(
                                 content:
                                     Text('✅ Password updated successfully'),
-                                backgroundColor: Colors.green,
+                                backgroundColor: AppTheme.successColor,
                               ),
                             );
                           }
@@ -1628,7 +1583,7 @@ class _ProfileScreenState extends State<ProfileScreen> with AutoRefreshMixin {
                               SnackBar(
                                 content:
                                     Text('❌ Failed to update password: $e'),
-                                backgroundColor: Colors.red,
+                                backgroundColor: AppTheme.errorColor,
                               ),
                             );
                           }
@@ -1665,9 +1620,9 @@ class _ProfileScreenState extends State<ProfileScreen> with AutoRefreshMixin {
               RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
           title: Row(
             children: [
-              Icon(Icons.warning_amber_rounded, color: Colors.red, size: 28),
+              Icon(Icons.warning_amber_rounded, color: AppTheme.errorColor, size: 28),
               const SizedBox(width: 12),
-              const Text('Delete Account', style: TextStyle(color: Colors.red)),
+              const Text('Delete Account', style: TextStyle(color: AppTheme.errorColor)),
             ],
           ),
           content: Form(
@@ -1679,9 +1634,9 @@ class _ProfileScreenState extends State<ProfileScreen> with AutoRefreshMixin {
                 Container(
                   padding: const EdgeInsets.all(16),
                   decoration: BoxDecoration(
-                    color: Colors.red.withOpacity(0.1),
+                    color: AppTheme.errorColor.withOpacity(0.1),
                     borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: Colors.red.withOpacity(0.3)),
+                    border: Border.all(color: AppTheme.errorColor.withOpacity(0.3)),
                   ),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -1689,7 +1644,7 @@ class _ProfileScreenState extends State<ProfileScreen> with AutoRefreshMixin {
                       Text(
                         'This action cannot be undone!',
                         style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                              color: Colors.red,
+                              color: AppTheme.errorColor,
                               fontWeight: FontWeight.bold,
                             ),
                       ),
@@ -1764,7 +1719,7 @@ class _ProfileScreenState extends State<ProfileScreen> with AutoRefreshMixin {
                             ScaffoldMessenger.of(context).showSnackBar(
                               const SnackBar(
                                 content: Text('Account deleted successfully'),
-                                backgroundColor: Colors.green,
+                                backgroundColor: AppTheme.successColor,
                               ),
                             );
                           }
@@ -1773,7 +1728,7 @@ class _ProfileScreenState extends State<ProfileScreen> with AutoRefreshMixin {
                             ScaffoldMessenger.of(context).showSnackBar(
                               SnackBar(
                                 content: Text('❌ Failed to delete account: $e'),
-                                backgroundColor: Colors.red,
+                                backgroundColor: AppTheme.errorColor,
                               ),
                             );
                           }
@@ -1782,16 +1737,16 @@ class _ProfileScreenState extends State<ProfileScreen> with AutoRefreshMixin {
                         }
                       }
                     },
-              style: FilledButton.styleFrom(backgroundColor: Colors.red),
+              style: FilledButton.styleFrom(backgroundColor: AppTheme.errorColor),
               child: isLoading
                   ? const SizedBox(
                       width: 16,
                       height: 16,
                       child: CircularProgressIndicator(
-                          strokeWidth: 2, color: Colors.white),
+                          strokeWidth: 2, color: AppTheme.whitePure),
                     )
                   : const Text('Delete Account',
-                      style: TextStyle(color: Colors.white)),
+                      style: TextStyle(color: AppTheme.whitePure)),
             ),
           ],
         ),

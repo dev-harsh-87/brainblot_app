@@ -757,64 +757,7 @@ class _JoinSessionScreenState extends State<JoinSessionScreen>
             ],
           ),
         ),
-        
-        SizedBox(height: isSmallScreen ? 16 : 20),
-        
-        // Troubleshooting Tips
-        Container(
-          padding: EdgeInsets.all(isSmallScreen ? 16 : 20),
-          decoration: BoxDecoration(
-            color: colorScheme.tertiaryContainer.withOpacity(0.2),
-            borderRadius: BorderRadius.circular(isSmallScreen ? 12 : 16),
-            border: Border.all(
-              color: colorScheme.tertiary.withOpacity(0.2),
-            ),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  Icon(
-                    Icons.build_rounded,
-                    color: colorScheme.tertiary,
-                    size: isSmallScreen ? 18 : 20,
-                  ),
-                  SizedBox(width: isSmallScreen ? 6 : 8),
-                  Text(
-                    'Troubleshooting',
-                    style: theme.textTheme.titleMedium?.copyWith(
-                      fontWeight: FontWeight.bold,
-                      fontSize: isSmallScreen ? 15 : null,
-                      color: colorScheme.tertiary,
-                    ),
-                  ),
-                ],
-              ),
-              SizedBox(height: isSmallScreen ? 12 : 16),
-              _buildTroubleshootItem(
-                context,
-                'Session Not Found',
-                '• Check internet connection\n• Verify session code is correct\n• Ensure host has created the session\n• Try refreshing the app',
-                isSmallScreen,
-              ),
-              SizedBox(height: isSmallScreen ? 8 : 12),
-              _buildTroubleshootItem(
-                context,
-                'Connection Failed',
-                '• Check internet connectivity\n• Verify Firebase services are working\n• Try switching networks (WiFi/Mobile)\n• Restart the app',
-                isSmallScreen,
-              ),
-              SizedBox(height: isSmallScreen ? 8 : 12),
-              _buildTroubleshootItem(
-                context,
-                'Sync Issues',
-                '• Check internet stability\n• Ensure both devices are online\n• Try rejoining the session\n• Contact host to restart session',
-                isSmallScreen,
-              ),
-            ],
-          ),
-        ),
+
       ],
     );
   }

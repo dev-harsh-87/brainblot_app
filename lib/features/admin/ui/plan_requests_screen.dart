@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:spark_app/features/subscription/domain/subscription_request.dart';
 import 'package:spark_app/features/subscription/services/subscription_request_service.dart';
+import 'package:spark_app/core/theme/app_theme.dart';
 
 class PlanRequestsScreen extends StatefulWidget {
   const PlanRequestsScreen({super.key});
@@ -37,14 +38,9 @@ class _PlanRequestsScreenState extends State<PlanRequestsScreen>
       backgroundColor: colorScheme.surface,
       appBar: AppBar(
         title: const Text('Subscription Requests'),
-        backgroundColor: colorScheme.primary,
-        foregroundColor: colorScheme.onPrimary,
         elevation: 0,
         bottom: TabBar(
           controller: _tabController,
-          indicatorColor: colorScheme.onPrimary,
-          labelColor: colorScheme.onPrimary,
-          unselectedLabelColor: colorScheme.onPrimary.withOpacity(0.7),
           tabs: const [
             Tab(text: 'All'),
             Tab(text: 'Pending'),
@@ -118,13 +114,13 @@ class _PlanRequestsScreenState extends State<PlanRequestsScreen>
     Color statusColor;
     IconData statusIcon;
     if (isPending) {
-      statusColor = Colors.orange;
+      statusColor = AppTheme.warningColor;
       statusIcon = Icons.pending;
     } else if (isApproved) {
-      statusColor = Colors.green;
+      statusColor = AppTheme.successColor;
       statusIcon = Icons.check_circle;
     } else {
-      statusColor = Colors.red;
+      statusColor = AppTheme.errorColor;
       statusIcon = Icons.cancel;
     }
 
@@ -134,8 +130,8 @@ class _PlanRequestsScreenState extends State<PlanRequestsScreen>
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(12),
         side: BorderSide(
-          color: isPending ? statusColor.withOpacity(0.3) : Colors.transparent,
-          width: isPending ? 2 : 0,
+          color: statusColor.withOpacity(0.3),
+          width: 2,
         ),
       ),
       child: Padding(
@@ -205,7 +201,7 @@ class _PlanRequestsScreenState extends State<PlanRequestsScreen>
               child: Row(
                 children: [
                   _buildPlanBadge(
-                      request.currentPlan.toUpperCase(), Colors.grey, theme,),
+                      request.currentPlan.toUpperCase(), colorScheme.outline, theme,),
                   const SizedBox(width: 8),
                   Icon(Icons.arrow_forward,
                       size: 20, color: colorScheme.primary,),
@@ -273,14 +269,14 @@ class _PlanRequestsScreenState extends State<PlanRequestsScreen>
               Container(
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
-                  color: Colors.red.withOpacity(0.1),
+                  color: AppTheme.errorColor.withOpacity(0.1),
                   borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: Colors.red.withOpacity(0.3)),
+                  border: Border.all(color: AppTheme.errorColor.withOpacity(0.3)),
                 ),
                 child: Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Icon(Icons.info_outline, size: 20, color: Colors.red[700]),
+                    Icon(Icons.info_outline, size: 20, color: AppTheme.errorColor),
                     const SizedBox(width: 8),
                     Expanded(
                       child: Column(
@@ -289,7 +285,7 @@ class _PlanRequestsScreenState extends State<PlanRequestsScreen>
                           Text(
                             'Rejection Reason:',
                             style: theme.textTheme.labelSmall?.copyWith(
-                              color: Colors.red[700],
+                              color: AppTheme.errorColor,
                               fontWeight: FontWeight.bold,
                             ),
                           ),
@@ -297,7 +293,7 @@ class _PlanRequestsScreenState extends State<PlanRequestsScreen>
                           Text(
                             request.rejectionReason!,
                             style: theme.textTheme.bodySmall?.copyWith(
-                              color: Colors.red[700],
+                              color: AppTheme.errorColor,
                             ),
                           ),
                         ],
@@ -317,8 +313,8 @@ class _PlanRequestsScreenState extends State<PlanRequestsScreen>
                     child: OutlinedButton.icon(
                       onPressed: () => _showRejectDialog(request),
                       style: OutlinedButton.styleFrom(
-                        foregroundColor: Colors.red,
-                        side: const BorderSide(color: Colors.red),
+                        foregroundColor: AppTheme.errorColor,
+                        side: BorderSide(color: AppTheme.errorColor),
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(8),
                         ),
@@ -332,8 +328,8 @@ class _PlanRequestsScreenState extends State<PlanRequestsScreen>
                     child: FilledButton.icon(
                       onPressed: () => _approveRequest(request),
                       style: FilledButton.styleFrom(
-                        backgroundColor: Colors.green,
-                        foregroundColor: Colors.white,
+                        backgroundColor: AppTheme.successColor,
+                        foregroundColor: colorScheme.onPrimary,
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(8),
                         ),
@@ -460,7 +456,7 @@ class _PlanRequestsScreenState extends State<PlanRequestsScreen>
           ),
           FilledButton(
             onPressed: () => Navigator.pop(context, true),
-            style: FilledButton.styleFrom(backgroundColor: Colors.green),
+            style: FilledButton.styleFrom(backgroundColor: AppTheme.successColor),
             child: const Text('Approve'),
           ),
         ],
@@ -495,7 +491,7 @@ class _PlanRequestsScreenState extends State<PlanRequestsScreen>
               ),
             ],
           ),
-          backgroundColor: Colors.green,
+          backgroundColor: AppTheme.successColor,
           behavior: SnackBarBehavior.floating,
         ),
       );
@@ -506,7 +502,7 @@ class _PlanRequestsScreenState extends State<PlanRequestsScreen>
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('Failed to approve request: $e'),
-          backgroundColor: Colors.red,
+          backgroundColor: AppTheme.errorColor,
           behavior: SnackBarBehavior.floating,
         ),
       );
@@ -560,7 +556,7 @@ class _PlanRequestsScreenState extends State<PlanRequestsScreen>
                 Navigator.pop(context, true);
               }
             },
-            style: FilledButton.styleFrom(backgroundColor: Colors.red),
+            style: FilledButton.styleFrom(backgroundColor: AppTheme.errorColor),
             child: const Text('Reject'),
           ),
         ],
@@ -594,12 +590,12 @@ class _PlanRequestsScreenState extends State<PlanRequestsScreen>
         const SnackBar(
           content: Row(
             children: [
-              Icon(Icons.check_circle, color: Colors.white),
+              const Icon(Icons.check_circle, color: Colors.white),
               SizedBox(width: 12),
               Expanded(child: Text('Request rejected')),
             ],
           ),
-          backgroundColor: Colors.orange,
+          backgroundColor: AppTheme.warningColor,
           behavior: SnackBarBehavior.floating,
         ),
       );
@@ -610,7 +606,7 @@ class _PlanRequestsScreenState extends State<PlanRequestsScreen>
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('Failed to reject request: $e'),
-          backgroundColor: Colors.red,
+          backgroundColor: AppTheme.errorColor,
           behavior: SnackBarBehavior.floating,
         ),
       );

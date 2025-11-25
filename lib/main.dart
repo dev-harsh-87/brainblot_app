@@ -14,9 +14,6 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:spark_app/features/subscription/services/subscription_fix_service.dart';
 import 'package:spark_app/core/services/fcm_token_service.dart';
 import 'package:spark_app/core/utils/app_logger.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:spark_app/core/services/admin_account_service.dart';
-import 'package:spark_app/core/services/category_initialization_service.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -26,12 +23,6 @@ Future<void> main() async {
   
   // Initialize Firebase
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
-  
-  // Create admin account if it doesn't exist
-  await _createAdminAccountIfNeeded();
-  
-  // Initialize default categories if needed
-  await _initializeCategoriesIfNeeded();
   
   // Initialize app storage
   await AppStorage.init();
@@ -66,76 +57,6 @@ void _fixSubscriptionOnStartup() {
   });
 }
 
-/// Create admin account if it doesn't exist using the robust service
-Future<void> _createAdminAccountIfNeeded() async {
-  try {
-    AppLogger.info('🚀 Starting admin account creation process...');
-    
-    final adminService = AdminAccountService();
-    final result = await adminService.createAdminAccountIfNeeded();
-    
-    if (result.success) {
-      if (result.alreadyExists) {
-        AppLogger.success('✅ Admin account already exists and is ready to use');
-        print('✅ Admin account already exists');
-        print('📧 Email: admin@gmail.com');
-        print('🔑 Password: Admin@1234');
-      } else {
-        AppLogger.success('🎉 Admin account created successfully!');
-        print('🎉 ADMIN ACCOUNT CREATED SUCCESSFULLY!');
-        print('📧 Email: admin@gmail.com');
-        print('🔑 Password: Admin@1234');
-        print('🆔 User ID: ${result.userId}');
-      }
-      
-      // Verify the account was created properly
-      final isVerified = await adminService.verifyAdminAccount();
-      if (isVerified) {
-        AppLogger.success('✅ Admin account verification passed');
-        print('✅ Admin account verified and ready for use');
-      } else {
-        AppLogger.warning('⚠️ Admin account verification failed');
-        print('⚠️ Admin account created but verification failed');
-      }
-    } else {
-      AppLogger.error('❌ Failed to create admin account: ${result.message}');
-      print('❌ Failed to create admin account: ${result.message}');
-      if (result.error != null) {
-        print('Error details: ${result.error}');
-      }
-    }
-    
-  } catch (e) {
-    AppLogger.error('❌ Unexpected error during admin account creation', error: e);
-    print('❌ Unexpected error during admin account creation: $e');
-    // Don't throw - let the app continue even if admin creation fails
-  }
-}
-
-/// Initialize default categories if needed
-Future<void> _initializeCategoriesIfNeeded() async {
-  try {
-    AppLogger.info('🏷️ Checking if categories need initialization...');
-    
-    final categoryService = CategoryInitializationService();
-    final needsInit = await categoryService.needsInitialization();
-    
-    if (needsInit) {
-      AppLogger.info('📝 Initializing default drill categories...');
-      print('📝 Initializing default drill categories...');
-      await categoryService.initializeDefaultCategories();
-      AppLogger.success('✅ Default categories initialized successfully!');
-      print('✅ Default categories initialized successfully!');
-    } else {
-      AppLogger.info('✅ Drill categories already exist');
-      print('✅ Drill categories already exist');
-    }
-  } catch (e) {
-    AppLogger.error('❌ Failed to initialize categories', error: e);
-    print('❌ Failed to initialize categories: $e');
-    // Don't throw - let the app continue even if category initialization fails
-  }
-}
 
 class CogniTrainApp extends StatelessWidget {
   const CogniTrainApp({super.key});

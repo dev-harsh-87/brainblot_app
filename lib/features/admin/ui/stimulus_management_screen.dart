@@ -5,6 +5,7 @@ import 'dart:io';
 import 'package:spark_app/features/admin/domain/custom_stimulus.dart';
 import 'package:spark_app/features/admin/services/custom_stimulus_service.dart';
 import 'package:spark_app/features/admin/ui/create_stimulus_screen.dart';
+import 'package:spark_app/core/theme/app_theme.dart';
 
 class StimulusManagementScreen extends StatefulWidget {
   const StimulusManagementScreen({super.key});
@@ -89,10 +90,10 @@ class _StimulusManagementScreenState extends State<StimulusManagementScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Failed to load stimuli. Please try again.'),
-            backgroundColor: Colors.red,
+            backgroundColor: Theme.of(context).colorScheme.error,
             action: SnackBarAction(
               label: 'Retry',
-              textColor: Colors.white,
+              textColor: Theme.of(context).colorScheme.onError,
               onPressed: _loadStimuli,
             ),
           ),
@@ -137,10 +138,10 @@ class _StimulusManagementScreenState extends State<StimulusManagementScreen> {
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(
                 content: Text('Connection lost. Refreshing data...'),
-                backgroundColor: Colors.orange,
+                backgroundColor: AppTheme.warningColor,
                 action: SnackBarAction(
                   label: 'Reconnect',
-                  textColor: Colors.white,
+                  textColor: Theme.of(context).colorScheme.onError,
                   onPressed: () {
                     _streamSubscription?.cancel();
                     _setupRealtimeListener();
@@ -185,14 +186,11 @@ class _StimulusManagementScreenState extends State<StimulusManagementScreen> {
       backgroundColor: colorScheme.surface,
       appBar: AppBar(
         elevation: 0,
-        backgroundColor: colorScheme.primary,
+
         foregroundColor: colorScheme.onPrimary,
         title: Text(
           'Stimulus Management',
-          style: theme.textTheme.headlineSmall?.copyWith(
-            color: colorScheme.onPrimary,
-            fontWeight: FontWeight.w700,
-          ),
+
         ),
         centerTitle: true,
         actions: [
@@ -202,19 +200,6 @@ class _StimulusManagementScreenState extends State<StimulusManagementScreen> {
             tooltip: 'Refresh Data',
           ),
         ],
-        flexibleSpace: Container(
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-              colors: [
-                colorScheme.primary,
-                colorScheme.primary.withOpacity(0.9),
-                colorScheme.secondary.withOpacity(0.8),
-              ],
-            ),
-          ),
-        ),
       ),
       body: Column(
         children: [

@@ -10,6 +10,7 @@ import 'package:spark_app/features/drills/domain/session_result.dart';
 import 'package:spark_app/features/stats/bloc/stats_bloc.dart';
 import 'package:spark_app/core/theme/app_theme.dart';
 import 'package:spark_app/core/widgets/profile_avatar.dart';
+import 'package:spark_app/core/widgets/app_loader.dart';
 import 'package:spark_app/features/profile/services/profile_service.dart';
 import 'package:spark_app/features/sharing/domain/user_profile.dart';
 import 'package:spark_app/core/di/injection.dart';
@@ -72,131 +73,110 @@ class _StatsScreenState extends State<StatsScreen> with SingleTickerProviderStat
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return Scaffold(
-      backgroundColor: const Color(0xFFF8FAFC),
-      appBar: AppBar(
-        title: const Text(
-          'Performance Analytics',
-          style: TextStyle(
-            fontWeight: FontWeight.bold,
-            fontSize: 20,
-            letterSpacing: -0.5,
-          ),
-        ),
-        backgroundColor: theme.colorScheme.primary,
-        foregroundColor: theme.colorScheme.onPrimary,
-        elevation: 0,
-        shadowColor: Colors.transparent,
-        surfaceTintColor: Colors.transparent,
-        flexibleSpace: Container(
-          decoration: BoxDecoration(
-            color: AppTheme.goldPrimary,
-          ),
-        ),
-        bottom: PreferredSize(
-          preferredSize: const Size.fromHeight(60),
-          child: Container(
-            color: Colors.white,
-            child: TabBar(
-              controller: _tabController,
-              labelColor: const Color(0xFF6366F1),
-              unselectedLabelColor: const Color(0xFF6B7280),
-              indicatorColor: const Color(0xFF6366F1),
-              indicatorWeight: 3,
-              labelStyle: const TextStyle(
-                fontWeight: FontWeight.w600,
-                fontSize: 14,
-              ),
-              unselectedLabelStyle: const TextStyle(
-                fontWeight: FontWeight.w500,
-                fontSize: 14,
-              ),
-              tabs: const [
-                Tab(
-                  icon: Icon(Icons.dashboard_outlined, size: 20),
-                  text: 'Overview',
-                ),
-                Tab(
-                  icon: Icon(Icons.trending_up, size: 20),
-                  text: 'Performance',
-                ),
-                Tab(
-                  icon: Icon(Icons.history, size: 20),
-                  text: 'History',
-                ),
-              ],
+    return DefaultTabController(
+      length: 3,
+      child: Scaffold(
+        backgroundColor: context.colors.background,
+        appBar: AppBar(
+          title: Text(
+            'Performance Analytics',
+            style: context.textStyles.headlineMedium?.copyWith(
+              fontWeight: FontWeight.bold,
+              letterSpacing: -0.5,
             ),
           ),
-        ),
-      ),
-      body: BlocBuilder<StatsBloc, StatsState>(
-        builder: (context, state) {
-          if (state.status == StatsStatus.loading) {
-            return const Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  CircularProgressIndicator(),
-                  SizedBox(height: 16),
-                  Text('Loading analytics...'),
-                ],
-              ),
-            );
-          }
-
-          final sessions = state.sessions;
-          if (sessions.isEmpty) {
-            return RefreshIndicator(
-              onRefresh: () async {
-                if (mounted && !_disposed) {
-                  context.read<StatsBloc>().add(const StatsStarted());
-                  await Future<void>.delayed(const Duration(milliseconds: 500));
-                }
-              },
-              child: SingleChildScrollView(
-                physics: const AlwaysScrollableScrollPhysics(),
-                child: SizedBox(
-                  height: MediaQuery.of(context).size.height * 0.6,
-                  child: _buildEmptyState(),
-                ),
-              ),
-            );
-          }
-
-          return TabBarView(
+          elevation: 0,
+          bottom: TabBar(
             controller: _tabController,
-            children: [
-              RefreshIndicator(
-                onRefresh: () async {
-                  if (mounted && !_disposed) {
-                    context.read<StatsBloc>().add(const StatsStarted());
-                    await Future<void>.delayed(const Duration(milliseconds: 500));
-                  }
-                },
-                child: _buildOverviewTab(sessions),
+            labelColor: context.colors.primary,
+            unselectedLabelColor: context.colors.onSurface.withOpacity(0.6),
+            indicatorColor: context.colors.primary,
+            indicatorWeight: 3,
+            labelStyle: const TextStyle(
+              fontWeight: FontWeight.w600,
+              fontSize: 14,
+            ),
+            unselectedLabelStyle: const TextStyle(
+              fontWeight: FontWeight.w500,
+              fontSize: 14,
+            ),
+            tabs: const [
+              Tab(
+                icon: Icon(Icons.dashboard_outlined, size: 20),
+                text: 'Overview',
               ),
-              RefreshIndicator(
-                onRefresh: () async {
-                  if (mounted && !_disposed) {
-                    context.read<StatsBloc>().add(const StatsStarted());
-                    await Future<void>.delayed(const Duration(milliseconds: 500));
-                  }
-                },
-                child: _buildPerformanceTab(sessions),
+              Tab(
+                icon: Icon(Icons.trending_up, size: 20),
+                text: 'Performance',
               ),
-              RefreshIndicator(
-                onRefresh: () async {
-                  if (mounted && !_disposed) {
-                    context.read<StatsBloc>().add(const StatsStarted());
-                    await Future<void>.delayed(const Duration(milliseconds: 500));
-                  }
-                },
-                child: _buildHistoryTab(sessions),
+              Tab(
+                icon: Icon(Icons.history, size: 20),
+                text: 'History',
               ),
             ],
-          );
-        },
+          ),
+        ),
+        body: BlocBuilder<StatsBloc, StatsState>(
+          builder: (context, state) {
+            if (state.status == StatsStatus.loading) {
+              return const AppLoader.fullScreen(
+                message: 'Loading analytics...',
+              );
+            }
+
+            final sessions = state.sessions;
+            if (sessions.isEmpty) {
+              return RefreshIndicator(
+                onRefresh: () async {
+                  if (mounted && !_disposed) {
+                    context.read<StatsBloc>().add(const StatsStarted());
+                    await Future<void>.delayed(const Duration(milliseconds: 500));
+                  }
+                },
+                child: SingleChildScrollView(
+                  physics: const AlwaysScrollableScrollPhysics(),
+                  child: SizedBox(
+                    height: MediaQuery.of(context).size.height * 0.6,
+                    child: _buildEmptyState(),
+                  ),
+                ),
+              );
+            }
+
+            return TabBarView(
+              controller: _tabController,
+              children: [
+                RefreshIndicator(
+                  onRefresh: () async {
+                    if (mounted && !_disposed) {
+                      context.read<StatsBloc>().add(const StatsStarted());
+                      await Future<void>.delayed(const Duration(milliseconds: 500));
+                    }
+                  },
+                  child: _buildOverviewTab(sessions),
+                ),
+                RefreshIndicator(
+                  onRefresh: () async {
+                    if (mounted && !_disposed) {
+                      context.read<StatsBloc>().add(const StatsStarted());
+                      await Future<void>.delayed(const Duration(milliseconds: 500));
+                    }
+                  },
+                  child: _buildPerformanceTab(sessions),
+                ),
+                RefreshIndicator(
+                  onRefresh: () async {
+                    if (mounted && !_disposed) {
+                      context.read<StatsBloc>().add(const StatsStarted());
+                      await Future<void>.delayed(const Duration(milliseconds: 500));
+                    }
+                  },
+                  child: _buildHistoryTab(sessions),
+                ),
+              ],
+            );
+          },
+        ),
       ),
     );
   }
@@ -209,30 +189,27 @@ class _StatsScreenState extends State<StatsScreen> with SingleTickerProviderStat
           Container(
             padding: const EdgeInsets.all(24),
             decoration: BoxDecoration(
-              color: const Color(0xFF6366F1).withOpacity(0.1),
+              color: context.colors.primary.withOpacity(0.1),
               borderRadius: BorderRadius.circular(24),
             ),
-            child: const Icon(
+            child: Icon(
               Icons.analytics_outlined,
               size: 64,
-              color: Color(0xFF6366F1),
+              color: context.colors.primary,
             ),
           ),
           const SizedBox(height: 24),
-          const Text(
+          Text(
             'No Analytics Yet',
-            style: TextStyle(
-              fontSize: 24,
+            style: context.textStyles.headlineMedium?.copyWith(
               fontWeight: FontWeight.bold,
-              color: Color(0xFF1F2937),
             ),
           ),
           const SizedBox(height: 12),
           Text(
             'Complete some training sessions to unlock\nyour performance insights and trends',
-            style: TextStyle(
-              fontSize: 16,
-              color: Colors.grey[600],
+            style: context.textStyles.bodyLarge?.copyWith(
+              color: context.colors.onSurface.withOpacity(0.7),
               height: 1.5,
             ),
             textAlign: TextAlign.center,
@@ -241,26 +218,25 @@ class _StatsScreenState extends State<StatsScreen> with SingleTickerProviderStat
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
             decoration: BoxDecoration(
-              color: const Color(0xFF6366F1).withOpacity(0.1),
+              color: context.colors.primary.withOpacity(0.1),
               borderRadius: BorderRadius.circular(12),
               border: Border.all(
-                color: const Color(0xFF6366F1).withOpacity(0.2),
+                color: context.colors.primary.withOpacity(0.2),
               ),
             ),
             child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                const Icon(
+                Icon(
                   Icons.info_outline,
                   size: 16,
-                  color: Color(0xFF6366F1),
+                  color: context.colors.primary,
                 ),
                 const SizedBox(width: 8),
                 Text(
                   'Pull down to refresh',
-                  style: TextStyle(
-                    fontSize: 14,
-                    color: Colors.grey[700],
+                  style: context.textStyles.bodyMedium?.copyWith(
+                    color: context.colors.onSurface.withOpacity(0.8),
                     fontWeight: FontWeight.w500,
                   ),
                 ),
@@ -319,15 +295,15 @@ class _StatsScreenState extends State<StatsScreen> with SingleTickerProviderStat
               Expanded(
                 child: Text(
                   'Session History',
-                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                  style: context.textStyles.titleLarge?.copyWith(
                     fontWeight: FontWeight.bold,
                   ),
                 ),
               ),
               Text(
                 '${sessions.length} sessions',
-                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                  color: Colors.grey[600],
+                style: context.textStyles.bodyMedium?.copyWith(
+                  color: context.colors.onSurface.withOpacity(0.7),
                 ),
               ),
             ],
@@ -349,14 +325,14 @@ class _StatsScreenState extends State<StatsScreen> with SingleTickerProviderStat
     return Container(
       padding: const EdgeInsets.all(4),
       decoration: BoxDecoration(
-        color: const Color(0xFFF1F5F9),
+        color: context.colors.surface,
         borderRadius: BorderRadius.circular(12),
         border: Border.all(
-          color: const Color(0xFFE2E8F0),
+          color: context.colors.outline.withOpacity(0.2),
         ),
       ),
       child: Row(
-        mainAxisSize: MainAxisSize.min,
+        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
         children: [
           _buildPeriodButton('7d', '7 Days'),
           _buildPeriodButton('30d', '30 Days'),
@@ -374,20 +350,14 @@ class _StatsScreenState extends State<StatsScreen> with SingleTickerProviderStat
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
         decoration: BoxDecoration(
-          color: isSelected ? const Color(0xFF6366F1) : Colors.transparent,
+          color: isSelected ? context.colors.primary : Colors.transparent,
           borderRadius: BorderRadius.circular(8),
-          boxShadow: isSelected ? [
-            BoxShadow(
-              color: const Color(0xFF6366F1).withOpacity(0.3),
-              blurRadius: 8,
-              offset: const Offset(0, 2),
-            ),
-          ] : null,
+      
         ),
         child: Text(
           label,
           style: TextStyle(
-            color: isSelected ? Colors.white : const Color(0xFF64748B),
+            color: isSelected ? context.colors.onPrimary : context.colors.onSurface.withOpacity(0.7),
             fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
             fontSize: 13,
           ),
@@ -556,12 +526,12 @@ class _StatsScreenState extends State<StatsScreen> with SingleTickerProviderStat
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: context.colors.surface,
         borderRadius: BorderRadius.circular(16),
         border: Border.all(color: color.withOpacity(0.1)),
         boxShadow: [
           BoxShadow(
-            color: Colors.grey.withOpacity(0.08),
+            color: context.colors.shadow.withOpacity(0.08),
             blurRadius: 10,
             offset: const Offset(0, 4),
           ),
@@ -581,10 +551,8 @@ class _StatsScreenState extends State<StatsScreen> with SingleTickerProviderStat
           const SizedBox(height: 12),
           Text(
             value,
-            style: TextStyle(
-              fontSize: 20,
+            style: context.textStyles.headlineSmall?.copyWith(
               fontWeight: FontWeight.bold,
-              color: Colors.grey[800],
             ),
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
@@ -592,9 +560,8 @@ class _StatsScreenState extends State<StatsScreen> with SingleTickerProviderStat
           const SizedBox(height: 4),
           Text(
             title,
-            style: TextStyle(
-              fontSize: 14,
-              color: Colors.grey[600],
+            style: context.textStyles.bodyMedium?.copyWith(
+              color: context.colors.onSurface.withOpacity(0.7),
               fontWeight: FontWeight.w500,
             ),
           ),
@@ -609,11 +576,11 @@ class _StatsScreenState extends State<StatsScreen> with SingleTickerProviderStat
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: context.colors.surface,
         borderRadius: BorderRadius.circular(20),
         boxShadow: [
           BoxShadow(
-            color: Colors.grey.withOpacity(0.1),
+            color: context.colors.shadow.withOpacity(0.1),
             blurRadius: 20,
             offset: const Offset(0, 8),
           ),
@@ -627,22 +594,20 @@ class _StatsScreenState extends State<StatsScreen> with SingleTickerProviderStat
               Container(
                 padding: const EdgeInsets.all(8),
                 decoration: BoxDecoration(
-                  color: const Color(0xFF6366F1).withOpacity(0.1),
+                  color: context.colors.primary.withOpacity(0.1),
                   borderRadius: BorderRadius.circular(8),
                 ),
-                child: const Icon(
+                child: Icon(
                   Icons.show_chart,
-                  color: Color(0xFF6366F1),
+                  color: context.colors.primary,
                   size: 20,
                 ),
               ),
               const SizedBox(width: 12),
-              const Text(
+              Text(
                 'Reaction Time Trend',
-                style: TextStyle(
-                  fontSize: 18,
+                style: context.textStyles.headlineSmall?.copyWith(
                   fontWeight: FontWeight.bold,
-                  color: Color(0xFF1F2937),
                 ),
               ),
             ],
@@ -656,7 +621,7 @@ class _StatsScreenState extends State<StatsScreen> with SingleTickerProviderStat
                     drawVerticalLine: false,
                     horizontalInterval: 50,
                     getDrawingHorizontalLine: (value) => FlLine(
-                      color: Colors.grey[300]!,
+                      color: context.colors.outline.withOpacity(0.3),
                       strokeWidth: 1,
                     ),
                   ),
@@ -667,7 +632,7 @@ class _StatsScreenState extends State<StatsScreen> with SingleTickerProviderStat
                         reservedSize: 40,
                         getTitlesWidget: (value, meta) => Text(
                           '${value.toInt()}ms',
-                          style: const TextStyle(fontSize: 10),
+                          style: context.textStyles.bodySmall?.copyWith(fontSize: 10),
                         ),
                       ),
                     ),
@@ -683,22 +648,22 @@ class _StatsScreenState extends State<StatsScreen> with SingleTickerProviderStat
                           FlSpot(i.toDouble(), sessions[i].avgReactionMs),
                       ],
                       isCurved: true,
-                      color: const Color(0xFF6366F1),
+                      color: context.colors.primary,
                       barWidth: 4,
                       dotData: FlDotData(
                         getDotPainter: (spot, percent, barData, index) => FlDotCirclePainter(
                           radius: 4,
-                          color: const Color(0xFF6366F1),
+                          color: context.colors.primary,
                           strokeWidth: 2,
-                          strokeColor: Colors.white,
+                          strokeColor: context.colors.surface,
                         ),
                       ),
                       belowBarData: BarAreaData(
                         show: true,
                         gradient: LinearGradient(
                           colors: [
-                            const Color(0xFF6366F1).withOpacity(0.3),
-                            const Color(0xFF6366F1).withOpacity(0.05),
+                            context.colors.primary.withOpacity(0.3),
+                            context.colors.primary.withOpacity(0.05),
                           ],
                           begin: Alignment.topCenter,
                           end: Alignment.bottomCenter,
@@ -721,11 +686,11 @@ class _StatsScreenState extends State<StatsScreen> with SingleTickerProviderStat
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: context.colors.surface,
         borderRadius: BorderRadius.circular(20),
         boxShadow: [
           BoxShadow(
-            color: Colors.grey.withOpacity(0.1),
+            color: context.colors.shadow.withOpacity(0.1),
             blurRadius: 20,
             offset: const Offset(0, 8),
           ),
@@ -739,22 +704,20 @@ class _StatsScreenState extends State<StatsScreen> with SingleTickerProviderStat
               Container(
                 padding: const EdgeInsets.all(8),
                 decoration: BoxDecoration(
-                  color: const Color(0xFF10B981).withOpacity(0.1),
+                  color: AppTheme.successColor.withOpacity(0.1),
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: const Icon(
                   Icons.trending_up,
-                  color: Color(0xFF10B981),
+                  color: AppTheme.successColor,
                   size: 20,
                 ),
               ),
               const SizedBox(width: 12),
-              const Text(
+              Text(
                 'Accuracy Trend',
-                style: TextStyle(
-                  fontSize: 18,
+                style: context.textStyles.headlineSmall?.copyWith(
                   fontWeight: FontWeight.bold,
-                  color: Color(0xFF1F2937),
                 ),
               ),
             ],
@@ -768,7 +731,7 @@ class _StatsScreenState extends State<StatsScreen> with SingleTickerProviderStat
                     drawVerticalLine: false,
                     horizontalInterval: 0.1,
                     getDrawingHorizontalLine: (value) => FlLine(
-                      color: Colors.grey[300]!,
+                      color: context.colors.outline.withOpacity(0.3),
                       strokeWidth: 1,
                     ),
                   ),
@@ -779,7 +742,7 @@ class _StatsScreenState extends State<StatsScreen> with SingleTickerProviderStat
                         reservedSize: 40,
                         getTitlesWidget: (value, meta) => Text(
                           '${(value * 100).toInt()}%',
-                          style: const TextStyle(fontSize: 10),
+                          style: context.textStyles.bodySmall?.copyWith(fontSize: 10),
                         ),
                       ),
                     ),
@@ -797,22 +760,22 @@ class _StatsScreenState extends State<StatsScreen> with SingleTickerProviderStat
                           FlSpot(i.toDouble(), sessions[i].accuracy),
                       ],
                       isCurved: true,
-                      color: const Color(0xFF10B981),
+                      color: AppTheme.successColor,
                       barWidth: 4,
                       dotData: FlDotData(
                         getDotPainter: (spot, percent, barData, index) => FlDotCirclePainter(
                           radius: 4,
-                          color: const Color(0xFF10B981),
+                          color: AppTheme.successColor,
                           strokeWidth: 2,
-                          strokeColor: Colors.white,
+                          strokeColor: context.colors.surface,
                         ),
                       ),
                       belowBarData: BarAreaData(
                         show: true,
                         gradient: LinearGradient(
                           colors: [
-                            const Color(0xFF10B981).withOpacity(0.3),
-                            const Color(0xFF10B981).withOpacity(0.05),
+                            AppTheme.successColor.withOpacity(0.3),
+                            AppTheme.successColor.withOpacity(0.05),
                           ],
                           begin: Alignment.topCenter,
                           end: Alignment.bottomCenter,
@@ -835,9 +798,9 @@ class _StatsScreenState extends State<StatsScreen> with SingleTickerProviderStat
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text(
+            Text(
               'Performance Trends',
-              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+              style: context.textStyles.titleLarge?.copyWith(fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 16),
             _buildTrendItem('Reaction Time', _calculateReactionTrend(sessions)),
@@ -857,17 +820,17 @@ class _StatsScreenState extends State<StatsScreen> with SingleTickerProviderStat
       padding: const EdgeInsets.symmetric(vertical: 8),
       child: Row(
         children: [
-          Expanded(child: Text(label)),
+          Expanded(child: Text(label, style: context.textStyles.bodyMedium)),
           Icon(
             isPositive ? Icons.trending_up : Icons.trending_down,
-            color: isPositive ? Colors.green : Colors.red,
+            color: isPositive ? AppTheme.successColor : AppTheme.errorColor,
             size: 16,
           ),
           const SizedBox(width: 4),
           Text(
             '${percentage.toStringAsFixed(1)}%',
-            style: TextStyle(
-              color: isPositive ? Colors.green : Colors.red,
+            style: context.textStyles.bodyMedium?.copyWith(
+              color: isPositive ? AppTheme.successColor : AppTheme.errorColor,
               fontWeight: FontWeight.bold,
             ),
           ),
@@ -885,9 +848,9 @@ class _StatsScreenState extends State<StatsScreen> with SingleTickerProviderStat
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text(
+            Text(
               'Drill Performance',
-              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+              style: context.textStyles.titleLarge?.copyWith(fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 16),
             ...drillStats.entries.map((entry) => _buildDrillStatItem(entry.key, entry.value)),
@@ -906,25 +869,28 @@ class _StatsScreenState extends State<StatsScreen> with SingleTickerProviderStat
             flex: 2,
             child: Text(
               drillName,
-              style: const TextStyle(fontWeight: FontWeight.w500),
+              style: context.textStyles.bodyMedium?.copyWith(fontWeight: FontWeight.w500),
             ),
           ),
           Expanded(
             child: Text(
               '${stats['avgReaction']?.toStringAsFixed(0) ?? '0'}ms',
               textAlign: TextAlign.center,
+              style: context.textStyles.bodyMedium,
             ),
           ),
           Expanded(
             child: Text(
               '${((stats['avgAccuracy'] ?? 0) * 100).toStringAsFixed(1)}%',
               textAlign: TextAlign.center,
+              style: context.textStyles.bodyMedium,
             ),
           ),
           Expanded(
             child: Text(
               '${stats['sessions'] ?? 0}x',
               textAlign: TextAlign.center,
+              style: context.textStyles.bodyMedium,
             ),
           ),
         ],
@@ -941,9 +907,9 @@ class _StatsScreenState extends State<StatsScreen> with SingleTickerProviderStat
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text(
+            Text(
               'Performance Insights',
-              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+              style: context.textStyles.titleLarge?.copyWith(fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 16),
             ...insights.map((insight) => Padding(
@@ -960,7 +926,7 @@ class _StatsScreenState extends State<StatsScreen> with SingleTickerProviderStat
                   Expanded(
                     child: Text(
                       insight['text'] as String,
-                      style: const TextStyle(fontSize: 14),
+                      style: context.textStyles.bodyMedium,
                     ),
                   ),
                 ],
@@ -976,31 +942,42 @@ class _StatsScreenState extends State<StatsScreen> with SingleTickerProviderStat
     return Card(
       child: ListTile(
         leading: CircleAvatar(
-          backgroundColor: Theme.of(context).primaryColor.withOpacity(0.1),
+          backgroundColor: context.colors.primary.withOpacity(0.1),
           child: Icon(
             Icons.fitness_center,
-            color: Theme.of(context).primaryColor,
+            color: context.colors.primary,
             size: 20,
           ),
         ),
         title: Text(
           session.drill.name,
-          style: const TextStyle(fontWeight: FontWeight.w500),
+          style: context.textStyles.titleMedium?.copyWith(fontWeight: FontWeight.w500),
         ),
         subtitle: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(DateFormat('MMM dd, yyyy • HH:mm').format(session.startedAt)),
+            Text(
+              DateFormat('MMM dd, yyyy • HH:mm').format(session.startedAt),
+              style: context.textStyles.bodyMedium?.copyWith(
+                color: context.colors.onSurface.withOpacity(0.7),
+              ),
+            ),
             const SizedBox(height: 4),
             Row(
               children: [
-                Icon(Icons.timer, size: 14, color: Colors.grey[600]),
+                Icon(Icons.timer, size: 14, color: context.colors.onSurface.withOpacity(0.6)),
                 const SizedBox(width: 4),
-                Text('${session.avgReactionMs.toStringAsFixed(0)}ms'),
+                Text(
+                  '${session.avgReactionMs.toStringAsFixed(0)}ms',
+                  style: context.textStyles.bodySmall,
+                ),
                 const SizedBox(width: 16),
-                Icon(Icons.gps_fixed, size: 14, color: Colors.grey[600]),
+                Icon(Icons.gps_fixed, size: 14, color: context.colors.onSurface.withOpacity(0.6)),
                 const SizedBox(width: 4),
-                Text('${(session.accuracy * 100).toStringAsFixed(1)}%'),
+                Text(
+                  '${(session.accuracy * 100).toStringAsFixed(1)}%',
+                  style: context.textStyles.bodySmall,
+                ),
               ],
             ),
           ],
@@ -1014,11 +991,11 @@ class _StatsScreenState extends State<StatsScreen> with SingleTickerProviderStat
     final accuracy = session.accuracy;
     Color color;
     if (accuracy >= 0.9) {
-      color = Colors.green;
+      color = AppTheme.successColor;
     } else if (accuracy >= 0.7) {
-      color = Colors.orange;
+      color = AppTheme.warningColor;
     } else {
-      color = Colors.red;
+      color = AppTheme.errorColor;
     }
     
     return Container(

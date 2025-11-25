@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:spark_app/core/theme/app_theme.dart';
+import 'package:spark_app/core/widgets/feature_not_available_dialog.dart';
 import 'package:spark_app/features/subscription/domain/subscription_plan.dart';
 
 /// Widget to display subscription plan information with upgrade prompts
@@ -339,6 +340,7 @@ class SubscriptionStatusWidget extends StatelessWidget {
 }
 
 /// Widget to show feature access with upgrade prompts
+/// Shows all features normally but shows dialog on tap for inaccessible ones
 class FeatureAccessWidget extends StatelessWidget {
   final String featureName;
   final String description;
@@ -363,7 +365,20 @@ class FeatureAccessWidget extends StatelessWidget {
     
     return Card(
       child: InkWell(
-        onTap: hasAccess ? onTap : onUpgrade,
+        onTap: () {
+          if (hasAccess) {
+            // User has access, call the provided onTap callback
+            onTap?.call();
+          } else {
+            // User doesn't have access, show upgrade dialog
+            FeatureNotAvailableDialog.show(
+              context,
+              featureName: featureName,
+              description: description,
+              onUpgradePressed: onUpgrade,
+            );
+          }
+        },
         borderRadius: BorderRadius.circular(AppTheme.radiusLarge),
         child: Padding(
           padding: const EdgeInsets.all(AppTheme.spacing16),
@@ -373,7 +388,7 @@ class FeatureAccessWidget extends StatelessWidget {
                 width: 48,
                 height: 48,
                 decoration: BoxDecoration(
-                  color: hasAccess ? AppTheme.goldPrimary : AppTheme.neutral300,
+                  color: AppTheme.goldPrimary,
                   borderRadius: BorderRadius.circular(AppTheme.radiusSmall),
                 ),
                 child: Icon(
@@ -392,7 +407,6 @@ class FeatureAccessWidget extends StatelessWidget {
                     Text(
                       featureName,
                       style: theme.textTheme.titleMedium?.copyWith(
-                        color: hasAccess ? null : AppTheme.neutral400,
                         fontWeight: FontWeight.w600,
                       ),
                     ),
@@ -400,40 +414,19 @@ class FeatureAccessWidget extends StatelessWidget {
                     Text(
                       description,
                       style: theme.textTheme.bodySmall?.copyWith(
-                        color: hasAccess ? AppTheme.neutral600 : AppTheme.neutral400,
+                        color: AppTheme.neutral600,
                       ),
                     ),
                   ],
                 ),
               ),
               
-              if (!hasAccess) ...[
-                const SizedBox(width: AppTheme.spacing8),
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: AppTheme.spacing8,
-                    vertical: AppTheme.spacing4,
-                  ),
-                  decoration: BoxDecoration(
-                    color: AppTheme.goldBright,
-                    borderRadius: BorderRadius.circular(AppTheme.radiusSmall),
-                  ),
-                  child: Text(
-                    'UPGRADE',
-                    style: theme.textTheme.labelSmall?.copyWith(
-                      color: AppTheme.whitePure,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ),
-              ] else ...[
-                const SizedBox(width: AppTheme.spacing8),
-                Icon(
-                  Icons.arrow_forward_ios,
-                  color: AppTheme.neutral400,
-                  size: 16,
-                ),
-              ],
+              const SizedBox(width: AppTheme.spacing8),
+              Icon(
+                Icons.arrow_forward_ios,
+                color: AppTheme.neutral400,
+                size: 16,
+              ),
             ],
           ),
         ),

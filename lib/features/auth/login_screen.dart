@@ -174,16 +174,7 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
               width: 140,
               height: 140,
               decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  colors: [
-                    colorScheme.primary,
-                    colorScheme.secondary,
-                    colorScheme.tertiary,
-                  ],
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                  stops: const [0.0, 0.5, 1.0],
-                ),
+                color: colorScheme.primary,
                 shape: BoxShape.circle,
                 boxShadow: [
                   BoxShadow(
@@ -312,24 +303,10 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
             height: 60,
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(20),
-              gradient: LinearGradient(
-                colors: loading 
-                    ? [
-                        colorScheme.primary.withOpacity(0.8),
-                        colorScheme.secondary.withOpacity(0.8),
-                      ]
-                    : [
-                        colorScheme.primary,
-                        colorScheme.secondary,
-                      ],
-              ),
-              boxShadow: [
-                BoxShadow(
-                  color: colorScheme.primary.withOpacity(0.4),
-                  blurRadius: 15,
-                  offset: const Offset(0, 8),
-                ),
-              ],
+              color: loading
+                  ? colorScheme.primary.withOpacity(0.8)
+                  : colorScheme.primary,
+ 
             ),
             child: FilledButton(
               onPressed: loading ? null : _submit,
@@ -464,14 +441,7 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
           
           return Container(
             decoration: BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topCenter,
-                end: Alignment.bottomCenter,
-                colors: [
-                  colorScheme.surface,
-                  colorScheme.surfaceContainerHighest.withOpacity(0.3),
-                ],
-              ),
+              color: colorScheme.surface,
             ),
             child: SafeArea(
               child: Center(
@@ -492,37 +462,7 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
                             // Enhanced Logo Section
                             _buildAnimatedLogo(colorScheme),
                             const SizedBox(height: 40),
-                            
-                            // Professional Welcome Section
-                            Column(
-                              children: [
-                                Text(
-                                  'Welcome Back',
-                                  style: theme.textTheme.headlineLarge?.copyWith(
-                                    fontWeight: FontWeight.w800,
-                                    color: colorScheme.onSurface,
-                                    letterSpacing: -0.5,
-                                  ),
-                                ),
-                                const SizedBox(height: 12),
-                                Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
-                                  decoration: BoxDecoration(
-                                    color: colorScheme.primaryContainer.withOpacity(0.3),
-                                    borderRadius: BorderRadius.circular(25),
-                                  ),
-                                  child: Text(
-                                    'Sign in to continue your brain training journey',
-                                    style: theme.textTheme.bodyLarge?.copyWith(
-                                      color: colorScheme.onSurface.withOpacity(0.8),
-                                      fontWeight: FontWeight.w500,
-                                    ),
-                                    textAlign: TextAlign.center,
-                                  ),
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 48),
+                         
                             
                             // Enhanced Login Form
                             Form(

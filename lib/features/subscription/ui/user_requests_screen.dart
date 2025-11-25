@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:spark_app/features/subscription/domain/subscription_request.dart';
 import 'package:spark_app/features/subscription/services/subscription_request_service.dart';
+import 'package:spark_app/core/theme/app_theme.dart';
 
 /// Screen to view all user subscription requests with tab-based status filtering
 class UserRequestsScreen extends StatefulWidget {
@@ -54,24 +55,22 @@ class _UserRequestsScreenState extends State<UserRequestsScreen>
     return Scaffold(
       backgroundColor: colorScheme.surface,
       appBar: AppBar(
+        elevation: 0,
+        backgroundColor: colorScheme.primary,
+        foregroundColor: colorScheme.onPrimary,
         title: Text(
           'My Requests',
           style: theme.textTheme.headlineSmall?.copyWith(
-            fontWeight: FontWeight.bold,
-            color: colorScheme.onSurface,
+            color: colorScheme.onPrimary,
+            fontWeight: FontWeight.w700,
           ),
         ),
-        backgroundColor: colorScheme.surface,
-        elevation: 0,
-        leading: IconButton(
-          icon: Icon(Icons.arrow_back, color: colorScheme.onSurface),
-          onPressed: () => context.pop(),
-        ),
+        centerTitle: true,
         bottom: TabBar(
           controller: _tabController,
-          labelColor: colorScheme.primary,
-          unselectedLabelColor: colorScheme.onSurface.withOpacity(0.6),
-          indicatorColor: colorScheme.primary,
+          labelColor: colorScheme.onPrimary,
+          unselectedLabelColor: colorScheme.onPrimary.withOpacity(0.7),
+          indicatorColor: colorScheme.onPrimary,
           indicatorWeight: 3,
           tabs: const [
             Tab(text: 'All'),
@@ -230,15 +229,15 @@ class _UserRequestsScreenState extends State<UserRequestsScreen>
     String statusText;
     
     if (request.isPending) {
-      statusColor = Colors.orange;
+      statusColor = AppTheme.warningColor;
       statusIcon = Icons.pending;
       statusText = 'PENDING';
     } else if (request.isApproved) {
-      statusColor = Colors.green;
+      statusColor = AppTheme.successColor;
       statusIcon = Icons.check_circle;
       statusText = 'APPROVED';
     } else {
-      statusColor = Colors.red;
+      statusColor = AppTheme.errorColor;
       statusIcon = Icons.cancel;
       statusText = 'REJECTED';
     }
@@ -338,10 +337,10 @@ class _UserRequestsScreenState extends State<UserRequestsScreen>
               Container(
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
-                  color: Colors.red.withOpacity(0.1),
+                  color: AppTheme.errorColor.withOpacity(0.1),
                   borderRadius: BorderRadius.circular(8),
                   border: Border.all(
-                    color: Colors.red.withOpacity(0.3),
+                    color: AppTheme.errorColor.withOpacity(0.3),
                   ),
                 ),
                 child: Column(
@@ -351,7 +350,7 @@ class _UserRequestsScreenState extends State<UserRequestsScreen>
                       children: [
                         Icon(
                           Icons.info_outline,
-                          color: Colors.red,
+                          color: AppTheme.errorColor,
                           size: 16,
                         ),
                         const SizedBox(width: 4),
@@ -359,7 +358,7 @@ class _UserRequestsScreenState extends State<UserRequestsScreen>
                           'Rejection Reason:',
                           style: theme.textTheme.labelMedium?.copyWith(
                             fontWeight: FontWeight.w600,
-                            color: Colors.red,
+                            color: AppTheme.errorColor,
                           ),
                         ),
                       ],
@@ -368,7 +367,7 @@ class _UserRequestsScreenState extends State<UserRequestsScreen>
                     Text(
                       request.rejectionReason!,
                       style: theme.textTheme.bodySmall?.copyWith(
-                        color: Colors.red.shade700,
+                        color: AppTheme.errorColor,
                       ),
                     ),
                   ],

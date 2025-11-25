@@ -33,28 +33,54 @@ class RoleGuard extends StatelessWidget {
       future: _checkAccess(),
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
-          return const Scaffold(
+          return Scaffold(
+            backgroundColor: Theme.of(context).colorScheme.surface,
             body: Center(
-              child: CircularProgressIndicator(),
+              child: CircularProgressIndicator(
+                color: Theme.of(context).colorScheme.primary,
+              ),
             ),
           );
         }
 
         if (snapshot.hasError) {
           return Scaffold(
+            backgroundColor: Theme.of(context).colorScheme.surface,
             appBar: AppBar(
-              title: const Text('Error'),
+              title: Text(
+                'Error',
+                style: TextStyle(
+                  color: Theme.of(context).colorScheme.onSurface,
+                ),
+              ),
+              backgroundColor: Theme.of(context).colorScheme.surface,
+              iconTheme: IconThemeData(
+                color: Theme.of(context).colorScheme.onSurface,
+              ),
             ),
             body: Center(
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  const Icon(Icons.error_outline, size: 64, color: Colors.red),
+                  Icon(
+                    Icons.error_outline,
+                    size: 64,
+                    color: Theme.of(context).colorScheme.error,
+                  ),
                   const SizedBox(height: 16),
-                  Text('Error checking permissions: ${snapshot.error}'),
+                  Text(
+                    'Error checking permissions: ${snapshot.error}',
+                    style: TextStyle(
+                      color: Theme.of(context).colorScheme.onSurface,
+                    ),
+                  ),
                   const SizedBox(height: 24),
                   ElevatedButton(
                     onPressed: () => Navigator.of(context).pop(),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Theme.of(context).colorScheme.primary,
+                      foregroundColor: Theme.of(context).colorScheme.onPrimary,
+                    ),
                     child: const Text('Go Back'),
                   ),
                 ],
@@ -71,8 +97,13 @@ class RoleGuard extends StatelessWidget {
             WidgetsBinding.instance.addPostFrameCallback((_) {
               context.go(redirectRoute!);
             });
-            return const Scaffold(
-              body: Center(child: CircularProgressIndicator()),
+            return Scaffold(
+              backgroundColor: Theme.of(context).colorScheme.surface,
+              body: Center(
+                child: CircularProgressIndicator(
+                  color: Theme.of(context).colorScheme.primary,
+                ),
+              ),
             );
           }
 
@@ -83,9 +114,18 @@ class RoleGuard extends StatelessWidget {
 
           // Default access denied screen
           return Scaffold(
+            backgroundColor: Theme.of(context).colorScheme.surface,
             appBar: AppBar(
-              title: const Text('Access Denied'),
-              backgroundColor: Colors.red[50],
+              title: Text(
+                'Access Denied',
+                style: TextStyle(
+                  color: Theme.of(context).colorScheme.onSurface,
+                ),
+              ),
+              backgroundColor: Theme.of(context).colorScheme.surface,
+              iconTheme: IconThemeData(
+                color: Theme.of(context).colorScheme.onSurface,
+              ),
             ),
             body: Center(
               child: Column(
@@ -94,14 +134,14 @@ class RoleGuard extends StatelessWidget {
                   Icon(
                     Icons.shield_outlined,
                     size: 80,
-                    color: Colors.red[300],
+                    color: Theme.of(context).colorScheme.error,
                   ),
                   const SizedBox(height: 24),
                   Text(
                     'Access Denied',
                     style: Theme.of(context).textTheme.headlineSmall?.copyWith(
                       fontWeight: FontWeight.bold,
-                      color: Colors.red[700],
+                      color: Theme.of(context).colorScheme.error,
                     ),
                   ),
                   const SizedBox(height: 16),
@@ -110,7 +150,9 @@ class RoleGuard extends StatelessWidget {
                     child: Text(
                       message ?? _getDefaultMessage(),
                       textAlign: TextAlign.center,
-                      style: Theme.of(context).textTheme.bodyLarge,
+                      style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                        color: Theme.of(context).colorScheme.onSurface,
+                      ),
                     ),
                   ),
                   const SizedBox(height: 32),
@@ -119,12 +161,22 @@ class RoleGuard extends StatelessWidget {
                     children: [
                       ElevatedButton.icon(
                         onPressed: () => Navigator.of(context).pop(),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Theme.of(context).colorScheme.primary,
+                          foregroundColor: Theme.of(context).colorScheme.onPrimary,
+                        ),
                         icon: const Icon(Icons.arrow_back),
                         label: const Text('Go Back'),
                       ),
                       const SizedBox(width: 16),
                       OutlinedButton.icon(
                         onPressed: () => context.go('/'),
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: Theme.of(context).colorScheme.onSurface,
+                          side: BorderSide(
+                            color: Theme.of(context).colorScheme.outline,
+                          ),
+                        ),
                         icon: const Icon(Icons.home),
                         label: const Text('Home'),
                       ),

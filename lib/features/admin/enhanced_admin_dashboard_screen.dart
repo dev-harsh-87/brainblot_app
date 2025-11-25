@@ -75,7 +75,7 @@ class EnhancedAdminDashboardScreen extends StatelessWidget {
         Text(
           'Manage your platform from this central hub',
           style: context.textStyles.bodyLarge?.copyWith(
-                color: AppTheme.neutral600,
+                color: context.colors.onSurface.withOpacity(0.7),
               ),
         ),
       ],

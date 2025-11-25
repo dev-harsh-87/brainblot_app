@@ -27,7 +27,7 @@ class DrillDetailScreen extends StatefulWidget {
   State<DrillDetailScreen> createState() => _DrillDetailScreenState();
 }
 
-class _DrillDetailScreenState extends State<DrillDetailScreen> {
+class _DrillDetailScreenState extends State<DrillDetailScreen> with WidgetsBindingObserver {
   late DrillRepository _drillRepository;
   late SharingService _sharingService;
   late ProfileService _profileService;
@@ -39,12 +39,32 @@ class _DrillDetailScreenState extends State<DrillDetailScreen> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _drillRepository = getIt<DrillRepository>();
     _sharingService = getIt<SharingService>();
     _profileService = getIt<ProfileService>();
     _currentDrill = widget.drill;
     _loadOwnershipInfo();
     _loadUserProfile();
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      // Refresh drill data when app is resumed
+      try {
+        final drillLibraryBloc = getIt<DrillLibraryBloc>();
+        drillLibraryBloc.add(const DrillLibraryRefreshRequested());
+      } catch (e) {
+        // Bloc might not be available
+      }
+    }
   }
 
   Future<void> _loadUserProfile() async {
@@ -74,20 +94,32 @@ class _DrillDetailScreenState extends State<DrillDetailScreen> {
   }
 
   @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // Refresh the drill library bloc when returning to this screen
+    try {
+      final drillLibraryBloc = getIt<DrillLibraryBloc>();
+      drillLibraryBloc.add(const DrillLibraryRefreshRequested());
+    } catch (e) {
+      // Bloc might not be available
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
     final hasMedia = _currentDrill.videoUrl != null || _currentDrill.stepImageUrl != null;
 
     return Scaffold(
-      backgroundColor: AppTheme.whiteSoft,
+      backgroundColor: colorScheme.surface,
       appBar: AppBar(
         backgroundColor: colorScheme.primary,
         foregroundColor: colorScheme.onPrimary,
         elevation: 0,
         flexibleSpace: Container(
           decoration: BoxDecoration(
-            color: AppTheme.goldPrimary,
+            color: colorScheme.primary,
           ),
         ),
         title: Text(
@@ -98,14 +130,8 @@ class _DrillDetailScreenState extends State<DrillDetailScreen> {
           ),
         ),
         actions: [
-          IconButton(
-            onPressed: _isLoading ? null : _toggleFavorite,
-            icon: Icon(
-              _currentDrill.favorite ? Icons.favorite : Icons.favorite_border,
-              color: _currentDrill.favorite ? colorScheme.error : null,
-            ),
-          ),
           PopupMenuButton<String>(
+            iconColor: colorScheme.onPrimary,
             onSelected: _isLoading ? null : (value) {
               switch (value) {
                 case 'edit':
@@ -379,17 +405,21 @@ class _DrillDetailScreenState extends State<DrillDetailScreen> {
           // Loading overlay
           if (_isLoading)
             Container(
-              color: Colors.black.withOpacity(0.3),
-              child: const Center(
+              color: colorScheme.surface.withOpacity(0.8),
+              child: Center(
                 child: Card(
+                  color: colorScheme.surface,
                   child: Padding(
-                    padding: EdgeInsets.all(20),
+                    padding: const EdgeInsets.all(20),
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        CircularProgressIndicator(),
-                        SizedBox(height: 16),
-                        Text('Processing...'),
+                        CircularProgressIndicator(color: colorScheme.primary),
+                        const SizedBox(height: 16),
+                        Text(
+                          'Processing...',
+                          style: TextStyle(color: colorScheme.onSurface),
+                        ),
                       ],
                     ),
                   ),
@@ -796,55 +826,6 @@ class _DrillDetailScreenState extends State<DrillDetailScreen> {
     );
   }
 
-  Future<void> _toggleFavorite() async {
-    if (_isLoading) return;
-    
-    setState(() => _isLoading = true);
-    
-    try {
-      await _drillRepository.toggleFavorite(_currentDrill.id);
-      setState(() {
-        _currentDrill = _currentDrill.copyWith(favorite: !_currentDrill.favorite);
-      });
-      
-      try {
-        final drillLibraryBloc = getIt<DrillLibraryBloc>();
-        drillLibraryBloc.add(const DrillLibraryRefreshRequested());
-      } catch (e) {
-        // Bloc might not be available
-      }
-      
-      if (mounted) {
-        HapticFeedback.lightImpact();
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              _currentDrill.favorite 
-                ? 'Added to favorites' 
-                : 'Removed from favorites',
-            ),
-            duration: const Duration(seconds: 2),
-            behavior: SnackBarBehavior.floating,
-          ),
-        );
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Failed to update favorite: $e'),
-            backgroundColor: Theme.of(context).colorScheme.error,
-            behavior: SnackBarBehavior.floating,
-          ),
-        );
-      }
-    } finally {
-      if (mounted) {
-        setState(() => _isLoading = false);
-      }
-    }
-  }
-
   Future<void> _editDrill() async {
     HapticFeedback.lightImpact();
     
@@ -953,11 +934,11 @@ class _DrillDetailScreenState extends State<DrillDetailScreen> {
   Color _getDifficultyColor(Difficulty difficulty) {
     switch (difficulty) {
       case Difficulty.beginner:
-        return Colors.green;
+        return AppTheme.successColor;
       case Difficulty.intermediate:
-        return Colors.orange;
+        return AppTheme.warningColor;
       case Difficulty.advanced:
-        return Colors.red;
+        return AppTheme.errorColor;
     }
   }
 
@@ -1077,11 +1058,11 @@ class _ZoneVisualizationPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     final paint = Paint()
-      ..color = Colors.blue.withOpacity(0.3)
+      ..color = AppTheme.infoColor.withOpacity(0.3)
       ..style = PaintingStyle.fill;
 
     final borderPaint = Paint()
-      ..color = Colors.blue
+      ..color = AppTheme.infoColor
       ..style = PaintingStyle.stroke
       ..strokeWidth = 2;
 

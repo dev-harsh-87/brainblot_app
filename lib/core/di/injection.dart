@@ -28,6 +28,7 @@ import 'package:spark_app/features/multiplayer/services/session_sync_service.dar
 import 'package:spark_app/features/multiplayer/services/firebase_session_sync_service.dart';
 import 'package:spark_app/core/auth/services/permission_service.dart';
 import 'package:spark_app/core/auth/services/subscription_permission_service.dart';
+import 'package:spark_app/core/auth/services/comprehensive_permission_service.dart';
 import 'package:spark_app/features/subscription/data/subscription_plan_repository.dart';
 import 'package:spark_app/features/subscription/services/subscription_sync_service.dart';
 import 'package:spark_app/core/services/fcm_token_service.dart';
@@ -168,6 +169,12 @@ Future<void> configureDependencies() async {
   
   // Register Subscription Permission Service
   getIt.registerLazySingleton<SubscriptionPermissionService>(() => SubscriptionPermissionService(
+    auth: firebaseAuth,
+    firestore: firebaseFirestore,
+  ),);
+
+  // Register Comprehensive Permission Service (New centralized permission system)
+  getIt.registerLazySingleton<ComprehensivePermissionService>(() => ComprehensivePermissionService(
     auth: firebaseAuth,
     firestore: firebaseFirestore,
   ),);

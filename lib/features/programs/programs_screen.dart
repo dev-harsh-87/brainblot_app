@@ -8,6 +8,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:spark_app/core/di/injection.dart';
 import 'package:spark_app/core/utils/app_logger.dart';
 import 'package:spark_app/core/widgets/main_navigation.dart';
+import 'package:spark_app/core/widgets/app_loader.dart';
 import 'package:spark_app/features/drills/data/drill_category_repository.dart';
 import 'package:spark_app/features/drills/domain/drill_category.dart';
 import 'package:spark_app/features/programs/bloc/programs_bloc.dart';
@@ -29,6 +30,7 @@ import 'package:spark_app/core/theme/app_theme.dart';
 import 'package:spark_app/core/widgets/profile_avatar.dart';
 import 'package:spark_app/features/profile/services/profile_service.dart';
 import 'package:spark_app/features/sharing/domain/user_profile.dart';
+import 'package:spark_app/features/auth/bloc/auth_bloc.dart';
 
 class ProgramsScreen extends StatefulWidget {
   const ProgramsScreen({super.key});
@@ -155,7 +157,7 @@ class _ProgramsScreenState extends State<ProgramsScreen>
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(
                       content: Text(state.errorMessage!),
-                      backgroundColor: Colors.red,
+                      backgroundColor: theme.colorScheme.error,
                     ),
                   );
                 }
@@ -191,7 +193,7 @@ class _ProgramsScreenState extends State<ProgramsScreen>
                           child: SizedBox(
                             height: 4,
                             child: LinearProgressIndicator(
-                              backgroundColor: Colors.transparent,
+                              backgroundColor: colorScheme.surface.withOpacity(0.1),
                               valueColor: AlwaysStoppedAnimation<Color>(
                                 colorScheme.primary,
                               ),
@@ -258,47 +260,8 @@ class _ProgramsScreenState extends State<ProgramsScreen>
   }
 
   Widget _buildLoadingState() {
-    final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
-
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(64),
-        child: Column(
-          children: [
-            Container(
-              padding: const EdgeInsets.all(24),
-              decoration: BoxDecoration(
-                color: colorScheme.surfaceContainerHighest,
-                borderRadius: BorderRadius.circular(16),
-              ),
-              child: Column(
-                children: [
-                  CircularProgressIndicator(
-                    color: colorScheme.primary,
-                    strokeWidth: 3,
-                  ),
-                  const SizedBox(height: 16),
-                  Text(
-                    'Loading programs...',
-                    style: theme.textTheme.bodyLarge?.copyWith(
-                      color: colorScheme.onSurface.withOpacity(0.7),
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    'Setting up your training programs',
-                    style: theme.textTheme.bodySmall?.copyWith(
-                      color: colorScheme.onSurface.withOpacity(0.5),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
-      ),
+    return const AppLoader.fullScreen(
+      message: 'Loading programs...',
     );
   }
 
@@ -362,7 +325,7 @@ class _ProgramsScreenState extends State<ProgramsScreen>
 
     return Container(
       decoration: BoxDecoration(
-        color: AppTheme.neutral100.withOpacity(0.5),
+        color: colorScheme.surfaceContainerHighest.withOpacity(0.3),
         border: Border(
           bottom: BorderSide(
             color: colorScheme.outline.withOpacity(0.1),
@@ -791,7 +754,7 @@ class _ProgramsScreenState extends State<ProgramsScreen>
             height: 200,
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(16),
-              color: AppTheme.neutral100,
+              color: colorScheme.surfaceContainerHighest.withOpacity(0.5),
             ),
             child: Center(
               child: Column(
@@ -1107,7 +1070,7 @@ class _ProgramsScreenState extends State<ProgramsScreen>
       margin: const EdgeInsets.only(bottom: 16),
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(16),
-        color: AppTheme.whitePure,
+        color: colorScheme.surface,
         border: Border.all(
           color: categoryColor.withOpacity(0.1),
           width: 1,
@@ -1150,7 +1113,7 @@ class _ProgramsScreenState extends State<ProgramsScreen>
                   ),
                   child: Icon(
                     categoryIcon,
-                    color: Colors.white,
+                    color: colorScheme.onPrimary,
                     size: 24,
                   ),
                 ),
@@ -1182,7 +1145,7 @@ class _ProgramsScreenState extends State<ProgramsScreen>
                                 vertical: 4,
                               ),
                               decoration: BoxDecoration(
-                                color: Colors.orange.shade600,
+                                color: AppTheme.warningColor,
                                 borderRadius: BorderRadius.circular(12),
                               ),
                               child: Row(
@@ -1190,14 +1153,14 @@ class _ProgramsScreenState extends State<ProgramsScreen>
                                 children: [
                                   Icon(
                                     Icons.admin_panel_settings,
-                                    color: Colors.white,
+                                    color: colorScheme.onPrimary,
                                     size: 12,
                                   ),
                                   const SizedBox(width: 4),
                                   Text(
                                     'ADMIN',
                                     style: TextStyle(
-                                      color: Colors.white,
+                                      color: colorScheme.onPrimary,
                                       fontSize: 9,
                                       fontWeight: FontWeight.w700,
                                       letterSpacing: 0.5,
@@ -1220,14 +1183,14 @@ class _ProgramsScreenState extends State<ProgramsScreen>
                               children: [
                                 Icon(
                                   Icons.play_circle_fill_rounded,
-                                  color: Colors.white,
+                                  color: colorScheme.onPrimary,
                                   size: 12,
                                 ),
                                 const SizedBox(width: 4),
                                 Text(
                                   'ACTIVE',
                                   style: TextStyle(
-                                    color: Colors.white,
+                                    color: colorScheme.onPrimary,
                                     fontSize: 9,
                                     fontWeight: FontWeight.w700,
                                     letterSpacing: 0.5,
@@ -1398,14 +1361,14 @@ class _ProgramsScreenState extends State<ProgramsScreen>
               Text(
                 '✅ $daysCompleted completed',
                 style: theme.textTheme.bodySmall?.copyWith(
-                  color: Colors.green,
+                  color: AppTheme.successColor,
                   fontWeight: FontWeight.w600,
                 ),
               ),
               Text(
                 '⏳ $daysRemaining remaining',
                 style: theme.textTheme.bodySmall?.copyWith(
-                  color: Colors.orange,
+                  color: AppTheme.warningColor,
                   fontWeight: FontWeight.w600,
                 ),
               ),
@@ -1575,7 +1538,7 @@ class _ProgramsScreenState extends State<ProgramsScreen>
                 ),
                 child: Icon(
                   hasDrill ? Icons.fitness_center : Icons.self_improvement,
-                  color: Colors.white,
+                  color: colorScheme.onPrimary,
                   size: 28,
                 ),
               ),
@@ -1783,13 +1746,13 @@ class _ProgramsScreenState extends State<ProgramsScreen>
   Color _getDifficultyColor(String level) {
     switch (level.toLowerCase()) {
       case 'beginner':
-        return Colors.green;
+        return AppTheme.successColor;
       case 'intermediate':
-        return Colors.orange;
+        return AppTheme.warningColor;
       case 'advanced':
-        return Colors.red;
+        return AppTheme.errorColor;
       default:
-        return Colors.blue;
+        return AppTheme.infoColor;
     }
   }
 
@@ -1805,7 +1768,7 @@ class _ProgramsScreenState extends State<ProgramsScreen>
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: colorScheme.surface,
         borderRadius: BorderRadius.circular(16),
         border:
             isActive ? Border.all(color: colorScheme.primary, width: 2) : null,
@@ -1813,7 +1776,7 @@ class _ProgramsScreenState extends State<ProgramsScreen>
           BoxShadow(
             color: isActive
                 ? colorScheme.primary.withOpacity(0.15)
-                : Colors.grey.withOpacity(0.08),
+                : colorScheme.shadow.withOpacity(0.08),
             blurRadius: isActive ? 20 : 12,
             offset: const Offset(0, 4),
             spreadRadius: isActive ? 1 : 0,
@@ -1852,16 +1815,12 @@ class _ProgramsScreenState extends State<ProgramsScreen>
                           color: categoryColor,
                           borderRadius: BorderRadius.circular(18),
                           boxShadow: [
-                            BoxShadow(
-                              color: categoryColor.withOpacity(0.4),
-                              blurRadius: 10,
-                              offset: const Offset(0, 4),
-                            ),
+                      
                           ],
                         ),
                         child: Icon(
                           _getCategoryIcon(program.category),
-                          color: Colors.white,
+                          color: colorScheme.onPrimary,
                           size: 30,
                         ),
                       ),
@@ -1878,7 +1837,7 @@ class _ProgramsScreenState extends State<ProgramsScreen>
                                     program.name,
                                     style: theme.textTheme.titleLarge?.copyWith(
                                       fontWeight: FontWeight.w800,
-                                      color: const Color(0xFF1A1A1A),
+                                      color: colorScheme.onSurface,
                                       letterSpacing: -0.5,
                                     ),
                                     maxLines: 2,
@@ -1894,7 +1853,7 @@ class _ProgramsScreenState extends State<ProgramsScreen>
                                       vertical: 4,
                                     ),
                                     decoration: BoxDecoration(
-                                      color: Colors.orange.shade600,
+                                      color: AppTheme.warningColor,
                                       borderRadius: BorderRadius.circular(12),
                                     ),
                                     child: Row(
@@ -1902,14 +1861,14 @@ class _ProgramsScreenState extends State<ProgramsScreen>
                                       children: [
                                         Icon(
                                           Icons.admin_panel_settings,
-                                          color: Colors.white,
+                                          color: colorScheme.onPrimary,
                                           size: 12,
                                         ),
                                         const SizedBox(width: 4),
                                         Text(
                                           'ADMIN',
                                           style: TextStyle(
-                                            color: Colors.white,
+                                            color: colorScheme.onPrimary,
                                             fontSize: 10,
                                             fontWeight: FontWeight.w700,
                                             letterSpacing: 0.5,
@@ -1933,14 +1892,14 @@ class _ProgramsScreenState extends State<ProgramsScreen>
                                       children: [
                                         Icon(
                                           Icons.play_circle_fill,
-                                          color: Colors.white,
+                                          color: colorScheme.onPrimary,
                                           size: 12,
                                         ),
                                         const SizedBox(width: 4),
                                         Text(
                                           'ACTIVE',
                                           style: TextStyle(
-                                            color: Colors.white,
+                                            color: colorScheme.onPrimary,
                                             fontSize: 10,
                                             fontWeight: FontWeight.w700,
                                             letterSpacing: 0.5,
@@ -1990,14 +1949,14 @@ class _ProgramsScreenState extends State<ProgramsScreen>
                             Icons.calendar_today_outlined,
                             '${program.durationDays}',
                             'Days',
-                            Colors.blue,
+                            AppTheme.infoColor,
                           ),
                           const SizedBox(width: 20),
                           _buildModernStatItem(
                             Icons.trending_up,
                             program.level,
                             'Level',
-                            Colors.orange,
+                            AppTheme.warningColor,
                           ),
                           const SizedBox(width: 20),
                           if (program.selectedDrillIds.isNotEmpty)
@@ -2005,7 +1964,7 @@ class _ProgramsScreenState extends State<ProgramsScreen>
                               Icons.fitness_center_outlined,
                               '${program.selectedDrillIds.length}',
                               'Drills',
-                              Colors.green,
+                              AppTheme.successColor,
                             ),
                         ],
                       ),
@@ -2017,7 +1976,7 @@ class _ProgramsScreenState extends State<ProgramsScreen>
                         Text(
                           program.description!,
                           style: theme.textTheme.bodyMedium?.copyWith(
-                            color: Colors.grey[600],
+                            color: colorScheme.onSurface.withOpacity(0.7),
                             height: 1.4,
                           ),
                           maxLines: 2,
@@ -2034,6 +1993,26 @@ class _ProgramsScreenState extends State<ProgramsScreen>
                           Expanded(
                             child: OutlinedButton(
                               onPressed: () {
+                                // Check if this is an admin program and user has access
+                                final isAdminProgram = program.createdByRole == 'admin' || program.createdByRole == null;
+                                if (isAdminProgram) {
+                                  final authState = context.read<AuthBloc>().state;
+                                  final permissions = authState.permissions;
+                                  final hasProgramAccess = permissions?.hasProgramAccess ?? false;
+                                  
+                                  if (!hasProgramAccess) {
+                                    // Show snackbar for no access
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      SnackBar(
+                                        content: const Text('No access to Admin Programs'),
+                                        duration: const Duration(seconds: 2),
+                                        behavior: SnackBarBehavior.floating,
+                                      ),
+                                    );
+                                    return;
+                                  }
+                                }
+                                
                                 Navigator.of(context).push(
                                   MaterialPageRoute(
                                     builder: (context) =>
@@ -2044,7 +2023,7 @@ class _ProgramsScreenState extends State<ProgramsScreen>
                               style: OutlinedButton.styleFrom(
                                 padding:
                                     const EdgeInsets.symmetric(vertical: 14),
-                                side: BorderSide(color: Colors.grey[300]!),
+                                side: BorderSide(color: colorScheme.outline.withOpacity(0.5)),
                                 shape: RoundedRectangleBorder(
                                   borderRadius: BorderRadius.circular(12),
                                 ),
@@ -2052,7 +2031,7 @@ class _ProgramsScreenState extends State<ProgramsScreen>
                               child: Text(
                                 'View Details',
                                 style: TextStyle(
-                                  color: Colors.grey[700],
+                                  color: colorScheme.onSurface.withOpacity(0.8),
                                   fontWeight: FontWeight.w600,
                                 ),
                               ),
@@ -2066,6 +2045,26 @@ class _ProgramsScreenState extends State<ProgramsScreen>
                             Expanded(
                               child: ElevatedButton(
                                 onPressed: () async {
+                                  // Check if this is an admin program and user has access
+                                  final isAdminProgram = program.createdByRole == 'admin' || program.createdByRole == null;
+                                  if (isAdminProgram) {
+                                    final authState = context.read<AuthBloc>().state;
+                                    final permissions = authState.permissions;
+                                    final hasProgramAccess = permissions?.hasProgramAccess ?? false;
+                                    
+                                    if (!hasProgramAccess) {
+                                      // Show snackbar for no access
+                                      ScaffoldMessenger.of(context).showSnackBar(
+                                        SnackBar(
+                                          content: const Text('No access to Admin Programs'),
+                                          duration: const Duration(seconds: 2),
+                                          behavior: SnackBarBehavior.floating,
+                                        ),
+                                      );
+                                      return;
+                                    }
+                                  }
+                                  
                                   final confirmed = await ConfirmationDialog
                                       .showProgramActivationConfirmation(
                                     context,
@@ -2084,7 +2083,7 @@ class _ProgramsScreenState extends State<ProgramsScreen>
                                 },
                                 style: ElevatedButton.styleFrom(
                                   backgroundColor: categoryColor,
-                                  foregroundColor: Colors.white,
+                                  foregroundColor: colorScheme.onPrimary,
                                   padding:
                                       const EdgeInsets.symmetric(vertical: 14),
                                   elevation: 0,
@@ -2105,14 +2104,14 @@ class _ProgramsScreenState extends State<ProgramsScreen>
                           const SizedBox(width: 8),
                           Container(
                             decoration: BoxDecoration(
-                              color: Colors.grey[100],
+                              color: colorScheme.surfaceContainerHighest.withOpacity(0.5),
                               borderRadius: BorderRadius.circular(12),
                             ),
                             child: IconButton(
                               onPressed: () => _shareProgram(program),
                               icon: Icon(
                                 Icons.share_outlined,
-                                color: Colors.grey[600],
+                                color: colorScheme.onSurface.withOpacity(0.7),
                                 size: 20,
                               ),
                               tooltip: 'Share Program',
@@ -2164,7 +2163,7 @@ class _ProgramsScreenState extends State<ProgramsScreen>
             Text(
               label,
               style: theme.textTheme.labelSmall?.copyWith(
-                color: Colors.grey[600],
+                color: theme.colorScheme.onSurface.withOpacity(0.6),
                 fontSize: 10,
               ),
             ),
@@ -2178,13 +2177,13 @@ class _ProgramsScreenState extends State<ProgramsScreen>
     final colorScheme = Theme.of(context).colorScheme;
     switch (category.toLowerCase()) {
       case 'agility':
-        return Colors.orange;
+        return AppTheme.warningColor;
       case 'soccer':
-        return Colors.green;
+        return AppTheme.successColor;
       case 'basketball':
-        return Colors.deepOrange;
+        return AppTheme.errorColor;
       case 'tennis':
-        return Colors.blue;
+        return AppTheme.infoColor;
       default:
         return colorScheme.primary;
     }
@@ -2205,32 +2204,6 @@ class _ProgramsScreenState extends State<ProgramsScreen>
     }
   }
 
-  void _showCategoryFilter() {
-    final categoryNames = _availableCategories.map((c) => c.name).toList();
-    final icons = <String, IconData>{
-      'All': Icons.apps,
-      ..._buildCategoryIconMap(),
-    };
-
-    showModalBottomSheet<void>(
-      context: context,
-      isScrollControlled: true,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (context) => _FilterBottomSheet(
-        title: 'Select Category',
-        options: ['All', ...categoryNames],
-        selectedValue: _selectedCategory.isEmpty ? 'All' : _selectedCategory,
-        onSelected: (value) {
-          setState(() {
-            _selectedCategory = value == 'All' ? '' : value;
-          });
-        },
-        icons: icons,
-      ),
-    );
-  }
 
   Map<String, IconData> _buildCategoryIconMap() {
     final iconMap = <String, IconData>{};
@@ -2261,7 +2234,7 @@ class _ProgramsScreenState extends State<ProgramsScreen>
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Error navigating to program day: $e'),
-            backgroundColor: Colors.red,
+            backgroundColor: Theme.of(context).colorScheme.error,
           ),
         );
       }
@@ -2277,9 +2250,9 @@ class _ProgramsScreenState extends State<ProgramsScreen>
         return FractionallySizedBox(
           heightFactor: 0.7, // 70% of screen height
           child: Container(
-            decoration: const BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+            decoration: BoxDecoration(
+              color: Theme.of(context).colorScheme.surface,
+              borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
             ),
             child: Column(
               children: [
@@ -2290,7 +2263,7 @@ class _ProgramsScreenState extends State<ProgramsScreen>
                     width: 40,
                     height: 4,
                     decoration: BoxDecoration(
-                      color: Colors.grey[300],
+                      color: Theme.of(context).colorScheme.onSurface.withOpacity(0.2),
                       borderRadius: BorderRadius.circular(2),
                     ),
                   ),
@@ -2390,7 +2363,7 @@ class _ProgramsScreenState extends State<ProgramsScreen>
                                   .textTheme
                                   .bodyLarge
                                   ?.copyWith(
-                                    color: Colors.grey,
+                                    color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6),
                                   ),
                             ),
                           ),
@@ -2464,21 +2437,21 @@ class _ProgramsScreenState extends State<ProgramsScreen>
                 height: 40,
                 decoration: BoxDecoration(
                   color: isCompleted
-                      ? Colors.green
+                      ? AppTheme.successColor
                       : isCurrent
                           ? colorScheme.primary
                           : isAccessible
-                              ? Colors.grey[400]
-                              : Colors.grey[300],
+                              ? colorScheme.outline
+                              : colorScheme.outline.withOpacity(0.5),
                   shape: BoxShape.circle,
                 ),
                 child: Center(
                   child: isCompleted
-                      ? const Icon(Icons.check, color: Colors.white, size: 20)
+                      ? Icon(Icons.check, color: colorScheme.onPrimary, size: 20)
                       : Text(
                           '$dayNumber',
-                          style: const TextStyle(
-                            color: Colors.white,
+                          style: TextStyle(
+                            color: colorScheme.onPrimary,
                             fontWeight: FontWeight.bold,
                             fontSize: 14,
                           ),
@@ -2489,7 +2462,7 @@ class _ProgramsScreenState extends State<ProgramsScreen>
                 title,
                 style: TextStyle(
                   fontWeight: isCurrent ? FontWeight.bold : FontWeight.normal,
-                  color: isAccessible ? null : Colors.grey,
+                  color: isAccessible ? colorScheme.onSurface : colorScheme.onSurface.withOpacity(0.5),
                 ),
               ),
               subtitle: Column(
@@ -2500,7 +2473,7 @@ class _ProgramsScreenState extends State<ProgramsScreen>
                         ? '${description.substring(0, 60)}...'
                         : description,
                     style: TextStyle(
-                      color: isAccessible ? null : Colors.grey,
+                      color: isAccessible ? colorScheme.onSurface.withOpacity(0.8) : colorScheme.onSurface.withOpacity(0.5),
                     ),
                   ),
                   if (hasDrills) ...[
@@ -2512,7 +2485,7 @@ class _ProgramsScreenState extends State<ProgramsScreen>
                           size: 14,
                           color: isCurrent
                               ? colorScheme.primary
-                              : Colors.grey[600],
+                              : colorScheme.onSurface.withOpacity(0.6),
                         ),
                         const SizedBox(width: 4),
                         Text(
@@ -2523,7 +2496,7 @@ class _ProgramsScreenState extends State<ProgramsScreen>
                             fontSize: 12,
                             color: isCurrent
                                 ? colorScheme.primary
-                                : Colors.grey[600],
+                                : colorScheme.onSurface.withOpacity(0.6),
                             fontWeight: FontWeight.w500,
                           ),
                         ),
@@ -2538,7 +2511,7 @@ class _ProgramsScreenState extends State<ProgramsScreen>
                       size: 16,
                       color: isCurrent ? colorScheme.primary : null,
                     )
-                  : Icon(Icons.lock, color: Colors.grey[400], size: 16),
+                  : Icon(Icons.lock, color: colorScheme.onSurface.withOpacity(0.4), size: 16),
               onTap: isAccessible
                   ? () {
                       Navigator.pop(context);
@@ -2602,8 +2575,8 @@ class _ProgramsScreenState extends State<ProgramsScreen>
                         icon: const Icon(Icons.check_circle, size: 18),
                         label: const Text('Complete Day'),
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.green,
-                          foregroundColor: Colors.white,
+                          backgroundColor: AppTheme.successColor,
+                          foregroundColor: colorScheme.onPrimary,
                           padding: const EdgeInsets.symmetric(vertical: 8),
                         ),
                       ),
@@ -2625,8 +2598,8 @@ class _ProgramsScreenState extends State<ProgramsScreen>
                     icon: const Icon(Icons.check_circle, size: 18),
                     label: const Text('Complete Rest Day'),
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.green,
-                      foregroundColor: Colors.white,
+                      backgroundColor: AppTheme.successColor,
+                      foregroundColor: colorScheme.onPrimary,
                       padding: const EdgeInsets.symmetric(vertical: 8),
                     ),
                   ),
@@ -2679,9 +2652,9 @@ class _ProgramsScreenState extends State<ProgramsScreen>
         } else {
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text('Drill not found'),
-                backgroundColor: Colors.red,
+              SnackBar(
+                content: const Text('Drill not found'),
+                backgroundColor: Theme.of(context).colorScheme.error,
               ),
             );
           }
@@ -2691,7 +2664,7 @@ class _ProgramsScreenState extends State<ProgramsScreen>
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
               content: Text('Error loading drill: $e'),
-              backgroundColor: Colors.red,
+              backgroundColor: Theme.of(context).colorScheme.error,
             ),
           );
         }
@@ -2731,9 +2704,9 @@ class _ProgramsScreenState extends State<ProgramsScreen>
       Program program, int dayNumber, List<String> drillIds) async {
     if (drillIds.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('No drills assigned for this day'),
-          backgroundColor: Colors.orange,
+        SnackBar(
+          content: const Text('No drills assigned for this day'),
+          backgroundColor: AppTheme.warningColor,
         ),
       );
       return;
@@ -2760,9 +2733,9 @@ class _ProgramsScreenState extends State<ProgramsScreen>
       } else {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Drill not found'),
-              backgroundColor: Colors.red,
+            SnackBar(
+              content: const Text('Drill not found'),
+              backgroundColor: Theme.of(context).colorScheme.error,
             ),
           );
         }
@@ -2772,7 +2745,7 @@ class _ProgramsScreenState extends State<ProgramsScreen>
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Error loading drill: $e'),
-            backgroundColor: Colors.red,
+            backgroundColor: Theme.of(context).colorScheme.error,
           ),
         );
       }
@@ -2816,7 +2789,7 @@ class _ProgramsScreenState extends State<ProgramsScreen>
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Day $dayNumber completed! 🎉'),
-            backgroundColor: Colors.green,
+            backgroundColor: AppTheme.successColor,
             duration: const Duration(seconds: 2),
           ),
         );
@@ -2836,7 +2809,7 @@ class _ProgramsScreenState extends State<ProgramsScreen>
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Error completing day: $e'),
-            backgroundColor: Colors.red,
+            backgroundColor: Theme.of(context).colorScheme.error,
           ),
         );
       }
@@ -2952,7 +2925,7 @@ class _ProgramsScreenState extends State<ProgramsScreen>
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('Failed to open sharing: $e'),
-          backgroundColor: Colors.red,
+          backgroundColor: Theme.of(context).colorScheme.error,
         ),
       );
     }

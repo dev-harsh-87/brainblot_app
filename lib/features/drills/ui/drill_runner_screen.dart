@@ -136,7 +136,7 @@ class _DrillRunnerScreenState extends State<DrillRunnerScreen>
 
   // UI
   String _display = '';
-  Color _displayColor = Colors.white;
+  Color _displayColor = Colors.transparent; // Will be set dynamically based on theme
   
   // Custom stimuli cache
   final Map<String, CustomStimulus> _customStimuliCache = {};
@@ -153,7 +153,7 @@ class _DrillRunnerScreenState extends State<DrillRunnerScreen>
   // State management
   DrillRunnerState _state = DrillRunnerState.ready;
   String _feedbackText = '';
-  Color _feedbackColor = Colors.green;
+  Color _feedbackColor = AppTheme.successColor;
   
   // Countdown
   int _countdown = 0;
@@ -251,7 +251,7 @@ class _DrillRunnerScreenState extends State<DrillRunnerScreen>
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Failed to initialize drill: $e'),
-            backgroundColor: Colors.red,
+            backgroundColor: AppTheme.errorColor,
             duration: const Duration(seconds: 5),
           ),
         );
@@ -523,7 +523,7 @@ class _DrillRunnerScreenState extends State<DrillRunnerScreen>
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(
                 content: Text('Sync error: $error'),
-                backgroundColor: Colors.orange,
+                backgroundColor: AppTheme.warningColor,
               ),
             );
           }
@@ -535,9 +535,9 @@ class _DrillRunnerScreenState extends State<DrillRunnerScreen>
       AppLogger.error('Failed to initialize multiplayer sync', error: e, tag: 'Multiplayer');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Failed to initialize multiplayer sync'),
-            backgroundColor: Colors.red,
+          SnackBar(
+            content: const Text('Failed to initialize multiplayer sync'),
+            backgroundColor: AppTheme.errorColor,
           ),
         );
       }
@@ -626,7 +626,7 @@ class _DrillRunnerScreenState extends State<DrillRunnerScreen>
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Sync error: $e'),
-            backgroundColor: Colors.red,
+            backgroundColor: AppTheme.errorColor,
           ),
         );
       }
@@ -819,10 +819,10 @@ class _DrillRunnerScreenState extends State<DrillRunnerScreen>
         _state = DrillRunnerState.running;
         _isMultiplayerPaused = false;
         _display = 'Ready';
-        _displayColor = Colors.white;
+        _displayColor = Theme.of(context).colorScheme.onSurface;
       });
       
-      _showFeedback('Started by Host', Colors.green);
+      _showFeedback('Started by Host', AppTheme.successColor);
       HapticFeedback.mediumImpact();
       
       AppLogger.success('Drill started from multiplayer sync', tag: 'Multiplayer');
@@ -844,7 +844,7 @@ class _DrillRunnerScreenState extends State<DrillRunnerScreen>
         _isMultiplayerPaused = false; // Reset pause state
       });
       
-      _showFeedback('Stopped by Host', Colors.red);
+      _showFeedback('Stopped by Host', AppTheme.errorColor);
       HapticFeedback.mediumImpact();
       
       // Complete the drill and navigate back with proper delay
@@ -896,7 +896,7 @@ class _DrillRunnerScreenState extends State<DrillRunnerScreen>
                   ),
                 ],
               ),
-              backgroundColor: Colors.green,
+              backgroundColor: AppTheme.successColor,
               duration: const Duration(seconds: 2),
             ),
           );
@@ -953,11 +953,11 @@ class _DrillRunnerScreenState extends State<DrillRunnerScreen>
       setState(() {
         _state = DrillRunnerState.paused;
         _display = 'PAUSED BY HOST';
-        _displayColor = Colors.orange;
+        _displayColor = AppTheme.warningColor;
         _current = null; // Clear current stimulus
       });
       
-      _showFeedback('Paused by Host', Colors.orange);
+      _showFeedback('Paused by Host', AppTheme.warningColor);
       HapticFeedback.mediumImpact();
       
       // Stop any ongoing TTS
@@ -1010,10 +1010,10 @@ class _DrillRunnerScreenState extends State<DrillRunnerScreen>
       setState(() {
         _state = DrillRunnerState.running;
         _display = 'Ready'; // Reset display
-        _displayColor = Colors.white;
+        _displayColor = Theme.of(context).colorScheme.onSurface;
       });
       
-      _showFeedback('Resumed by Host', Colors.green);
+      _showFeedback('Resumed by Host', AppTheme.successColor);
       HapticFeedback.mediumImpact();
       
       AppLogger.success('Drill resumed from multiplayer sync', tag: 'Multiplayer');
@@ -1107,7 +1107,7 @@ void _broadcastStimulusToParticipants(String label, Color color, StimulusType ty
       _state = DrillRunnerState.running;
     });
     
-    _showFeedback('Resumed', Colors.green);
+    _showFeedback('Resumed', AppTheme.successColor);
     HapticFeedback.mediumImpact();
   }
 
@@ -1748,13 +1748,13 @@ void _broadcastStimulusToParticipants(String label, Color color, StimulusType ty
     if (correct) {
       _score++;
       if (widget.drill.drillMode == DrillMode.touch) {
-        _showFeedback('Great!', Colors.green);
+        _showFeedback('Great!', AppTheme.successColor);
         SystemSound.play(SystemSoundType.click);
         HapticFeedback.mediumImpact();
       }
     } else {
       if (widget.drill.drillMode == DrillMode.touch) {
-        _showFeedback('Too slow!', Colors.red);
+        _showFeedback('Too slow!', AppTheme.errorColor);
         SystemSound.play(SystemSoundType.alert);
         HapticFeedback.heavyImpact();
       }
@@ -1780,7 +1780,7 @@ void _broadcastStimulusToParticipants(String label, Color color, StimulusType ty
     
     // Only show missed feedback in touch mode
     if (widget.drill.drillMode == DrillMode.touch) {
-      _showFeedback('Missed!', Colors.orange);
+      _showFeedback('Missed!', AppTheme.warningColor);
       SystemSound.play(SystemSoundType.alert);
       HapticFeedback.lightImpact();
     }
@@ -1845,7 +1845,7 @@ void _completeRep() {
     if (widget.drill.drillMode == DrillMode.touch) {
       HapticFeedback.heavyImpact();
       SystemSound.play(SystemSoundType.click);
-      _showFeedback('Set $_currentSet Complete!', Colors.green);
+      _showFeedback('Set $_currentSet Complete!', AppTheme.successColor);
     }
     
     // Check if all sets are complete
@@ -1890,7 +1890,7 @@ void _completeRep() {
       _restCountdown = widget.drill.restSec;
     });
     
-    _showFeedback('Rest Time', Colors.blue);
+    _showFeedback('Rest Time', AppTheme.infoColor);
     
     _restTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
       if (_restCountdown > 1) {
@@ -2039,7 +2039,7 @@ void _completeRep() {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
               content: Text('Day ${widget.programDayNumber} completed! 🎉'),
-              backgroundColor: Colors.green,
+              backgroundColor: AppTheme.successColor,
               duration: const Duration(seconds: 3),
             ),
           );
@@ -2051,7 +2051,7 @@ void _completeRep() {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
               content: Text('Failed to complete program day: $e'),
-              backgroundColor: Colors.red,
+              backgroundColor: AppTheme.errorColor,
               duration: const Duration(seconds: 5),
             ),
           );
@@ -2078,7 +2078,7 @@ void _completeRep() {
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(
                 content: Text('Day ${widget.programDayNumber} completed! 🎉'),
-                backgroundColor: Colors.green,
+                backgroundColor: AppTheme.successColor,
                 duration: const Duration(seconds: 3),
               ),
             );
@@ -2103,7 +2103,7 @@ void _completeRep() {
               ScaffoldMessenger.of(context).showSnackBar(
                 SnackBar(
                   content: const Text('Drill completed! 🎉'),
-                  backgroundColor: Colors.green,
+                  backgroundColor: AppTheme.successColor,
                   duration: const Duration(seconds: 2),
                 ),
               );
@@ -2180,7 +2180,7 @@ void _completeRep() {
     final progress = elapsed / (widget.drill.durationSec * 1000);
     
     return Scaffold(
-      backgroundColor: Colors.black,
+      backgroundColor: theme.colorScheme.surface,
       extendBodyBehindAppBar: true,
       appBar: _buildAppBar(context),
       body: GestureDetector(
@@ -2191,7 +2191,7 @@ void _completeRep() {
             // Background gradient
             Container(
               decoration: BoxDecoration(
-                color: AppTheme.neutral900,
+                color: theme.colorScheme.surface,
               ),
             ),
             
@@ -2233,15 +2233,15 @@ void _completeRep() {
     return AppBar(
       backgroundColor: Colors.transparent,
       elevation: 0,
-      foregroundColor: Colors.white,
+      foregroundColor: theme.colorScheme.onSurface,
       title: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisSize: MainAxisSize.min,
         children: [
           Text(
             widget.drill.name,
-            style: const TextStyle(
-              color: Colors.white,
+            style: TextStyle(
+              color: theme.colorScheme.onSurface,
               fontWeight: FontWeight.w600,
             ),
           ),
@@ -2249,7 +2249,7 @@ void _completeRep() {
             Text(
               'Program Day ${widget.programDayNumber}',
               style: theme.textTheme.bodySmall?.copyWith(
-                color: Colors.white.withOpacity(0.7),
+                color: theme.colorScheme.onSurface.withOpacity(0.7),
                 fontSize: 12,
               ),
             ),
@@ -2260,13 +2260,14 @@ void _completeRep() {
         if (_state == DrillRunnerState.running && (!widget.isMultiplayerMode || widget.isHost))
           IconButton(
             onPressed: _showPauseDialog,
-            icon: const Icon(Icons.pause, color: Colors.white),
+            icon: Icon(Icons.pause, color: theme.colorScheme.onSurface),
           ),
       ],
     );
   }
   
   Widget _buildStatsHeader(int elapsed, double progress) {
+    final theme = Theme.of(context);
     return Container(
       padding: const EdgeInsets.all(20),
       child: Column(
@@ -2276,7 +2277,7 @@ void _completeRep() {
             width: double.infinity,
             height: 8,
             decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.2),
+              color: theme.colorScheme.onSurface.withOpacity(0.2),
               borderRadius: BorderRadius.circular(4),
             ),
             child: FractionallySizedBox(
@@ -2328,16 +2329,16 @@ void _completeRep() {
             Container(
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
-                color: Colors.blue.withOpacity(0.1),
+                color: AppTheme.infoColor.withOpacity(0.1),
                 borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: Colors.blue.withOpacity(0.3)),
+                border: Border.all(color: AppTheme.infoColor.withOpacity(0.3)),
               ),
               child: Column(
                 children: [
                   Text(
                     'REST TIME',
-                    style: const TextStyle(
-                      color: Colors.blue,
+                    style: TextStyle(
+                      color: AppTheme.infoColor,
                       fontSize: 16,
                       fontWeight: FontWeight.bold,
                     ),
@@ -2345,8 +2346,8 @@ void _completeRep() {
                   const SizedBox(height: 8),
                   Text(
                     '$_restCountdown',
-                    style: const TextStyle(
-                      color: Colors.blue,
+                    style: TextStyle(
+                      color: AppTheme.infoColor,
                       fontSize: 32,
                       fontWeight: FontWeight.bold,
                     ),
@@ -2361,22 +2362,23 @@ void _completeRep() {
   }
   
   Widget _buildStatItem(String label, String value, IconData icon) {
+    final theme = Theme.of(context);
     return Column(
       children: [
-        Icon(icon, color: Colors.white70, size: 20),
+        Icon(icon, color: theme.colorScheme.onSurface.withOpacity(0.7), size: 20),
         const SizedBox(height: 4),
         Text(
           value,
-          style: const TextStyle(
-            color: Colors.white,
+          style: TextStyle(
+            color: theme.colorScheme.onSurface,
             fontSize: 24,
             fontWeight: FontWeight.bold,
           ),
         ),
         Text(
           label,
-          style: const TextStyle(
-            color: Colors.white70,
+          style: TextStyle(
+            color: theme.colorScheme.onSurface.withOpacity(0.7),
             fontSize: 12,
           ),
         ),
@@ -2629,12 +2631,12 @@ void _completeRep() {
                 return Text(
                   currentItem.name,
                   style: TextStyle(
-                    color: Colors.white,
+                    color: Theme.of(context).colorScheme.onSurface,
                     fontSize: fontSize,
                     fontWeight: FontWeight.bold,
                     shadows: [
                       Shadow(
-                        color: Colors.black.withOpacity(0.7),
+                        color: Theme.of(context).colorScheme.shadow.withOpacity(0.7),
                         blurRadius: 15,
                       ),
                     ],
@@ -2654,13 +2656,13 @@ void _completeRep() {
                 displayText,
                 textAlign: TextAlign.center,
                 style: TextStyle(
-                  color: Colors.white,
+                  color: Theme.of(context).colorScheme.onSurface,
                   fontSize: fontSize * 1.2,
                   fontWeight: FontWeight.bold,
                   letterSpacing: 2.0,
                   shadows: [
                     Shadow(
-                      color: Colors.black.withOpacity(0.8),
+                      color: Theme.of(context).colorScheme.shadow.withOpacity(0.8),
                       blurRadius: 20,
                       offset: const Offset(0, 4),
                     ),
@@ -2750,12 +2752,12 @@ void _completeRep() {
                     return Text(
                       item.name,
                       style: TextStyle(
-                        color: Colors.white,
+                        color: Theme.of(context).colorScheme.onSurface,
                         fontSize: fontSize,
                         fontWeight: FontWeight.bold,
                         shadows: [
                           Shadow(
-                            color: Colors.black.withOpacity(0.7),
+                            color: Theme.of(context).colorScheme.shadow.withOpacity(0.7),
                             blurRadius: 15,
                           ),
                         ],
@@ -2773,13 +2775,13 @@ void _completeRep() {
                     displayText,
                     textAlign: TextAlign.center,
                     style: TextStyle(
-                      color: Colors.white,
+                      color: Theme.of(context).colorScheme.onSurface,
                       fontSize: fontSize * 1.2,
                       fontWeight: FontWeight.bold,
                       letterSpacing: 2.0,
                       shadows: [
                         Shadow(
-                          color: Colors.black.withOpacity(0.8),
+                          color: Theme.of(context).colorScheme.shadow.withOpacity(0.8),
                           blurRadius: 20,
                           offset: const Offset(0, 4),
                         ),
@@ -2867,14 +2869,14 @@ void _completeRep() {
       textAlign: TextAlign.center,
       style: TextStyle(
         color: _current?.type == StimulusType.color || _current?.type == StimulusType.custom
-            ? Colors.white
-            : Colors.black,
+            ? Theme.of(context).colorScheme.onSurface
+            : Theme.of(context).colorScheme.onSurface,
         fontSize: fontSize * 1.2,
         fontWeight: FontWeight.bold,
         letterSpacing: 2.0,
         shadows: [
           Shadow(
-            color: Colors.black.withOpacity(0.8),
+            color: Theme.of(context).colorScheme.shadow.withOpacity(0.8),
             blurRadius: 20,
             offset: const Offset(0, 4),
           ),
@@ -2960,7 +2962,7 @@ void _completeRep() {
                 ),
                 child: Icon(
                   Icons.people_outline_rounded,
-                  color: Colors.blue[300],
+                  color: AppTheme.infoColor,
                   size: 24,
                 ),
               ),
@@ -2972,7 +2974,7 @@ void _completeRep() {
                     Text(
                       'Participant Mode',
                       style: TextStyle(
-                        color: Colors.blue[200],
+                        color: AppTheme.infoColor.withOpacity(0.8),
                         fontWeight: FontWeight.w600,
                         fontSize: 16,
                       ),
@@ -2981,7 +2983,7 @@ void _completeRep() {
                     Text(
                       'Host controls the drill session',
                       style: TextStyle(
-                        color: Colors.blue[300],
+                        color: AppTheme.infoColor,
                         fontSize: 13,
                       ),
                     ),
@@ -3002,15 +3004,15 @@ void _completeRep() {
         decoration: BoxDecoration(
           gradient: LinearGradient(
             colors: [
-              Colors.grey.shade900.withOpacity(0.8),
-              Colors.grey.shade800.withOpacity(0.9),
+              Theme.of(context).colorScheme.surface.withOpacity(0.8),
+              Theme.of(context).colorScheme.surface.withOpacity(0.9),
             ],
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
           ),
           borderRadius: BorderRadius.circular(20),
           border: Border.all(
-            color: Colors.white.withOpacity(0.1),
+            color: Theme.of(context).colorScheme.outline.withOpacity(0.1),
             width: 1,
           ),
         ),
@@ -3039,7 +3041,7 @@ void _completeRep() {
                       onPressed: _showPauseDialog,
                       icon: Icons.pause_rounded,
                       label: 'PAUSE',
-                      color: Colors.orange,
+                      color: AppTheme.warningColor,
                     ),
                   ),
                   const SizedBox(width: 12),
@@ -3048,9 +3050,9 @@ void _completeRep() {
                       onPressed: _finish,
                       icon: Icons.stop_rounded,
                       label: 'STOP',
-                      color: Colors.red,
+                      color: AppTheme.errorColor,
                       gradient: LinearGradient(
-                        colors: [Colors.red.shade400, Colors.red.shade600],
+                        colors: [AppTheme.errorColor.withOpacity(0.8), AppTheme.errorColor],
                       ),
                     ),
                   ),
@@ -3064,9 +3066,9 @@ void _completeRep() {
                       onPressed: _resumeDrill,
                       icon: Icons.play_arrow_rounded,
                       label: 'RESUME',
-                      color: Colors.green,
+                      color: AppTheme.successColor,
                       gradient: LinearGradient(
-                        colors: [Colors.green.shade400, Colors.green.shade600],
+                        colors: [AppTheme.successColor.withOpacity(0.8), AppTheme.successColor],
                       ),
                     ),
                   ),
@@ -3076,7 +3078,7 @@ void _completeRep() {
                       onPressed: _finish,
                       icon: Icons.stop_rounded,
                       label: 'STOP',
-                      color: Colors.red,
+                      color: AppTheme.errorColor,
                     ),
                   ),
                 ],
@@ -3086,9 +3088,9 @@ void _completeRep() {
                 onPressed: null,
                 icon: Icons.hourglass_empty_rounded,
                 label: 'RESTING... ${_restCountdown}s',
-                color: Colors.blue,
+                color: AppTheme.infoColor,
                 gradient: LinearGradient(
-                  colors: [Colors.blue.shade400, Colors.blue.shade600],
+                  colors: [AppTheme.infoColor.withOpacity(0.8), AppTheme.infoColor],
                 ),
               ),
             ] else if (_state == DrillRunnerState.finished) ...[
@@ -3222,32 +3224,32 @@ void _completeRep() {
     switch (_state) {
       case DrillRunnerState.ready:
         statusText = 'Ready to start';
-        statusColor = Colors.white70;
+        statusColor = Theme.of(context).colorScheme.onSurface.withOpacity(0.7);
         statusIcon = Icons.radio_button_unchecked;
         break;
       case DrillRunnerState.countdown:
         statusText = 'Get ready...';
-        statusColor = Colors.orange;
+        statusColor = AppTheme.warningColor;
         statusIcon = Icons.timer;
         break;
       case DrillRunnerState.running:
         statusText = 'Drill in progress';
-        statusColor = Colors.green;
+        statusColor = AppTheme.successColor;
         statusIcon = Icons.play_circle_filled;
         break;
       case DrillRunnerState.paused:
         statusText = 'Drill paused';
-        statusColor = Colors.orange;
+        statusColor = AppTheme.warningColor;
         statusIcon = Icons.pause_circle_filled;
         break;
       case DrillRunnerState.rest:
         statusText = 'Rest period';
-        statusColor = Colors.blue;
+        statusColor = AppTheme.infoColor;
         statusIcon = Icons.hourglass_empty;
         break;
       case DrillRunnerState.finished:
         statusText = 'Drill completed';
-        statusColor = Colors.green;
+        statusColor = AppTheme.successColor;
         statusIcon = Icons.check_circle;
         break;
     }
@@ -3302,8 +3304,9 @@ void _completeRep() {
   }
   
   Widget _buildCountdownOverlay() {
+    final theme = Theme.of(context);
     return Container(
-      color: Colors.black.withOpacity(0.8),
+      color: theme.colorScheme.surface.withOpacity(0.9),
       child: Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
@@ -3311,7 +3314,7 @@ void _completeRep() {
             Text(
               'Get Ready!',
               style: TextStyle(
-                color: Colors.white,
+                color: theme.colorScheme.onSurface,
                 fontSize: 32,
                 fontWeight: FontWeight.bold,
               ),
@@ -3323,9 +3326,9 @@ void _completeRep() {
               height: 200,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                color: Colors.white.withOpacity(0.1),
+                color: theme.colorScheme.onSurface.withOpacity(0.1),
                 border: Border.all(
-                  color: Colors.white,
+                  color: theme.colorScheme.onSurface,
                   width: 4,
                 ),
               ),
@@ -3333,7 +3336,7 @@ void _completeRep() {
                 child: Text(
                   '$_countdown',
                   style: TextStyle(
-                    color: Colors.white,
+                    color: theme.colorScheme.onSurface,
                     fontSize: 120,
                     fontWeight: FontWeight.bold,
                   ),
@@ -3379,7 +3382,7 @@ void _completeRep() {
           children: [
             Icon(
               Icons.pause_circle_filled,
-              color: Colors.orange,
+              color: AppTheme.warningColor,
               size: 28,
             ),
             const SizedBox(width: 12),
@@ -3398,7 +3401,7 @@ void _completeRep() {
             icon: const Icon(Icons.play_arrow),
             label: const Text('Resume'),
             style: TextButton.styleFrom(
-              foregroundColor: Colors.green,
+              foregroundColor: AppTheme.successColor,
             ),
           ),
           TextButton.icon(
@@ -3416,7 +3419,7 @@ void _completeRep() {
             icon: const Icon(Icons.stop),
             label: const Text('End Drill'),
             style: TextButton.styleFrom(
-              foregroundColor: Colors.red,
+              foregroundColor: AppTheme.errorColor,
             ),
           ),
         ],

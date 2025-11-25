@@ -6,6 +6,7 @@ import 'package:spark_app/features/programs/services/program_progress_service.da
 import 'package:spark_app/features/programs/services/drill_assignment_service.dart';
 import 'package:spark_app/features/drills/domain/drill.dart';
 import 'package:spark_app/core/di/injection.dart';
+import 'package:spark_app/core/theme/app_theme.dart';
 
 class ProgramDayScreen extends StatefulWidget {
   final Program program;
@@ -151,7 +152,7 @@ class _ProgramDayScreenState extends State<ProgramDayScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Day ${widget.dayNumber} completed! 🎉'),
-            backgroundColor: Colors.green,
+            backgroundColor: AppTheme.successColor,
             duration: const Duration(seconds: 2),
           ),
         );
@@ -169,7 +170,7 @@ class _ProgramDayScreenState extends State<ProgramDayScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Error completing day: $e'),
-            backgroundColor: Colors.red,
+            backgroundColor: AppTheme.errorColor,
           ),
         );
       }
@@ -202,9 +203,9 @@ class _ProgramDayScreenState extends State<ProgramDayScreen> {
             Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: Colors.green.withOpacity(0.1),
+                color: AppTheme.successColor.withOpacity(0.1),
                 borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: Colors.green.withOpacity(0.3)),
+                border: Border.all(color: AppTheme.successColor.withOpacity(0.3)),
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -305,7 +306,7 @@ class _ProgramDayScreenState extends State<ProgramDayScreen> {
               padding: EdgeInsets.only(right: 16),
               child: Icon(
                 Icons.check_circle,
-                color: Colors.green,
+                color: AppTheme.successColor,
                 size: 28,
               ),
             ),
@@ -353,7 +354,7 @@ class _ProgramDayScreenState extends State<ProgramDayScreen> {
                     if (_progress != null) ...[
                       LinearProgressIndicator(
                         value: _progress!.progressPercentage / 100,
-                        backgroundColor: Colors.grey.withOpacity(0.3),
+                        backgroundColor: Theme.of(context).colorScheme.surfaceContainerHighest,
                       ),
                       const SizedBox(height: 8),
                       Text(
@@ -381,20 +382,20 @@ class _ProgramDayScreenState extends State<ProgramDayScreen> {
                           width: 40,
                           height: 40,
                           decoration: BoxDecoration(
-                            color: isCompleted 
-                                ? Colors.green 
-                                : isCurrentDay 
+                            color: isCompleted
+                                ? AppTheme.successColor
+                                : isCurrentDay
                                     ? Theme.of(context).primaryColor
-                                    : Colors.grey,
+                                    : Theme.of(context).colorScheme.outline,
                             shape: BoxShape.circle,
                           ),
                           child: Center(
                             child: isCompleted
-                                ? const Icon(Icons.check, color: Colors.white)
+                                ? Icon(Icons.check, color: Theme.of(context).colorScheme.onPrimary)
                                 : Text(
                                     '${widget.dayNumber}',
-                                    style: const TextStyle(
-                                      color: Colors.white,
+                                    style: TextStyle(
+                                      color: Theme.of(context).colorScheme.onPrimary,
                                       fontWeight: FontWeight.bold,
                                     ),
                                   ),
@@ -415,7 +416,7 @@ class _ProgramDayScreenState extends State<ProgramDayScreen> {
                                 Text(
                                   'Completed ✓',
                                   style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                                    color: Colors.green,
+                                    color: AppTheme.successColor,
                                     fontWeight: FontWeight.bold,
                                   ),
                                 )
@@ -479,7 +480,7 @@ class _ProgramDayScreenState extends State<ProgramDayScreen> {
                           margin: EdgeInsets.only(bottom: index < _assignedDrills.length - 1 ? 12 : 0),
                           padding: const EdgeInsets.all(12),
                           decoration: BoxDecoration(
-                            border: Border.all(color: Colors.grey.withOpacity(0.3)),
+                            border: Border.all(color: Theme.of(context).colorScheme.outline.withOpacity(0.3)),
                             borderRadius: BorderRadius.circular(8),
                             color: index == 0 
                                 ? Theme.of(context).primaryColor.withOpacity(0.05)
@@ -502,8 +503,8 @@ class _ProgramDayScreenState extends State<ProgramDayScreen> {
                                       child: Center(
                                         child: Text(
                                           '${index + 1}',
-                                          style: const TextStyle(
-                                            color: Colors.white,
+                                          style: TextStyle(
+                                            color: Theme.of(context).colorScheme.onPrimary,
                                             fontSize: 12,
                                             fontWeight: FontWeight.bold,
                                           ),
@@ -620,8 +621,8 @@ class _ProgramDayScreenState extends State<ProgramDayScreen> {
                               : const Icon(Icons.check_circle),
                           label: Text(_isCompleting ? 'Completing...' : 'Complete Day'),
                           style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.green,
-                            foregroundColor: Colors.white,
+                            backgroundColor: AppTheme.successColor,
+                            foregroundColor: Theme.of(context).colorScheme.onPrimary,
                           ),
                         ),
                       ),
@@ -631,12 +632,12 @@ class _ProgramDayScreenState extends State<ProgramDayScreen> {
               ),
             ] else if (isCompleted) ...[
               Card(
-                color: Colors.green.withOpacity(0.1),
+                color: AppTheme.successColor.withOpacity(0.1),
                 child: Padding(
                   padding: const EdgeInsets.all(16),
                   child: Row(
                     children: [
-                      const Icon(Icons.check_circle, color: Colors.green, size: 32),
+                      Icon(Icons.check_circle, color: AppTheme.successColor, size: 32),
                       const SizedBox(width: 12),
                       Expanded(
                         child: Column(
@@ -646,7 +647,7 @@ class _ProgramDayScreenState extends State<ProgramDayScreen> {
                               'Day Completed!',
                               style: Theme.of(context).textTheme.titleMedium?.copyWith(
                                 fontWeight: FontWeight.bold,
-                                color: Colors.green,
+                                color: AppTheme.successColor,
                               ),
                             ),
                             Text(
@@ -670,11 +671,11 @@ class _ProgramDayScreenState extends State<ProgramDayScreen> {
   Color _getDifficultyColor(Difficulty difficulty) {
     switch (difficulty) {
       case Difficulty.beginner:
-        return Colors.green;
+        return AppTheme.successColor;
       case Difficulty.intermediate:
-        return Colors.orange;
+        return AppTheme.warningColor;
       case Difficulty.advanced:
-        return Colors.red;
+        return AppTheme.errorColor;
     }
   }
 }

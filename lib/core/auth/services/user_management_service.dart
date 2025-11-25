@@ -8,11 +8,12 @@ import 'package:firebase_core/firebase_core.dart';
 class UserManagementService {
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
-  
+
   // Secondary Firebase app for creating users without affecting current session
   FirebaseApp? _secondaryApp;
   FirebaseAuth? _secondaryAuth;
-/// Initialize secondary Firebase app for user creation
+
+  /// Initialize secondary Firebase app for user creation
   Future<void> _initializeSecondaryApp() async {
     if (_secondaryApp != null && _secondaryAuth != null) {
       return; // Already initialized
@@ -55,7 +56,7 @@ class UserManagementService {
       final currentAdminId = currentUser?.uid;
       final currentAdminEmail = currentUser?.email;
       final currentAdminName = currentUser?.displayName;
-      
+
       if (currentAdminId == null || currentAdminEmail == null) {
         throw Exception('No authenticated admin user found');
       }
@@ -65,7 +66,8 @@ class UserManagementService {
       await _initializeSecondaryApp();
 
       // Use secondary auth to create user without logging out admin
-      final userCredential = await _secondaryAuth!.createUserWithEmailAndPassword(
+      final userCredential =
+          await _secondaryAuth!.createUserWithEmailAndPassword(
         email: email,
         password: password,
       );
@@ -79,7 +81,7 @@ class UserManagementService {
       await firebaseUser.updateDisplayName(displayName);
 // Step 3: Sign out from secondary auth to prevent conflicts
       await _secondaryAuth!.signOut();
-      
+
       print('✅ User created successfully without affecting admin session');
 
       // Step 3: Create Firestore user document
@@ -111,7 +113,10 @@ class UserManagementService {
 
       // Save to Firestore with error handling
       try {
-        await _firestore.collection('users').doc(firebaseUser.uid).set(userData);
+        await _firestore
+            .collection('users')
+            .doc(firebaseUser.uid)
+            .set(userData);
         print('✅ User document created successfully in Firestore');
       } catch (firestoreError) {
         print('❌ Failed to create user document in Firestore: $firestoreError');
@@ -121,7 +126,8 @@ class UserManagementService {
         } catch (cleanupError) {
           print('⚠️ Failed to cleanup Firebase Auth user: $cleanupError');
         }
-        throw Exception('Failed to create user profile in Firestore: $firestoreError');
+        throw Exception(
+            'Failed to create user profile in Firestore: $firestoreError');
       }
 
       // Note: Admin session restoration would require admin password
@@ -151,7 +157,7 @@ class UserManagementService {
       final currentAdminId = currentUser?.uid;
       final currentAdminEmail = currentUser?.email;
       final currentAdminName = currentUser?.displayName;
-      
+
       if (currentAdminId == null || currentAdminEmail == null) {
         throw Exception('No authenticated admin user found');
       }
@@ -159,7 +165,7 @@ class UserManagementService {
       // Due to Flutter limitations, we cannot create Firebase Auth users
       // without affecting the current session. Instead, we'll create a user profile
       // that can be converted to a full account when the user first logs in.
-      
+
       return await createUserProfile(
         email: email,
         password: password,
@@ -189,7 +195,7 @@ class UserManagementService {
       // Step 2: Delete from Firebase Auth
       // Note: This requires admin SDK or the user to be currently signed in
       // For production, you'd want to use Firebase Admin SDK
-      
+
       // For now, we'll mark the user as deleted in a separate collection
       // and use Cloud Functions to actually delete from Auth
       await _firestore.collection('deleted_users').doc(userId).set({
@@ -200,7 +206,6 @@ class UserManagementService {
 
       // TODO: Implement Cloud Function to delete from Firebase Auth
       // This requires Firebase Admin SDK which can't be used in client apps
-      
     } catch (e) {
       throw Exception('Failed to delete user: $e');
     }
@@ -219,14 +224,14 @@ class UserManagementService {
       final currentAdminId = currentUser?.uid;
       final currentAdminEmail = currentUser?.email;
       final currentAdminName = currentUser?.displayName;
-      
+
       if (currentAdminId == null || currentAdminEmail == null) {
         throw Exception('No authenticated admin user found');
       }
 
       // Generate a unique user ID
       final newUserId = _firestore.collection('users').doc().id;
-      
+
       // Create user profile in Firestore
       final newUser = AppUser(
         id: newUserId,
@@ -252,11 +257,12 @@ class UserManagementService {
         'adminName': currentAdminName ?? 'Unknown Admin',
         'createdAt': FieldValue.serverTimestamp(),
       };
-      
+
       // Store temporary password for the user to use during first login
       userData['tempPassword'] = password;
       userData['requiresPasswordReset'] = true;
-      userData['authAccountCreated'] = false; // Flag to track if Auth account exists
+      userData['authAccountCreated'] =
+          false; // Flag to track if Auth account exists
 
       await _firestore.collection('users').doc(newUserId).set(userData);
 
@@ -288,18 +294,19 @@ class UserManagementService {
   }
 
   /// Updates user subscription
-  Future<void> updateUserSubscription(String userId, Map<String, dynamic> subscriptionData) async {
+  Future<void> updateUserSubscription(
+      String userId, Map<String, dynamic> subscriptionData) async {
     try {
       // Use dot notation to update nested subscription fields properly
       final Map<String, dynamic> updateData = {
         'updatedAt': FieldValue.serverTimestamp(),
       };
-      
+
       // Add subscription fields with dot notation
       subscriptionData.forEach((key, value) {
         updateData['subscription.$key'] = value;
       });
-      
+
       await _firestore.collection('users').doc(userId).update(updateData);
     } catch (e) {
       throw Exception('Failed to update user subscription: $e');
@@ -311,7 +318,7 @@ class UserManagementService {
     try {
       final doc = await _firestore.collection('users').doc(userId).get();
       if (!doc.exists) return null;
-      
+
       return AppUser.fromFirestore(doc);
     } catch (e) {
       throw Exception('Failed to get user: $e');
@@ -326,28 +333,32 @@ class UserManagementService {
   }) {
     try {
       Query query = _firestore.collection('users');
-      
+
       if (roleFilter != null) {
         query = query.where('role', isEqualTo: roleFilter.name);
       }
-      
+
       if (planFilter != null) {
         query = query.where('subscription.plan', isEqualTo: planFilter);
       }
-      
+
       if (limit != null) {
         query = query.limit(limit);
       }
-      
+
       return query.snapshots().map((snapshot) {
-        return snapshot.docs.map((doc) {
-          try {
-            return AppUser.fromFirestore(doc);
-          } catch (e) {
-            // Skip malformed documents
-            return null;
-          }
-        }).where((user) => user != null).cast<AppUser>().toList();
+        return snapshot.docs
+            .map((doc) {
+              try {
+                return AppUser.fromFirestore(doc);
+              } catch (e) {
+                // Skip malformed documents
+                return null;
+              }
+            })
+            .where((user) => user != null)
+            .cast<AppUser>()
+            .toList();
       });
     } catch (e) {
       throw Exception('Failed to get users stream: $e');
@@ -363,7 +374,8 @@ class UserManagementService {
       if (users.isNotEmpty) {
         // User exists in Auth, would need admin SDK to delete
         // For now, just log the issue
-        print('Warning: Partially created user exists in Firebase Auth: $email');
+        print(
+            'Warning: Partially created user exists in Firebase Auth: $email');
       }
     } catch (e) {
       // Ignore cleanup errors
@@ -375,7 +387,8 @@ class UserManagementService {
   Future<bool> validateAdminCredentials(String email, String password) async {
     try {
       // Create a temporary credential to validate admin password
-      final credential = EmailAuthProvider.credential(email: email, password: password);
+      final credential =
+          EmailAuthProvider.credential(email: email, password: password);
       await _auth.currentUser?.reauthenticateWithCredential(credential);
       return true;
     } catch (e) {
@@ -389,27 +402,34 @@ class UserManagementService {
     int limit = 50,
   }) async {
     try {
-      Query query = _firestore.collection('user_audit_log')
+      Query query = _firestore
+          .collection('user_audit_log')
           .orderBy('timestamp', descending: true);
-      
+
       if (userId != null) {
         query = query.where('targetUserId', isEqualTo: userId);
       }
-      
+
       query = query.limit(limit);
-      
+
       final snapshot = await query.get();
-      return snapshot.docs.map((doc) => {
-        'id': doc.id,
-        ...doc.data() as Map<String, dynamic>,
-      },).toList();
+      return snapshot.docs
+          .map(
+            (doc) => {
+              'id': doc.id,
+              ...doc.data() as Map<String, dynamic>,
+            },
+          )
+          .toList();
     } catch (e) {
       throw Exception('Failed to get audit log: $e');
     }
   }
 
   /// Logs user management operations for audit trail
-  Future<void> _logOperation(String operation, String targetUserId, {
+  Future<void> _logOperation(
+    String operation,
+    String targetUserId, {
     Map<String, dynamic>? additionalData,
   }) async {
     try {

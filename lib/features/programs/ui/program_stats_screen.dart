@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:spark_app/features/programs/services/program_progress_service.dart';
 import 'package:spark_app/core/di/injection.dart';
+import 'package:spark_app/core/theme/app_theme.dart';
 
 class ProgramStatsScreen extends StatefulWidget {
   const ProgramStatsScreen({super.key});
@@ -36,7 +37,7 @@ class _ProgramStatsScreenState extends State<ProgramStatsScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Error loading stats: $e'),
-            backgroundColor: Colors.red,
+            backgroundColor: Theme.of(context).colorScheme.error,
           ),
         );
       }
@@ -97,7 +98,7 @@ class _ProgramStatsScreenState extends State<ProgramStatsScreen> {
                   'Programs Completed',
                   '${_stats!.totalProgramsCompleted}',
                   Icons.check_circle,
-                  Colors.green,
+                  AppTheme.successColor,
                 ),
               ),
             ],
@@ -121,8 +122,8 @@ class _ProgramStatsScreenState extends State<ProgramStatsScreen> {
                   'Completion Rate',
                   '${_stats!.completionRate.toStringAsFixed(1)}%',
                   Icons.trending_up,
-                  _stats!.completionRate >= 70 ? Colors.green : 
-                  _stats!.completionRate >= 40 ? Colors.orange : Colors.red,
+                  _stats!.completionRate >= 70 ? AppTheme.successColor :
+                  _stats!.completionRate >= 40 ? AppTheme.warningColor : AppTheme.errorColor,
                 ),
               ),
             ],
@@ -153,16 +154,16 @@ class _ProgramStatsScreenState extends State<ProgramStatsScreen> {
                               width: 60,
                               height: 60,
                               decoration: BoxDecoration(
-                                color: Colors.orange.withOpacity(0.1),
+                                color: AppTheme.warningColor.withOpacity(0.1),
                                 shape: BoxShape.circle,
-                                border: Border.all(color: Colors.orange, width: 2),
+                                border: Border.all(color: AppTheme.warningColor, width: 2),
                               ),
                               child: Center(
                                 child: Text(
                                   '${_stats!.currentStreak}',
                                   style: theme.textTheme.headlineMedium?.copyWith(
                                     fontWeight: FontWeight.bold,
-                                    color: Colors.orange,
+                                    color: AppTheme.warningColor,
                                   ),
                                 ),
                               ),
@@ -340,7 +341,7 @@ class _ProgramStatsScreenState extends State<ProgramStatsScreen> {
         'title': 'First Steps',
         'description': 'Started your first program',
         'icon': Icons.rocket_launch,
-        'color': Colors.blue,
+        'color': AppTheme.infoColor,
         'unlocked': true,
       });
     }
@@ -362,7 +363,7 @@ class _ProgramStatsScreenState extends State<ProgramStatsScreen> {
         'title': 'Consistent',
         'description': 'Maintained a 7-day streak',
         'icon': Icons.local_fire_department,
-        'color': Colors.orange,
+        'color': AppTheme.warningColor,
         'unlocked': true,
       });
     }
@@ -395,7 +396,7 @@ class _ProgramStatsScreenState extends State<ProgramStatsScreen> {
         'title': 'Consistent',
         'description': 'Maintain a 7-day streak',
         'icon': Icons.local_fire_department,
-        'color': Colors.grey,
+        'color': AppTheme.neutral500,
         'unlocked': false,
       });
     }
@@ -405,7 +406,7 @@ class _ProgramStatsScreenState extends State<ProgramStatsScreen> {
         'title': 'Dedicated',
         'description': 'Complete 30 program days',
         'icon': Icons.star,
-        'color': Colors.grey,
+        'color': AppTheme.neutral500,
         'unlocked': false,
       });
     }
@@ -415,7 +416,7 @@ class _ProgramStatsScreenState extends State<ProgramStatsScreen> {
         'title': 'Champion',
         'description': 'Complete 5 programs',
         'icon': Icons.military_tech,
-        'color': Colors.grey,
+        'color': AppTheme.neutral500,
         'unlocked': false,
       });
     }
@@ -439,18 +440,18 @@ class _ProgramStatsScreenState extends State<ProgramStatsScreen> {
           achievement['title'] as String,
           style: TextStyle(
             fontWeight: FontWeight.bold,
-            color: (achievement['unlocked'] as bool) ? null : Colors.grey,
+            color: (achievement['unlocked'] as bool) ? null : AppTheme.neutral500,
           ),
         ),
         subtitle: Text(
           achievement['description'] as String,
           style: TextStyle(
-            color: (achievement['unlocked'] as bool) ? null : Colors.grey,
+            color: (achievement['unlocked'] as bool) ? null : AppTheme.neutral500,
           ),
         ),
         trailing: (achievement['unlocked'] as bool)
-            ? const Icon(Icons.check_circle, color: Colors.green)
-            : const Icon(Icons.lock, color: Colors.grey),
+            ? Icon(Icons.check_circle, color: AppTheme.successColor)
+            : Icon(Icons.lock, color: AppTheme.neutral500),
       ),
     ),).toList();
   }

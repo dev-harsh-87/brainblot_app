@@ -1,4 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:spark_app/features/subscription/domain/subscription_plan.dart';
 import 'package:spark_app/features/subscription/data/subscription_plan_repository.dart';
 import 'package:spark_app/core/utils/app_logger.dart';
@@ -10,7 +11,7 @@ class SubscriptionSyncService {
   final FirebaseFirestore _firestore;
   final SubscriptionPlanRepository _planRepository;
   StreamSubscription<QuerySnapshot>? _planChangeSubscription;
-  bool _isInitialized = false;
+  bool isInitialized = false;
 
   SubscriptionSyncService({
     FirebaseFirestore? firestore,
@@ -19,23 +20,32 @@ class SubscriptionSyncService {
         _planRepository = planRepository ?? SubscriptionPlanRepository();
 
   /// Initialize the service and start automatic synchronization
+  /// Only initializes if a user is authenticated
   Future<void> initialize() async {
-    if (_isInitialized) return;
+    if (isInitialized) return;
     
     try {
       AppLogger.debug('Initializing subscription sync service');
       
-      // Initialize default plans if they don't exist
+      // Check if user is authenticated before accessing Firestore
+      final currentUser = FirebaseAuth.instance.currentUser;
+      if (currentUser == null) {
+        AppLogger.debug('No authenticated user - skipping subscription sync initialization');
+        return;
+      }
+      
+      // Initialize default plans if they don't exist (only when authenticated)
       await _ensureDefaultPlansExist();
       
       // Start listening for plan changes
       _startPlanChangeListener();
       
-      _isInitialized = true;
+      isInitialized = true;
       AppLogger.info('Subscription sync service initialized');
     } catch (e) {
       AppLogger.error('Failed to initialize subscription sync service', error: e);
-      rethrow;
+      // Don't rethrow - let the app continue without subscription sync
+      AppLogger.warning('Continuing without subscription sync - it will be initialized when user authenticates');
     }
   }
 
@@ -243,6 +253,6 @@ class SubscriptionSyncService {
   Future<void> dispose() async {
     await _planChangeSubscription?.cancel();
     _planChangeSubscription = null;
-    _isInitialized = false;
+    isInitialized = false;
   }
 }

@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import 'package:spark_app/core/theme/app_theme.dart';
 import 'package:spark_app/core/widgets/subscription_widgets.dart';
 import 'package:spark_app/core/widgets/enhanced_subscription_card.dart';
+import 'package:spark_app/core/widgets/feature_not_available_dialog.dart';
 import 'package:spark_app/core/auth/models/user_role.dart';
 import 'package:spark_app/core/auth/models/app_user.dart';
 import 'package:spark_app/features/subscription/domain/subscription_plan.dart';
@@ -479,7 +480,7 @@ class _HomeScreenState extends State<HomeScreen>
     // Use real subscription data from user, no need for fake plan creation
     final userSubscription = user.subscription;
 
-    final features = [
+    final allFeatures = [
       _FeatureItem(
         name: 'Multiplayer',
         description: 'Train together',
@@ -513,6 +514,8 @@ class _HomeScreenState extends State<HomeScreen>
             ),
           ),
           const SizedBox(height: 16),
+          
+          // Show all features in a grid - both accessible and inaccessible
           GridView.builder(
             shrinkWrap: true,
             physics: const NeverScrollableScrollPhysics(),
@@ -521,9 +524,9 @@ class _HomeScreenState extends State<HomeScreen>
               crossAxisSpacing: 16,
               mainAxisSpacing: 16,
             ),
-            itemCount: features.length,
+            itemCount: allFeatures.length,
             itemBuilder: (context, index) {
-              final feature = features[index];
+              final feature = allFeatures[index];
               return TweenAnimationBuilder<double>(
                 duration: Duration(milliseconds: 800 + (index * 100)),
                 tween: Tween(begin: 0.0, end: 1.0),
@@ -547,32 +550,40 @@ class _HomeScreenState extends State<HomeScreen>
     final colorScheme = theme.colorScheme;
 
     return InkWell(
-      onTap: feature.hasAccess
-          ? () => context.push(feature.route)
-          : () => context.push('/subscription'),
+      onTap: () {
+        if (feature.hasAccess) {
+          // User has access, navigate to the feature
+          context.push(feature.route);
+        } else {
+          // User doesn't have access, show upgrade dialog
+          FeatureNotAvailableDialog.show(
+            context,
+            featureName: feature.name,
+            description: feature.description,
+            onUpgradePressed: () {
+              Navigator.of(context).pop();
+              context.push('/subscription');
+            },
+          );
+        }
+      },
       borderRadius: BorderRadius.circular(20),
       child: Container(
         padding: const EdgeInsets.all(20),
         decoration: BoxDecoration(
-          color: feature.hasAccess
-              ? colorScheme.surfaceContainerHighest
-              : colorScheme.surfaceContainer,
+          color: colorScheme.surfaceContainerHighest,
           borderRadius: BorderRadius.circular(20),
           border: Border.all(
-            color: feature.hasAccess
-                ? feature.color.withOpacity(0.3)
-                : colorScheme.outline.withOpacity(0.2),
-            width: feature.hasAccess ? 2 : 1,
+            color: feature.color.withOpacity(0.3),
+            width: 2,
           ),
-          boxShadow: feature.hasAccess
-              ? [
-                  BoxShadow(
-                    color: feature.color.withOpacity(0.1),
-                    blurRadius: 12,
-                    offset: const Offset(0, 4),
-                  ),
-                ]
-              : null,
+          boxShadow: [
+            BoxShadow(
+              color: feature.color.withOpacity(0.1),
+              blurRadius: 12,
+              offset: const Offset(0, 4),
+            ),
+          ],
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -580,24 +591,17 @@ class _HomeScreenState extends State<HomeScreen>
             Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                gradient: feature.hasAccess
-                    ? LinearGradient(
-                        colors: [
-                          feature.color,
-                          feature.color.withOpacity(0.8),
-                        ],
-                      )
-                    : null,
-                color: feature.hasAccess
-                    ? null
-                    : colorScheme.outline.withOpacity(0.3),
+                gradient: LinearGradient(
+                  colors: [
+                    feature.color,
+                    feature.color.withOpacity(0.8),
+                  ],
+                ),
                 borderRadius: BorderRadius.circular(12),
               ),
               child: Icon(
                 feature.icon,
-                color: feature.hasAccess
-                    ? Colors.white
-                    : colorScheme.onSurface.withOpacity(0.5),
+                color: Colors.white,
                 size: 24,
               ),
             ),
@@ -606,51 +610,16 @@ class _HomeScreenState extends State<HomeScreen>
               feature.name,
               style: theme.textTheme.titleMedium?.copyWith(
                 fontWeight: FontWeight.bold,
-                color: feature.hasAccess
-                    ? colorScheme.onSurface
-                    : colorScheme.onSurface.withOpacity(0.5),
+                color: colorScheme.onSurface,
               ),
             ),
             const SizedBox(height: 4),
             Text(
               feature.description,
               style: theme.textTheme.bodySmall?.copyWith(
-                color: feature.hasAccess
-                    ? colorScheme.onSurface.withOpacity(0.6)
-                    : colorScheme.onSurface.withOpacity(0.4),
+                color: colorScheme.onSurface.withOpacity(0.6),
               ),
             ),
-            if (!feature.hasAccess) ...[
-              const SizedBox(height: 8),
-              Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 8,
-                  vertical: 4,
-                ),
-                decoration: BoxDecoration(
-                  color: colorScheme.outline.withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(
-                      Icons.lock_outline,
-                      size: 12,
-                      color: colorScheme.onSurface.withOpacity(0.5),
-                    ),
-                    const SizedBox(width: 4),
-                    Text(
-                      'Upgrade',
-                      style: theme.textTheme.labelSmall?.copyWith(
-                        color: colorScheme.onSurface.withOpacity(0.5),
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
           ],
         ),
       ),

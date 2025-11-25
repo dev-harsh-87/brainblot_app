@@ -89,64 +89,6 @@ class DeviceSessionService {
     }
   }
 
-  /// Logout existing sessions (the old behavior)
-  Future<void> _logoutExistingSessions(String userId, String currentDeviceId) async {
-    try {
-      final existingSessions = await _checkForExistingSessions(userId, currentDeviceId);
-      
-      for (final sessionData in existingSessions) {
-        final existingDeviceId = sessionData['deviceId'] as String?;
-        final existingFcmToken = sessionData['fcmToken'] as String?;
-        
-        AppLogger.info('Logging out existing device: $existingDeviceId', tag: 'DeviceSession');
-        
-        if (existingFcmToken != null) {
-          await _sendLogoutNotification(existingFcmToken, sessionData);
-        }
-        
-        // Remove the device session
-        await _removeDeviceSession(userId, existingDeviceId);
-      }
-    } catch (e) {
-      AppLogger.warning('Error logging out existing sessions', tag: 'DeviceSession');
-    }
-  }
-
-  /// Check for existing sessions and handle device conflicts (DEPRECATED - kept for compatibility)
-  Future<void> _checkAndHandleExistingSession(String userId, String currentDeviceId) async {
-    try {
-      // Get current active session for this user
-      final existingSessionQuery = await _firestore
-          .collection(_userSessionsCollection)
-          .doc(userId)
-          .get();
-
-      if (existingSessionQuery.exists) {
-        final sessionData = existingSessionQuery.data()!;
-        final existingDeviceId = sessionData['deviceId'] as String?;
-        final existingFcmToken = sessionData['fcmToken'] as String?;
-        
-        // If same device, just update timestamp
-        if (existingDeviceId == currentDeviceId) {
-          await _updateSessionTimestamp(userId);
-          return;
-        }
-        
-        // Different device detected - force logout the previous device
-        AppLogger.info('Different device detected, logging out previous session...', tag: 'DeviceSession');
-        
-        if (existingFcmToken != null) {
-          await _sendLogoutNotification(existingFcmToken, sessionData);
-        }
-        
-        // Remove the previous device session
-        await _removeDeviceSession(userId, existingDeviceId);
-      }
-    } catch (e) {
-      AppLogger.warning('Error checking existing session', tag: 'DeviceSession');
-      // Continue with registration even if check fails
-    }
-  }
 
   /// Create a new device session
   Future<void> _createDeviceSession(String userId, Map<String, dynamic> deviceInfo, String? fcmToken) async {
@@ -173,20 +115,18 @@ class DeviceSessionService {
         .set(sessionData);
   }
 
-  /// Update session timestamp for activity tracking
-  Future<void> _updateSessionTimestamp(String userId) async {
-    try {
-      await _firestore.collection(_userSessionsCollection).doc(userId).update({
-        'lastActiveTime': FieldValue.serverTimestamp(),
-      });
-    } catch (e) {
-      AppLogger.warning('Failed to update session timestamp', tag: 'DeviceSession');
-    }
-  }
+
 
   /// Remove device session
   Future<void> _removeDeviceSession(String userId, String? deviceId) async {
     try {
+      // Check if user is still authenticated
+      final currentUser = _auth.currentUser;
+      if (currentUser == null || currentUser.uid != userId) {
+        AppLogger.info('User not authenticated, skipping device session removal', tag: 'DeviceSession');
+        return;
+      }
+      
       final batch = _firestore.batch();
       
       // Remove user session
@@ -220,6 +160,13 @@ class DeviceSessionService {
   /// Mark device session as inactive (for proper cleanup)
   Future<void> _markDeviceSessionInactive(String userId, String deviceId) async {
     try {
+      // Check if user is still authenticated
+      final currentUser = _auth.currentUser;
+      if (currentUser == null || currentUser.uid != userId) {
+        AppLogger.info('User not authenticated, skipping device session inactive marking', tag: 'DeviceSession');
+        return;
+      }
+      
       // Mark device-specific session as inactive
       await _firestore
           .collection(_deviceSessionsCollection)
@@ -236,25 +183,7 @@ class DeviceSessionService {
     }
   }
 
-  /// Send logout notification to the previous device
-  Future<void> _sendLogoutNotification(String fcmToken, Map<String, dynamic> sessionData) async {
-    try {
-      // In a real implementation, you would send this via your backend
-      // For now, we'll create a Firestore document that the other device can listen to
-      await _firestore.collection('logoutNotifications').add({
-        'fcmToken': fcmToken,
-        'userId': sessionData['userId'],
-        'deviceId': sessionData['deviceId'],
-        'message': 'You have been logged out because your account was accessed from another device.',
-        'timestamp': FieldValue.serverTimestamp(),
-        'processed': false,
-      });
-      
-      AppLogger.info('Logout notification sent to previous device', tag: 'DeviceSession');
-    } catch (e) {
-      AppLogger.warning('Failed to send logout notification', tag: 'DeviceSession');
-    }
-  }
+
 
   /// Listen for logout notifications for current device
   Stream<DocumentSnapshot> listenForLogoutNotifications() async* {
@@ -391,6 +320,13 @@ class DeviceSessionService {
   /// Cleanup session on logout
   Future<void> cleanupSession(String userId) async {
     try {
+      // Check if user is still authenticated before attempting cleanup
+      final currentUser = _auth.currentUser;
+      if (currentUser == null) {
+        AppLogger.info('User already signed out, skipping device session cleanup', tag: 'DeviceSession');
+        return;
+      }
+      
       final deviceInfo = await getDeviceInfo();
       final deviceId = deviceInfo['deviceId'] as String;
       

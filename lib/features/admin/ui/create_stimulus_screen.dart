@@ -316,7 +316,7 @@ class _CreateStimulusScreenState extends State<CreateStimulusScreen> {
                 ),
                 IconButton(
                   onPressed: () => _removeImageItem(index),
-                  icon: const Icon(Icons.delete, size: 20, color: Colors.red),
+                  icon: Icon(Icons.delete, size: 20, color: context.colors.error),
                   tooltip: 'Delete Image',
                 ),
               ],
@@ -352,7 +352,7 @@ class _CreateStimulusScreenState extends State<CreateStimulusScreen> {
         color: colorScheme.surface,
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.1),
+            color: context.colors.onSurface.withOpacity(0.1),
             blurRadius: 8,
             offset: const Offset(0, -2),
           ),
@@ -418,7 +418,7 @@ class _CreateStimulusScreenState extends State<CreateStimulusScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Error adding image: $e'),
-            backgroundColor: Colors.red,
+            backgroundColor: context.colors.error,
           ),
         );
       }
@@ -460,7 +460,7 @@ class _CreateStimulusScreenState extends State<CreateStimulusScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('Cannot duplicate - maximum $_maxImages images allowed'),
-          backgroundColor: Colors.orange,
+          backgroundColor: AppTheme.warningColor,
         ),
       );
       return;
@@ -480,7 +480,7 @@ class _CreateStimulusScreenState extends State<CreateStimulusScreen> {
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(
         content: Text('Image duplicated successfully'),
-        backgroundColor: Colors.green,
+        backgroundColor: AppTheme.successColor,
       ),
     );
   }
@@ -499,9 +499,9 @@ class _CreateStimulusScreenState extends State<CreateStimulusScreen> {
     if (!_formKey.currentState!.validate()) return;
     if (_items.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Please add at least one stimulus item'),
-          backgroundColor: Colors.red,
+        SnackBar(
+          content: const Text('Please add at least one stimulus item'),
+          backgroundColor: context.colors.error,
         ),
       );
       return;
@@ -526,7 +526,7 @@ class _CreateStimulusScreenState extends State<CreateStimulusScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('Custom stimulus created successfully!'),
-            backgroundColor: Colors.green,
+            backgroundColor: AppTheme.successColor,
           ),
         );
       }
@@ -535,7 +535,7 @@ class _CreateStimulusScreenState extends State<CreateStimulusScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Error creating stimulus: $e'),
-            backgroundColor: Colors.red,
+            backgroundColor: context.colors.error,
           ),
         );
       }
@@ -680,7 +680,7 @@ class _EditImageDialogState extends State<_EditImageDialog> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Error changing image: $e'),
-            backgroundColor: Colors.red,
+            backgroundColor: context.colors.error,
           ),
         );
       }

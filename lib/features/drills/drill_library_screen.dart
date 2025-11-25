@@ -12,6 +12,7 @@ import 'package:spark_app/features/sharing/domain/user_profile.dart';
 import 'package:spark_app/features/profile/services/profile_service.dart';
 import 'package:spark_app/core/services/auto_refresh_service.dart';
 import 'package:spark_app/core/widgets/confirmation_dialog.dart';
+import 'package:spark_app/core/widgets/app_loader.dart';
 import 'package:spark_app/core/ui/edge_to_edge.dart';
 import 'package:spark_app/features/auth/bloc/auth_bloc.dart';
 import 'package:spark_app/core/auth/models/user_role.dart';
@@ -58,14 +59,10 @@ class _DrillLibraryScreenState extends State<DrillLibraryScreen>
     _profileService = getIt<ProfileService>();
     _drillRepository = getIt<DrillRepository>();
     
-    // Get permissions from AuthBloc to determine tab count
-    final authState = context.read<AuthBloc>().state;
-    final permissions = authState.permissions;
-    final hasDrillAccess = permissions?.hasDrillAccess ?? false;
-    
-    // Initialize tab controller with correct length based on permissions
+    // Always show 3 tabs: My Drills, Admin Drills, Favorites
+    // Admin Drills will show snackbar if no access
     _tabController = TabController(
-      length: hasDrillAccess ? 3 : 2,
+      length: 3,
       vsync: this,
     );
     
@@ -147,27 +144,28 @@ class _DrillLibraryScreenState extends State<DrillLibraryScreen>
     final permissions = authState.permissions;
     final hasDrillAccess = permissions?.hasDrillAccess ?? false;
 
-    // Tab mapping based on permissions:
-    // With drill access: 0=My Drills, 1=Admin Drills, 2=Favorites
-    // Without drill access: 0=My Drills, 1=Favorites
-    DrillLibraryView view;
-    
-    if (hasDrillAccess) {
-      // User with drill access: My Drills, Admin Drills, Favorites
-      view = switch (_tabController.index) {
-        0 => DrillLibraryView.custom, // My Drills
-        1 => DrillLibraryView.all, // Admin Drills
-        2 => DrillLibraryView.favorites, // Favorites
-        _ => DrillLibraryView.custom,
-      };
-    } else {
-      // User without drill access: My Drills, Favorites (no Admin Drills)
-      view = switch (_tabController.index) {
-        0 => DrillLibraryView.custom, // My Drills
-        1 => DrillLibraryView.favorites, // Favorites
-        _ => DrillLibraryView.custom,
-      };
+    // Check if user tapped on Admin Drills tab without access
+    if (_tabController.index == 1 && !hasDrillAccess) {
+      // Show snackbar and switch back to previous tab
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Text('No access to Admin Drills'),
+          duration: const Duration(seconds: 2),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      // Switch back to My Drills tab
+      _tabController.animateTo(0);
+      return;
     }
+
+    // Tab mapping: 0=My Drills, 1=Admin Drills, 2=Favorites
+    DrillLibraryView view = switch (_tabController.index) {
+      0 => DrillLibraryView.custom, // My Drills
+      1 => DrillLibraryView.all, // Admin Drills
+      2 => DrillLibraryView.favorites, // Favorites
+      _ => DrillLibraryView.custom,
+    };
 
     context.read<DrillLibraryBloc>().add(DrillLibraryViewChanged(view));
   }
@@ -192,48 +190,23 @@ class _DrillLibraryScreenState extends State<DrillLibraryScreen>
   }
 
   List<Widget> _buildTabs() {
-    final authState = context.read<AuthBloc>().state;
-    final permissions = authState.permissions;
-    final hasDrillAccess = permissions?.hasDrillAccess ?? false;
-    
-    print('🔍 _buildTabs called: hasDrillAccess=$hasDrillAccess');
-    if (hasDrillAccess) {
-      // User with drill access: My Drills, Admin Drills, Favorites
-      print('🔍 Building 3 tabs (My Drills, Admin Drills, Favorites)');
-      return [
-        const Tab(text: 'My Drills'),
-        const Tab(text: 'Admin Drills'),
-        const Tab(text: 'Favorites'),
-      ];
-    } else {
-      // User without drill access: My Drills, Favorites (no Admin Drills)
-      print('🔍 Building 2 tabs (My Drills, Favorites)');
-      return [
-        const Tab(text: 'My Drills'),
-        const Tab(text: 'Favorites'),
-      ];
-    }
+    // Always show all 3 tabs: My Drills, Admin Drills, Favorites
+    // Access control is handled in _onTabChanged()
+    return [
+      const Tab(text: 'My Drills'),
+      const Tab(text: 'Admin Drills'),
+      const Tab(text: 'Favorites'),
+    ];
   }
 
   List<Widget> _buildTabsWithCounts(DrillLibraryState state) {
-    final authState = context.read<AuthBloc>().state;
-    final permissions = authState.permissions;
-    final isAdmin = permissions?.role == UserRole.admin;
-    
-    if (isAdmin) {
-      // Admin users: My Drills, Favorites (no Admin Drills tab)
-      return const [
-        Tab(text: 'My Drills'),
-        Tab(text: 'Favorites'),
-      ];
-    } else {
-      // Non-admin users: My Drills, Admin Drills, Favorites
-      return const [
-        Tab(text: 'My Drills'),
-        Tab(text: 'Admin Drills'),
-        Tab(text: 'Favorites'),
-      ];
-    }
+    // Always show all 3 tabs: My Drills, Admin Drills, Favorites
+    // Access control is handled in _onTabChanged()
+    return const [
+      Tab(text: 'My Drills'),
+      Tab(text: 'Admin Drills'),
+      Tab(text: 'Favorites'),
+    ];
   }
 
   Widget _buildTabWithCount(String title, int count) {
@@ -273,24 +246,13 @@ class _DrillLibraryScreenState extends State<DrillLibraryScreen>
   }
 
   List<Widget> _buildTabViews(DrillLibraryState state) {
-    final authState = context.read<AuthBloc>().state;
-    final permissions = authState.permissions;
-    final isAdmin = permissions?.role == UserRole.admin;
-    
-    if (isAdmin) {
-      // Admin users: My Drills, Favorites (no Admin Drills view)
-      return [
-        _buildMyDrillsViewWithRefresh(state), // My drills only
-        _buildFavoriteDrillsViewWithRefresh(state), // Favorites
-      ];
-    } else {
-      // Non-admin users: My Drills, Admin Drills, Favorites
-      return [
-        _buildMyDrillsViewWithRefresh(state), // My drills only
-        _buildAdminDrillsViewWithRefresh(state), // Admin drills only
-        _buildFavoriteDrillsViewWithRefresh(state), // Favorites
-      ];
-    }
+    // Always show all 3 tab views: My Drills, Admin Drills, Favorites
+    // Access control is handled in _onTabChanged() and _buildAdminDrillsView()
+    return [
+      _buildMyDrillsViewWithRefresh(state), // My drills
+      _buildAdminDrillsViewWithRefresh(state), // Admin drills
+      _buildFavoriteDrillsViewWithRefresh(state), // Favorites
+    ];
   }
 
   @override
@@ -436,7 +398,7 @@ class _DrillLibraryScreenState extends State<DrillLibraryScreen>
 
     return Container(
       decoration: BoxDecoration(
-        color: AppTheme.neutral100.withOpacity(0.5),
+        color: colorScheme.surfaceContainerHighest.withOpacity(0.3),
         border: Border(
           bottom: BorderSide(
             color: colorScheme.outline.withOpacity(0.1),
@@ -517,47 +479,8 @@ class _DrillLibraryScreenState extends State<DrillLibraryScreen>
  
 
   Widget _buildLoadingState() {
-    final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
-    
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(64),
-        child: Column(
-          children: [
-            Container(
-              padding: const EdgeInsets.all(24),
-              decoration: BoxDecoration(
-                color: colorScheme.surfaceContainerHighest,
-                borderRadius: BorderRadius.circular(16),
-              ),
-              child: Column(
-                children: [
-                  CircularProgressIndicator(
-                    color: colorScheme.primary,
-                    strokeWidth: 3,
-                  ),
-                  const SizedBox(height: 16),
-                  Text(
-                    'Loading drills...',
-                    style: theme.textTheme.bodyLarge?.copyWith(
-                      color: colorScheme.onSurface.withOpacity(0.7),
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    'Fetching the latest drill library',
-                    style: theme.textTheme.bodySmall?.copyWith(
-                      color: colorScheme.onSurface.withOpacity(0.5),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
-      ),
+    return const AppLoader.fullScreen(
+      message: 'Loading drills...',
     );
   }
 
@@ -710,7 +633,7 @@ Widget _buildCompactStatChip(IconData icon, String text, Color color) {
       margin: const EdgeInsets.only(bottom: 12),
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(16),
-        color: AppTheme.whitePure,
+        color: colorScheme.surface,
         boxShadow: [
           BoxShadow(
             color: colorScheme.shadow.withOpacity(0.08),
@@ -768,13 +691,13 @@ Widget _buildCompactStatChip(IconData icon, String text, Color color) {
                                   padding: const EdgeInsets.all(6),
                                   decoration: BoxDecoration(
                                     color: isFavorite
-                                        ? Colors.red.withOpacity(0.1)
+                                        ? AppTheme.errorColor.withOpacity(0.1)
                                         : colorScheme.surfaceContainerHighest,
                                     borderRadius: BorderRadius.circular(8),
                                   ),
                                   child: Icon(
                                     isFavorite ? Icons.favorite : Icons.favorite_border,
-                                    color: isFavorite ? Colors.red : colorScheme.onSurface.withOpacity(0.6),
+                                    color: isFavorite ? AppTheme.errorColor : colorScheme.onSurface.withOpacity(0.6),
                                     size: 16,
                                   ),
                                 );
@@ -849,26 +772,26 @@ Widget _buildCompactStatChip(IconData icon, String text, Color color) {
                         children: [
                           _buildCompactStatChip(Icons.timer_outlined, '${drill.durationSec}s', colorScheme.primary),
                           const SizedBox(width: 8),
-                          _buildCompactStatChip(Icons.repeat_rounded, '${drill.reps}x', Colors.orange),
+                          _buildCompactStatChip(Icons.repeat_rounded, '${drill.reps}x', AppTheme.warningColor),
                           const SizedBox(width: 8),
-                          _buildCompactStatChip(Icons.pause_circle_outline, '${drill.restSec}s', Colors.grey),
+                          _buildCompactStatChip(Icons.pause_circle_outline, '${drill.restSec}s', colorScheme.outline),
                           const Spacer(),
                           if (drill.sharedWith.isNotEmpty)
                             Container(
                               padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                               decoration: BoxDecoration(
-                                color: Colors.blue.withOpacity(0.1),
+                                color: AppTheme.infoColor.withOpacity(0.1),
                                 borderRadius: BorderRadius.circular(4),
                               ),
                               child: Row(
                                 mainAxisSize: MainAxisSize.min,
                                 children: [
-                                  Icon(Icons.people_outline, color: Colors.blue, size: 10),
+                                  Icon(Icons.people_outline, color: AppTheme.infoColor, size: 10),
                                   const SizedBox(width: 2),
                                   Text(
                                     'SHARED',
                                     style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                                      color: Colors.blue,
+                                      color: AppTheme.infoColor,
                                       fontSize: 8,
                                       fontWeight: FontWeight.w600,
                                     ),
@@ -1019,11 +942,11 @@ Widget _buildCompactStatChip(IconData icon, String text, Color color) {
   Color _getDifficultyColor(Difficulty difficulty) {
     switch (difficulty) {
       case Difficulty.beginner:
-        return Colors.green;
+        return AppTheme.successColor;
       case Difficulty.intermediate:
-        return Colors.orange;
+        return AppTheme.warningColor;
       case Difficulty.advanced:
-        return Colors.red;
+        return AppTheme.errorColor;
     }
   }
 
@@ -1317,7 +1240,7 @@ Widget _buildCompactStatChip(IconData icon, String text, Color color) {
             children: [
               Icon(
                 currentlyFavorite ? Icons.favorite_border : Icons.favorite,
-                color: Colors.white,
+                color: Theme.of(context).colorScheme.onPrimary,
                 size: 20,
               ),
               const SizedBox(width: 8),

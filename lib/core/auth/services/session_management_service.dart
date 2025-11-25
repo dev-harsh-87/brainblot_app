@@ -43,15 +43,14 @@ class SessionManagementService {
 
   /// Initialize session monitoring
   void _initializeSessionMonitoring() {
-    // Initialize subscription sync service
-    _subscriptionSync.initialize().catchError((e) {
-      AppLogger.error('Failed to initialize subscription sync', error: e);
-    });
-    
     // Check if there's an existing Firebase Auth user on init
     final currentUser = _auth.currentUser;
     if (currentUser != null) {
       AppLogger.debug('Session init: Found existing Firebase user, establishing session');
+      // Initialize subscription sync service when user is authenticated
+      _subscriptionSync.initialize().catchError((e) {
+        AppLogger.error('Failed to initialize subscription sync', error: e);
+      });
       _establishSession(currentUser).catchError((e) {
         AppLogger.error('Failed to establish initial session', error: e);
       });
@@ -67,6 +66,13 @@ class SessionManagementService {
       // User logged out - clear session
       await _clearSession();
       return;
+    }
+
+    // Initialize subscription sync service when user logs in
+    if (!_subscriptionSync.isInitialized) {
+      _subscriptionSync.initialize().catchError((e) {
+        AppLogger.error('Failed to initialize subscription sync on login', error: e);
+      });
     }
 
     // CRITICAL: User logged in - establish session WITHOUT device registration
@@ -211,18 +217,13 @@ class SessionManagementService {
     AppLogger.info('You have been logged out because your account was accessed from another device');
   }
 
-  /// Clear user session
+  /// Clear user session (called automatically by auth state changes)
   Future<void> _clearSession() async {
     // Cancel subscriptions
     await _userSubscription?.cancel();
     await _logoutSubscription?.cancel();
     _userSubscription = null;
     _logoutSubscription = null;
-    
-    // Cleanup device session
-    if (_currentSession != null) {
-      await _deviceSessionService.cleanupSession(_currentSession!.id);
-    }
     
     // Clear session data
     _currentSession = null;
@@ -354,23 +355,41 @@ class SessionManagementService {
   /// Sign out and clear session
   Future<void> signOut() async {
     try {
-      // CRITICAL: Sign out from Firebase Auth
+      // CRITICAL: Cleanup device session BEFORE signing out from Firebase Auth
+      // This ensures we still have authentication when accessing Firestore
+      if (_currentSession != null) {
+        await _deviceSessionService.cleanupSession(_currentSession!.id);
+      }
+      
+      // Cancel subscriptions
+      await _userSubscription?.cancel();
+      await _logoutSubscription?.cancel();
+      _userSubscription = null;
+      _logoutSubscription = null;
+      
+      // Clear saved credentials
+      try {
+        final prefs = await PreferencesService.getInstance();
+        await prefs.clearSavedCredentials();
+      } catch (e) {
+        AppLogger.error('Failed to clear saved credentials', error: e);
+      }
+      
+      // NOW sign out from Firebase Auth
       await _auth.signOut();
       
-      // Wait for auth state to propagate
-      await Future.delayed(const Duration(milliseconds: 100));
+      // Clear session data
+      _currentSession = null;
       
-      // _clearSession will be called automatically via auth state changes
-      // But we ensure state is cleared even if listener fails
-      if (_currentSession != null) {
-        await _clearSession();
-      }
+      // Notify listeners
+      _notifySessionListeners(null);
       
       AppLogger.success('Sign out completed', tag: 'SessionManagement');
     } catch (e) {
       AppLogger.error('Sign out error', error: e, tag: 'SessionManagement');
       // Force clear session even on error
-      await _clearSession();
+      _currentSession = null;
+      _notifySessionListeners(null);
       rethrow;
     }
   }

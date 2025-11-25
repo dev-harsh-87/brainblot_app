@@ -1,16 +1,18 @@
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import 'package:spark_app/core/auth/auth_wrapper.dart';
-import 'package:spark_app/core/auth/guards/admin_guard.dart';
-import 'package:spark_app/core/auth/models/user_role.dart';
+import 'package:spark_app/core/auth/screens/permission_splash_screen.dart';
 import 'package:spark_app/core/auth/services/permission_service.dart';
+import 'package:spark_app/core/widgets/permission_based_screen.dart';
 import 'package:spark_app/core/di/injection.dart';
 import 'package:spark_app/core/router/go_router_refresh_stream.dart';
 import 'package:spark_app/core/storage/app_storage.dart';
 import 'package:spark_app/core/widgets/main_navigation.dart';
+import 'package:spark_app/core/screens/app_initialization_screen.dart';
 import 'package:spark_app/features/admin/enhanced_admin_dashboard_screen.dart';
 import 'package:spark_app/features/auth/bloc/auth_bloc.dart';
 import 'package:spark_app/features/auth/forgot_password_screen.dart';
@@ -44,6 +46,9 @@ import 'package:spark_app/features/stats/stats_screen.dart';
 import 'package:spark_app/features/subscription/ui/subscription_screen.dart';
 import 'package:spark_app/features/subscription/ui/user_requests_screen.dart';
 import 'package:spark_app/features/training/training_screen.dart';
+import 'package:spark_app/features/admin/ui/user_management_screen.dart';
+import 'package:spark_app/features/admin/ui/screens/user_permission_management_screen.dart';
+import 'package:spark_app/core/auth/models/app_user.dart';
 
 
 /// Main application router configuration
@@ -64,13 +69,10 @@ class AppRouter {
   AppRouter(this._authBloc);
 
   /// Determines the initial route based on authentication state
-  /// Always starts at home screen for authenticated users to ensure consistent experience
+  /// Always starts at initialization screen first
   String _getInitialLocation() {
-    final currentUser = FirebaseAuth.instance.currentUser;
-    
-    // Always start at home screen for authenticated users
-    // This ensures consistent behavior on app restart
-    return currentUser != null ? '/' : '/login';
+    // Always start at initialization screen to handle app setup
+    return '/init';
   }
 
   /// Saves current location for hot reload restoration (debug mode only)
@@ -86,30 +88,30 @@ class AppRouter {
     final currentLocation = state.uri.toString();
     final authState = _authBloc.state;
     final isAuthRoute = _authRoutes.contains(currentLocation);
+    final isInitRoute = currentLocation == '/init';
     final currentUser = FirebaseAuth.instance.currentUser;
     
     // Save location for hot reload (debug mode)
     _saveLocationForHotReload(currentLocation);
+    
+    // Always allow access to initialization screen
+    if (isInitRoute) {
+      return null;
+    }
     
     // Don't redirect during authentication loading
     if (authState.status == AuthStatus.loading) {
       return null;
     }
     
+    // User is not authenticated - redirect to login (not initialization)
+    if (authState.status == AuthStatus.initial && !isAuthRoute) {
+      return '/login';
+    }
+    
     // Authenticated user trying to access auth routes -> redirect to home
     if (authState.status == AuthStatus.authenticated && isAuthRoute) {
       return '/';
-    }
-    
-    // Check if Firebase Auth has a user (handles app restart and hot reload)
-    if (authState.status == AuthStatus.initial && !isAuthRoute) {
-      if (currentUser != null) {
-        // User exists in Firebase Auth, allow navigation while session establishes
-        debugPrint('[Router] Firebase user exists, allowing navigation during session restoration');
-        return null;
-      }
-      // No Firebase user, redirect to login
-      return '/login';
     }
     
     // Allow navigation (admin routes protected by AdminGuard)
@@ -127,6 +129,20 @@ class AppRouter {
   /// Builds all application routes
   List<RouteBase> _buildRoutes() {
     return [
+      // App Initialization Screen (first screen)
+      GoRoute(
+        path: '/init',
+        name: 'init',
+        builder: (context, state) => const AppInitializationScreen(),
+      ),
+      
+      // Permission Splash Screen Route (for authenticated users)
+      GoRoute(
+        path: '/splash',
+        name: 'splash',
+        builder: (context, state) => const PermissionSplashScreen(),
+      ),
+      
       // Authentication Routes (outside shell)
       ..._buildAuthRoutes(),
       
@@ -161,35 +177,92 @@ class AppRouter {
             name: 'drills',
             builder: (context, state) {
               final categoryId = state.uri.queryParameters['category'];
-              return BlocProvider.value(
-                value: getIt<DrillLibraryBloc>(),
-                child: DrillLibraryScreen(initialCategory: categoryId),
+              return PermissionBasedScreen(
+                requiredModule: 'drills',
+                child: BlocProvider.value(
+                  value: getIt<DrillLibraryBloc>(),
+                  child: DrillLibraryScreen(initialCategory: categoryId),
+                ),
               );
             },
           ),
           GoRoute(
             path: '/programs',
             name: 'programs',
-            builder: (context, state) => BlocProvider.value(
-              value: getIt<ProgramsBloc>(),
-              child: const ProgramsScreen(),
+            builder: (context, state) => PermissionBasedScreen(
+              requiredModule: 'programs',
+              child: BlocProvider.value(
+                value: getIt<ProgramsBloc>(),
+                child: const ProgramsScreen(),
+              ),
             ),
           ),
           GoRoute(
             path: '/subscription',
             name: 'subscription',
-            builder: (context, state) => const SubscriptionScreen(),
+            builder: (context, state) => PermissionBasedScreen(
+              requiredModule: 'subscription',
+              child: const SubscriptionScreen(),
+            ),
           ),
           GoRoute(
             path: '/admin',
             name: 'admin',
-            builder: (context, state) => AdminGuard(
-              permissionService: getIt<PermissionService>(),
-              requiredRole: UserRole.admin,
+            builder: (context, state) => PermissionBasedScreen(
+              requireAdmin: true,
               child: EnhancedAdminDashboardScreen(
                 permissionService: getIt<PermissionService>(),
               ),
             ),
+            routes: [
+              GoRoute(
+                path: '/user-management',
+                name: 'user-management',
+                builder: (context, state) => PermissionBasedScreen(
+                  requireAdmin: true,
+                  child: const UserManagementScreen(),
+                ),
+                routes: [
+                  GoRoute(
+                    path: '/permissions/:userId',
+                    name: 'user-permissions',
+                    builder: (context, state) {
+                      final userId = state.pathParameters['userId']!;
+                      return PermissionBasedScreen(
+                        requireAdmin: true,
+                        child: FutureBuilder<DocumentSnapshot>(
+                          future: FirebaseFirestore.instance
+                              .collection('users')
+                              .doc(userId)
+                              .get(),
+                          builder: (context, snapshot) {
+                            if (snapshot.connectionState == ConnectionState.waiting) {
+                              return const Scaffold(
+                                body: Center(child: CircularProgressIndicator()),
+                              );
+                            }
+                            
+                            if (snapshot.hasError || !snapshot.hasData || !snapshot.data!.exists) {
+                              return Scaffold(
+                                appBar: AppBar(title: const Text('User Not Found')),
+                                body: const Center(
+                                  child: Text('User not found or error loading user data'),
+                                ),
+                              );
+                            }
+                            
+                            final userData = snapshot.data!.data() as Map<String, dynamic>;
+                            final user = AppUser.fromFirestore(snapshot.data!);
+                            
+                            return UserPermissionManagementScreen(user: user);
+                          },
+                        ),
+                      );
+                    },
+                  ),
+                ],
+              ),
+            ],
           ),
         ],
       ),
@@ -213,16 +286,19 @@ class AppRouter {
       GoRoute(
         path: '/profile',
         name: 'profile',
-        builder: (context, state) => MultiBlocProvider(
-          providers: [
-            BlocProvider.value(
-              value: getIt<SettingsBloc>()..add(const SettingsStarted()),
-            ),
-            BlocProvider(
-              create: (_) => StatsBloc(getIt())..add(const StatsStarted()),
-            ),
-          ],
-          child: const ProfileScreen(),
+        builder: (context, state) => PermissionBasedScreen(
+          requiredModule: 'profile',
+          child: MultiBlocProvider(
+            providers: [
+              BlocProvider.value(
+                value: getIt<SettingsBloc>()..add(const SettingsStarted()),
+              ),
+              BlocProvider(
+                create: (_) => StatsBloc(getIt())..add(const StatsStarted()),
+              ),
+            ],
+            child: const ProfileScreen(),
+          ),
         ),
       ),
       GoRoute(
@@ -236,9 +312,12 @@ class AppRouter {
       GoRoute(
         path: '/stats',
         name: 'stats',
-        builder: (context, state) => BlocProvider(
-          create: (_) => StatsBloc(getIt())..add(const StatsStarted()),
-          child: const StatsScreen(),
+        builder: (context, state) => PermissionBasedScreen(
+          requiredModule: 'stats',
+          child: BlocProvider(
+            create: (_) => StatsBloc(getIt())..add(const StatsStarted()),
+            child: const StatsScreen(),
+          ),
         ),
       ),
       
@@ -408,25 +487,34 @@ class AppRouter {
     return GoRoute(
       path: '/multiplayer',
       name: 'multiplayer',
-      builder: (context, state) => BlocProvider.value(
-        value: getIt<SettingsBloc>()..add(const SettingsStarted()),
-        child: const MultiplayerSelectionScreen(),
+      builder: (context, state) => PermissionBasedScreen(
+        requiredModule: 'multiplayer',
+        child: BlocProvider.value(
+          value: getIt<SettingsBloc>()..add(const SettingsStarted()),
+          child: const MultiplayerSelectionScreen(),
+        ),
       ),
       routes: [
         GoRoute(
           path: 'host',
           name: 'multiplayer-host',
-          builder: (context, state) => BlocProvider.value(
-            value: getIt<SettingsBloc>()..add(const SettingsStarted()),
-            child: const HostSessionScreen(),
+          builder: (context, state) => PermissionBasedScreen(
+            requiredModule: 'host_features',
+            child: BlocProvider.value(
+              value: getIt<SettingsBloc>()..add(const SettingsStarted()),
+              child: const HostSessionScreen(),
+            ),
           ),
         ),
         GoRoute(
           path: 'join',
           name: 'multiplayer-join',
-          builder: (context, state) => BlocProvider.value(
-            value: getIt<SettingsBloc>()..add(const SettingsStarted()),
-            child: const JoinSessionScreen(),
+          builder: (context, state) => PermissionBasedScreen(
+            requiredModule: 'multiplayer',
+            child: BlocProvider.value(
+              value: getIt<SettingsBloc>()..add(const SettingsStarted()),
+              child: const JoinSessionScreen(),
+            ),
           ),
         ),
       ],

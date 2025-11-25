@@ -109,15 +109,23 @@ class UserRegistrationService {
 
       await firebaseUser.updateDisplayName(displayName);
 
-      // Create default user profile in Firestore
+      // Create default user profile with proper permissions
       final newUser = AppUser(
         id: firebaseUser.uid,
         email: email,
         displayName: displayName,
+        role: UserRole.user, // Default role for new registrations
         subscription: const UserSubscription(
           plan: 'free',
-          moduleAccess: ['drills', 'profile', 'stats', 'analysis'],
-        ), // Default subscription
+          status: 'active',
+          moduleAccess: [
+            'drills',      // Basic drill access (CRUD operations)
+            'programs',    // Basic program access (CRUD operations)
+            'profile',     // Profile management
+            'stats',       // Personal statistics
+            'subscription' // Subscription management
+          ],
+        ),
         preferences: const UserPreferences(),
         stats: const UserStats(),
         createdAt: DateTime.now(),

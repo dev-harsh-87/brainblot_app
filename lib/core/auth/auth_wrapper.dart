@@ -55,9 +55,12 @@ class AuthGuard extends StatelessWidget {
     return BlocBuilder<AuthBloc, AuthState>(
       builder: (context, state) {
         if (state.status == AuthStatus.loading) {
-          return const Scaffold(
+          return Scaffold(
+            backgroundColor: Theme.of(context).colorScheme.surface,
             body: Center(
-              child: CircularProgressIndicator(),
+              child: CircularProgressIndicator(
+                color: Theme.of(context).colorScheme.primary,
+              ),
             ),
           );
         }
@@ -71,9 +74,12 @@ class AuthGuard extends StatelessWidget {
           context.go('/login');
         });
         
-        return const Scaffold(
+        return Scaffold(
+          backgroundColor: Theme.of(context).colorScheme.surface,
           body: Center(
-            child: CircularProgressIndicator(),
+            child: CircularProgressIndicator(
+              color: Theme.of(context).colorScheme.primary,
+            ),
           ),
         );
       },

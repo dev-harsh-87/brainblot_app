@@ -51,26 +51,16 @@ class _DrillBuilderScreenState extends State<DrillBuilderScreen>
   int _numberOfStimuli = 30;
   int _stimulusLengthMs = 1000; // 1 second default for Timed mode
   int _delayBetweenStimuliMs = 500; // 500ms default delay between stimuli
-  final Set<StimulusType> _stimuli = {StimulusType.color};
+  final Set<StimulusType> _stimuli =
+      <StimulusType>{}; // Start with no stimuli selected
   final Set<ReactionZone> _zones = {ReactionZone.center}; // Always center only
-  final List<Color> _selectedColors = [
-    Colors.red,
-    Colors.green,
-    Colors.blue,
-    Colors.yellow
-  ];
-  final List<ArrowDirection> _selectedArrows = [
-    ArrowDirection.up,
-    ArrowDirection.down,
-    ArrowDirection.left,
-    ArrowDirection.right
-  ];
-  final List<ShapeType> _selectedShapes = [
-    ShapeType.circle,
-    ShapeType.square,
-    ShapeType.triangle
-  ];
-  final List<int> _selectedNumbers = [1, 2, 3, 4, 5];
+  final List<Color> _selectedColors =
+      <Color>[]; // Start with no colors selected
+  final List<ArrowDirection> _selectedArrows =
+      <ArrowDirection>[]; // Start with no arrows selected
+  final List<ShapeType> _selectedShapes =
+      <ShapeType>[]; // Start with no shapes selected
+  final List<int> _selectedNumbers = <int>[]; // Start with no numbers selected
   PresentationMode _presentationMode = PresentationMode.visual;
   DrillMode _drillMode = DrillMode.touch;
 
@@ -232,12 +222,14 @@ class _DrillBuilderScreenState extends State<DrillBuilderScreen>
 
         // If editing an existing drill, populate selected custom stimulus items
         final existingDrill = widget.initial;
-        if (existingDrill != null && existingDrill.customStimuliIds.isNotEmpty) {
-          print('🔄 Loading selected custom stimulus items for existing drill...');
+        if (existingDrill != null &&
+            existingDrill.customStimuliIds.isNotEmpty) {
+          print(
+              '🔄 Loading selected custom stimulus items for existing drill...');
           print('🔍 Drill customStimuliIds: ${existingDrill.customStimuliIds}');
-          
+
           _selectedCustomStimulusItems.clear();
-          
+
           // Find and add the selected custom stimulus items
           for (final customStimulus in stimuli) {
             for (final item in customStimulus.items) {
@@ -247,9 +239,10 @@ class _DrillBuilderScreenState extends State<DrillBuilderScreen>
               }
             }
           }
-          
-          print('✅ Loaded ${_selectedCustomStimulusItems.length} selected custom stimulus items');
-          
+
+          print(
+              '✅ Loaded ${_selectedCustomStimulusItems.length} selected custom stimulus items');
+
           // Trigger UI update
           setState(() {});
         }
@@ -287,25 +280,31 @@ class _DrillBuilderScreenState extends State<DrillBuilderScreen>
       return ((_delayBetweenStimuliMs / 1000) * _numberOfStimuli).round();
     } else {
       // Timed mode: (stimulus_length_seconds + delay_time_seconds) × stimuli_count
-      return (((_stimulusLengthMs / 1000) + (_delayBetweenStimuliMs / 1000)) * _numberOfStimuli).round();
+      return (((_stimulusLengthMs / 1000) + (_delayBetweenStimuliMs / 1000)) *
+              _numberOfStimuli)
+          .round();
     }
   }
 
   Drill _build() {
     final initial = widget.initial;
-    
+
     // Debug logging
-    print('🔷 Spark 🔍 [DrillBuilder] Building drill with ${_selectedCustomStimulusItems.length} selected custom stimulus items');
+    print(
+        '🔷 Spark 🔍 [DrillBuilder] Building drill with ${_selectedCustomStimulusItems.length} selected custom stimulus items');
     for (final item in _selectedCustomStimulusItems) {
-      print('🔷 Spark 🔍 [DrillBuilder] Selected item: ${item.name} (${item.id})');
+      print(
+          '🔷 Spark 🔍 [DrillBuilder] Selected item: ${item.name} (${item.id})');
     }
-    print('🔷 Spark 🔍 [DrillBuilder] Final customStimuliIds: ${_selectedCustomStimulusItems.map((item) => item.id).toList()}');
-    
+    print(
+        '🔷 Spark 🔍 [DrillBuilder] Final customStimuliIds: ${_selectedCustomStimulusItems.map((item) => item.id).toList()}');
+
     // Calculate duration based on drill mode
     final calculatedDuration = _calculateDuration();
-    
-    print('🔷 Spark 🔍 [DrillBuilder] Calculated duration: ${calculatedDuration}s (mode: $_drillMode, stimuli: $_numberOfStimuli, delay: ${_delayBetweenStimuliMs}ms, length: ${_stimulusLengthMs}ms)');
-    
+
+    print(
+        '🔷 Spark 🔍 [DrillBuilder] Calculated duration: ${calculatedDuration}s (mode: $_drillMode, stimuli: $_numberOfStimuli, delay: ${_delayBetweenStimuliMs}ms, length: ${_stimulusLengthMs}ms)');
+
     return Drill(
       id: initial?.id ?? _uuid.v4(),
       name: _name.text.trim(),
@@ -634,8 +633,8 @@ class _DrillBuilderScreenState extends State<DrillBuilderScreen>
                             },
                             icon: const Icon(Icons.close),
                             style: IconButton.styleFrom(
-                              backgroundColor: Colors.black54,
-                              foregroundColor: Colors.white,
+                              backgroundColor: Theme.of(context).colorScheme.scrim.withOpacity(0.7),
+                              foregroundColor: Theme.of(context).colorScheme.onPrimary,
                             ),
                           ),
                         ),
@@ -664,8 +663,8 @@ class _DrillBuilderScreenState extends State<DrillBuilderScreen>
                             },
                             icon: const Icon(Icons.close),
                             style: IconButton.styleFrom(
-                              backgroundColor: Colors.black54,
-                              foregroundColor: Colors.white,
+                              backgroundColor: Theme.of(context).colorScheme.scrim.withOpacity(0.7),
+                              foregroundColor: Theme.of(context).colorScheme.onPrimary,
                             ),
                           ),
                         ),
@@ -832,11 +831,11 @@ class _DrillBuilderScreenState extends State<DrillBuilderScreen>
     Color getDifficultyColor() {
       switch (difficulty) {
         case Difficulty.beginner:
-          return Colors.green;
+          return AppTheme.successColor;
         case Difficulty.intermediate:
-          return Colors.orange;
+          return AppTheme.warningColor;
         case Difficulty.advanced:
-          return Colors.red;
+          return AppTheme.errorColor;
       }
     }
 
@@ -897,92 +896,79 @@ class _DrillBuilderScreenState extends State<DrillBuilderScreen>
   }
 
   Widget _buildDrillModeCard(DrillMode mode) {
-    final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
-    final isSelected = _drillMode == mode;
+   final theme = Theme.of(context);
+   final colorScheme = theme.colorScheme;
+   final isSelected = _drillMode == mode;
 
-    String getTitle() {
-      switch (mode) {
-        case DrillMode.touch:
-          return 'Touch';
-        case DrillMode.timed:
-          return 'Timed';
-      }
-    }
 
-    IconData getIcon() {
-      switch (mode) {
-        case DrillMode.touch:
-          return Icons.touch_app;
-        case DrillMode.timed:
-          return Icons.timer;
-      }
-    }
+   String getTitle() {
+     switch (mode) {
+       case DrillMode.touch:
+         return 'Touch';
+       case DrillMode.timed:
+         return 'Timed';
+     }
+   }
 
-    return GestureDetector(
-      onTap: () {
-        setState(() {
-          _drillMode = mode;
-        });
-        HapticFeedback.lightImpact();
-      },
-      child: Container(
-      
-        padding: const EdgeInsets.all(20),
-        decoration: BoxDecoration(
-          color: isSelected
-              ? AppTheme.goldPrimary.withOpacity(0.3)
-              : AppTheme.neutral100,
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(
-            color: isSelected
-                ? colorScheme.primary
-                : colorScheme.outline.withOpacity(0.2),
-            width: isSelected ? 2.5 : 1,
-          ),
-          boxShadow: isSelected
-              ? [
-                  BoxShadow(
-                    color: colorScheme.primary.withOpacity(0.15),
-                    blurRadius: 12,
-                    offset: const Offset(0, 4),
-                  ),
-                ]
-              : null,
-        ),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Container(
-              padding: const EdgeInsets.all(10),
-              decoration: BoxDecoration(
-                color: isSelected
-                    ? colorScheme.primary.withOpacity(0.1)
-                    : colorScheme.surfaceContainerHigh,
-                shape: BoxShape.circle,
-              ),
-              child: Icon(
-                getIcon(),
-                color: isSelected
-                    ? colorScheme.primary
-                    : colorScheme.onSurface.withOpacity(0.7),
-                size: 26,
-              ),
-            ),
-            const SizedBox(height: 10),
-            Text(
-              getTitle(),
-              style: theme.textTheme.titleMedium?.copyWith(
-                fontWeight: FontWeight.w700,
-                color: isSelected ? colorScheme.primary : colorScheme.onSurface,
-                letterSpacing: 0.5,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
+
+   IconData getIcon() {
+     switch (mode) {
+       case DrillMode.touch:
+         return Icons.touch_app;
+       case DrillMode.timed:
+         return Icons.timer;
+     }
+   }
+
+
+   return GestureDetector(
+     onTap: () {
+       setState(() {
+         _drillMode = mode;
+       });
+       HapticFeedback.lightImpact();
+     },
+     child: Container(
+       padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+         color: isSelected
+             ? colorScheme.primaryContainer
+             : colorScheme.surfaceContainerHighest,
+         borderRadius: BorderRadius.circular(12),
+         border: Border.all(
+           color: isSelected
+               ? colorScheme.primary
+               : colorScheme.outline.withOpacity(0.3),
+           width: isSelected ? 2 : 1,
+         ),
+ 
+       ),
+       child: Column(
+         mainAxisAlignment: MainAxisAlignment.center,
+         children: [
+              Icon(
+             getIcon(),
+             color: isSelected
+                 ? colorScheme.onPrimaryContainer
+                 : colorScheme.onSurface.withOpacity(0.7),
+             size: 32,
+           ),
+           const SizedBox(height: 10),
+           Text(
+             getTitle(),
+ style: theme.textTheme.titleSmall?.copyWith(
+               fontWeight: FontWeight.w600,
+               color: isSelected
+                   ? colorScheme.onPrimaryContainer
+                   : colorScheme.onSurface,
+             ),
+           ),
+         ],
+       ),
+     ),
+   );
+ }
+
 
   Widget _buildNavigationButtons() {
     final theme = Theme.of(context);
@@ -1082,7 +1068,7 @@ class _DrillBuilderScreenState extends State<DrillBuilderScreen>
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Please fix the following: ${stepErrors.join(', ')}'),
-            backgroundColor: Colors.red,
+            backgroundColor: Theme.of(context).colorScheme.error,
           ),
         );
         HapticFeedback.heavyImpact();
@@ -1147,45 +1133,45 @@ class _DrillBuilderScreenState extends State<DrillBuilderScreen>
                 child: _buildDrillModeCard(DrillMode.timed),
               ),
             ],
-            ),
-            const SizedBox(height: 16),
-  
-            // Mode Meaning Section
-            Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: colorScheme.primaryContainer.withOpacity(0.2),
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(
-                  color: colorScheme.primary.withOpacity(0.3),
-                  width: 1,
-                ),
+          ),
+          const SizedBox(height: 16),
+
+          // Mode Meaning Section
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: colorScheme.primaryContainer.withOpacity(0.2),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(
+                color: colorScheme.primary.withOpacity(0.3),
+                width: 1,
               ),
-              child: Row(
-                children: [
-                  Icon(
-                    Icons.info_outline,
-                    color: colorScheme.primary,
-                    size: 20,
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Text(
-                      _drillMode == DrillMode.touch
-                          ? 'Touch Mode: Tap stimuli as they appear. Performance metrics will be tracked and analyzed.'
-                          : 'Timed Mode: Watch stimuli appear automatically. No interaction required, perfect for passive observation.',
-                      style: theme.textTheme.bodySmall?.copyWith(
-                        color: colorScheme.onSurface.withOpacity(0.8),
-                        height: 1.4,
-                      ),
+            ),
+            child: Row(
+              children: [
+                Icon(
+                  Icons.info_outline,
+                  color: colorScheme.primary,
+                  size: 20,
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    _drillMode == DrillMode.touch
+                        ? 'Touch Mode: Tap stimuli as they appear. Performance metrics will be tracked and analyzed.'
+                        : 'Timed Mode: Watch stimuli appear automatically. No interaction required, perfect for passive observation.',
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: colorScheme.onSurface.withOpacity(0.8),
+                      height: 1.4,
                     ),
                   ),
-                ],
-              ),
+                ),
+              ],
             ),
-            const SizedBox(height: 24),
-  
-            // Timing Section - Different fields based on drill mode
+          ),
+          const SizedBox(height: 24),
+
+          // Timing Section - Different fields based on drill mode
           Text(
             'Timing Settings',
             style: theme.textTheme.titleMedium?.copyWith(
@@ -1207,13 +1193,15 @@ class _DrillBuilderScreenState extends State<DrillBuilderScreen>
                     children: [
                       Expanded(
                         child: _buildSliderField(
-                          'Length of time',
+                          'Length of Time',
                           (_stimulusLengthMs / 1000).toDouble(),
                           0.1,
                           5.0,
-                          (value) => setState(() => _stimulusLengthMs = (value * 1000).round()),
+                          (value) => setState(
+                              () => _stimulusLengthMs = (value * 1000).round()),
                           '${(_stimulusLengthMs / 1000).toStringAsFixed(1)}s',
-                          description: 'How long each stimulus stays visible on screen',
+                          description:
+                              'How long each stimulus stays visible on screen',
                         ),
                       ),
                     ],
@@ -1223,11 +1211,12 @@ class _DrillBuilderScreenState extends State<DrillBuilderScreen>
                     children: [
                       Expanded(
                         child: _buildSliderField(
-                          'Delay time',
+                          'Delay Time',
                           (_delayBetweenStimuliMs / 1000).toDouble(),
                           0.1,
                           3.0,
-                          (value) => setState(() => _delayBetweenStimuliMs = (value * 1000).round()),
+                          (value) => setState(() =>
+                              _delayBetweenStimuliMs = (value * 1000).round()),
                           '${(_delayBetweenStimuliMs / 1000).toStringAsFixed(1)}s',
                           description: 'Pause between each stimulus appearing',
                         ),
@@ -1235,18 +1224,36 @@ class _DrillBuilderScreenState extends State<DrillBuilderScreen>
                     ],
                   ),
                   const SizedBox(height: 16),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: _buildSliderField(
+                          'Rounds',
+                          _numberOfStimuli.toDouble(),
+                          5.0,
+                          100.0,
+                          (value) =>
+                              setState(() => _numberOfStimuli = value.round()),
+                          '$_numberOfStimuli stimuli',
+                          description:
+                              'Total number of stimuli shown during the drill',
+                        ),
+                      ),
+                    ],
+                  ),
                 ],
-                // Touch Mode: Only delay time
+                // Touch Mode: Delay time and rest time
                 if (_drillMode == DrillMode.touch) ...[
                   Row(
                     children: [
                       Expanded(
                         child: _buildSliderField(
-                          'Delay time',
+                          'Delay Time',
                           (_delayBetweenStimuliMs / 1000).toDouble(),
                           0.1,
                           3.0,
-                          (value) => setState(() => _delayBetweenStimuliMs = (value * 1000).round()),
+                          (value) => setState(() =>
+                              _delayBetweenStimuliMs = (value * 1000).round()),
                           '${(_delayBetweenStimuliMs / 1000).toStringAsFixed(1)}s',
                           description: 'Time between each stimulus appearing',
                         ),
@@ -1254,23 +1261,24 @@ class _DrillBuilderScreenState extends State<DrillBuilderScreen>
                     ],
                   ),
                   const SizedBox(height: 16),
-                ],
-                // Both modes: Rest time between sets
-                Row(
-                  children: [
-                    Expanded(
-                      child: _buildSliderField(
-                        'Rest time between sets',
-                        _rest.toDouble(),
-                        10.0,
-                        120.0,
-                        (value) => setState(() => _rest = value.round()),
-                        '${_rest}s',
-                        description: 'Break time between completing sets',
+                  Row(
+                    children: [
+                      Expanded(
+                        child: _buildSliderField(
+                          'Rounds',
+                          _numberOfStimuli.toDouble(),
+                          5.0,
+                          100.0,
+                          (value) =>
+                              setState(() => _numberOfStimuli = value.round()),
+                          '$_numberOfStimuli stimuli',
+                          description:
+                              'Total number of stimuli shown during the drill',
+                        ),
                       ),
-                    ),
-                  ],
-                ),
+                    ],
+                  ),
+                ],
               ],
             ),
           ),
@@ -1296,7 +1304,7 @@ class _DrillBuilderScreenState extends State<DrillBuilderScreen>
                   children: [
                     Expanded(
                       child: _buildSliderField(
-                        'Set count',
+                        'Sets',
                         _sets.toDouble(),
                         1.0,
                         5.0,
@@ -1312,14 +1320,13 @@ class _DrillBuilderScreenState extends State<DrillBuilderScreen>
                   children: [
                     Expanded(
                       child: _buildSliderField(
-                        'Stimuli count',
-                        _numberOfStimuli.toDouble(),
-                        5.0,
-                        100.0,
-                        (value) =>
-                            setState(() => _numberOfStimuli = value.round()),
-                        '$_numberOfStimuli stimuli',
-                        description: 'Total number of stimuli shown during the drill',
+                        'Rest Time',
+                        _rest.toDouble(),
+                        10.0,
+                        120.0,
+                        (value) => setState(() => _rest = value.round()),
+                        '${_rest}s',
+                        description: 'Break time between completing sets',
                       ),
                     ),
                   ],
@@ -1390,18 +1397,17 @@ class _DrillBuilderScreenState extends State<DrillBuilderScreen>
               ),
               const SizedBox(height: 16),
 
-              // Colors Section with Checkbox
-              _buildStimulusSelectionSection(
-                'Colors',
-                StimulusType.color,
-                Column(
+              // Colors Section (always visible)
+              _buildDirectStimulusSection(
+                title: 'Colors',
+                content: Column(
                   children: [
                     Row(
                       children: [
-                        Colors.red,
-                        Colors.blue,
-                        Colors.green,
-                        Colors.yellow
+                        AppTheme.errorColor,
+                        AppTheme.infoColor,
+                        AppTheme.successColor,
+                        AppTheme.warningColor
                       ]
                           .map((color) => Expanded(
                                   child: Padding(
@@ -1414,10 +1420,10 @@ class _DrillBuilderScreenState extends State<DrillBuilderScreen>
                     const SizedBox(height: 12),
                     Row(
                       children: [
-                        Colors.purple,
-                        Colors.orange,
-                        Colors.black,
-                        Colors.grey
+                        const Color(0xFF8B5CF6),
+                        AppTheme.warningColor,
+                        AppTheme.neutral900,
+                        AppTheme.neutral500
                       ]
                           .map((color) => Expanded(
                                   child: Padding(
@@ -1429,16 +1435,13 @@ class _DrillBuilderScreenState extends State<DrillBuilderScreen>
                     ),
                   ],
                 ),
-                _stimuli.contains(StimulusType.color) &&
-                    _selectedColors.length < 2,
               ),
-              const SizedBox(height: 12),
+              const SizedBox(height: 20),
 
-              // Arrows Section with Checkbox
-              _buildStimulusSelectionSection(
-                'Arrows',
-                StimulusType.arrow,
-                Column(
+              // Arrows Section (always visible)
+              _buildDirectStimulusSection(
+                title: 'Arrows',
+                content: Column(
                   children: [
                     Row(
                       children: [
@@ -1473,16 +1476,13 @@ class _DrillBuilderScreenState extends State<DrillBuilderScreen>
                     ),
                   ],
                 ),
-                _stimuli.contains(StimulusType.arrow) &&
-                    _selectedArrows.length < 2,
               ),
-              const SizedBox(height: 12),
+              const SizedBox(height: 20),
 
-              // Shapes Section with Checkbox
-              _buildStimulusSelectionSection(
-                'Shapes',
-                StimulusType.shape,
-                Column(
+              // Shapes Section (always visible)
+              _buildDirectStimulusSection(
+                title: 'Shapes',
+                content: Column(
                   children: [
                     Row(
                       children: [
@@ -1517,16 +1517,13 @@ class _DrillBuilderScreenState extends State<DrillBuilderScreen>
                     ),
                   ],
                 ),
-                _stimuli.contains(StimulusType.shape) &&
-                    _selectedShapes.length < 2,
               ),
-              const SizedBox(height: 12),
+              const SizedBox(height: 20),
 
-              // Numbers Section with Checkbox (simplified)
-              _buildStimulusSelectionSection(
-                'Numbers',
-                StimulusType.number,
-                Column(
+              // Numbers Section (always visible)
+              _buildDirectStimulusSection(
+                title: 'Numbers',
+                content: Column(
                   children: [
                     Row(
                       children: [1, 2, 3, 4]
@@ -1551,86 +1548,77 @@ class _DrillBuilderScreenState extends State<DrillBuilderScreen>
                     ),
                   ],
                 ),
-                _stimuli.contains(StimulusType.number) &&
-                    _selectedNumbers.length < 2,
               ),
-              const SizedBox(height: 12),
+              const SizedBox(height: 30),
 
-              // Custom Stimuli Section with separate heading and description
-              const SizedBox(height: 12),
-              
-              // Custom Stimuli Header
-              Row(
+              // Custom Stimuli Section (always visible)
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Icon(
-                    Icons.extension,
-                    color: colorScheme.primary,
-                    size: 20,
-                  ),
-                  const SizedBox(width: 8),
                   Text(
-                    'Custom Stimuli',
+                    'Select Your Custom Stimuli',
                     style: theme.textTheme.titleMedium?.copyWith(
                       fontWeight: FontWeight.w600,
                     ),
                   ),
-                ],
-              ),
-              const SizedBox(height: 8),
-              Text(
-                'Select from custom stimuli created by administrators',
-                style: theme.textTheme.bodySmall?.copyWith(
-                  color: colorScheme.onSurface.withOpacity(0.7),
-                ),
-              ),
-              const SizedBox(height: 16),
-
-              // Custom Stimuli Content with individual checkboxes
-              if (_loadingCustomStimuli) ...[
-                Container(
-                  padding: const EdgeInsets.all(20),
-                  child: const Center(
-                    child: CircularProgressIndicator(),
-                  ),
-                ),
-              ] else if (_customStimuli.isEmpty) ...[
-                Container(
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    color: colorScheme.surfaceContainerHighest.withOpacity(0.5),
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(
-                      color: colorScheme.outline.withOpacity(0.3),
+                  const SizedBox(height: 8),
+                  Text(
+                    'Select which cues will appear on the screen',
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: colorScheme.onSurface.withOpacity(0.7),
                     ),
                   ),
-                  child: Row(
-                    children: [
-                      Icon(
-                        Icons.info_outline,
-                        color: colorScheme.onSurface.withOpacity(0.6),
-                        size: 20,
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Text(
-                          'No custom stimuli available. Contact your administrator to add custom stimuli.',
-                          style: theme.textTheme.bodyMedium?.copyWith(
-                            color: colorScheme.onSurface.withOpacity(0.7),
+                  const SizedBox(height: 16),
+                  _buildDirectStimulusSection(
+                    content: Column(
+                      children: [
+                        if (_loadingCustomStimuli) ...[
+                          Container(
+                            padding: const EdgeInsets.all(20),
+                            child: const Center(
+                              child: CircularProgressIndicator(),
+                            ),
                           ),
-                        ),
-                      ),
-                    ],
+                        ] else if (_customStimuli.isEmpty) ...[
+                          Container(
+                            padding: const EdgeInsets.all(16),
+                            decoration: BoxDecoration(
+                              color: colorScheme.surfaceContainerHighest
+                                  .withOpacity(0.5),
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(
+                                color: colorScheme.outline.withOpacity(0.3),
+                              ),
+                            ),
+                            child: Row(
+                              children: [
+                                Icon(
+                                  Icons.info_outline,
+                                  color: colorScheme.onSurface.withOpacity(0.6),
+                                  size: 20,
+                                ),
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  child: Text(
+                                    'No custom stimuli available. Contact your administrator to add custom stimuli.',
+                                    style: theme.textTheme.bodyMedium?.copyWith(
+                                      color: colorScheme.onSurface
+                                          .withOpacity(0.7),
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ] else ...[
+                          ...(_customStimuli.map((stimulus) =>
+                              _buildDirectCustomStimulusSection(stimulus))),
+                        ],
+                      ],
+                    ),
                   ),
-                ),
-              ] else ...[
-                ...(_customStimuli.map((stimulus) => _buildCustomStimulusSection(stimulus))),
-              ],
-              
-              // Show validation warning if custom stimuli are selected but not enough items
-              if (_stimuli.contains(StimulusType.custom) && _selectedCustomStimulusItems.length < 2) ...[
-                const SizedBox(height: 16),
-                _buildValidationWarning('Please select at least 2 custom stimulus items'),
-              ],
+                ],
+              ),
             ],
           ),
         ],
@@ -1720,13 +1708,17 @@ class _DrillBuilderScreenState extends State<DrillBuilderScreen>
             [
               _buildReviewItem('Drill Mode', _drillMode.name.toUpperCase()),
               if (_drillMode == DrillMode.timed) ...[
-                _buildReviewItem('Length of time', '${(_stimulusLengthMs / 1000).toStringAsFixed(1)}s'),
-                _buildReviewItem('Delay time', '${(_delayBetweenStimuliMs / 1000).toStringAsFixed(1)}s'),
+                _buildReviewItem('Length of time',
+                    '${(_stimulusLengthMs / 1000).toStringAsFixed(1)}s'),
+                _buildReviewItem('Delay time',
+                    '${(_delayBetweenStimuliMs / 1000).toStringAsFixed(1)}s'),
               ],
               if (_drillMode == DrillMode.touch) ...[
-                _buildReviewItem('Delay time', '${(_delayBetweenStimuliMs / 1000).toStringAsFixed(1)}s'),
+                _buildReviewItem('Delay time',
+                    '${(_delayBetweenStimuliMs / 1000).toStringAsFixed(1)}s'),
               ],
-              _buildReviewItem('Total duration per set', '${_calculateDuration()}s'),
+              _buildReviewItem(
+                  'Total duration per set', '${_calculateDuration()}s'),
               _buildReviewItem('Rest time between sets', '${_rest}s'),
               _buildReviewItem('Set count', '$_sets'),
               _buildReviewItem('Stimuli count', '$_numberOfStimuli'),
@@ -1763,11 +1755,11 @@ class _DrillBuilderScreenState extends State<DrillBuilderScreen>
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(16),
                 side: BorderSide(
-                  color: Colors.red.withOpacity(0.4),
+                  color: AppTheme.errorColor.withOpacity(0.4),
                   width: 1.5,
                 ),
               ),
-              color: Colors.red.withOpacity(0.08),
+              color: AppTheme.errorColor.withOpacity(0.08),
               child: Padding(
                 padding: const EdgeInsets.all(20),
                 child: Column(
@@ -1778,12 +1770,12 @@ class _DrillBuilderScreenState extends State<DrillBuilderScreen>
                         Container(
                           padding: const EdgeInsets.all(10),
                           decoration: BoxDecoration(
-                            color: Colors.red.withOpacity(0.2),
+                            color: AppTheme.errorColor.withOpacity(0.2),
                             shape: BoxShape.circle,
                           ),
                           child: Icon(
                             Icons.warning_rounded,
-                            color: Colors.red.shade700,
+                            color: AppTheme.errorColor,
                             size: 28,
                           ),
                         ),
@@ -1793,7 +1785,7 @@ class _DrillBuilderScreenState extends State<DrillBuilderScreen>
                             'Please fix the following issues:',
                             style: theme.textTheme.titleMedium?.copyWith(
                               fontWeight: FontWeight.bold,
-                              color: Colors.red.shade800,
+                              color: AppTheme.errorColor,
                               letterSpacing: 0.3,
                             ),
                           ),
@@ -1812,7 +1804,7 @@ class _DrillBuilderScreenState extends State<DrillBuilderScreen>
                               width: 6,
                               height: 6,
                               decoration: BoxDecoration(
-                                color: Colors.red.shade700,
+                                color: AppTheme.errorColor,
                                 shape: BoxShape.circle,
                               ),
                             ),
@@ -1821,7 +1813,7 @@ class _DrillBuilderScreenState extends State<DrillBuilderScreen>
                               child: Text(
                                 error,
                                 style: theme.textTheme.bodyMedium?.copyWith(
-                                  color: Colors.red.shade700,
+                                  color: AppTheme.errorColor,
                                   fontWeight: FontWeight.w500,
                                 ),
                               ),
@@ -1844,11 +1836,11 @@ class _DrillBuilderScreenState extends State<DrillBuilderScreen>
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(16),
                 side: BorderSide(
-                  color: Colors.green.withOpacity(0.4),
+                  color: AppTheme.successColor.withOpacity(0.4),
                   width: 1.5,
                 ),
               ),
-              color: Colors.green.withOpacity(0.08),
+              color: AppTheme.successColor.withOpacity(0.08),
               child: Padding(
                 padding: const EdgeInsets.all(20),
                 child: Row(
@@ -1856,12 +1848,12 @@ class _DrillBuilderScreenState extends State<DrillBuilderScreen>
                     Container(
                       padding: const EdgeInsets.all(10),
                       decoration: BoxDecoration(
-                        color: Colors.green.withOpacity(0.2),
+                        color: AppTheme.successColor.withOpacity(0.2),
                         shape: BoxShape.circle,
                       ),
                       child: Icon(
                         Icons.check_circle,
-                        color: Colors.green.shade700,
+                        color: AppTheme.successColor,
                         size: 28,
                       ),
                     ),
@@ -1882,7 +1874,7 @@ class _DrillBuilderScreenState extends State<DrillBuilderScreen>
                           Text(
                             'Your drill is configured correctly and ready to be saved.',
                             style: theme.textTheme.bodyMedium?.copyWith(
-                              color: Colors.green.shade700,
+                              color: AppTheme.successColor,
                               fontWeight: FontWeight.w500,
                             ),
                           ),
@@ -1899,11 +1891,39 @@ class _DrillBuilderScreenState extends State<DrillBuilderScreen>
     );
   }
 
+  Widget _buildDirectStimulusSection({
+    String? title,
+    required Widget content,
+  }) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        if (title != null && title.isNotEmpty) ...[
+          Text(
+            title,
+            style: const TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+          const SizedBox(height: 12),
+        ],
+        content,
+      ],
+    );
+  }
+
   // Helper methods for the drill builder
   Widget _buildSliderField(String label, double value, double min, double max,
-      ValueChanged<double> onChanged, String displayValue, {String? description}) {
+      ValueChanged<double> onChanged, String displayValue,
+      {String? description}) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
+
+    // Determine if this is a delay time slider (to remove divisions)
+    final isDelayTime = label.toLowerCase().contains('delay');
+    // Determine increment step
+    final step = max > 10 ? 1.0 : 0.1;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -1944,17 +1964,87 @@ class _DrillBuilderScreenState extends State<DrillBuilderScreen>
           ),
         ],
         const SizedBox(height: 8),
-        Slider(
-          value: value,
-          min: min,
-          max: max,
-          divisions: (max - min).round(),
-          onChanged: onChanged,
+        // Enhanced slider with +/- buttons
+        Row(
+          children: [
+            // Minus button (compact design)
+            GestureDetector(
+              onTap: value > min
+                  ? () {
+                      final newValue = (value - step).clamp(min, max);
+                      onChanged(newValue);
+                      HapticFeedback.lightImpact();
+                    }
+                  : null,
+              child: Container(
+                width: 20,
+                height: 20,
+                decoration: BoxDecoration(
+                  color: colorScheme.surfaceContainerHighest,
+                  borderRadius: BorderRadius.circular(4),
+                  border: Border.all(
+                    color: colorScheme.outline.withOpacity(0.3),
+                  ),
+                ),
+                child: Icon(
+                  Icons.remove,
+                  size: 12,
+                  color: value > min
+                      ? colorScheme.onSurface
+                      : colorScheme.onSurface.withOpacity(0.3),
+                ),
+              ),
+            ),
+            const SizedBox(width: 8),
+            // Slider
+            Expanded(
+              child: Slider(
+                value: value,
+                min: min,
+                max: max,
+                // Remove divisions for delay time sliders, keep for others
+                divisions: isDelayTime
+                    ? null
+                    : (max > 10
+                        ? (max - min).round()
+                        : ((max - min) * 10).round()),
+                onChanged: onChanged,
+              ),
+            ),
+            const SizedBox(width: 8),
+            // Plus button (compact design)
+            GestureDetector(
+              onTap: value < max
+                  ? () {
+                      final newValue = (value + step).clamp(min, max);
+                      onChanged(newValue);
+                      HapticFeedback.lightImpact();
+                    }
+                  : null,
+              child: Container(
+                width: 20,
+                height: 20,
+                decoration: BoxDecoration(
+                  color: colorScheme.surfaceContainerHighest,
+                  borderRadius: BorderRadius.circular(4),
+                  border: Border.all(
+                    color: colorScheme.outline.withOpacity(0.3),
+                  ),
+                ),
+                child: Icon(
+                  Icons.add,
+                  size: 12,
+                  color: value < max
+                      ? colorScheme.onSurface
+                      : colorScheme.onSurface.withOpacity(0.3),
+                ),
+              ),
+            ),
+          ],
         ),
       ],
     );
   }
-
 
   Widget _buildPresentationModeCard(PresentationMode mode) {
     final theme = Theme.of(context);
@@ -2023,7 +2113,9 @@ class _DrillBuilderScreenState extends State<DrillBuilderScreen>
               getLabel(),
               style: theme.textTheme.titleSmall?.copyWith(
                 fontWeight: FontWeight.w600,
-                color: isSelected ? colorScheme.onPrimaryContainer : colorScheme.onSurface,
+                color: isSelected
+                    ? colorScheme.onPrimaryContainer
+                    : colorScheme.onSurface,
               ),
             ),
             const SizedBox(height: 4),
@@ -2069,7 +2161,11 @@ class _DrillBuilderScreenState extends State<DrillBuilderScreen>
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Icon(icon, color: colorScheme.onSurface.withOpacity(0.8), size: 22,),
+                  Icon(
+                    icon,
+                    color: colorScheme.onSurface.withOpacity(0.8),
+                    size: 22,
+                  ),
                   const SizedBox(width: 10),
                   Text(
                     title,
@@ -2084,9 +2180,9 @@ class _DrillBuilderScreenState extends State<DrillBuilderScreen>
             ),
             const SizedBox(height: 20),
             ...items.map((item) => Padding(
-              padding: const EdgeInsets.only(bottom: 4),
-              child: item,
-            )),
+                  padding: const EdgeInsets.only(bottom: 4),
+                  child: item,
+                )),
           ],
         ),
       ),
@@ -2174,7 +2270,8 @@ class _DrillBuilderScreenState extends State<DrillBuilderScreen>
       errors.add('Please select at least 2 numbers');
     }
 
-    if (_stimuli.contains(StimulusType.custom) && _selectedCustomStimulusItems.length < 2) {
+    if (_stimuli.contains(StimulusType.custom) &&
+        _selectedCustomStimulusItems.length < 2) {
       errors.add('Please select at least 2 custom stimulus items');
     }
 
@@ -2241,7 +2338,7 @@ class _DrillBuilderScreenState extends State<DrillBuilderScreen>
     // Calculate luminance to determine if we should use black or white text
     final luminance =
         (0.299 * color.red + 0.587 * color.green + 0.114 * color.blue) / 255;
-    return luminance > 0.5 ? Colors.black : Colors.white;
+    return luminance > 0.5 ? AppTheme.blackPure : AppTheme.whitePure;
   }
 
   void _saveDrill() async {
@@ -2278,10 +2375,10 @@ class _DrillBuilderScreenState extends State<DrillBuilderScreen>
               content: Text(widget.initial == null
                   ? 'Drill created successfully!'
                   : 'Drill updated successfully!'),
-              backgroundColor: Colors.green,
+              backgroundColor: AppTheme.successColor,
             ),
           );
-          
+
           if (runAfterSave) {
             // Navigate to drill runner screen
             context.go('/drill-runner', extra: drill);
@@ -2297,7 +2394,7 @@ class _DrillBuilderScreenState extends State<DrillBuilderScreen>
             SnackBar(
               content: Text(
                   'Error: ${e.toString().replaceAll('Exception: ', '').replaceAll('ArgumentError: ', '')}'),
-              backgroundColor: Colors.red,
+              backgroundColor: Theme.of(context).colorScheme.error,
             ),
           );
           HapticFeedback.heavyImpact();
@@ -2309,7 +2406,7 @@ class _DrillBuilderScreenState extends State<DrillBuilderScreen>
         SnackBar(
           content: Text(
               'Please fix ${errors.length} validation error${errors.length > 1 ? 's' : ''}'),
-          backgroundColor: Colors.red,
+          backgroundColor: Theme.of(context).colorScheme.error,
         ),
       );
       HapticFeedback.heavyImpact();
@@ -2345,7 +2442,7 @@ class _DrillBuilderScreenState extends State<DrillBuilderScreen>
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('Image uploaded successfully!'),
-            backgroundColor: Colors.green,
+            backgroundColor: AppTheme.successColor,
             duration: Duration(seconds: 2),
           ),
         );
@@ -2360,7 +2457,7 @@ class _DrillBuilderScreenState extends State<DrillBuilderScreen>
         SnackBar(
           content: Text(
               'Failed to upload image: ${e.toString().replaceAll('Exception: ', '')}'),
-          backgroundColor: Colors.red,
+          backgroundColor: Theme.of(context).colorScheme.error,
           duration: const Duration(seconds: 3),
         ),
       );
@@ -2388,33 +2485,6 @@ class _DrillBuilderScreenState extends State<DrillBuilderScreen>
     }
   }
 
-  Widget _buildValidationWarning(String message) {
-    final theme = Theme.of(context);
-
-    return Container(
-      padding: const EdgeInsets.all(8),
-      decoration: BoxDecoration(
-        color: Colors.orange.withOpacity(0.1),
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: Colors.orange.withOpacity(0.3)),
-      ),
-      child: Row(
-        children: [
-          Icon(Icons.warning_amber, color: Colors.orange, size: 16),
-          const SizedBox(width: 8),
-          Expanded(
-            child: Text(
-              message,
-              style: theme.textTheme.bodySmall?.copyWith(
-                color: Colors.orange.shade700,
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
   Widget _buildSimpleColorChip(Color color) {
     final isSelected = _selectedColors.contains(color);
     final colorScheme = Theme.of(context).colorScheme;
@@ -2424,8 +2494,14 @@ class _DrillBuilderScreenState extends State<DrillBuilderScreen>
         setState(() {
           if (isSelected) {
             _selectedColors.remove(color);
+            // Remove stimulus type if no colors are selected
+            if (_selectedColors.isEmpty) {
+              _stimuli.remove(StimulusType.color);
+            }
           } else {
             _selectedColors.add(color);
+            // Add stimulus type when first color is selected
+            _stimuli.add(StimulusType.color);
           }
         });
         HapticFeedback.lightImpact();
@@ -2453,7 +2529,7 @@ class _DrillBuilderScreenState extends State<DrillBuilderScreen>
               color: color,
               shape: BoxShape.circle,
               border: Border.all(
-                color: Colors.white,
+                color: Theme.of(context).colorScheme.onPrimary,
                 width: 2,
               ),
             ),
@@ -2473,8 +2549,14 @@ class _DrillBuilderScreenState extends State<DrillBuilderScreen>
         setState(() {
           if (isSelected) {
             _selectedArrows.remove(arrow);
+            // Remove stimulus type if no arrows are selected
+            if (_selectedArrows.isEmpty) {
+              _stimuli.remove(StimulusType.arrow);
+            }
           } else {
             _selectedArrows.add(arrow);
+            // Add stimulus type when first arrow is selected
+            _stimuli.add(StimulusType.arrow);
           }
         });
         HapticFeedback.lightImpact();
@@ -2515,8 +2597,14 @@ class _DrillBuilderScreenState extends State<DrillBuilderScreen>
         setState(() {
           if (isSelected) {
             _selectedShapes.remove(shape);
+            // Remove stimulus type if no shapes are selected
+            if (_selectedShapes.isEmpty) {
+              _stimuli.remove(StimulusType.shape);
+            }
           } else {
             _selectedShapes.add(shape);
+            // Add stimulus type when first shape is selected
+            _stimuli.add(StimulusType.shape);
           }
         });
         HapticFeedback.lightImpact();
@@ -2557,8 +2645,14 @@ class _DrillBuilderScreenState extends State<DrillBuilderScreen>
         setState(() {
           if (isSelected) {
             _selectedNumbers.remove(number);
+            // Remove stimulus type if no numbers are selected
+            if (_selectedNumbers.isEmpty) {
+              _stimuli.remove(StimulusType.number);
+            }
           } else {
             _selectedNumbers.add(number);
+            // Add stimulus type when first number is selected
+            _stimuli.add(StimulusType.number);
           }
         });
         HapticFeedback.lightImpact();
@@ -2604,79 +2698,6 @@ class _DrillBuilderScreenState extends State<DrillBuilderScreen>
     return NumberRange.oneToTwelve;
   }
 
-  Widget _buildStimulusSelectionSection(
-      String title,
-      StimulusType type,
-      Widget content,
-      bool showWarning, {
-      bool? customCheckboxValue,
-      void Function(bool?)? customCheckboxOnChanged,
-    }) {
-    final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
-    final isSelected = customCheckboxValue ?? _stimuli.contains(type);
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        // Header with checkbox
-        Row(
-          children: [
-            Checkbox(
-              value: isSelected,
-              onChanged: customCheckboxOnChanged ?? (value) {
-                setState(() {
-                  if (value == true) {
-                    _stimuli.add(type);
-                  } else {
-                    _stimuli.remove(type);
-                  }
-                });
-                HapticFeedback.lightImpact();
-              },
-              activeColor: Colors.orange,
-            ),
-            const SizedBox(width: 8),
-            Text(
-              title,
-              style: theme.textTheme.headlineSmall?.copyWith(
-                fontWeight: FontWeight.w600,
-                color: colorScheme.onSurface.withOpacity(0.8),
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 8),
-
-        // Content (only show if stimulus type is selected)
-        if (isSelected) ...[
-          content,
-          if (showWarning) ...[
-            const SizedBox(height: 16),
-            _buildValidationWarning(
-                'Please select at least 2 ${title.toLowerCase()}'),
-          ],
-        ],
-        
-
-      ],
-    );
-  }
-
-  // Custom stimulus helper methods
-  IconData _getCustomStimulusIcon(CustomStimulusType type) {
-    switch (type) {
-      case CustomStimulusType.color:
-        return Icons.palette;
-      case CustomStimulusType.shape:
-        return Icons.category;
-      case CustomStimulusType.text:
-        return Icons.text_fields;
-      case CustomStimulusType.image:
-        return Icons.image;
-    }
-  }
-
   Widget _buildCustomStimulusItemChip(
       CustomStimulusItem item, CustomStimulusType stimulusType) {
     final isSelected = _selectedCustomStimulusItems.contains(item);
@@ -2689,21 +2710,27 @@ class _DrillBuilderScreenState extends State<DrillBuilderScreen>
           setState(() {
             if (isSelected) {
               _selectedCustomStimulusItems.remove(item);
-              print('🔷 Spark 🔍 [DrillBuilder] Removed custom stimulus item: ${item.name} (${item.id})');
+              print(
+                  '🔷 Spark 🔍 [DrillBuilder] Removed custom stimulus item: ${item.name} (${item.id})');
               // Remove custom stimulus type if no items are selected
               if (_selectedCustomStimulusItems.isEmpty) {
                 _stimuli.remove(StimulusType.custom);
-                print('🔷 Spark 🔍 [DrillBuilder] Removed StimulusType.custom - no items selected');
+                print(
+                    '🔷 Spark 🔍 [DrillBuilder] Removed StimulusType.custom - no items selected');
               }
             } else {
               _selectedCustomStimulusItems.add(item);
-              print('🔷 Spark 🔍 [DrillBuilder] Added custom stimulus item: ${item.name} (${item.id})');
+              print(
+                  '🔷 Spark 🔍 [DrillBuilder] Added custom stimulus item: ${item.name} (${item.id})');
               // Add custom stimulus type when first item is selected
               _stimuli.add(StimulusType.custom);
-              print('🔷 Spark 🔍 [DrillBuilder] Added StimulusType.custom to stimuli set');
+              print(
+                  '🔷 Spark 🔍 [DrillBuilder] Added StimulusType.custom to stimuli set');
             }
-            print('🔷 Spark 🔍 [DrillBuilder] Total selected custom items: ${_selectedCustomStimulusItems.length}');
-            print('🔷 Spark 🔍 [DrillBuilder] Current stimuli types: ${_stimuli.map((s) => s.name).join(', ')}');
+            print(
+                '🔷 Spark 🔍 [DrillBuilder] Total selected custom items: ${_selectedCustomStimulusItems.length}');
+            print(
+                '🔷 Spark 🔍 [DrillBuilder] Current stimuli types: ${_stimuli.map((s) => s.name).join(', ')}');
           });
           HapticFeedback.lightImpact();
         },
@@ -2711,17 +2738,17 @@ class _DrillBuilderScreenState extends State<DrillBuilderScreen>
           width: 50,
           height: 50,
           decoration: BoxDecoration(
-            color: item.color ?? Colors.grey,
+            color: item.color ?? AppTheme.neutral500,
             shape: BoxShape.circle,
             border: Border.all(
-              color: isSelected ? Colors.black : Colors.grey.withOpacity(0.3),
+              color: isSelected ? Theme.of(context).colorScheme.onSurface : AppTheme.neutral500.withOpacity(0.3),
               width: isSelected ? 3 : 1,
             ),
           ),
           child: isSelected
               ? Icon(
                   Icons.check,
-                  color: _getContrastColor(item.color ?? Colors.grey),
+                  color: _getContrastColor(item.color ?? AppTheme.neutral500),
                   size: 24,
                 )
               : null,
@@ -2735,21 +2762,27 @@ class _DrillBuilderScreenState extends State<DrillBuilderScreen>
         setState(() {
           if (isSelected) {
             _selectedCustomStimulusItems.remove(item);
-            print('🔷 Spark 🔍 [DrillBuilder] Removed custom stimulus item: ${item.name} (${item.id})');
+            print(
+                '🔷 Spark 🔍 [DrillBuilder] Removed custom stimulus item: ${item.name} (${item.id})');
             // Remove custom stimulus type if no items are selected
             if (_selectedCustomStimulusItems.isEmpty) {
               _stimuli.remove(StimulusType.custom);
-              print('🔷 Spark 🔍 [DrillBuilder] Removed StimulusType.custom - no items selected');
+              print(
+                  '🔷 Spark 🔍 [DrillBuilder] Removed StimulusType.custom - no items selected');
             }
           } else {
             _selectedCustomStimulusItems.add(item);
-            print('🔷 Spark 🔍 [DrillBuilder] Added custom stimulus item: ${item.name} (${item.id})');
+            print(
+                '🔷 Spark 🔍 [DrillBuilder] Added custom stimulus item: ${item.name} (${item.id})');
             // Add custom stimulus type when first item is selected
             _stimuli.add(StimulusType.custom);
-            print('🔷 Spark 🔍 [DrillBuilder] Added StimulusType.custom to stimuli set');
+            print(
+                '🔷 Spark 🔍 [DrillBuilder] Added StimulusType.custom to stimuli set');
           }
-          print('🔷 Spark 🔍 [DrillBuilder] Total selected custom items: ${_selectedCustomStimulusItems.length}');
-          print('🔷 Spark 🔍 [DrillBuilder] Current stimuli types: ${_stimuli.map((s) => s.name).join(', ')}');
+          print(
+              '🔷 Spark 🔍 [DrillBuilder] Total selected custom items: ${_selectedCustomStimulusItems.length}');
+          print(
+              '🔷 Spark 🔍 [DrillBuilder] Current stimuli types: ${_stimuli.map((s) => s.name).join(', ')}');
         });
         HapticFeedback.lightImpact();
       },
@@ -2770,126 +2803,6 @@ class _DrillBuilderScreenState extends State<DrillBuilderScreen>
         ),
         child: _buildCustomStimulusItemContent(item, stimulusType, isSelected),
       ),
-    );
-  }
-
-  Widget _buildCustomStimuliContent() {
-    final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
-
-    if (_loadingCustomStimuli) {
-      return Container(
-        padding: const EdgeInsets.all(20),
-        child: const Center(
-          child: CircularProgressIndicator(),
-        ),
-      );
-    }
-
-    if (_customStimuli.isEmpty) {
-      return Container(
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: colorScheme.surfaceContainerHighest.withOpacity(0.5),
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(
-            color: colorScheme.outline.withOpacity(0.3),
-          ),
-        ),
-        child: Row(
-          children: [
-            Icon(
-              Icons.info_outline,
-              color: colorScheme.onSurface.withOpacity(0.6),
-              size: 20,
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Text(
-                'No custom stimuli available. Contact your administrator to add custom stimuli.',
-                style: theme.textTheme.bodyMedium?.copyWith(
-                  color: colorScheme.onSurface.withOpacity(0.7),
-                ),
-              ),
-            ),
-          ],
-        ),
-      );
-    }
-
-    return Column(
-      children: _customStimuli.map((stimulus) => Container(
-        margin: const EdgeInsets.only(bottom: 20),
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: colorScheme.surfaceContainerHighest,
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(
-            color: colorScheme.outline.withOpacity(0.3),
-          ),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Stimulus header
-            Row(
-              children: [
-                Icon(
-                  _getCustomStimulusIcon(stimulus.type),
-                  color: colorScheme.primary,
-                  size: 20,
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    stimulus.name,
-                    style: theme.textTheme.titleSmall?.copyWith(
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ),
-                // Selection count
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 8,
-                    vertical: 4,
-                  ),
-                  decoration: BoxDecoration(
-                    color: colorScheme.primary.withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Text(
-                    '${_selectedCustomStimulusItems.where((item) => stimulus.items.contains(item)).length}/${stimulus.items.length}',
-                    style: theme.textTheme.bodySmall?.copyWith(
-                      color: colorScheme.primary,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-            if (stimulus.description.isNotEmpty) ...[
-              const SizedBox(height: 8),
-              Text(
-                stimulus.description,
-                style: theme.textTheme.bodySmall?.copyWith(
-                  color: colorScheme.onSurface.withOpacity(0.7),
-                ),
-              ),
-            ],
-            const SizedBox(height: 12),
-            // Stimulus items
-            Wrap(
-              spacing: 12,
-              runSpacing: 12,
-              children: stimulus.items
-                  .map((item) => _buildCustomStimulusItemChip(
-                      item, stimulus.type))
-                  .toList(),
-            ),
-          ],
-        ),
-      )).toList(),
     );
   }
 
@@ -2935,7 +2848,7 @@ class _DrillBuilderScreenState extends State<DrillBuilderScreen>
                 base64String = base64String.substring(commaIndex + 1);
               }
             }
-            
+
             final bytes = base64Decode(base64String);
             return ClipRRect(
               borderRadius: BorderRadius.circular(6),
@@ -2949,12 +2862,12 @@ class _DrillBuilderScreenState extends State<DrillBuilderScreen>
                     width: 40,
                     height: 40,
                     decoration: BoxDecoration(
-                      color: Colors.grey[300],
+                      color: Theme.of(context).colorScheme.surfaceContainerHighest,
                       borderRadius: BorderRadius.circular(6),
                     ),
                     child: Icon(
                       Icons.broken_image,
-                      color: Colors.grey[600],
+                      color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6),
                       size: 20,
                     ),
                   );
@@ -2967,12 +2880,12 @@ class _DrillBuilderScreenState extends State<DrillBuilderScreen>
               width: 40,
               height: 40,
               decoration: BoxDecoration(
-                color: Colors.red[100],
+                color: Theme.of(context).colorScheme.errorContainer,
                 borderRadius: BorderRadius.circular(6),
               ),
               child: Icon(
                 Icons.error,
-                color: Colors.red,
+                color: Theme.of(context).colorScheme.error,
                 size: 20,
               ),
             );
@@ -3026,10 +2939,9 @@ class _DrillBuilderScreenState extends State<DrillBuilderScreen>
     }
   }
 
-  Widget _buildCustomStimulusSection(CustomStimulus stimulus) {
+  Widget _buildDirectCustomStimulusSection(CustomStimulus stimulus) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
-    final hasSelectedItems = _selectedCustomStimulusItems.any((item) => stimulus.items.contains(item));
 
     return Container(
       margin: const EdgeInsets.only(bottom: 16),
@@ -3044,41 +2956,9 @@ class _DrillBuilderScreenState extends State<DrillBuilderScreen>
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Stimulus header with checkbox
+          // Stimulus header without checkbox
           Row(
             children: [
-              Checkbox(
-                value: hasSelectedItems,
-                onChanged: (value) {
-                  setState(() {
-                    if (value == true) {
-                      // Add all items from this stimulus
-                      for (final item in stimulus.items) {
-                        if (!_selectedCustomStimulusItems.contains(item)) {
-                          _selectedCustomStimulusItems.add(item);
-                        }
-                      }
-                      // Add custom stimulus type
-                      _stimuli.add(StimulusType.custom);
-                    } else {
-                      // Remove all items from this stimulus
-                      _selectedCustomStimulusItems.removeWhere((item) => stimulus.items.contains(item));
-                      // Remove custom stimulus type if no items are selected
-                      if (_selectedCustomStimulusItems.isEmpty) {
-                        _stimuli.remove(StimulusType.custom);
-                      }
-                    }
-                  });
-                  HapticFeedback.lightImpact();
-                },
-                activeColor: Colors.orange,
-              ),
-              const SizedBox(width: 8),
-              Icon(
-                _getCustomStimulusIcon(stimulus.type),
-                color: colorScheme.primary,
-                size: 20,
-              ),
               const SizedBox(width: 8),
               Expanded(
                 child: Text(
@@ -3088,56 +2968,45 @@ class _DrillBuilderScreenState extends State<DrillBuilderScreen>
                   ),
                 ),
               ),
-              // Selection count
-              Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 8,
-                  vertical: 4,
-                ),
-                decoration: BoxDecoration(
-                  color: colorScheme.primary.withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Text(
-                  '${_selectedCustomStimulusItems.where((item) => stimulus.items.contains(item)).length}/${stimulus.items.length}',
-                  style: theme.textTheme.bodySmall?.copyWith(
-                    color: colorScheme.primary,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ),
             ],
           ),
-          if (stimulus.description.isNotEmpty) ...[
-            const SizedBox(height: 8),
-            Padding(
-              padding: const EdgeInsets.only(left: 48),
-              child: Text(
-                stimulus.description,
-                style: theme.textTheme.bodySmall?.copyWith(
-                  color: colorScheme.onSurface.withOpacity(0.7),
-                ),
-              ),
-            ),
-          ],
-          
-          // Show stimulus items only if this stimulus is selected
-          if (hasSelectedItems) ...[
-            const SizedBox(height: 12),
-            Padding(
-              padding: const EdgeInsets.only(left: 48),
-              child: Wrap(
-                spacing: 12,
-                runSpacing: 12,
-                children: stimulus.items
-                    .map((item) => _buildCustomStimulusItemChip(item, stimulus.type))
-                    .toList(),
-              ),
-            ),
-          ],
+
+          // Always show stimulus items in grid format (4 per row)
+          const SizedBox(height: 12),
+          _buildCustomStimulusGrid(stimulus.items, stimulus.type),
         ],
       ),
     );
   }
 
+  Widget _buildCustomStimulusGrid(
+      List<CustomStimulusItem> items, CustomStimulusType stimulusType) {
+    // Group items into rows of 4
+    final rows = <List<CustomStimulusItem>>[];
+    for (int i = 0; i < items.length; i += 4) {
+      final end = (i + 4 < items.length) ? i + 4 : items.length;
+      rows.add(items.sublist(i, end));
+    }
+
+    return Column(
+      children: rows.map((row) {
+        return Column(
+          children: [
+            Row(
+              children: row
+                  .map((item) => Expanded(
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 4),
+                          child:
+                              _buildCustomStimulusItemChip(item, stimulusType),
+                        ),
+                      ))
+                  .toList(),
+            ),
+            if (row != rows.last) const SizedBox(height: 12),
+          ],
+        );
+      }).toList(),
+    );
+  }
 }

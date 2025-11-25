@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import 'package:spark_app/features/auth/bloc/auth_bloc.dart';
+import 'package:spark_app/core/theme/app_theme.dart';
 
 class ForgotPasswordScreen extends StatefulWidget {
   const ForgotPasswordScreen({super.key});
@@ -50,13 +51,15 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> with Ticker
 
   @override
   Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    
     return Scaffold(
-      backgroundColor: const Color(0xFFF8FAFC),
+      backgroundColor: colorScheme.surface,
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Color(0xFF1F2937)),
+          icon: Icon(Icons.arrow_back, color: colorScheme.onSurface),
           onPressed: () => context.pop(),
         ),
       ),
@@ -66,7 +69,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> with Ticker
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(
                 content: Text(state.message ?? 'Password reset email sent!'),
-                backgroundColor: Colors.green,
+                backgroundColor: AppTheme.successColor,
                 behavior: SnackBarBehavior.floating,
               ),
             );
@@ -78,7 +81,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> with Ticker
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(
                 content: Text(state.error ?? 'An error occurred'),
-                backgroundColor: Colors.red,
+                backgroundColor: colorScheme.error,
                 behavior: SnackBarBehavior.floating,
               ),
             );
@@ -99,22 +102,22 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> with Ticker
                     Container(
                       padding: const EdgeInsets.all(16),
                       decoration: BoxDecoration(
-                        color: const Color(0xFF6366F1).withOpacity(0.1),
+                        color: colorScheme.primary.withOpacity(0.1),
                         borderRadius: BorderRadius.circular(16),
                       ),
-                      child: const Icon(
+                      child: Icon(
                         Icons.lock_reset,
                         size: 32,
-                        color: Color(0xFF6366F1),
+                        color: colorScheme.primary,
                       ),
                     ),
                     const SizedBox(height: 32),
-                    const Text(
+                    Text(
                       'Forgot Password?',
                       style: TextStyle(
                         fontSize: 32,
                         fontWeight: FontWeight.bold,
-                        color: Color(0xFF1F2937),
+                        color: colorScheme.onSurface,
                         letterSpacing: -0.5,
                       ),
                     ),
@@ -123,7 +126,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> with Ticker
                       'No worries! Enter your email address and we\'ll send you a link to reset your password.',
                       style: TextStyle(
                         fontSize: 16,
-                        color: Colors.grey[600],
+                        color: colorScheme.onSurface.withOpacity(0.7),
                         height: 1.5,
                       ),
                     ),
@@ -136,11 +139,11 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> with Ticker
                           // Email Field
                           Container(
                             decoration: BoxDecoration(
-                              color: Colors.white,
+                              color: colorScheme.surface,
                               borderRadius: BorderRadius.circular(16),
                               boxShadow: [
                                 BoxShadow(
-                                  color: Colors.grey.withOpacity(0.1),
+                                  color: colorScheme.shadow.withOpacity(0.1),
                                   blurRadius: 10,
                                   offset: const Offset(0, 4),
                                 ),
@@ -149,17 +152,19 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> with Ticker
                             child: TextFormField(
                               controller: _emailController,
                               keyboardType: TextInputType.emailAddress,
-                              decoration: const InputDecoration(
+                              decoration: InputDecoration(
                                 labelText: 'Email Address',
-                                prefixIcon: Icon(Icons.email_outlined, color: Color(0xFF6366F1)),
+                                labelStyle: TextStyle(color: colorScheme.onSurface.withOpacity(0.7)),
+                                prefixIcon: Icon(Icons.email_outlined, color: colorScheme.primary),
                                 border: OutlineInputBorder(
-                                  borderRadius: BorderRadius.all(Radius.circular(16)),
+                                  borderRadius: const BorderRadius.all(Radius.circular(16)),
                                   borderSide: BorderSide.none,
                                 ),
                                 filled: true,
-                                fillColor: Colors.white,
-                                contentPadding: EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+                                fillColor: colorScheme.surface,
+                                contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
                               ),
+                              style: TextStyle(color: colorScheme.onSurface),
                               validator: (value) {
                                 if (value == null || value.isEmpty) {
                                   return 'Please enter your email';
@@ -182,8 +187,8 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> with Ticker
                                 child: ElevatedButton(
                                   onPressed: isLoading ? null : _submitForgotPassword,
                                   style: ElevatedButton.styleFrom(
-                                    backgroundColor: const Color(0xFF6366F1),
-                                    foregroundColor: Colors.white,
+                                    backgroundColor: colorScheme.primary,
+                                    foregroundColor: colorScheme.onPrimary,
                                     shape: RoundedRectangleBorder(
                                       borderRadius: BorderRadius.circular(16),
                                     ),
@@ -191,12 +196,12 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> with Ticker
                                     shadowColor: Colors.transparent,
                                   ),
                                   child: isLoading
-                                      ? const SizedBox(
+                                      ? SizedBox(
                                           width: 24,
                                           height: 24,
                                           child: CircularProgressIndicator(
                                             strokeWidth: 2,
-                                            valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                                            valueColor: AlwaysStoppedAnimation<Color>(colorScheme.onPrimary),
                                           ),
                                         )
                                       : const Text(
@@ -219,17 +224,17 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> with Ticker
                       child: TextButton(
                         onPressed: () => context.pop(),
                         child: RichText(
-                          text: const TextSpan(
+                          text: TextSpan(
                             text: 'Remember your password? ',
                             style: TextStyle(
-                              color: Color(0xFF6B7280),
+                              color: colorScheme.onSurface.withOpacity(0.6),
                               fontSize: 14,
                             ),
                             children: [
                               TextSpan(
                                 text: 'Back to Login',
                                 style: TextStyle(
-                                  color: Color(0xFF6366F1),
+                                  color: colorScheme.primary,
                                   fontWeight: FontWeight.w600,
                                 ),
                               ),

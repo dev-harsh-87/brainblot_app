@@ -7,6 +7,7 @@ import 'package:spark_app/features/programs/services/program_progress_service.da
 import 'package:spark_app/features/programs/services/drill_assignment_service.dart';
 import 'package:spark_app/features/drills/domain/drill.dart';
 import 'package:spark_app/core/di/injection.dart';
+import 'package:spark_app/core/theme/app_theme.dart';
 
 class EnhancedProgramDayScreen extends StatefulWidget {
   final Program program;
@@ -164,7 +165,7 @@ class _EnhancedProgramDayScreenState extends State<EnhancedProgramDayScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Day ${widget.dayNumber} completed! 🎉'),
-            backgroundColor: Colors.green,
+            backgroundColor: AppTheme.successColor,
             duration: const Duration(seconds: 2),
           ),
         );
@@ -182,7 +183,7 @@ class _EnhancedProgramDayScreenState extends State<EnhancedProgramDayScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Error completing day: $e'),
-            backgroundColor: Colors.red,
+            backgroundColor: AppTheme.errorColor,
           ),
         );
       }
@@ -254,22 +255,22 @@ class _EnhancedProgramDayScreenState extends State<EnhancedProgramDayScreen> {
       margin: const EdgeInsets.all(16),
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.orange.shade50,
+        color: AppTheme.warningColor.withOpacity(0.1),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.orange.shade200),
+        border: Border.all(color: AppTheme.warningColor.withOpacity(0.3)),
       ),
       child: Column(
         children: [
           Icon(
             Icons.schedule,
             size: 48,
-            color: Colors.orange.shade600,
+            color: AppTheme.warningColor,
           ),
           const SizedBox(height: 12),
           Text(
             'Day ${widget.dayNumber} Unlocks In:',
             style: Theme.of(context).textTheme.titleMedium?.copyWith(
-              color: Colors.orange.shade800,
+              color: AppTheme.warningColor,
               fontWeight: FontWeight.bold,
             ),
           ),
@@ -277,7 +278,7 @@ class _EnhancedProgramDayScreenState extends State<EnhancedProgramDayScreen> {
           Text(
             _formatCountdown(_timeUntilUnlock!),
             style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-              color: Colors.orange.shade600,
+              color: AppTheme.warningColor,
               fontWeight: FontWeight.bold,
               fontFamily: 'monospace',
             ),
@@ -286,7 +287,7 @@ class _EnhancedProgramDayScreenState extends State<EnhancedProgramDayScreen> {
           Text(
             'Complete the previous day and wait until midnight to unlock this day.',
             style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-              color: Colors.orange.shade700,
+              color: AppTheme.warningColor,
             ),
             textAlign: TextAlign.center,
           ),
@@ -312,14 +313,14 @@ class _EnhancedProgramDayScreenState extends State<EnhancedProgramDayScreen> {
                   width: 32,
                   height: 32,
                   decoration: BoxDecoration(
-                    color: isCompleted ? Colors.green : Colors.blue,
+                    color: isCompleted ? AppTheme.successColor : AppTheme.infoColor,
                     shape: BoxShape.circle,
                   ),
                   child: Center(
                     child: Text(
                       '${index + 1}',
-                      style: const TextStyle(
-                        color: Colors.white,
+                      style: TextStyle(
+                        color: Theme.of(context).colorScheme.onPrimary,
                         fontWeight: FontWeight.bold,
                       ),
                     ),
@@ -341,7 +342,7 @@ class _EnhancedProgramDayScreenState extends State<EnhancedProgramDayScreen> {
                         Text(
                           drill.description!,
                           style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                            color: Colors.grey[600],
+                            color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6),
                           ),
                           maxLines: 2,
                           overflow: TextOverflow.ellipsis,
@@ -352,7 +353,7 @@ class _EnhancedProgramDayScreenState extends State<EnhancedProgramDayScreen> {
                 if (isCompleted)
                   const Icon(
                     Icons.check_circle,
-                    color: Colors.green,
+                    color: AppTheme.successColor,
                     size: 24,
                   ),
               ],
@@ -362,14 +363,14 @@ class _EnhancedProgramDayScreenState extends State<EnhancedProgramDayScreen> {
               children: [
                 Chip(
                   label: Text(drill.category),
-                  backgroundColor: Colors.blue.shade50,
-                  labelStyle: TextStyle(color: Colors.blue.shade700),
+                  backgroundColor: AppTheme.infoColor.withOpacity(0.1),
+                  labelStyle: TextStyle(color: AppTheme.infoColor),
                 ),
                 const SizedBox(width: 8),
                 Chip(
                   label: Text(drill.difficulty.name.toUpperCase()),
-                  backgroundColor: Colors.green.shade50,
-                  labelStyle: TextStyle(color: Colors.green.shade700),
+                  backgroundColor: AppTheme.successColor.withOpacity(0.1),
+                  labelStyle: TextStyle(color: AppTheme.successColor),
                 ),
                 const Spacer(),
                 if (!isCompleted)
@@ -387,7 +388,7 @@ class _EnhancedProgramDayScreenState extends State<EnhancedProgramDayScreen> {
                   const Text(
                     'Completed ✓',
                     style: TextStyle(
-                      color: Colors.green,
+                      color: AppTheme.successColor,
                       fontWeight: FontWeight.bold,
                     ),
                   ),
@@ -444,7 +445,7 @@ class _EnhancedProgramDayScreenState extends State<EnhancedProgramDayScreen> {
                       margin: const EdgeInsets.all(16),
                       decoration: BoxDecoration(
                         gradient: LinearGradient(
-                          colors: [Colors.blue.shade400, Colors.blue.shade600],
+                          colors: [AppTheme.infoColor.withOpacity(0.8), AppTheme.infoColor],
                           begin: Alignment.topLeft,
                           end: Alignment.bottomRight,
                         ),
@@ -455,8 +456,8 @@ class _EnhancedProgramDayScreenState extends State<EnhancedProgramDayScreen> {
                         children: [
                           Text(
                             'Day ${widget.dayNumber}',
-                            style: const TextStyle(
-                              color: Colors.white,
+                            style: TextStyle(
+                              color: Theme.of(context).colorScheme.onPrimary,
                               fontSize: 24,
                               fontWeight: FontWeight.bold,
                             ),
@@ -464,8 +465,8 @@ class _EnhancedProgramDayScreenState extends State<EnhancedProgramDayScreen> {
                           const SizedBox(height: 4),
                           Text(
                             '${_assignedDrills.length} drill${_assignedDrills.length != 1 ? 's' : ''} assigned',
-                            style: const TextStyle(
-                              color: Colors.white70,
+                            style: TextStyle(
+                              color: Theme.of(context).colorScheme.onPrimary.withOpacity(0.7),
                               fontSize: 16,
                             ),
                           ),
@@ -473,14 +474,14 @@ class _EnhancedProgramDayScreenState extends State<EnhancedProgramDayScreen> {
                             const SizedBox(height: 8),
                             LinearProgressIndicator(
                               value: _drillCompletionStatus.where((c) => c).length / _drillCompletionStatus.length,
-                              backgroundColor: Colors.white30,
-                              valueColor: const AlwaysStoppedAnimation<Color>(Colors.white),
+                              backgroundColor: Theme.of(context).colorScheme.onPrimary.withOpacity(0.3),
+                              valueColor: AlwaysStoppedAnimation<Color>(Theme.of(context).colorScheme.onPrimary),
                             ),
                             const SizedBox(height: 4),
                             Text(
                               '${_drillCompletionStatus.where((c) => c).length}/${_drillCompletionStatus.length} completed',
-                              style: const TextStyle(
-                                color: Colors.white70,
+                              style: TextStyle(
+                                color: Theme.of(context).colorScheme.onPrimary.withOpacity(0.7),
                                 fontSize: 14,
                               ),
                             ),
@@ -499,20 +500,20 @@ class _EnhancedProgramDayScreenState extends State<EnhancedProgramDayScreen> {
                                   Icon(
                                     Icons.fitness_center,
                                     size: 64,
-                                    color: Colors.grey[400],
+                                    color: Theme.of(context).colorScheme.onSurface.withOpacity(0.4),
                                   ),
                                   const SizedBox(height: 16),
                                   Text(
                                     'No drills assigned for this day',
                                     style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                                      color: Colors.grey[600],
+                                      color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6),
                                     ),
                                   ),
                                   const SizedBox(height: 8),
                                   Text(
                                     'Contact your trainer to add drills to this day.',
                                     style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                                      color: Colors.grey[500],
+                                      color: Theme.of(context).colorScheme.onSurface.withOpacity(0.5),
                                     ),
                                   ),
                                 ],
@@ -534,8 +535,8 @@ class _EnhancedProgramDayScreenState extends State<EnhancedProgramDayScreen> {
                         child: ElevatedButton(
                           onPressed: _isCompleting ? null : _completeProgramDay,
                           style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.green,
-                            foregroundColor: Colors.white,
+                            backgroundColor: AppTheme.successColor,
+                            foregroundColor: Theme.of(context).colorScheme.onPrimary,
                             padding: const EdgeInsets.symmetric(vertical: 16),
                             shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(12),

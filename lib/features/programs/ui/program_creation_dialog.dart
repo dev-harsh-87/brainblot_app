@@ -125,7 +125,7 @@ class _ProgramCreationScreenState extends State<ProgramCreationScreen>
       centerTitle: true,
       flexibleSpace: Container(
         decoration: BoxDecoration(
-          color: AppTheme.goldPrimary,
+          color: colorScheme.primary,
         ),
       ),
       actions: [
@@ -151,7 +151,7 @@ class _ProgramCreationScreenState extends State<ProgramCreationScreen>
     final colorScheme = theme.colorScheme;
 
     return Scaffold(
-        backgroundColor: AppTheme.whiteSoft,
+        backgroundColor: colorScheme.surface,
         appBar: _buildAppBar(context),
         body: Column(
           children: [
@@ -339,7 +339,7 @@ class _ProgramCreationScreenState extends State<ProgramCreationScreen>
       duration: const Duration(milliseconds: 300),
       padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
-        color: AppTheme.whitePure,
+        color: theme.colorScheme.surface,
         borderRadius: BorderRadius.circular(16),
         border: Border.all(
           color: _getCategoryColor(_selectedCategory).withOpacity(0.2),
@@ -347,7 +347,7 @@ class _ProgramCreationScreenState extends State<ProgramCreationScreen>
         ),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.08),
+            color: theme.colorScheme.shadow.withOpacity(0.08),
             blurRadius: 16,
             offset: const Offset(0, 4),
           ),
@@ -374,7 +374,7 @@ class _ProgramCreationScreenState extends State<ProgramCreationScreen>
                 ),
                 child: Icon(
                   _getCategoryIcon(_selectedCategory),
-                  color: Colors.white,
+                  color: theme.colorScheme.onPrimary,
                   size: 28,
                 ),
               ),
@@ -613,6 +613,8 @@ class _ProgramCreationScreenState extends State<ProgramCreationScreen>
             _buildCategoryDropdown(),
             const SizedBox(height: 20),
             _buildDurationSlider(),
+            const SizedBox(height: 20),
+            _buildProgramPreview(),
           ],
         ),
       ),
@@ -621,6 +623,7 @@ class _ProgramCreationScreenState extends State<ProgramCreationScreen>
 
   Widget _buildDurationSlider() {
     final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
     
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -628,35 +631,117 @@ class _ProgramCreationScreenState extends State<ProgramCreationScreen>
         Text(
           'Program Duration',
           style: theme.textTheme.titleMedium?.copyWith(
-            fontWeight: FontWeight.bold,
+            fontWeight: FontWeight.w600,
           ),
         ),
-        const SizedBox(height: 8),
+        const SizedBox(height: 12),
         Container(
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
-            color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
+            color: colorScheme.surfaceContainerHighest,
             borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: theme.colorScheme.outline.withValues(alpha: 0.2)),
+            border: Border.all(color: colorScheme.outline.withOpacity(0.3)),
           ),
           child: Column(
             children: [
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Text('Duration: $_programDuration days'),
-                  Text(_formatDuration(_programDuration)),
+                  Text(
+                    'Duration: $_programDuration days',
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: colorScheme.primary.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Text(
+                      _formatDuration(_programDuration),
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        fontWeight: FontWeight.w600,
+                        color: colorScheme.primary,
+                      ),
+                    ),
+                  ),
                 ],
               ),
               const SizedBox(height: 12),
-              Slider(
-                value: _programDuration.toDouble(),
-                min: 7,
-                max: 365,
-                divisions: 358,
-                onChanged: (value) {
-                  setState(() => _programDuration = value.round());
-                },
+              // Enhanced slider with +/- buttons
+              Row(
+                children: [
+                  // Minus button
+                  GestureDetector(
+                    onTap: _programDuration > 7
+                        ? () {
+                            setState(() => _programDuration = (_programDuration - 1).clamp(7, 365));
+                            HapticFeedback.lightImpact();
+                          }
+                        : null,
+                    child: Container(
+                      width: 20,
+                      height: 20,
+                      decoration: BoxDecoration(
+                        color: colorScheme.surfaceContainerHighest,
+                        borderRadius: BorderRadius.circular(4),
+                        border: Border.all(
+                          color: colorScheme.outline.withOpacity(0.3),
+                        ),
+                      ),
+                      child: Icon(
+                        Icons.remove,
+                        size: 12,
+                        color: _programDuration > 7
+                            ? colorScheme.onSurface
+                            : colorScheme.onSurface.withOpacity(0.3),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  // Slider
+                  Expanded(
+                    child: Slider(
+                      value: _programDuration.toDouble(),
+                      min: 7,
+                      max: 365,
+                      divisions: 358,
+                      onChanged: (value) {
+                        setState(() => _programDuration = value.round());
+                      },
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  // Plus button
+                  GestureDetector(
+                    onTap: _programDuration < 365
+                        ? () {
+                            setState(() => _programDuration = (_programDuration + 1).clamp(7, 365));
+                            HapticFeedback.lightImpact();
+                          }
+                        : null,
+                    child: Container(
+                      width: 20,
+                      height: 20,
+                      decoration: BoxDecoration(
+                        color: colorScheme.surfaceContainerHighest,
+                        borderRadius: BorderRadius.circular(4),
+                        border: Border.all(
+                          color: colorScheme.outline.withOpacity(0.3),
+                        ),
+                      ),
+                      child: Icon(
+                        Icons.add,
+                        size: 12,
+                        color: _programDuration < 365
+                            ? colorScheme.onSurface
+                            : colorScheme.onSurface.withOpacity(0.3),
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ],
           ),
@@ -673,38 +758,113 @@ class _ProgramCreationScreenState extends State<ProgramCreationScreen>
   }
 
   Widget _buildDrillSelectionStep() {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    
     return Padding(
       padding: const EdgeInsets.all(24),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            'Select Drills',
-            style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-              fontWeight: FontWeight.bold,
+          // Enhanced header section
+          Container(
+            padding: const EdgeInsets.all(20),
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                colors: [
+                  colorScheme.primaryContainer,
+                  colorScheme.primaryContainer.withOpacity(0.7),
+                ],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+              borderRadius: BorderRadius.circular(16),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Icon(
+                      Icons.fitness_center,
+                      color: colorScheme.onPrimaryContainer,
+                      size: 28,
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Text(
+                        'Select Drills',
+                        style: theme.textTheme.headlineSmall?.copyWith(
+                          fontWeight: FontWeight.bold,
+                          color: colorScheme.onPrimaryContainer,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  'Choose drills for your program. You can filter by category.',
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    color: colorScheme.onPrimaryContainer,
+                  ),
+                ),
+              ],
             ),
           ),
-          const SizedBox(height: 16),
-          Text('Choose drills for your program. You can filter by category.'),
-          const SizedBox(height: 8),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text('Available drills: ${_getFilteredDrills().length}', 
-                   style: Theme.of(context).textTheme.bodySmall,),
-              if (_getFilteredDrills().isNotEmpty)
-                TextButton.icon(
-                  onPressed: _selectedDrillIds.length == _getFilteredDrills().length 
-                      ? _deselectAllDrills 
-                      : _selectAllDrills,
-                  icon: Icon(_selectedDrillIds.length == _getFilteredDrills().length 
-                      ? Icons.deselect 
-                      : Icons.select_all,),
-                  label: Text(_selectedDrillIds.length == _getFilteredDrills().length 
-                      ? 'Deselect All' 
-                      : 'Select All',),
+          const SizedBox(height: 24),
+          
+          // Stats and controls section
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: colorScheme.surfaceContainerHighest,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: colorScheme.outline.withOpacity(0.3)),
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Available Drills',
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: colorScheme.onSurface.withOpacity(0.7),
+                      ),
+                    ),
+                    Text(
+                      '${_getFilteredDrills().length} drills',
+                      style: theme.textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.w600,
+                        color: colorScheme.primary,
+                      ),
+                    ),
+                  ],
                 ),
-            ],
+                if (_getFilteredDrills().isNotEmpty)
+                  FilledButton.icon(
+                    onPressed: _selectedDrillIds.length == _getFilteredDrills().length
+                        ? _deselectAllDrills
+                        : _selectAllDrills,
+                    icon: Icon(_selectedDrillIds.length == _getFilteredDrills().length
+                        ? Icons.deselect
+                        : Icons.select_all),
+                    label: Text(_selectedDrillIds.length == _getFilteredDrills().length
+                        ? 'Deselect All'
+                        : 'Select All'),
+                    style: FilledButton.styleFrom(
+                      backgroundColor: colorScheme.primary,
+                      foregroundColor: colorScheme.onPrimary,
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                    ),
+                  ),
+              ],
+            ),
           ),
           const SizedBox(height: 16),
           Expanded(
@@ -715,7 +875,7 @@ class _ProgramCreationScreenState extends State<ProgramCreationScreen>
                         child: Column(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
-                            Icon(Icons.fitness_center, size: 64, color: Colors.grey),
+                            Icon(Icons.fitness_center, size: 64, color: Theme.of(context).colorScheme.onSurface.withOpacity(0.5)),
                             const SizedBox(height: 16),
                             Text('No drills available'),
                             const SizedBox(height: 8),
@@ -818,7 +978,7 @@ class _ProgramCreationScreenState extends State<ProgramCreationScreen>
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        Icon(Icons.calendar_today, size: 64, color: Colors.grey),
+                        Icon(Icons.calendar_today, size: 64, color: Theme.of(context).colorScheme.onSurface.withOpacity(0.5)),
                         const SizedBox(height: 16),
                         Text('No drill assignments yet'),
                         const SizedBox(height: 8),
@@ -898,9 +1058,9 @@ class _ProgramCreationScreenState extends State<ProgramCreationScreen>
     final selectedDrills = _getSelectedDrills();
     if (selectedDrills.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
+        SnackBar(
           content: Text('Please select at least one drill first'),
-          backgroundColor: Colors.orange,
+          backgroundColor: AppTheme.warningColor,
         ),
       );
       return;
@@ -930,7 +1090,7 @@ class _ProgramCreationScreenState extends State<ProgramCreationScreen>
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text('Auto-assigned drills to ${_dayWiseDrills.length} days'),
-        backgroundColor: Colors.green,
+        backgroundColor: AppTheme.successColor,
       ),
     );
   }
@@ -1073,6 +1233,8 @@ class _ProgramCreationScreenState extends State<ProgramCreationScreen>
 
   Widget _buildValidationStatus() {
     final errors = _getValidationErrors();
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
     
     return Card(
       child: Padding(
@@ -1084,14 +1246,14 @@ class _ProgramCreationScreenState extends State<ProgramCreationScreen>
               children: [
                 Icon(
                   errors.isEmpty ? Icons.check_circle : Icons.error,
-                  color: errors.isEmpty ? Colors.green : Colors.red,
+                  color: errors.isEmpty ? AppTheme.successColor : colorScheme.error,
                 ),
                 const SizedBox(width: 8),
                 Text(
                   errors.isEmpty ? 'Ready to Create' : 'Please Fix Issues',
                   style: TextStyle(
                     fontWeight: FontWeight.bold,
-                    color: errors.isEmpty ? Colors.green : Colors.red,
+                    color: errors.isEmpty ? AppTheme.successColor : AppTheme.errorColor,
                   ),
                 ),
               ],
@@ -1100,7 +1262,7 @@ class _ProgramCreationScreenState extends State<ProgramCreationScreen>
               const SizedBox(height: 12),
               ...errors.map((error) => Padding(
                 padding: const EdgeInsets.only(top: 4),
-                child: Text('• $error', style: TextStyle(color: Colors.red.shade700)),
+                child: Text('• $error', style: TextStyle(color: AppTheme.errorColor)),
               ),),
             ],
           ],
@@ -1196,7 +1358,7 @@ class _ProgramCreationScreenState extends State<ProgramCreationScreen>
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('Please fix the following errors: ${validationErrors.join(', ')}'),
-          backgroundColor: Colors.red,
+          backgroundColor: Theme.of(context).colorScheme.error,
         ),
       );
       return;
@@ -1243,13 +1405,13 @@ class _ProgramCreationScreenState extends State<ProgramCreationScreen>
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Row(
-              children: const [
-                Icon(Icons.check_circle, color: Colors.white),
-                SizedBox(width: 12),
-                Text('Program created successfully!'),
-              ],
+              children: [
+                 Icon(Icons.check_circle, color: Theme.of(context).colorScheme.onPrimary),
+                 const SizedBox(width: 12),
+                 Text('Program created successfully!'),
+               ],
             ),
-            backgroundColor: Colors.green,
+            backgroundColor: AppTheme.successColor,
             behavior: SnackBarBehavior.floating,
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(10),
@@ -1267,14 +1429,14 @@ class _ProgramCreationScreenState extends State<ProgramCreationScreen>
           SnackBar(
             content: Row(
               children: [
-                const Icon(Icons.error, color: Colors.white),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Text('Failed to create program: $e'),
-                ),
-              ],
+                 Icon(Icons.error, color: Theme.of(context).colorScheme.onPrimary),
+                 const SizedBox(width: 12),
+                 Expanded(
+                   child: Text('Failed to create program: $e'),
+                 ),
+               ],
             ),
-            backgroundColor: Colors.red,
+            backgroundColor: Theme.of(context).colorScheme.error,
             behavior: SnackBarBehavior.floating,
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(10),
@@ -1282,7 +1444,7 @@ class _ProgramCreationScreenState extends State<ProgramCreationScreen>
             duration: const Duration(seconds: 5),
             action: SnackBarAction(
               label: 'Retry',
-              textColor: Colors.white,
+              textColor: Theme.of(context).colorScheme.onPrimary,
               onPressed: () {
                 _createProgram();
               },
@@ -1343,13 +1505,13 @@ class _ProgramCreationScreenState extends State<ProgramCreationScreen>
   Color _getLevelColor(String level) {
     switch (level.toLowerCase()) {
       case 'beginner':
-        return Colors.green;
+        return AppTheme.successColor;
       case 'intermediate':
-        return Colors.orange;
+        return AppTheme.warningColor;
       case 'advanced':
-        return Colors.red;
+        return AppTheme.errorColor;
       default:
-        return Colors.grey;
+        return AppTheme.neutral500;
     }
   }
 

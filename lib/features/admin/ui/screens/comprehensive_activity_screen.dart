@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:spark_app/core/theme/app_theme.dart';
+import 'package:spark_app/core/widgets/app_loader.dart';
 
 enum ActivityType {
   userRegistered,
@@ -38,7 +39,6 @@ class ComprehensiveActivityScreen extends StatefulWidget {
 
 class _ComprehensiveActivityScreenState extends State<ComprehensiveActivityScreen> {
   final _firestore = FirebaseFirestore.instance;
-  String _selectedFilter = 'all';
   bool _isLoading = true;
   List<ActivityItem> _activities = [];
 
@@ -77,25 +77,58 @@ class _ComprehensiveActivityScreenState extends State<ComprehensiveActivityScree
       }
 
       // Load subscription plans
-      final plansSnapshot = await _firestore
-          .collection('subscription_plans')
-          .get();
+      try {
+        final plansSnapshot = await _firestore
+            .collection('subscription_plans')
+            .orderBy('createdAt', descending: true)
+            .limit(30)
+            .get();
 
-      for (var doc in plansSnapshot.docs) {
-        final data = doc.data();
-        final createdAt = _parseTimestamp(data['createdAt']);
-        if (createdAt != null) {
-          activities.add(ActivityItem(
-            id: doc.id,
-            type: ActivityType.planCreated,
-            title: 'Subscription plan created',
-            subtitle: data['name'] as String? ?? 'Unknown',
-            timestamp: createdAt.toDate(),
-            data: data,
-          ),);
+        for (var doc in plansSnapshot.docs) {
+          final data = doc.data();
+          final createdAt = _parseTimestamp(data['createdAt']);
+          if (createdAt != null) {
+            activities.add(ActivityItem(
+              id: doc.id,
+              type: ActivityType.planCreated,
+              title: 'Subscription plan created',
+              subtitle: data['name'] as String? ?? data['title'] as String? ?? 'Unknown Plan',
+              timestamp: createdAt.toDate(),
+              data: data,
+            ));
+          }
+        }
+      } catch (e) {
+        debugPrint('Error loading subscription plans: $e');
+        // Try alternative query without ordering if createdAt field doesn't exist or isn't indexed
+        try {
+          final plansSnapshot = await _firestore
+              .collection('subscription_plans')
+              .limit(30)
+              .get();
+
+          for (var doc in plansSnapshot.docs) {
+            final data = doc.data();
+            // Try different timestamp field names
+            final createdAt = _parseTimestamp(data['createdAt']) ??
+                             _parseTimestamp(data['created_at']) ??
+                             _parseTimestamp(data['timestamp']);
+            
+            final timestamp = createdAt?.toDate() ?? DateTime.now();
+            
+            activities.add(ActivityItem(
+              id: doc.id,
+              type: ActivityType.planCreated,
+              title: 'Subscription plan created',
+              subtitle: data['name'] as String? ?? data['title'] as String? ?? 'Unknown Plan',
+              timestamp: timestamp,
+              data: data,
+            ));
+          }
+        } catch (e2) {
+          debugPrint('Error loading subscription plans (fallback): $e2');
         }
       }
-
 
       // Load plan requests
       try {
@@ -113,14 +146,43 @@ class _ComprehensiveActivityScreenState extends State<ComprehensiveActivityScree
               id: doc.id,
               type: ActivityType.planRequest,
               title: 'Plan upgrade requested',
-              subtitle: '${data['userName']} → ${data['requestedPlan']}',
+              subtitle: '${data['userName'] ?? data['user_name'] ?? 'Unknown User'} → ${data['requestedPlan'] ?? data['requested_plan'] ?? 'Unknown Plan'}',
               timestamp: createdAt.toDate(),
               data: data,
-            ),);
+            ));
           }
         }
       } catch (e) {
         debugPrint('Error loading plan requests: $e');
+        // Try alternative query without ordering if createdAt field doesn't exist or isn't indexed
+        try {
+          final requestsSnapshot = await _firestore
+              .collection('plan_requests')
+              .limit(30)
+              .get();
+
+          for (var doc in requestsSnapshot.docs) {
+            final data = doc.data();
+            // Try different timestamp field names
+            final createdAt = _parseTimestamp(data['createdAt']) ??
+                             _parseTimestamp(data['created_at']) ??
+                             _parseTimestamp(data['timestamp']) ??
+                             _parseTimestamp(data['requestedAt']);
+            
+            final timestamp = createdAt?.toDate() ?? DateTime.now();
+            
+            activities.add(ActivityItem(
+              id: doc.id,
+              type: ActivityType.planRequest,
+              title: 'Plan upgrade requested',
+              subtitle: '${data['userName'] ?? data['user_name'] ?? 'Unknown User'} → ${data['requestedPlan'] ?? data['requested_plan'] ?? 'Unknown Plan'}',
+              timestamp: timestamp,
+              data: data,
+            ));
+          }
+        } catch (e2) {
+          debugPrint('Error loading plan requests (fallback): $e2');
+        }
       }
 
       // Sort all activities by timestamp
@@ -149,76 +211,14 @@ class _ComprehensiveActivityScreenState extends State<ComprehensiveActivityScree
           ),
         ],
       ),
-      body: Column(
-        children: [
-          _buildFilterChips(),
-          Expanded(
-            child: _isLoading
-                ? const Center(child: CircularProgressIndicator())
-                : _buildActivityList(),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildFilterChips() {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      color: context.colors.surfaceContainerHighest,
-      child: SingleChildScrollView(
-        scrollDirection: Axis.horizontal,
-        child: Row(
-          children: [
-            _buildFilterChip('All', 'all', Icons.all_inclusive),
-            const SizedBox(width: 8),
-            _buildFilterChip('Users', 'users', Icons.person),
-            const SizedBox(width: 8),
-            _buildFilterChip('Plans', 'plans', Icons.card_membership),
-      
-            const SizedBox(width: 8),
-            _buildFilterChip('Requests', 'requests', Icons.receipt_long),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildFilterChip(String label, String value, IconData icon) {
-    final isSelected = _selectedFilter == value;
-    return FilterChip(
-      label: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, size: 16, color: isSelected ? AppTheme.whitePure : AppTheme.goldPrimary),
-          const SizedBox(width: 6),
-          Text(label),
-        ],
-      ),
-      selected: isSelected,
-      onSelected: (selected) {
-        setState(() {
-          _selectedFilter = value;
-        });
-      },
-      selectedColor: AppTheme.goldPrimary,
-      checkmarkColor: AppTheme.whitePure,
-      backgroundColor: context.colors.surface,
-      labelStyle: TextStyle(
-        color: isSelected ? AppTheme.whitePure : AppTheme.goldPrimary,
-        fontWeight: FontWeight.w600,
-        fontSize: 13,
-      ),
-      side: BorderSide(
-        color: isSelected ? AppTheme.goldPrimary : AppTheme.goldPrimary.withOpacity(0.3),
-      ),
+      body: _isLoading
+          ? const AppLoader.fullScreen(message: 'Loading activities...')
+          : _buildActivityList(),
     );
   }
 
   Widget _buildActivityList() {
-    final filteredActivities = _getFilteredActivities();
-
-    if (filteredActivities.isEmpty) {
+    if (_activities.isEmpty) {
       return Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
@@ -236,31 +236,11 @@ class _ComprehensiveActivityScreenState extends State<ComprehensiveActivityScree
 
     return ListView.builder(
       padding: const EdgeInsets.all(16),
-      itemCount: filteredActivities.length,
+      itemCount: _activities.length,
       itemBuilder: (context, index) {
-        return _buildActivityCard(filteredActivities[index]);
+        return _buildActivityCard(_activities[index]);
       },
     );
-  }
-
-  List<ActivityItem> _getFilteredActivities() {
-    switch (_selectedFilter) {
-      case 'users':
-        return _activities.where((a) => 
-          a.type == ActivityType.userRegistered || 
-          a.type == ActivityType.userUpdated,
-        ).toList();
-      case 'plans':
-        return _activities.where((a) => 
-          a.type == ActivityType.planCreated || 
-          a.type == ActivityType.planUpdated ||
-          a.type == ActivityType.planDeleted,
-        ).toList();
-      case 'requests':
-        return _activities.where((a) => a.type == ActivityType.planRequest).toList();
-      default:
-        return _activities;
-    }
   }
 
   Widget _buildActivityCard(ActivityItem activity) {
@@ -313,7 +293,7 @@ class _ComprehensiveActivityScreenState extends State<ComprehensiveActivityScree
               Text(
                 activity.subtitle!,
                 style: TextStyle(
-                  color: Colors.grey[700],
+                  color: context.colors.onSurface.withOpacity(0.7),
                   fontSize: 14,
                 ),
               ),
@@ -327,7 +307,7 @@ class _ComprehensiveActivityScreenState extends State<ComprehensiveActivityScree
                   _formatTimeAgo(activity.timestamp),
                   style: TextStyle(
                     fontSize: 12,
-                    color: Colors.grey[500],
+                    color: context.colors.onSurface.withOpacity(0.5),
                   ),
                 ),
               ],

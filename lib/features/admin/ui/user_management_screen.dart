@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:go_router/go_router.dart';
 import 'package:spark_app/core/auth/models/app_user.dart';
 import 'package:spark_app/core/auth/models/user_role.dart';
 import 'package:spark_app/core/auth/services/user_management_service.dart';
 import 'package:spark_app/core/theme/app_theme.dart';
 import 'package:spark_app/features/admin/ui/screens/user_form_screen.dart';
+import 'package:spark_app/features/admin/ui/screens/user_permission_management_screen.dart';
 import 'package:get_it/get_it.dart';
 
 class UserManagementScreen extends StatefulWidget {
@@ -51,7 +53,7 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
   Widget _buildSearchBar() {
     return Container(
       padding: const EdgeInsets.all(16),
-      color: Colors.grey[50],
+      color: context.colors.surfaceContainerHighest,
       child: TextField(
         decoration: InputDecoration(
           hintText: 'Search users by name or email...',
@@ -69,7 +71,7 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
             borderSide: BorderSide.none,
           ),
           filled: true,
-          fillColor: Colors.white,
+          fillColor: context.colors.surface,
         ),
         onChanged: (value) {
           setState(() => _searchQuery = value.toLowerCase());
@@ -100,11 +102,11 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Icon(Icons.people_outline, size: 64, color: Colors.grey[400]),
+                Icon(Icons.people_outline, size: 64, color: context.colors.onSurface.withOpacity(0.4)),
                 const SizedBox(height: 16),
                 Text(
                   'No data received',
-                  style: TextStyle(fontSize: 18, color: Colors.grey[600]),
+                  style: TextStyle(fontSize: 18, color: context.colors.onSurface.withOpacity(0.6)),
                 ),
               ],
             ),
@@ -120,11 +122,11 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Icon(Icons.people_outline, size: 64, color: Colors.grey[400]),
+                Icon(Icons.people_outline, size: 64, color: context.colors.onSurface.withOpacity(0.4)),
                 const SizedBox(height: 16),
                 Text(
                   'No users found',
-                  style: TextStyle(fontSize: 18, color: Colors.grey[600]),
+                  style: TextStyle(fontSize: 18, color: context.colors.onSurface.withOpacity(0.6)),
                 ),
               ],
             ),
@@ -162,11 +164,11 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Icon(Icons.search_off, size: 64, color: Colors.grey[400]),
+                Icon(Icons.search_off, size: 64, color: context.colors.onSurface.withOpacity(0.4)),
                 const SizedBox(height: 16),
                 Text(
                   'No users match your search',
-                  style: TextStyle(fontSize: 18, color: Colors.grey[600]),
+                  style: TextStyle(fontSize: 18, color: context.colors.onSurface.withOpacity(0.6)),
                 ),
               ],
             ),
@@ -189,7 +191,7 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
               return Card(
                 margin: const EdgeInsets.only(bottom: 12),
                 child: ListTile(
-                  leading: const Icon(Icons.error, color: Colors.red),
+                  leading: Icon(Icons.error, color: context.colors.error),
                   title: Text('Error loading user: ${doc.id}'),
                   subtitle: Text('Data parsing error: $e'),
                 ),
@@ -249,7 +251,7 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
                         Text(
                           user.email,
                           style: TextStyle(
-                            color: Colors.grey[600],
+                            color: context.colors.onSurface.withOpacity(0.6),
                             fontSize: 14,
                           ),
                         ),
@@ -259,25 +261,33 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
                   PopupMenuButton<String>(
                     onSelected: (value) => _handleUserAction(value, user, data),
                     itemBuilder: (context) => [
-                   
+                      const PopupMenuItem(
+                        value: 'manage_permissions',
+                        child: Row(
+                          children: [
+                            Icon(Icons.security, size: 20),
+                            SizedBox(width: 8),
+                            Text('Manage Permissions'),
+                          ],
+                        ),
+                      ),
                       const PopupMenuItem(
                         value: 'manage_user',
                         child: Row(
                           children: [
                             Icon(Icons.manage_accounts, size: 20),
                             SizedBox(width: 8),
-                            Text('Manage User'),
+                            Text('Edit User'),
                           ],
                         ),
                       ),
-              
-                      const PopupMenuItem(
+                      PopupMenuItem(
                         value: 'delete',
                         child: Row(
                           children: [
-                            Icon(Icons.delete, size: 20, color: Colors.red),
-                            SizedBox(width: 8),
-                            Text('Delete', style: TextStyle(color: Colors.red)),
+                            Icon(Icons.delete, size: 20, color: context.colors.error),
+                            const SizedBox(width: 8),
+                            Text('Delete', style: TextStyle(color: context.colors.error)),
                           ],
                         ),
                       ),
@@ -303,7 +313,7 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
                   if (data['createdBy'] != null)
                     _buildChip(
                       'Admin Created',
-                      Colors.orange,
+                      AppTheme.warningColor,
                       Icons.verified_user,
                     ),
                 ],
@@ -397,6 +407,10 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
 
   void _handleUserAction(String action, AppUser user, Map<String, dynamic> data) {
     switch (action) {
+      case 'manage_permissions':
+        // Navigate to user permission management screen
+        context.go('/admin/user-management/permissions/${user.id}');
+        break;
       case 'manage_user':
         _showManageSubscriptionDialog(user);
         break;
@@ -510,7 +524,7 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
               Navigator.pop(context);
               await _deleteUser(user.id);
             },
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+            style: ElevatedButton.styleFrom(backgroundColor: context.colors.error),
             child: const Text('Delete'),
           ),
         ],
@@ -526,7 +540,7 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('User deleted successfully'),
-            backgroundColor: Colors.green,
+            backgroundColor: AppTheme.successColor,
           ),
         );
       }
@@ -535,7 +549,7 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Failed to delete user: ${e.toString()}'),
-            backgroundColor: Colors.red,
+            backgroundColor: context.colors.error,
           ),
         );
       }
