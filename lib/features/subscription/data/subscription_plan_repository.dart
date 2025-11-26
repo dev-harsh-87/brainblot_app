@@ -103,6 +103,17 @@ class SubscriptionPlanRepository {
             .toList(),);
   }
 
+  /// Watch all subscription plans changes (admin only)
+  Stream<List<SubscriptionPlan>> watchAllPlans() {
+    return _firestore
+        .collection(_plansCollection)
+        .orderBy('priority', descending: false)
+        .snapshots()
+        .map((snapshot) => snapshot.docs
+            .map((doc) => SubscriptionPlan.fromFirestore(doc))
+            .toList(),);
+  }
+
   /// Toggle plan active status (admin only)
   Future<void> togglePlanStatus(String planId, bool isActive) async {
     try {

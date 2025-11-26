@@ -279,7 +279,7 @@ class ComprehensivePermissionService {
   List<String> _getAllAvailableModules() {
     return [
       'drills',
-      'programs', 
+      'programs',
       'profile',
       'stats',
       'subscription',
@@ -290,6 +290,12 @@ class ComprehensivePermissionService {
       'team_management',
       'host_features',
       'bulk_operations',
+      'admin_user_management',
+      'admin_subscription_management',
+      'admin_plan_requests',
+      'admin_category_management',
+      'admin_stimulus_management',
+      'admin_comprehensive_activity',
     ];
   }
 

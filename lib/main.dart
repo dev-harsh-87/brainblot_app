@@ -33,10 +33,32 @@ Future<void> main() async {
   // Initialize FCM token service (disabled until Firebase Console is set up)
   await FCMTokenService.instance.initialize();
   
+  // Initialize permissions for current user if logged in
+  await _initializeAppPermissions();
+  
   // Fix subscription for current user if logged in
   _fixSubscriptionOnStartup();
   
   runApp(const CogniTrainApp());
+}
+
+/// Initialize app permissions for current user if logged in
+Future<void> _initializeAppPermissions() async {
+  try {
+    final currentUser = FirebaseAuth.instance.currentUser;
+    if (currentUser != null) {
+      AppLogger.info('App startup: User is logged in, permissions will be initialized by AuthBloc');
+      
+      // We don't need to do anything here - just log that we detected a logged-in user
+      // The AuthBloc will handle permission initialization properly
+      // This function serves as a placeholder for future enhancements
+    } else {
+      AppLogger.info('App startup: No logged-in user detected');
+    }
+  } catch (e) {
+    AppLogger.warning('App permission check failed: $e');
+    // Don't block app startup for permission issues
+  }
 }
 
 /// Fix subscription synchronization on app startup

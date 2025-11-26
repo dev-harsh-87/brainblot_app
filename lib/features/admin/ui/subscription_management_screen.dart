@@ -149,15 +149,32 @@ class _SubscriptionManagementScreenState
               ),
         ),
         const SizedBox(height: 16),
-        FutureBuilder<List<SubscriptionPlan>>(
-          future: _planRepository.getAllPlans(),
+        StreamBuilder<List<SubscriptionPlan>>(
+          stream: _planRepository.watchAllPlans(),
           builder: (context, snapshot) {
-            if (snapshot.connectionState == ConnectionState.waiting) {
-              return const Center(child: CircularProgressIndicator());
+            if (snapshot.hasError) {
+              return Center(
+                child: Column(
+                  children: [
+                    Icon(Icons.error_outline, size: 64, color: context.colors.error),
+                    const SizedBox(height: 16),
+                    Text(
+                      'Error loading plans',
+                      style: TextStyle(fontSize: 18, color: context.colors.error),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      '${snapshot.error}',
+                      style: TextStyle(fontSize: 14, color: context.colors.onSurface.withOpacity(0.6)),
+                      textAlign: TextAlign.center,
+                    ),
+                  ],
+                ),
+              );
             }
 
-            if (snapshot.hasError) {
-              return Center(child: Text('Error: ${snapshot.error}'));
+            if (snapshot.connectionState == ConnectionState.waiting) {
+              return const Center(child: CircularProgressIndicator());
             }
 
             final plans = snapshot.data ?? [];
@@ -171,6 +188,11 @@ class _SubscriptionManagementScreenState
                     Text(
                       'No subscription plans found',
                       style: TextStyle(fontSize: 18, color: context.colors.onSurface.withOpacity(0.6)),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      'Create your first plan to get started',
+                      style: TextStyle(fontSize: 14, color: context.colors.onSurface.withOpacity(0.5)),
                     ),
                   ],
                 ),
@@ -225,8 +247,10 @@ class _SubscriptionManagementScreenState
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Row(
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
+                            // Plan name
                             Text(
                               plan.name,
                               style: const TextStyle(
@@ -234,31 +258,72 @@ class _SubscriptionManagementScreenState
                                 fontWeight: FontWeight.bold,
                               ),
                             ),
-                            const SizedBox(width: 8),
-                            Container(
-                              padding: const EdgeInsets.symmetric(
-                                  horizontal: 8, vertical: 4,),
-                              decoration: BoxDecoration(
-                                color: plan.isActive
-                                    ? AppTheme.successColor.withOpacity(0.1)
-                                    : context.colors.onSurface.withOpacity(0.1),
-                                borderRadius: BorderRadius.circular(8),
-                                border: Border.all(
-                                  color: plan.isActive
-                                      ? AppTheme.successColor
-                                      : context.colors.onSurface.withOpacity(0.5),
+                            const SizedBox(height: 8),
+                            // Badges row
+                            Row(
+                              children: [
+                                // System Plan Badge
+                                if (_isPredefinedPlan(plan.id)) ...[
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(
+                                        horizontal: 8, vertical: 4,),
+                                    decoration: BoxDecoration(
+                                      color: AppTheme.infoColor.withOpacity(0.1),
+                                      borderRadius: BorderRadius.circular(8),
+                                      border: Border.all(
+                                        color: AppTheme.infoColor.withOpacity(0.3),
+                                      ),
+                                    ),
+                                    child: Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Icon(
+                                          Icons.verified_outlined,
+                                          size: 12,
+                                          color: AppTheme.infoColor,
+                                        ),
+                                        const SizedBox(width: 4),
+                                        Text(
+                                          'SYSTEM',
+                                          style: TextStyle(
+                                            fontSize: 10,
+                                            fontWeight: FontWeight.bold,
+                                            color: AppTheme.infoColor,
+                                            letterSpacing: 0.5,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                  const SizedBox(width: 8),
+                                ],
+                                // Active/Inactive Badge
+                                Container(
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 8, vertical: 4,),
+                                  decoration: BoxDecoration(
+                                    color: plan.isActive
+                                        ? AppTheme.successColor.withOpacity(0.1)
+                                        : context.colors.onSurface.withOpacity(0.1),
+                                    borderRadius: BorderRadius.circular(8),
+                                    border: Border.all(
+                                      color: plan.isActive
+                                          ? AppTheme.successColor
+                                          : context.colors.onSurface.withOpacity(0.5),
+                                    ),
+                                  ),
+                                  child: Text(
+                                    plan.isActive ? 'Active' : 'Inactive',
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w600,
+                                      color: plan.isActive
+                                          ? AppTheme.successColor
+                                          : context.colors.onSurface.withOpacity(0.5),
+                                    ),
+                                  ),
                                 ),
-                              ),
-                              child: Text(
-                                plan.isActive ? 'Active' : 'Inactive',
-                                style: TextStyle(
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.w600,
-                                  color: plan.isActive
-                                      ? AppTheme.successColor
-                                      : context.colors.onSurface.withOpacity(0.5),
-                                ),
-                              ),
+                              ],
                             ),
                           ],
                         ),
@@ -300,18 +365,21 @@ class _SubscriptionManagementScreenState
                           ],
                         ),
                       ),
-                      const PopupMenuDivider(),
-                      const PopupMenuItem(
-                        value: 'delete',
-                        child: Row(
-                          children: [
-                            Icon(Icons.delete, size: 20, color: AppTheme.errorColor),
-                            SizedBox(width: 8),
-                            Text('Delete',
-                                style: TextStyle(color: AppTheme.errorColor)),
-                          ],
+                      // Only show delete option for non-predefined plans
+                      if (!_isPredefinedPlan(plan.id)) ...[
+                        const PopupMenuDivider(),
+                        const PopupMenuItem(
+                          value: 'delete',
+                          child: Row(
+                            children: [
+                              Icon(Icons.delete, size: 20, color: AppTheme.errorColor),
+                              SizedBox(width: 8),
+                              Text('Delete',
+                                  style: TextStyle(color: AppTheme.errorColor)),
+                            ],
+                          ),
                         ),
-                      ),
+                      ],
                     ],
                   ),
                 ],
@@ -388,6 +456,12 @@ class _SubscriptionManagementScreenState
         ],
       ),
     );
+  }
+
+  /// Check if a plan is predefined and should not be deleted
+  bool _isPredefinedPlan(String planId) {
+    const predefinedPlans = ['free', 'player', 'premium', 'institute'];
+    return predefinedPlans.contains(planId.toLowerCase());
   }
 
   void _handlePlanAction(String action, SubscriptionPlan plan) {
@@ -492,8 +566,14 @@ class _SubscriptionManagementScreenState
       ),
     );
 
-    if (result == true) {
-      setState(() {});
+    // No need for setState() - StreamBuilder will automatically update
+    if (result == true && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Plan created successfully'),
+          backgroundColor: AppTheme.successColor,
+        ),
+      );
     }
   }
 
@@ -509,15 +589,21 @@ class _SubscriptionManagementScreenState
       ),
     );
 
-    if (result == true) {
-      setState(() {});
+    // No need for setState() - StreamBuilder will automatically update
+    if (result == true && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Plan updated successfully'),
+          backgroundColor: AppTheme.successColor,
+        ),
+      );
     }
   }
 
   Future<void> _togglePlanStatus(SubscriptionPlan plan) async {
     try {
       await _planRepository.togglePlanStatus(plan.id, !plan.isActive);
-      setState(() {});
+      // No need for setState() - StreamBuilder will automatically update
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -540,11 +626,98 @@ class _SubscriptionManagementScreenState
   }
 
   void _showDeleteConfirmation(SubscriptionPlan plan) {
+    // Check if this is a predefined plan
+    if (_isPredefinedPlan(plan.id)) {
+      showDialog(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: Row(
+            children: [
+              Icon(Icons.info_outline, color: AppTheme.warningColor),
+              const SizedBox(width: 8),
+              const Text('Cannot Delete Plan'),
+            ],
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('The "${plan.name}" plan is a predefined system plan and cannot be deleted.'),
+              const SizedBox(height: 12),
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: AppTheme.infoColor.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: AppTheme.infoColor.withOpacity(0.3)),
+                ),
+                child: Row(
+                  children: [
+                    Icon(Icons.lightbulb_outline, color: AppTheme.infoColor, size: 20),
+                    const SizedBox(width: 8),
+                    const Expanded(
+                      child: Text(
+                        'You can edit this plan to modify its features, pricing, and settings, but it cannot be removed from the system.',
+                        style: TextStyle(fontSize: 13),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('OK'),
+            ),
+            FilledButton.icon(
+              onPressed: () {
+                Navigator.pop(context);
+                _showEditPlanDialog(plan);
+              },
+              icon: const Icon(Icons.edit),
+              label: const Text('Edit Plan'),
+            ),
+          ],
+        ),
+      );
+      return;
+    }
+
+    // Show normal delete confirmation for custom plans
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('Delete Plan'),
-        content: Text('Are you sure you want to delete "${plan.name}"?'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Are you sure you want to delete "${plan.name}"?'),
+            const SizedBox(height: 12),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: AppTheme.errorColor.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: AppTheme.errorColor.withOpacity(0.3)),
+              ),
+              child: Row(
+                children: [
+                  Icon(Icons.warning_outlined, color: AppTheme.errorColor, size: 20),
+                  const SizedBox(width: 8),
+                  const Expanded(
+                    child: Text(
+                      'This action cannot be undone. Users with this plan will need to be reassigned to a different plan.',
+                      style: TextStyle(fontSize: 13),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
@@ -566,7 +739,7 @@ class _SubscriptionManagementScreenState
   Future<void> _deletePlan(String planId) async {
     try {
       await _planRepository.deletePlan(planId);
-      setState(() {});
+      // No need for setState() - StreamBuilder will automatically update
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(

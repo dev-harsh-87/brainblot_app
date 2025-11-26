@@ -7,6 +7,7 @@ import 'package:spark_app/core/services/preferences_service.dart';
 import 'package:spark_app/core/auth/services/session_management_service.dart';
 import 'package:spark_app/core/auth/services/device_session_service.dart';
 import 'package:spark_app/core/auth/services/permission_initialization_service.dart';
+import 'package:spark_app/core/auth/services/permission_manager.dart';
 import 'package:spark_app/core/di/injection.dart';
 import 'package:spark_app/core/utils/app_logger.dart';
 import 'dart:async';
@@ -43,6 +44,17 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
     _authSubscription = _repo.authState().listen((user) {
       add(AuthUserChanged(user));
     });
+    
+    // If we start with an authenticated user (app restart), initialize permissions
+    if (state.status == AuthStatus.loading && state.user != null) {
+      AppLogger.info('App restarted with authenticated user, initializing permissions', tag: 'Auth');
+      // Add a small delay to ensure Firebase is fully ready
+      Future.delayed(const Duration(milliseconds: 500), () {
+        if (!isClosed) {
+          add(AuthCheckRequested());
+        }
+      });
+    }
   }
 
   /// Determines initial state based on current Firebase Auth state
@@ -50,10 +62,10 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
   static AuthState _getInitialState() {
     final currentUser = FirebaseAuth.instance.currentUser;
     if (currentUser != null) {
-      // User is logged in, start with authenticated state immediately
-      // Permissions will be loaded asynchronously
-      debugPrint('🔄 Initial state: User exists in Firebase Auth, starting as authenticated');
-      return AuthState(status: AuthStatus.authenticated, user: currentUser);
+      // User is logged in, start with loading state to initialize permissions
+      // This ensures permissions are loaded on app restart
+      debugPrint('🔄 Initial state: User exists in Firebase Auth, starting with loading to initialize permissions');
+      return AuthState(status: AuthStatus.loading, user: currentUser);
     }
     return const AuthState.initial();
   }
@@ -105,6 +117,15 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
       final permissions = await _permissionService.initializePermissions();
       AppLogger.success('Permissions loaded: ${permissions.toString()}', tag: 'Auth');
       
+      // Also initialize the PermissionManager for real-time updates
+      try {
+        await PermissionManager.instance.initializePermissions();
+        AppLogger.success('PermissionManager initialized', tag: 'Auth');
+      } catch (e) {
+        AppLogger.warning('PermissionManager initialization failed: $e', tag: 'Auth');
+        // Don't fail login if PermissionManager fails
+      }
+      
       // No conflicts found, complete authentication with permissions
       emit(state.copyWith(
         status: AuthStatus.authenticated,
@@ -132,6 +153,15 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
       AppLogger.info('Initializing permissions for new user', tag: 'Auth');
       final permissions = await _permissionService.initializePermissions();
       AppLogger.success('Permissions loaded: ${permissions.toString()}', tag: 'Auth');
+      
+      // Also initialize the PermissionManager for real-time updates
+      try {
+        await PermissionManager.instance.initializePermissions();
+        AppLogger.success('PermissionManager initialized for new user', tag: 'Auth');
+      } catch (e) {
+        AppLogger.warning('PermissionManager initialization failed for new user: $e', tag: 'Auth');
+        // Don't fail registration if PermissionManager fails
+      }
       
       // Profile creation is now handled by SessionManagementService
       emit(state.copyWith(
@@ -181,12 +211,49 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
     }
     
     if (event.user != null) {
+      AppLogger.info('User changed to: ${event.user!.uid}', tag: 'Auth');
+      
       // Load permissions when user changes
       UserPermissions? permissions;
+      bool permissionLoadSuccess = false;
+      
       try {
         AppLogger.info('User changed - initializing permissions', tag: 'Auth');
-        permissions = await _permissionService.initializePermissions();
-        AppLogger.success('Permissions loaded on user change: ${permissions.toString()}', tag: 'Auth');
+        
+        // Try to load permissions with retry logic
+        int retryCount = 0;
+        const maxRetries = 2;
+        
+        while (retryCount < maxRetries && !permissionLoadSuccess) {
+          try {
+            permissions = await _permissionService.initializePermissions();
+            permissionLoadSuccess = true;
+            AppLogger.success('Permissions loaded on user change (attempt ${retryCount + 1}): ${permissions.toString()}', tag: 'Auth');
+          } catch (e) {
+            retryCount++;
+            AppLogger.warning('Permission load attempt $retryCount failed on user change: $e', tag: 'Auth');
+            if (retryCount < maxRetries) {
+              await Future.delayed(const Duration(milliseconds: 300));
+            }
+          }
+        }
+        
+        // Also initialize the PermissionManager for real-time updates
+        try {
+          await PermissionManager.instance.initializePermissions();
+          AppLogger.success('PermissionManager initialized on user change', tag: 'Auth');
+        } catch (e) {
+          AppLogger.warning('PermissionManager initialization failed on user change: $e', tag: 'Auth');
+          // Retry PermissionManager initialization in background
+          Future.delayed(const Duration(milliseconds: 500), () async {
+            try {
+              await PermissionManager.instance.initializePermissions();
+              AppLogger.success('PermissionManager initialized on retry (user change)', tag: 'Auth');
+            } catch (retryError) {
+              AppLogger.error('PermissionManager retry failed on user change: $retryError', tag: 'Auth');
+            }
+          });
+        }
       } catch (e) {
         AppLogger.error('Failed to load permissions on user change', error: e, tag: 'Auth');
       }
@@ -196,36 +263,134 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
         user: event.user,
         permissions: permissions,
       ));
+      
+      // If permission loading failed, try again in background
+      if (!permissionLoadSuccess) {
+        AppLogger.info('Attempting background permission load after user change...', tag: 'Auth');
+        Future.delayed(const Duration(seconds: 1), () async {
+          try {
+            final backgroundPermissions = await _permissionService.initializePermissions();
+            await PermissionManager.instance.initializePermissions();
+            AppLogger.success('Background permission load successful after user change', tag: 'Auth');
+            
+            // Update state if still authenticated and same user
+            if (!isClosed &&
+                state.status == AuthStatus.authenticated &&
+                state.user?.uid == event.user!.uid) {
+              emit(state.copyWith(permissions: backgroundPermissions));
+            }
+          } catch (e) {
+            AppLogger.error('Background permission load failed after user change', error: e, tag: 'Auth');
+          }
+        });
+      }
+      
     } else {
+      AppLogger.info('User changed to null - logging out', tag: 'Auth');
       // Clear permissions cache on logout
       _permissionService.clearCache();
+      
+      // Also clear PermissionManager
+      try {
+        PermissionManager.instance.clearCache();
+      } catch (e) {
+        AppLogger.warning('Failed to clear PermissionManager cache: $e', tag: 'Auth');
+      }
+      
       emit(const AuthState.initial());
     }
   }
   
   Future<void> _onAuthCheck(AuthCheckRequested event, Emitter<AuthState> emit) async {
-    final currentUser = FirebaseAuth.instance.currentUser;
-    if (currentUser != null) {
-      // User exists in Firebase Auth, mark as authenticated immediately
-      // Load permissions on auth check (important for app restart)
-      UserPermissions? permissions;
-      try {
-        AppLogger.info('Auth check - initializing permissions', tag: 'Auth');
-        permissions = await _permissionService.initializePermissions();
-        AppLogger.success('Permissions loaded on auth check: ${permissions.toString()}', tag: 'Auth');
-      } catch (e) {
-        AppLogger.error('Failed to load permissions on auth check', error: e, tag: 'Auth');
+    try {
+      final currentUser = FirebaseAuth.instance.currentUser;
+      if (currentUser != null) {
+        AppLogger.info('Auth check: Found Firebase user ${currentUser.uid}', tag: 'Auth');
+        
+        // Emit loading state first to show progress
+        emit(state.copyWith(status: AuthStatus.loading, user: currentUser));
+        
+        // Load permissions on auth check (important for app restart)
+        UserPermissions? permissions;
+        bool permissionInitSuccess = false;
+        
+        try {
+          AppLogger.info('Auth check - initializing permissions for user ${currentUser.uid}', tag: 'Auth');
+          
+          // Try multiple times if needed for robustness
+          int retryCount = 0;
+          const maxRetries = 3;
+          
+          while (retryCount < maxRetries && !permissionInitSuccess) {
+            try {
+              permissions = await _permissionService.initializePermissions();
+              permissionInitSuccess = true;
+              AppLogger.success('Permissions loaded on auth check (attempt ${retryCount + 1}): ${permissions.toString()}', tag: 'Auth');
+            } catch (e) {
+              retryCount++;
+              AppLogger.warning('Permission initialization attempt $retryCount failed: $e', tag: 'Auth');
+              if (retryCount < maxRetries) {
+                await Future.delayed(Duration(milliseconds: 500 * retryCount));
+              }
+            }
+          }
+          
+          // Also initialize the PermissionManager for real-time updates
+          try {
+            await PermissionManager.instance.initializePermissions();
+            AppLogger.success('PermissionManager initialized on auth check', tag: 'Auth');
+          } catch (e) {
+            AppLogger.warning('PermissionManager initialization failed on auth check: $e', tag: 'Auth');
+            // Try to initialize it again after a delay
+            Future.delayed(const Duration(seconds: 1), () async {
+              try {
+                await PermissionManager.instance.initializePermissions();
+                AppLogger.success('PermissionManager initialized on retry', tag: 'Auth');
+              } catch (retryError) {
+                AppLogger.error('PermissionManager retry also failed: $retryError', tag: 'Auth');
+              }
+            });
+          }
+          
+        } catch (e) {
+          AppLogger.error('Failed to load permissions on auth check after all retries', error: e, tag: 'Auth');
+          // Continue with authentication even if permissions fail
+          // The user can still use the app, just with limited functionality
+        }
+        
+        AppLogger.success('Auth check: User authenticated successfully', tag: 'Auth');
+        emit(state.copyWith(
+          status: AuthStatus.authenticated,
+          user: currentUser,
+          permissions: permissions,
+        ));
+        
+        // If permissions failed, try to reload them in the background
+        if (!permissionInitSuccess) {
+          AppLogger.info('Attempting background permission reload...', tag: 'Auth');
+          Future.delayed(const Duration(seconds: 2), () async {
+            try {
+              final backgroundPermissions = await _permissionService.initializePermissions();
+              await PermissionManager.instance.initializePermissions();
+              AppLogger.success('Background permission reload successful', tag: 'Auth');
+              
+              // Update state with loaded permissions if still authenticated
+              if (!isClosed && state.status == AuthStatus.authenticated) {
+                emit(state.copyWith(permissions: backgroundPermissions));
+              }
+            } catch (e) {
+              AppLogger.error('Background permission reload failed', error: e, tag: 'Auth');
+            }
+          });
+        }
+        
+      } else {
+        // No user found
+        AppLogger.debug('Auth check: No Firebase user found', tag: 'Auth');
+        emit(const AuthState.initial());
       }
-      
-      AppLogger.debug('Auth check: Found Firebase user, marking as authenticated', tag: 'Auth');
-      emit(state.copyWith(
-        status: AuthStatus.authenticated,
-        user: currentUser,
-        permissions: permissions,
-      ));
-    } else {
-      // No user found
-      AppLogger.debug('Auth check: No Firebase user found', tag: 'Auth');
+    } catch (e) {
+      AppLogger.error('Auth check failed completely', error: e, tag: 'Auth');
       emit(const AuthState.initial());
     }
   }

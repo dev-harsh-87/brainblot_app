@@ -60,10 +60,15 @@ class _DrillLibraryScreenState extends State<DrillLibraryScreen>
     _profileService = getIt<ProfileService>();
     _drillRepository = getIt<DrillRepository>();
     
-    // Always show 3 tabs: My Drills, Admin Drills, Favorites
-    // Admin Drills will show snackbar if no access
+    // Show different tabs based on user role
+    // Regular users: My Drills, Admin Drills, Favorites (3 tabs)
+    // Admin users: My Drills, Favorites (2 tabs)
+    final authState = context.read<AuthBloc>().state;
+    final permissions = authState.permissions;
+    final isAdmin = permissions?.isAdmin ?? false;
+    
     _tabController = TabController(
-      length: 3,
+      length: isAdmin ? 2 : 3, // Admin users see 2 tabs, regular users see 3 tabs
       vsync: this,
     );
     
@@ -89,6 +94,12 @@ class _DrillLibraryScreenState extends State<DrillLibraryScreen>
     // Load categories and user profile
     _loadCategories();
     _loadUserProfile();
+    
+    // Initialize the default tab (My Drills) data loading immediately
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      // Load data for the default tab (My Drills - DrillLibraryView.custom)
+      context.read<DrillLibraryBloc>().add(DrillLibraryViewChanged(DrillLibraryView.custom));
+    });
     
     // Apply initial category filter if provided - do this immediately, not in postFrameCallback
     if (widget.initialCategory != null && widget.initialCategory!.isNotEmpty) {
@@ -160,13 +171,28 @@ class _DrillLibraryScreenState extends State<DrillLibraryScreen>
       return;
     }
 
-    // Tab mapping: 0=My Drills, 1=Admin Drills, 2=Favorites
-    DrillLibraryView view = switch (_tabController.index) {
-      0 => DrillLibraryView.custom, // My Drills
-      1 => DrillLibraryView.all, // Admin Drills
-      2 => DrillLibraryView.favorites, // Favorites
-      _ => DrillLibraryView.custom,
-    };
+    // Tab mapping depends on user role:
+    // Regular users: 0=My Drills, 1=Admin Drills, 2=Favorites
+    // Admin users: 0=My Drills, 1=Favorites
+    final isAdmin = permissions?.isAdmin ?? false;
+    
+    DrillLibraryView view;
+    if (isAdmin) {
+      // Admin users: 0=My Drills, 1=Favorites
+      view = switch (_tabController.index) {
+        0 => DrillLibraryView.custom, // My Drills
+        1 => DrillLibraryView.favorites, // Favorites
+        _ => DrillLibraryView.custom,
+      };
+    } else {
+      // Regular users: 0=My Drills, 1=Admin Drills, 2=Favorites
+      view = switch (_tabController.index) {
+        0 => DrillLibraryView.custom, // My Drills
+        1 => DrillLibraryView.all, // Admin Drills
+        2 => DrillLibraryView.favorites, // Favorites
+        _ => DrillLibraryView.custom,
+      };
+    }
 
     context.read<DrillLibraryBloc>().add(DrillLibraryViewChanged(view));
   }
@@ -191,23 +217,45 @@ class _DrillLibraryScreenState extends State<DrillLibraryScreen>
   }
 
   List<Widget> _buildTabs() {
-    // Always show all 3 tabs: My Drills, Admin Drills, Favorites
-    // Access control is handled in _onTabChanged()
-    return [
-      const Tab(text: 'My Drills'),
-      const Tab(text: 'Admin Drills'),
-      const Tab(text: 'Favorites'),
-    ];
+    final authState = context.read<AuthBloc>().state;
+    final permissions = authState.permissions;
+    final isAdmin = permissions?.isAdmin ?? false;
+    
+    if (isAdmin) {
+      // Admin users see only: My Drills, Favorites
+      return [
+        const Tab(text: 'My Drills'),
+        const Tab(text: 'Favorites'),
+      ];
+    } else {
+      // Regular users see: My Drills, Admin Drills, Favorites
+      return [
+        const Tab(text: 'My Drills'),
+        const Tab(text: 'Admin Drills'),
+        const Tab(text: 'Favorites'),
+      ];
+    }
   }
 
   List<Widget> _buildTabsWithCounts(DrillLibraryState state) {
-    // Always show all 3 tabs: My Drills, Admin Drills, Favorites
-    // Access control is handled in _onTabChanged()
-    return const [
-      Tab(text: 'My Drills'),
-      Tab(text: 'Admin Drills'),
-      Tab(text: 'Favorites'),
-    ];
+    final authState = context.read<AuthBloc>().state;
+    final permissions = authState.permissions;
+    final isAdmin = permissions?.isAdmin ?? false;
+    
+    if (isAdmin) {
+      // Admin users see only: My Drills, Favorites
+      return const [
+        Tab(text: 'My Drills'),
+        Tab(text: 'Favorites'),
+      ];
+    } else {
+      // Regular users see: My Drills, Admin Drills, Favorites
+      return const [
+        Tab(text: 'My Drills'),
+        Tab(text: 'Admin Drills'),
+        Tab(text: 'Favorites'),
+      ];
+    }
   }
 
   Widget _buildTabWithCount(String title, int count) {
@@ -247,13 +295,24 @@ class _DrillLibraryScreenState extends State<DrillLibraryScreen>
   }
 
   List<Widget> _buildTabViews(DrillLibraryState state) {
-    // Always show all 3 tab views: My Drills, Admin Drills, Favorites
-    // Access control is handled in _onTabChanged() and _buildAdminDrillsView()
-    return [
-      _buildMyDrillsViewWithRefresh(state), // My drills
-      _buildAdminDrillsViewWithRefresh(state), // Admin drills
-      _buildFavoriteDrillsViewWithRefresh(state), // Favorites
-    ];
+    final authState = context.read<AuthBloc>().state;
+    final permissions = authState.permissions;
+    final isAdmin = permissions?.isAdmin ?? false;
+    
+    if (isAdmin) {
+      // Admin users see only: My Drills, Favorites
+      return [
+        _buildMyDrillsViewWithRefresh(state), // My drills
+        _buildFavoriteDrillsViewWithRefresh(state), // Favorites
+      ];
+    } else {
+      // Regular users see: My Drills, Admin Drills, Favorites
+      return [
+        _buildMyDrillsViewWithRefresh(state), // My drills
+        _buildAdminDrillsViewWithRefresh(state), // Admin drills
+        _buildFavoriteDrillsViewWithRefresh(state), // Favorites
+      ];
+    }
   }
 
   @override
@@ -944,10 +1003,22 @@ Widget _buildCompactStatChip(IconData icon, String text, Color color) {
         // Get user ID
         final userId = FirebaseAuth.instance.currentUser?.uid;
         
-        // Filter drills: only user-created drills (not preset) and apply search/category/difficulty filters
-        var myDrills = state.all.where((drill) =>
-          !drill.isPreset && drill.createdBy == userId
-        ).toList();
+        // Filter drills based on user role:
+        // Admin users: show all drills (including admin drills) in "My Drills"
+        // Regular users: show only user-created drills
+        final authState = context.read<AuthBloc>().state;
+        final permissions = authState.permissions;
+        final isAdmin = permissions?.isAdmin ?? false;
+        
+        var myDrills = state.all.where((drill) {
+          if (isAdmin) {
+            // Admin users see all drills (including admin drills) in "My Drills"
+            return !drill.isPreset;
+          } else {
+            // Regular users see only their own created drills
+            return !drill.isPreset && drill.createdBy == userId;
+          }
+        }).toList();
         
         // Apply search filter
         if (state.query != null && state.query!.isNotEmpty) {
@@ -988,22 +1059,65 @@ Widget _buildCompactStatChip(IconData icon, String text, Color color) {
   Widget _buildAdminDrillsView() {
     return BlocBuilder<DrillLibraryBloc, DrillLibraryState>(
       builder: (context, state) {
-        // Filter admin drills from the BLoC state
-        final adminDrills = state.items.where((drill) => drill.createdByRole == 'admin').toList();
-        print('🔍 Admin drills from BLoC: ${adminDrills.length} drills (filtered)');
+        print('🔍 Admin drills view - State: ${state.status}, Items: ${state.items.length}');
         
-        if (state.status == DrillLibraryStatus.loading || state.status == DrillLibraryStatus.filtering) {
-          return const Center(child: CircularProgressIndicator());
+        if (state.status == DrillLibraryStatus.loading) {
+          return const Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                CircularProgressIndicator(),
+                SizedBox(height: 16),
+                Text('Loading admin drills...'),
+              ],
+            ),
+          );
         }
 
         if (state.status == DrillLibraryStatus.error) {
           print('🔴 Error in BLoC state: ${state.errorMessage}');
           return Center(
-            child: Text('Error loading admin drills: ${state.errorMessage}'),
+            child: Padding(
+              padding: const EdgeInsets.all(32),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(
+                    Icons.error_outline,
+                    size: 64,
+                    color: Theme.of(context).colorScheme.error,
+                  ),
+                  const SizedBox(height: 16),
+                  Text(
+                    'Failed to load admin drills',
+                    style: Theme.of(context).textTheme.titleLarge,
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    state.errorMessage ?? 'Unknown error occurred',
+                    style: Theme.of(context).textTheme.bodyMedium,
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 24),
+                  ElevatedButton.icon(
+                    onPressed: () {
+                      context.read<DrillLibraryBloc>().add(const DrillLibraryRefreshRequested());
+                    },
+                    icon: const Icon(Icons.refresh),
+                    label: const Text('Retry'),
+                  ),
+                ],
+              ),
+            ),
           );
         }
         
-        if (adminDrills.isEmpty) {
+        // Filter admin drills from the BLoC state
+        final adminDrills = state.items.where((drill) => drill.createdByRole == 'admin').toList();
+        print('🔍 Admin drills from BLoC: ${adminDrills.length} drills (filtered from ${state.items.length} total)');
+        
+        if (adminDrills.isEmpty && state.status == DrillLibraryStatus.loaded) {
           print('🔍 No admin drills found - showing empty state');
           return _buildEmptyAdminDrillsState();
         }

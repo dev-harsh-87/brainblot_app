@@ -6,7 +6,6 @@ import 'package:spark_app/core/auth/models/user_role.dart';
 import 'package:spark_app/core/auth/services/user_management_service.dart';
 import 'package:spark_app/core/theme/app_theme.dart';
 import 'package:spark_app/features/admin/ui/screens/user_form_screen.dart';
-import 'package:spark_app/features/admin/ui/screens/user_permission_management_screen.dart';
 import 'package:get_it/get_it.dart';
 
 class UserManagementScreen extends StatefulWidget {
@@ -262,16 +261,6 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
                     onSelected: (value) => _handleUserAction(value, user, data),
                     itemBuilder: (context) => [
                       const PopupMenuItem(
-                        value: 'manage_permissions',
-                        child: Row(
-                          children: [
-                            Icon(Icons.security, size: 20),
-                            SizedBox(width: 8),
-                            Text('Manage Permissions'),
-                          ],
-                        ),
-                      ),
-                      const PopupMenuItem(
                         value: 'manage_user',
                         child: Row(
                           children: [
@@ -400,17 +389,18 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
       ),
     );
 
-    if (result == true) {
-      // User was created successfully, list will auto-update via StreamBuilder
+    if (result == true && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('User created successfully'),
+          backgroundColor: AppTheme.successColor,
+        ),
+      );
     }
   }
 
   void _handleUserAction(String action, AppUser user, Map<String, dynamic> data) {
     switch (action) {
-      case 'manage_permissions':
-        // Navigate to user permission management screen
-        context.go('/admin/user-management/permissions/${user.id}');
-        break;
       case 'manage_user':
         _showManageSubscriptionDialog(user);
         break;
@@ -421,10 +411,31 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
   }
 
   void _showUserDetailsDialog(AppUser user, Map<String, dynamic> data) {
-    showDialog(
+    showDialog<void>(
       context: context,
       builder: (context) => AlertDialog(
-        title: Text(user.displayName),
+        title: Row(
+          children: [
+            CircleAvatar(
+              radius: 20,
+              backgroundColor: AppTheme.getRoleColor(user.role.value).withOpacity(0.1),
+              child: Text(
+                user.displayName.isNotEmpty ? user.displayName[0].toUpperCase() : 'U',
+                style: TextStyle(
+                  color: AppTheme.getRoleColor(user.role.value),
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                user.displayName,
+                style: const TextStyle(fontSize: 20),
+              ),
+            ),
+          ],
+        ),
         content: SingleChildScrollView(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -432,13 +443,33 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
             children: [
               _buildDetailRow('Email', user.email),
               _buildDetailRow('Role', user.role.displayName),
-              _buildDetailRow('Subscription', user.subscription.plan.toUpperCase()),
+              _buildDetailRow('Subscription Plan', user.subscription.plan.toUpperCase()),
+              _buildDetailRow('Subscription Status', user.subscription.status.toUpperCase()),
+              if (user.subscription.moduleAccess.isNotEmpty)
+                _buildDetailRow('Module Access', user.subscription.moduleAccess.join(', ')),
+              if (user.subscription.expiresAt != null)
+                _buildDetailRow('Expires At', _formatDate(user.subscription.expiresAt!)),
+              _buildDetailRow('Account Status', user.subscription.isActive() ? 'Active' : 'Inactive'),
               _buildDetailRow('Created', user.createdAt != null ? _formatDate(user.createdAt!) : 'N/A'),
-              if (data['createdBy'] != null)
+              if (user.lastActiveAt != null)
+                _buildDetailRow('Last Active', _formatDate(user.lastActiveAt!)),
+              if (data['createdBy'] != null) ...[
+                const SizedBox(height: 16),
+                const Text(
+                  'Admin Created User',
+                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                ),
+                const SizedBox(height: 8),
                 _buildDetailRow(
                   'Created By',
-                  (data['createdBy']['adminName'] as String?) ?? 'Unknown',
+                  (data['createdBy']['adminName'] as String?) ?? 'Unknown Admin',
                 ),
+                if (data['createdBy']['adminEmail'] != null)
+                  _buildDetailRow(
+                    'Admin Email',
+                    data['createdBy']['adminEmail'] as String,
+                  ),
+              ],
             ],
           ),
         ),
@@ -446,6 +477,14 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
           TextButton(
             onPressed: () => Navigator.pop(context),
             child: const Text('Close'),
+          ),
+          FilledButton.icon(
+            onPressed: () {
+              Navigator.pop(context);
+              _showManageSubscriptionDialog(user);
+            },
+            icon: const Icon(Icons.edit),
+            label: const Text('Edit User'),
           ),
         ],
       ),
@@ -479,29 +518,43 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
 
 
   void _showManageSubscriptionDialog(AppUser user) async {
+    final subscriptionData = {
+      'planId': user.subscription.plan, // UserFormScreen expects 'planId'
+      'plan': user.subscription.plan,   // Keep for compatibility
+      'status': user.subscription.status,
+      'moduleAccess': user.subscription.moduleAccess,
+      'expiresAt': user.subscription.expiresAt?.toIso8601String(),
+    };
+    
+    final userData = {
+      'displayName': user.displayName,
+      'email': user.email,
+      'role': user.role.value,
+      'subscription': subscriptionData,
+    };
+    
+    // Debug logging
+    print('🔍 UserManagement: Passing user data: $userData');
+    print('🔍 UserManagement: User subscription plan: ${user.subscription.plan}');
+    
     final result = await Navigator.push<bool>(
       context,
       MaterialPageRoute(
         builder: (context) => UserFormScreen(
           userId: user.id,
-          existingUserData: {
-            'displayName': user.displayName,
-            'email': user.email,
-            'role': user.role.value,
-            'subscription': {
-              'plan': user.subscription.plan,
-              'planId': user.subscription.plan,
-              'status': user.subscription.status,
-              'expiresAt': user.subscription.expiresAt,
-            },
-          },
+          existingUserData: userData,
           isEdit: true,
         ),
       ),
     );
 
-    if (result == true) {
-      // User was updated successfully, list will auto-update via StreamBuilder
+    if (result == true && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('User updated successfully'),
+          backgroundColor: AppTheme.successColor,
+        ),
+      );
     }
   }
 

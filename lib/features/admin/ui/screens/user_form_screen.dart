@@ -58,7 +58,12 @@ class _UserFormScreenState extends State<UserFormScreen> {
       );
       final subscription = widget.existingUserData!['subscription'] as Map<String, dynamic>?;
       if (subscription != null) {
-        _selectedPlanId = subscription['planId'] as String?;
+        // Try to get planId first, then fall back to plan
+        _selectedPlanId = subscription['planId'] as String? ?? subscription['plan'] as String?;
+        
+        // Debug logging
+        print('🔍 UserFormScreen Init: Subscription data: $subscription');
+        print('🔍 UserFormScreen Init: Selected plan ID: $_selectedPlanId');
       }
     }
     
@@ -72,10 +77,40 @@ class _UserFormScreenState extends State<UserFormScreen> {
         _availablePlans = plans;
         _loadingPlans = false;
         
-        // Set default plan if not editing
+        // For editing, validate that the selected plan exists in available plans
+        if (widget.isEdit && _selectedPlanId != null) {
+          final planExists = plans.any((plan) => plan.id == _selectedPlanId);
+          if (!planExists) {
+            // If the user's current plan is not in active plans, try to find it by name
+            final subscription = widget.existingUserData!['subscription'] as Map<String, dynamic>?;
+            final currentPlanName = subscription?['plan'] as String?;
+            
+            if (currentPlanName != null) {
+              // Try to find a plan that matches the current plan name
+              final matchingPlan = plans.where((plan) =>
+                plan.name.toLowerCase() == currentPlanName.toLowerCase() ||
+                plan.id.toLowerCase() == currentPlanName.toLowerCase()
+              ).firstOrNull;
+              
+              if (matchingPlan != null) {
+                _selectedPlanId = matchingPlan.id;
+              } else if (plans.isNotEmpty) {
+                // Fallback to first available plan
+                _selectedPlanId = plans.first.id;
+              }
+            }
+          }
+        }
+        
+        // Set default plan if not editing and no plan selected
         if (!widget.isEdit && plans.isNotEmpty && _selectedPlanId == null) {
           _selectedPlanId = plans.first.id;
         }
+        
+        // Debug logging
+        print('🔍 UserFormScreen: Loaded ${plans.length} plans');
+        print('🔍 UserFormScreen: Selected plan ID: $_selectedPlanId');
+        print('🔍 UserFormScreen: Available plan IDs: ${plans.map((p) => p.id).toList()}');
       });
     } catch (e) {
       setState(() {
@@ -633,16 +668,36 @@ class _UserFormScreenState extends State<UserFormScreen> {
   Future<void> _updateUser(SubscriptionPlan plan) async {
     if (widget.userId == null) return;
 
+    print('🔄 Updating user subscription...');
+    print('📦 New Plan: ${plan.name} (ID: ${plan.id})');
+    print('🔧 Module Access: ${plan.moduleAccess}');
+
+    // Create complete subscription object
+    final subscriptionData = {
+      'plan': plan.name.toLowerCase(),
+      'planId': plan.id,
+      'status': 'active', // Keep existing status or set to active
+      'moduleAccess': plan.moduleAccess,
+      'expiresAt': null, // Admin changes don't set expiration by default
+    };
+
+    // Update user role and display name first
     await FirebaseFirestore.instance
         .collection('users')
         .doc(widget.userId)
         .update({
       'displayName': _displayNameController.text.trim(),
       'role': _selectedRole.value,
-      'subscription.plan': plan.name.toLowerCase(),
-      'subscription.planId': plan.id,
-      'subscription.moduleAccess': plan.moduleAccess,
       'updatedAt': FieldValue.serverTimestamp(),
     });
+
+    // Update subscription using the service method
+    await _userManagementService.updateUserSubscription(
+      widget.userId!,
+      subscriptionData,
+    );
+
+    print('✅ User subscription updated successfully');
+    print('📊 Updated subscription data: $subscriptionData');
   }
 }

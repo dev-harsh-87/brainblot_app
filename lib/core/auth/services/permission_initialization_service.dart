@@ -85,6 +85,13 @@ class PermissionInitializationService {
           'user_management',
           'team_management',
           'bulk_operations',
+          'subscription',
+          'admin_user_management',
+          'admin_subscription_management',
+          'admin_plan_requests',
+          'admin_category_management',
+          'admin_stimulus_management',
+          'admin_comprehensive_activity',
         ];
         AppLogger.info('Admin user detected - granted all module access', tag: 'PermissionInit');
       }

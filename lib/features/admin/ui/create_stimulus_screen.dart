@@ -41,6 +41,9 @@ class _CreateStimulusScreenState extends State<CreateStimulusScreen> {
     return Scaffold(
       backgroundColor: colorScheme.surface,
       appBar: AppBar(
+                iconTheme: IconThemeData(
+          color: colorScheme.onPrimary,
+        ),
         elevation: 0,
         backgroundColor: colorScheme.primary,
         foregroundColor: colorScheme.onPrimary,

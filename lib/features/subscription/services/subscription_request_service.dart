@@ -1,6 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:spark_app/features/subscription/domain/subscription_request.dart';
+import 'package:spark_app/core/auth/services/permission_manager.dart';
 
 /// Service for managing subscription upgrade requests
 class SubscriptionRequestService {
@@ -171,23 +172,26 @@ class SubscriptionRequestService {
       }
 
       // Update user's subscription in Firestore
-      // Use dot notation to update nested fields properly
-      final updateData = {
-        'subscription.plan': request.requestedPlan,
-        'subscription.status': 'active',
-        'subscription.moduleAccess': moduleAccess,
-        'updatedAt': FieldValue.serverTimestamp(),
+      // Create complete subscription object to ensure all fields are properly set
+      final subscriptionData = {
+        'plan': request.requestedPlan,
+        'status': 'active',
+        'moduleAccess': moduleAccess,
       };
 
       // Only set expiration if it's not null (lifetime plans don't expire)
       if (expiresAt != null) {
-        updateData['subscription.expiresAt'] = Timestamp.fromDate(expiresAt);
-      } else {
-        // Remove expiration for lifetime plans
-        updateData['subscription.expiresAt'] = FieldValue.delete();
+        subscriptionData['expiresAt'] = Timestamp.fromDate(expiresAt);
       }
 
+      final updateData = {
+        'subscription': subscriptionData, // Update entire subscription object
+        'updatedAt': FieldValue.serverTimestamp(),
+      };
+
+      print('🔄 Updating user subscription with data: $subscriptionData');
       await _firestore.collection('users').doc(request.userId).update(updateData);
+      print('✅ User subscription updated successfully');
 
       // Update request status
       await _firestore.collection('subscription_requests').doc(requestId).update({
@@ -201,14 +205,22 @@ class SubscriptionRequestService {
       print('✅ Subscription request approved and user plan upgraded');
       print("📅 Plan expires at: ${expiresAt?.toString() ?? 'Never (lifetime)'}");
       
-      // If the upgraded user is currently logged in, refresh their session
-      // The SessionManagementService listens to user document changes,
-      // so it will automatically pick up the subscription update via the
-      // Firestore snapshot listener. No manual refresh needed.
-      // The user document snapshot listener in SessionManagementService
-      // at line 62-92 will automatically detect the change and update
-      // the session, triggering permission cache clearing at line 74.
-      print('📡 User session will be automatically refreshed via Firestore listener');
+      // If the upgraded user is currently logged in, refresh their permissions
+      // The PermissionManager now listens to user document changes via the
+      // ComprehensivePermissionService.watchPermissionChanges() stream
+      // This will automatically refresh permissions when the user document is updated
+      print('📡 User permissions will be automatically refreshed via Firestore listener');
+      
+      // Also manually refresh permissions for the current user if they are the one being upgraded
+      if (currentUser.uid == request.userId) {
+        try {
+          await PermissionManager.instance.refreshPermissions();
+          print('🔄 Current user permissions manually refreshed');
+        } catch (e) {
+          print('⚠️ Failed to manually refresh current user permissions: $e');
+          // Don't throw - the automatic refresh via listener should still work
+        }
+      }
     } catch (e) {
       print('❌ Failed to approve request: $e');
       rethrow;

@@ -465,39 +465,68 @@ class _PlanRequestsScreenState extends State<PlanRequestsScreen>
 
     if (confirmed != true) return;
 
+    bool isDialogShowing = false;
+    
     try {
-      // Show loading
       if (!mounted) return;
+      
+      // Show loading dialog
+      isDialogShowing = true;
       showDialog(
         context: context,
         barrierDismissible: false,
-        builder: (context) => const Center(child: CircularProgressIndicator()),
+        builder: (context) => WillPopScope(
+          onWillPop: () async => false,
+          child: const Center(
+            child: Card(
+              child: Padding(
+                padding: EdgeInsets.all(20),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    CircularProgressIndicator(),
+                    SizedBox(height: 16),
+                    Text('Approving request...'),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
       );
 
       await _service.approveRequest(request.id);
 
-      if (!mounted) return;
-      Navigator.pop(context); // Close loading
+      // Close loading dialog
+      if (mounted && isDialogShowing) {
+        Navigator.of(context, rootNavigator: true).pop();
+        isDialogShowing = false;
+      }
 
       // Show success
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Row(
-            children: [
-              const Icon(Icons.check_circle, color: Colors.white),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Text('Request approved! User upgraded to ${request.requestedPlan}'),
-              ),
-            ],
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Row(
+              children: [
+                const Icon(Icons.check_circle, color: Colors.white),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text('Request approved! User upgraded to ${request.requestedPlan}'),
+                ),
+              ],
+            ),
+            backgroundColor: AppTheme.successColor,
+            behavior: SnackBarBehavior.floating,
           ),
-          backgroundColor: AppTheme.successColor,
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
+        );
+      }
     } catch (e) {
-      if (!mounted) return;
-      Navigator.pop(context); // Close loading
+      // Close loading dialog
+      if (mounted && isDialogShowing) {
+        Navigator.of(context, rootNavigator: true).pop();
+        isDialogShowing = false;
+      }
 
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -571,45 +600,76 @@ class _PlanRequestsScreenState extends State<PlanRequestsScreen>
     final reason = reasonController.text.trim();
     reasonController.dispose();
 
+    bool isDialogShowing = false;
+    
     try {
-      // Show loading
       if (!mounted) return;
+      
+      // Show loading dialog
+      isDialogShowing = true;
       showDialog(
         context: context,
         barrierDismissible: false,
-        builder: (context) => const Center(child: CircularProgressIndicator()),
+        builder: (context) => WillPopScope(
+          onWillPop: () async => false,
+          child: const Center(
+            child: Card(
+              child: Padding(
+                padding: EdgeInsets.all(20),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    CircularProgressIndicator(),
+                    SizedBox(height: 16),
+                    Text('Rejecting request...'),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
       );
 
       await _service.rejectRequest(request.id, reason);
 
-      if (!mounted) return;
-      Navigator.pop(context); // Close loading
+      // Close loading dialog
+      if (mounted && isDialogShowing) {
+        Navigator.of(context, rootNavigator: true).pop();
+        isDialogShowing = false;
+      }
 
       // Show success
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Row(
-            children: [
-              const Icon(Icons.check_circle, color: Colors.white),
-              SizedBox(width: 12),
-              Expanded(child: Text('Request rejected')),
-            ],
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Row(
+              children: [
+                Icon(Icons.check_circle, color: Colors.white),
+                SizedBox(width: 12),
+                Expanded(child: Text('Request rejected')),
+              ],
+            ),
+            backgroundColor: AppTheme.warningColor,
+            behavior: SnackBarBehavior.floating,
           ),
-          backgroundColor: AppTheme.warningColor,
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
+        );
+      }
     } catch (e) {
-      if (!mounted) return;
-      Navigator.pop(context); // Close loading
+      // Close loading dialog
+      if (mounted && isDialogShowing) {
+        Navigator.of(context, rootNavigator: true).pop();
+        isDialogShowing = false;
+      }
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Failed to reject request: $e'),
-          backgroundColor: AppTheme.errorColor,
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to reject request: $e'),
+            backgroundColor: AppTheme.errorColor,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
     }
   }
 }

@@ -240,18 +240,20 @@ class UserManagementService {
   Future<void> updateUserSubscription(
       String userId, Map<String, dynamic> subscriptionData) async {
     try {
-      // Use dot notation to update nested subscription fields properly
+      print('🔄 UserManagementService: Updating user subscription...');
+      print('👤 User ID: $userId');
+      print('📦 Subscription Data: $subscriptionData');
+
+      // Update the entire subscription object to ensure all fields are properly set
       final Map<String, dynamic> updateData = {
+        'subscription': subscriptionData,
         'updatedAt': FieldValue.serverTimestamp(),
       };
 
-      // Add subscription fields with dot notation
-      subscriptionData.forEach((key, value) {
-        updateData['subscription.$key'] = value;
-      });
-
       await _firestore.collection('users').doc(userId).update(updateData);
+      print('✅ UserManagementService: Subscription updated successfully');
     } catch (e) {
+      print('❌ UserManagementService: Failed to update subscription: $e');
       throw Exception('Failed to update user subscription: $e');
     }
   }

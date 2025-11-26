@@ -445,6 +445,9 @@ class _DeviceSessionsScreenState extends State<DeviceSessionsScreen> with Ticker
     return Scaffold(
       backgroundColor: colorScheme.surface,
       appBar: AppBar(
+                    iconTheme: IconThemeData(
+          color: colorScheme.onPrimary,
+        ),
         title: Text(
           'Device Sessions',
           style: TextStyle(
@@ -452,8 +455,8 @@ class _DeviceSessionsScreenState extends State<DeviceSessionsScreen> with Ticker
             fontWeight: FontWeight.w700,
           ),
         ),
-        backgroundColor: theme.colorScheme.primary,
-        foregroundColor: theme.colorScheme.onPrimary,
+      backgroundColor: colorScheme.primary,
+      foregroundColor: colorScheme.onPrimary,
         elevation: 0,
         flexibleSpace: Container(
           decoration: BoxDecoration(

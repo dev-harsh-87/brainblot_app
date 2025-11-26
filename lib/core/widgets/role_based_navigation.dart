@@ -109,8 +109,11 @@ class RoleBasedNavigation extends StatelessWidget {
       label: 'Stats',
     ),);
 
-    // Add admin navigation if user is admin
-    if (user.role.isAdmin()) {
+    // Add admin navigation if user is admin or has any admin module access
+    final hasAnyAdminAccess = user.role.isAdmin() ||
+        user.subscription.moduleAccess.any((module) => module.startsWith('admin_'));
+    
+    if (hasAnyAdminAccess) {
       items.add(NavigationItem(
         route: '/admin',
         icon: Icons.admin_panel_settings_outlined,

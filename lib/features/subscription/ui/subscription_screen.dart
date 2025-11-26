@@ -707,26 +707,52 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
   Future<void> _submitUpgradeRequest(SubscriptionPlan plan, String reason) async {
     if (!mounted) return;
     
-    // Show loading dialog
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (context) => const Center(child: CircularProgressIndicator()),
-    );
-
+    bool isDialogShowing = false;
+    
     try {
+      // Show loading dialog
+      isDialogShowing = true;
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (context) => WillPopScope(
+          onWillPop: () async => false,
+          child: const Center(
+            child: Card(
+              child: Padding(
+                padding: EdgeInsets.all(20),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    CircularProgressIndicator(),
+                    SizedBox(height: 16),
+                    Text('Submitting request...'),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+
       final service = SubscriptionRequestService();
       await service.createUpgradeRequest(
         requestedPlan: plan.id,
         reason: reason,
       );
 
-      // Close loading dialog if still mounted
-      if (mounted && Navigator.canPop(context)) {
-        Navigator.pop(context);
+      // Close loading dialog
+      if (mounted && isDialogShowing) {
+        Navigator.of(context, rootNavigator: true).pop();
+        isDialogShowing = false;
       }
 
-      // Show success message if still mounted
+      // Refresh the screen data to reflect any changes
+      if (mounted) {
+        await _loadData();
+      }
+
+      // Show success message
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -750,12 +776,13 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
         );
       }
     } catch (e) {
-      // Close loading dialog if still mounted
-      if (mounted && Navigator.canPop(context)) {
-        Navigator.pop(context);
+      // Close loading dialog
+      if (mounted && isDialogShowing) {
+        Navigator.of(context, rootNavigator: true).pop();
+        isDialogShowing = false;
       }
 
-      // Show error message if still mounted
+      // Show error message
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(

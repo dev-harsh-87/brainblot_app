@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:spark_app/core/auth/services/permission_manager.dart';
+import 'package:spark_app/core/utils/app_logger.dart';
 
 /// Simple widget that shows content based on cached permissions
 /// No async calls needed since permissions are pre-analyzed
@@ -24,20 +25,15 @@ class PermissionBasedScreen extends StatelessWidget {
     
     // Check if permissions are initialized
     if (!permissionManager.isInitialized) {
-      // Instead of redirecting to splash, show loading indicator
-      // This prevents navigation loops and app restarts
-      return const Scaffold(
-        body: Center(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              CircularProgressIndicator(),
-              SizedBox(height: 16),
-              Text('Loading permissions...'),
-            ],
-          ),
-        ),
-      );
+      // For admin-only features, show access denied immediately
+      if (requireAdmin) {
+        return _buildAccessDeniedScreen(context, 'Admin access required');
+      }
+      
+      // For regular modules, allow access by default and initialize permissions silently
+      // This prevents the "Loading permissions..." screen during navigation
+      _initializePermissionsSilently();
+      return child;
     }
 
     // Check admin requirement
@@ -47,11 +43,23 @@ class PermissionBasedScreen extends StatelessWidget {
 
     // Check module requirement
     if (requiredModule != null && !permissionManager.hasModuleAccess(requiredModule!)) {
-      return _buildAccessDeniedScreen(context, 
+      return _buildAccessDeniedScreen(context,
           customMessage ?? 'Access to ${requiredModule!.replaceAll('_', ' ')} module required');
     }
 
     return child;
+  }
+
+  /// Initialize permissions silently in the background without blocking UI
+  void _initializePermissionsSilently() {
+    // Only initialize once to avoid multiple calls
+    if (!PermissionManager.instance.isInitialized) {
+      AppLogger.info('Initializing permissions silently in background', tag: 'PermissionBasedScreen');
+      PermissionManager.instance.initializePermissions().catchError((error) {
+        // Log error but don't block UI
+        AppLogger.warning('Silent permission initialization failed: $error', tag: 'PermissionBasedScreen');
+      });
+    }
   }
 
   Widget _buildAccessDeniedScreen(BuildContext context, String message) {
@@ -206,7 +214,14 @@ class PermissionBasedWidget extends StatelessWidget {
     
     // Check if permissions are initialized
     if (!permissionManager.isInitialized) {
-      return fallback ?? const SizedBox.shrink();
+      // For admin-only widgets, hide by default
+      if (requireAdmin) {
+        return fallback ?? const SizedBox.shrink();
+      }
+      
+      // For regular module widgets, show by default and initialize permissions silently
+      _initializePermissionsSilently();
+      return child;
     }
 
     // Check admin requirement
@@ -220,5 +235,17 @@ class PermissionBasedWidget extends StatelessWidget {
     }
 
     return child;
+  }
+
+  /// Initialize permissions silently in the background without blocking UI
+  void _initializePermissionsSilently() {
+    // Only initialize once to avoid multiple calls
+    if (!PermissionManager.instance.isInitialized) {
+      AppLogger.info('Initializing permissions silently in background', tag: 'PermissionBasedWidget');
+      PermissionManager.instance.initializePermissions().catchError((error) {
+        // Log error but don't block UI
+        AppLogger.warning('Silent permission initialization failed: $error', tag: 'PermissionBasedWidget');
+      });
+    }
   }
 }

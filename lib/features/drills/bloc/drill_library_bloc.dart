@@ -127,44 +127,104 @@ class DrillLibraryBloc extends Bloc<DrillLibraryEvent, DrillLibraryState> {
 
   Future<void> _onViewChanged(DrillLibraryViewChanged event, Emitter<DrillLibraryState> emit) async {
     emit(state.copyWith(
-      status: DrillLibraryStatus.filtering,
+      status: DrillLibraryStatus.loading,
       currentView: event.view,
     ),);
     
     await _sub?.cancel();
     
-    // Use appropriate data source based on view
-    switch (event.view) {
-      case DrillLibraryView.favorites:
-        _sub = _repo.watchFavorites().listen(
-          (drills) => add(_DrillLibraryItemsUpdated(drills as List<Drill>)),
-          onError: (error) => add(_DrillLibraryErrorOccurred(error.toString())),
-        );
-        break;
-      case DrillLibraryView.all:
-        // For admin drills view, we need to fetch admin drills specifically
-        // This view is used for the "Admin Drills" tab
-        if (_repo is FirebaseDrillRepository) {
-          try {
-            final adminDrills = await (_repo as FirebaseDrillRepository).fetchAdminDrills();
-            add(_DrillLibraryItemsUpdated(adminDrills));
-          } catch (e) {
-            add(_DrillLibraryErrorOccurred('Failed to load admin drills: $e'));
-          }
-        } else {
-          _sub = _repo.watchAll().listen(
-            (drills) => add(_DrillLibraryItemsUpdated(drills as List<Drill>)),
-            onError: (error) => add(_DrillLibraryErrorOccurred(error.toString())),
+    try {
+      // Use appropriate data source based on view with proper error handling
+      switch (event.view) {
+        case DrillLibraryView.favorites:
+          _sub = _repo.watchFavorites().listen(
+            (drills) {
+              if (!isClosed) {
+                add(_DrillLibraryItemsUpdated(drills as List<Drill>));
+              }
+            },
+            onError: (error) {
+              if (!isClosed) {
+                AppLogger.error('Error in favorites stream', error: error);
+                add(_DrillLibraryErrorOccurred('Failed to load favorite drills: $error'));
+              }
+            },
           );
-        }
-        break;
-      case DrillLibraryView.custom:
-        // For custom/my drills view
-        _sub = _repo.watchAll().listen(
-          (drills) => add(_DrillLibraryItemsUpdated(drills as List<Drill>)),
-          onError: (error) => add(_DrillLibraryErrorOccurred(error.toString())),
-        );
-        break;
+          break;
+        case DrillLibraryView.all:
+          // For admin drills view, use a more reliable approach
+          if (_repo is FirebaseDrillRepository) {
+            try {
+              // Add retry logic for admin drills
+              List<Drill> adminDrills = [];
+              int retryCount = 0;
+              const maxRetries = 3;
+              
+              while (retryCount < maxRetries) {
+                try {
+                  adminDrills = await (_repo as FirebaseDrillRepository).fetchAdminDrills();
+                  break; // Success, exit retry loop
+                } catch (e) {
+                  retryCount++;
+                  if (retryCount >= maxRetries) {
+                    rethrow; // Re-throw after max retries
+                  }
+                  // Wait before retry with exponential backoff
+                  await Future.delayed(Duration(milliseconds: 500 * retryCount));
+                  AppLogger.warning('Retrying admin drills fetch (attempt $retryCount)', tag: 'DrillLibraryBloc');
+                }
+              }
+              
+              if (!isClosed) {
+                add(_DrillLibraryItemsUpdated(adminDrills));
+              }
+            } catch (e) {
+              if (!isClosed) {
+                AppLogger.error('Failed to load admin drills after retries', error: e);
+                add(_DrillLibraryErrorOccurred('Failed to load admin drills: $e'));
+              }
+            }
+          } else {
+            _sub = _repo.watchAll().listen(
+              (drills) {
+                if (!isClosed) {
+                  add(_DrillLibraryItemsUpdated(drills as List<Drill>));
+                }
+              },
+              onError: (error) {
+                if (!isClosed) {
+                  AppLogger.error('Error in all drills stream', error: error);
+                  add(_DrillLibraryErrorOccurred('Failed to load drills: $error'));
+                }
+              },
+            );
+          }
+          break;
+        case DrillLibraryView.custom:
+          // For custom/my drills view
+          _sub = _repo.watchAll().listen(
+            (drills) {
+              if (!isClosed) {
+                add(_DrillLibraryItemsUpdated(drills as List<Drill>));
+              }
+            },
+            onError: (error) {
+              if (!isClosed) {
+                AppLogger.error('Error in custom drills stream', error: error);
+                add(_DrillLibraryErrorOccurred('Failed to load your drills: $error'));
+              }
+            },
+          );
+          break;
+      }
+    } catch (e) {
+      if (!isClosed) {
+        AppLogger.error('Error in view change', error: e);
+        emit(state.copyWith(
+          status: DrillLibraryStatus.error,
+          errorMessage: 'Failed to switch view: $e',
+        ));
+      }
     }
   }
 
@@ -177,22 +237,46 @@ class DrillLibraryBloc extends Bloc<DrillLibraryEvent, DrillLibraryState> {
         ),);
         
         try {
-          // Force refresh from repository with retry mechanism
+          // Force refresh from repository with enhanced retry mechanism
           List<Drill> items = [];
           int retryCount = 0;
           const maxRetries = 3;
           
           while (retryCount < maxRetries) {
             try {
-              items = await _repo.fetchAll();
+              AppLogger.info('🔄 Refresh attempt ${retryCount + 1}/$maxRetries', tag: 'DrillLibraryBloc');
+              
+              // Use view-specific fetch method for better reliability
+              switch (state.currentView) {
+                case DrillLibraryView.favorites:
+                  items = await _repo.fetchFavoriteDrills();
+                  break;
+                case DrillLibraryView.all:
+                  if (_repo is FirebaseDrillRepository) {
+                    items = await (_repo as FirebaseDrillRepository).fetchAdminDrills();
+                  } else {
+                    items = await _repo.fetchAll();
+                  }
+                  break;
+                case DrillLibraryView.custom:
+                  items = await _repo.fetchAll();
+                  break;
+              }
+              
+              AppLogger.success('✅ Refresh successful: ${items.length} items loaded', tag: 'DrillLibraryBloc');
               break; // Success, exit retry loop
             } catch (e) {
               retryCount++;
+              AppLogger.warning('❌ Refresh attempt ${retryCount} failed: $e', tag: 'DrillLibraryBloc');
+              
               if (retryCount >= maxRetries) {
                 rethrow; // Re-throw after max retries
               }
+              
               // Wait before retry with exponential backoff
-              await Future.delayed(Duration(milliseconds: 500 * retryCount));
+              final delayMs = 500 * retryCount;
+              AppLogger.info('⏳ Waiting ${delayMs}ms before retry...', tag: 'DrillLibraryBloc');
+              await Future.delayed(Duration(milliseconds: delayMs));
             }
           }
           
@@ -204,21 +288,38 @@ class DrillLibraryBloc extends Bloc<DrillLibraryEvent, DrillLibraryState> {
             all: items,
             isRefreshing: false,
             lastUpdated: DateTime.now(),
+            errorMessage: null, // Clear any previous error
           ),);
           
-          AppLogger.success('Successfully refreshed ${items.length} drills', tag: 'DrillLibraryBloc');
+          AppLogger.success('Successfully refreshed ${items.length} drills (${filtered.length} after filters)', tag: 'DrillLibraryBloc');
         } catch (e) {
-
+          AppLogger.error('Failed to refresh after all retries', error: e, tag: 'DrillLibraryBloc');
           rethrow;
         }
       },
       emit,
       (error) => state.copyWith(
         status: DrillLibraryStatus.error,
-        errorMessage: 'Failed to refresh data: ${error.message}',
+        errorMessage: _getErrorMessage(error),
         isRefreshing: false,
       ),
     );
+  }
+  
+  String _getErrorMessage(dynamic error) {
+    final errorStr = error.toString().toLowerCase();
+    
+    if (errorStr.contains('network') || errorStr.contains('connection')) {
+      return 'Network connection issue. Please check your internet connection and try again.';
+    } else if (errorStr.contains('timeout')) {
+      return 'Request timed out. Please try again.';
+    } else if (errorStr.contains('permission') || errorStr.contains('unauthorized')) {
+      return 'Access denied. Please check your permissions.';
+    } else if (errorStr.contains('not found')) {
+      return 'Data not found. Please refresh and try again.';
+    } else {
+      return 'Failed to load data. Please try again.';
+    }
   }
 
   Future<void> _onFiltersCleared(DrillLibraryFiltersCleared event, Emitter<DrillLibraryState> emit) async {

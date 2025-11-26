@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
@@ -31,6 +32,7 @@ class FirebaseDrillRepository implements DrillRepository {
   Stream<List<Drill>> watchAll() {
     final userId = _currentUserId;
     if (userId == null) {
+      AppLogger.warning('User not authenticated for watchAll');
       return Stream.value([]);
     }
 
@@ -40,10 +42,13 @@ class FirebaseDrillRepository implements DrillRepository {
         .snapshots()
         .asyncMap((snapshot) async {
           try {
+            AppLogger.info('📡 watchAll: Processing ${snapshot.docs.length} documents');
             final allDrills = _mapSnapshotToDrills(snapshot);
+            AppLogger.info('📊 watchAll: Mapped ${allDrills.length} drills');
             
             // Filter drills based on user access
             final accessibleDrills = await _filterAccessibleDrills(allDrills, userId);
+            AppLogger.info('🔐 watchAll: ${accessibleDrills.length} accessible drills for user');
             
             // Sort by createdAt (newest first)
             accessibleDrills.sort((a, b) => b.createdAt.compareTo(a.createdAt));
@@ -51,8 +56,14 @@ class FirebaseDrillRepository implements DrillRepository {
             return accessibleDrills;
           } catch (error) {
             AppLogger.error('Error in watchAll', error: error);
-            return <Drill>[];
+            // Don't return empty list on error - let the error propagate
+            rethrow;
           }
+        })
+        .handleError((error) {
+          AppLogger.error('Stream error in watchAll', error: error);
+          // Return empty list only for stream errors to prevent stream termination
+          return <Drill>[];
         });
   }
 
@@ -110,6 +121,7 @@ class FirebaseDrillRepository implements DrillRepository {
   Stream<List<Drill>> watchFavorites() {
     final userId = _currentUserId;
     if (userId == null) {
+      AppLogger.warning('User not authenticated for watchFavorites');
       return Stream.value([]);
     }
 
@@ -120,34 +132,56 @@ class FirebaseDrillRepository implements DrillRepository {
         .snapshots()
         .asyncMap((favSnapshot) async {
           try {
+            AppLogger.info('📡 watchFavorites: Processing ${favSnapshot.docs.length} favorite entries');
+            
             final favoriteIds = favSnapshot.docs
                 .map((doc) => doc.data()['entityId'] as String)
+                .where((id) => id.isNotEmpty)
                 .toList();
 
             if (favoriteIds.isEmpty) {
+              AppLogger.info('📊 watchFavorites: No favorite drill IDs found');
               return <Drill>[];
             }
 
-            // Get favorite drills in batches (Firestore 'in' query limit is 10)
+            AppLogger.info('🔍 watchFavorites: Fetching ${favoriteIds.length} favorite drills');
+
+            // Get favorite drills in batches with timeout and error handling
             final drills = <Drill>[];
             for (int i = 0; i < favoriteIds.length; i += 10) {
               final batch = favoriteIds.skip(i).take(10).toList();
-              final drillSnapshot = await _firestore
-                  .collection(_drillsCollection)
-                  .where(FieldPath.documentId, whereIn: batch)
-                  .where('status', isEqualTo: 'active')
-                  .get();
               
-              drills.addAll(_mapSnapshotToDrills(drillSnapshot));
+              try {
+                final drillSnapshot = await _firestore
+                    .collection(_drillsCollection)
+                    .where(FieldPath.documentId, whereIn: batch)
+                    .where('status', isEqualTo: 'active')
+                    .get()
+                    .timeout(const Duration(seconds: 10));
+                
+                final batchDrills = _mapSnapshotToDrills(drillSnapshot);
+                drills.addAll(batchDrills);
+                AppLogger.info('📊 watchFavorites: Batch ${i ~/ 10 + 1} loaded ${batchDrills.length} drills');
+              } catch (e) {
+                AppLogger.error('Error loading favorite drills batch ${i ~/ 10 + 1}', error: e);
+                // Continue with other batches even if one fails
+              }
             }
 
-            // Sort by createdAt
+            // Sort by createdAt (newest first)
             drills.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+            AppLogger.info('✅ watchFavorites: Returning ${drills.length} favorite drills');
             return drills;
           } catch (error) {
             AppLogger.error('Error watching favorite drills', error: error);
-            return <Drill>[];
+            // Don't return empty list on error - let the error propagate
+            rethrow;
           }
+        })
+        .handleError((error) {
+          AppLogger.error('Stream error in watchFavorites', error: error);
+          // Return empty list only for stream errors to prevent stream termination
+          return <Drill>[];
         });
   }
 
@@ -242,31 +276,42 @@ class FirebaseDrillRepository implements DrillRepository {
     try {
       AppLogger.info('🔍 Fetching admin drills...', tag: 'DrillRepository');
       
-      // Try multiple approaches to find admin drills
       List<Drill> adminDrills = [];
       
-      // Approach 1: Query by createdByRole = 'admin'
-      Query drillQuery = _firestore
-          .collection(_drillsCollection)
-          .where('createdByRole', isEqualTo: 'admin')
-          .where('status', isEqualTo: 'active');
+      // Primary approach: Query by createdByRole = 'admin' with timeout
+      try {
+        Query drillQuery = _firestore
+            .collection(_drillsCollection)
+            .where('createdByRole', isEqualTo: 'admin')
+            .where('status', isEqualTo: 'active');
 
-      if (category != null && category.isNotEmpty) {
-        drillQuery = drillQuery.where('category', isEqualTo: category);
+        if (category != null && category.isNotEmpty) {
+          drillQuery = drillQuery.where('category', isEqualTo: category);
+        }
+
+        if (difficulty != null) {
+          drillQuery = drillQuery.where('difficulty', isEqualTo: difficulty.name);
+        }
+
+        final snapshot = await drillQuery.get().timeout(
+          const Duration(seconds: 10),
+          onTimeout: () => throw TimeoutException('Query timeout for createdByRole=admin'),
+        );
+        
+        adminDrills = _mapSnapshotToDrills(snapshot);
+        AppLogger.info('📊 Found ${adminDrills.length} drills with createdByRole=admin', tag: 'DrillRepository');
+        
+        if (adminDrills.isNotEmpty) {
+          // Success with primary approach
+          return _finalizeAdminDrills(adminDrills, query);
+        }
+      } catch (e) {
+        AppLogger.warning('Primary admin drill query failed: $e', tag: 'DrillRepository');
       }
-
-      if (difficulty != null) {
-        drillQuery = drillQuery.where('difficulty', isEqualTo: difficulty.name);
-      }
-
-      final snapshot = await drillQuery.get();
-      adminDrills = _mapSnapshotToDrills(snapshot);
       
-      AppLogger.info('📊 Found ${adminDrills.length} drills with createdByRole=admin', tag: 'DrillRepository');
-      
-      // Approach 2: If no drills found, try querying by is_admin field
-      if (adminDrills.isEmpty) {
-        AppLogger.info('🔍 No drills found with createdByRole=admin, trying is_admin field...', tag: 'DrillRepository');
+      // Fallback approach: Query by is_admin field
+      try {
+        AppLogger.info('🔍 Trying fallback approach with is_admin field...', tag: 'DrillRepository');
         
         Query adminFlagQuery = _firestore
             .collection(_drillsCollection)
@@ -281,66 +326,91 @@ class FirebaseDrillRepository implements DrillRepository {
           adminFlagQuery = adminFlagQuery.where('difficulty', isEqualTo: difficulty.name);
         }
 
-        final adminFlagSnapshot = await adminFlagQuery.get();
-        adminDrills = _mapSnapshotToDrills(adminFlagSnapshot);
+        final adminFlagSnapshot = await adminFlagQuery.get().timeout(
+          const Duration(seconds: 10),
+          onTimeout: () => throw TimeoutException('Query timeout for is_admin=true'),
+        );
         
+        adminDrills = _mapSnapshotToDrills(adminFlagSnapshot);
         AppLogger.info('📊 Found ${adminDrills.length} drills with is_admin=true', tag: 'DrillRepository');
+        
+        if (adminDrills.isNotEmpty) {
+          return _finalizeAdminDrills(adminDrills, query);
+        }
+      } catch (e) {
+        AppLogger.warning('Fallback admin drill query failed: $e', tag: 'DrillRepository');
       }
       
-      // Approach 3: If still no drills, try finding drills created by admin users
-      if (adminDrills.isEmpty) {
-        AppLogger.info('🔍 No admin drills found, checking for drills created by admin users...', tag: 'DrillRepository');
+      // Last resort: Query drills created by admin users
+      try {
+        AppLogger.info('🔍 Last resort: checking drills created by admin users...', tag: 'DrillRepository');
         
-        // Get admin user IDs
         final adminUsersSnapshot = await _firestore
             .collection('users')
             .where('role', isEqualTo: 'admin')
-            .get();
+            .get()
+            .timeout(const Duration(seconds: 5));
         
         final adminUserIds = adminUsersSnapshot.docs.map((doc) => doc.id).toList();
         AppLogger.info('👥 Found ${adminUserIds.length} admin users', tag: 'DrillRepository');
         
         if (adminUserIds.isNotEmpty) {
-          // Query drills created by admin users (Firestore 'in' query supports up to 10 values)
-          final adminUserIdsToQuery = adminUserIds.take(10).toList();
-          
-          Query adminUserDrillsQuery = _firestore
-              .collection(_drillsCollection)
-              .where('createdBy', whereIn: adminUserIdsToQuery)
-              .where('status', isEqualTo: 'active');
+          // Process in batches to handle Firestore 'in' query limit
+          for (int i = 0; i < adminUserIds.length; i += 10) {
+            final batch = adminUserIds.skip(i).take(10).toList();
+            
+            Query adminUserDrillsQuery = _firestore
+                .collection(_drillsCollection)
+                .where('createdBy', whereIn: batch)
+                .where('status', isEqualTo: 'active');
 
-          if (category != null && category.isNotEmpty) {
-            adminUserDrillsQuery = adminUserDrillsQuery.where('category', isEqualTo: category);
+            if (category != null && category.isNotEmpty) {
+              adminUserDrillsQuery = adminUserDrillsQuery.where('category', isEqualTo: category);
+            }
+
+            if (difficulty != null) {
+              adminUserDrillsQuery = adminUserDrillsQuery.where('difficulty', isEqualTo: difficulty.name);
+            }
+
+            final batchSnapshot = await adminUserDrillsQuery.get().timeout(
+              const Duration(seconds: 10),
+            );
+            
+            adminDrills.addAll(_mapSnapshotToDrills(batchSnapshot));
           }
-
-          if (difficulty != null) {
-            adminUserDrillsQuery = adminUserDrillsQuery.where('difficulty', isEqualTo: difficulty.name);
-          }
-
-          final adminUserDrillsSnapshot = await adminUserDrillsQuery.get();
-          adminDrills = _mapSnapshotToDrills(adminUserDrillsSnapshot);
           
           AppLogger.info('📊 Found ${adminDrills.length} drills created by admin users', tag: 'DrillRepository');
         }
+      } catch (e) {
+        AppLogger.error('Last resort admin drill query failed: $e', tag: 'DrillRepository');
       }
 
-      // Apply search query filter in memory
-      if (query != null && query.isNotEmpty) {
-        final queryLower = query.toLowerCase();
-        adminDrills = adminDrills.where((drill) =>
-          drill.name.toLowerCase().contains(queryLower) ||
-          drill.tags.any((tag) => tag.toLowerCase().contains(queryLower))
-        ).toList();
-      }
-
-      adminDrills.sort((a, b) => b.createdAt.compareTo(a.createdAt));
-      
-      AppLogger.info('✅ Returning ${adminDrills.length} admin drills', tag: 'DrillRepository');
-      return adminDrills;
+      return _finalizeAdminDrills(adminDrills, query);
     } catch (error) {
       AppLogger.error('Error fetching admin drills', error: error, tag: 'DrillRepository');
       throw Exception('Failed to fetch admin drills: $error');
     }
+  }
+  
+  List<Drill> _finalizeAdminDrills(List<Drill> adminDrills, String? query) {
+    // Apply search query filter in memory
+    if (query != null && query.isNotEmpty) {
+      final queryLower = query.toLowerCase();
+      adminDrills = adminDrills.where((drill) =>
+        drill.name.toLowerCase().contains(queryLower) ||
+        drill.description.toLowerCase().contains(queryLower) ||
+        drill.tags.any((tag) => tag.toLowerCase().contains(queryLower))
+      ).toList();
+    }
+
+    // Remove duplicates based on drill ID
+    final seenIds = <String>{};
+    adminDrills = adminDrills.where((drill) => seenIds.add(drill.id)).toList();
+
+    adminDrills.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+    
+    AppLogger.info('✅ Returning ${adminDrills.length} admin drills', tag: 'DrillRepository');
+    return adminDrills;
   }
 
   @override

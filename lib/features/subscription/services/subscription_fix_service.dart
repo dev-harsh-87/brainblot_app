@@ -75,9 +75,13 @@ class SubscriptionFixService {
 
       print('🔄 Updating user module access...');
 
+      // Update the entire subscription object with correct module access
+      final updatedSubscription = Map<String, dynamic>.from(subscription);
+      updatedSubscription['moduleAccess'] = correctModuleAccess;
+
       // Update user's subscription with correct module access
       await _firestore.collection('users').doc(currentUser.uid).update({
-        'subscription.moduleAccess': correctModuleAccess,
+        'subscription': updatedSubscription,
         'updatedAt': FieldValue.serverTimestamp(),
       });
 
@@ -146,9 +150,14 @@ class SubscriptionFixService {
 
           // Check if they match
           if (!_listsEqual(currentModuleAccess, correctModuleAccess)) {
+            // Get current subscription and update the entire object
+            final currentSubscription = subscription as Map<String, dynamic>;
+            final updatedSubscription = Map<String, dynamic>.from(currentSubscription);
+            updatedSubscription['moduleAccess'] = correctModuleAccess;
+
             // Update user's subscription
             await _firestore.collection('users').doc(userDoc.id).update({
-              'subscription.moduleAccess': correctModuleAccess,
+              'subscription': updatedSubscription,
               'updatedAt': FieldValue.serverTimestamp(),
             });
 

@@ -10,7 +10,9 @@ class PermissionManager extends ChangeNotifier {
   static PermissionManager? _instance;
   static PermissionManager get instance => _instance ??= PermissionManager._();
   
-  PermissionManager._() : _permissionService = ComprehensivePermissionService();
+  PermissionManager._() : _permissionService = ComprehensivePermissionService() {
+    _initializePermissionListener();
+  }
 
   final ComprehensivePermissionService _permissionService;
   
@@ -22,8 +24,11 @@ class PermissionManager extends ChangeNotifier {
   Map<String, dynamic> _permissionSummary = {};
   
   // Stream controller for permission changes
-  final StreamController<Map<String, bool>> _permissionStreamController = 
+  final StreamController<Map<String, bool>> _permissionStreamController =
       StreamController<Map<String, bool>>.broadcast();
+  
+  // Stream subscription for user document changes
+  StreamSubscription<Map<String, dynamic>>? _permissionSubscription;
 
 
   // Getters for cached permissions
@@ -35,6 +40,73 @@ class PermissionManager extends ChangeNotifier {
   
   // Stream for listening to permission changes
   Stream<Map<String, bool>> get permissionStream => _permissionStreamController.stream;
+
+  /// Initialize permission listener to watch for user document changes
+  void _initializePermissionListener() {
+    // Listen to permission changes from the comprehensive service
+    _permissionSubscription = _permissionService.watchPermissionChanges().listen(
+      (permissionData) {
+        AppLogger.info('User permissions changed, refreshing cache...', tag: 'PermissionManager');
+        // Refresh permissions when user document changes
+        _refreshPermissionsFromData(permissionData);
+      },
+      onError: (error) {
+        AppLogger.error('Error listening to permission changes', error: error, tag: 'PermissionManager');
+      },
+    );
+  }
+
+  /// Refresh permissions from permission data
+  void _refreshPermissionsFromData(Map<String, dynamic> permissionData) {
+    try {
+      // Update cached data from the permission summary
+      final authenticated = permissionData['authenticated'] as bool? ?? false;
+      
+      if (!authenticated) {
+        _isInitialized = false;
+        _userRole = UserRole.user;
+        _moduleAccess.clear();
+        _featureAccess.clear();
+        _permissionSummary.clear();
+        notifyListeners();
+        return;
+      }
+
+      // Update role
+      final roleString = permissionData['role'] as String?;
+      _userRole = UserRole.fromString(roleString ?? 'user');
+
+      // Update module access
+      final modules = permissionData['modules'] as List<dynamic>? ?? [];
+      _moduleAccess = modules.map((e) => e.toString()).toList();
+
+      // Update feature access
+      final featureAccess = permissionData['featureAccess'] as Map<String, dynamic>? ?? {};
+      _featureAccess.clear();
+      featureAccess.forEach((key, value) {
+        _featureAccess[key] = value as bool? ?? false;
+      });
+
+      // Add admin module features
+      _featureAccess['admin_user_management'] = _userRole.isAdmin() || _moduleAccess.contains('admin_user_management');
+      _featureAccess['admin_subscription_management'] = _userRole.isAdmin() || _moduleAccess.contains('admin_subscription_management');
+      _featureAccess['admin_plan_requests'] = _userRole.isAdmin() || _moduleAccess.contains('admin_plan_requests');
+      _featureAccess['admin_category_management'] = _userRole.isAdmin() || _moduleAccess.contains('admin_category_management');
+      _featureAccess['admin_stimulus_management'] = _userRole.isAdmin() || _moduleAccess.contains('admin_stimulus_management');
+      _featureAccess['admin_comprehensive_activity'] = _userRole.isAdmin() || _moduleAccess.contains('admin_comprehensive_activity');
+
+      // Update permission summary
+      _permissionSummary = Map.from(permissionData);
+
+      _isInitialized = true;
+      notifyListeners();
+      _permissionStreamController.add(_featureAccess);
+
+      AppLogger.success('Permissions refreshed from user document changes', tag: 'PermissionManager');
+    } catch (e) {
+      AppLogger.error('Error refreshing permissions from data', error: e, tag: 'PermissionManager');
+    }
+  }
 
   /// Initialize and analyze all permissions at startup
   Future<void> initializePermissions() async {
@@ -89,6 +161,14 @@ class PermissionManager extends ChangeNotifier {
       'user_management': _permissionService.canManageUsers(),
       'team_management': _permissionService.canManageTeams(),
       'bulk_operations': _permissionService.canPerformBulkOperations(),
+      
+      // Admin Module Features
+      'admin_user_management': _permissionService.isAdmin(),
+      'admin_subscription_management': _permissionService.isAdmin(),
+      'admin_plan_requests': _permissionService.isAdmin(),
+      'admin_category_management': _permissionService.isAdmin(),
+      'admin_stimulus_management': _permissionService.isAdmin(),
+      'admin_comprehensive_activity': _permissionService.isAdmin(),
     };
 
     // Wait for all feature checks to complete
@@ -116,11 +196,34 @@ class PermissionManager extends ChangeNotifier {
     await initializePermissions();
   }
 
+  /// Clear all cached permissions (call on logout)
+  void clearCache() {
+    AppLogger.info('Clearing permission cache...', tag: 'PermissionManager');
+    
+    _isInitialized = false;
+    _userRole = UserRole.user;
+    _moduleAccess.clear();
+    _featureAccess.clear();
+    _permissionSummary.clear();
+    
+    notifyListeners();
+    _permissionStreamController.add({});
+    
+    AppLogger.success('Permission cache cleared', tag: 'PermissionManager');
+  }
+
+
   // ========== QUICK ACCESS METHODS ==========
   // These methods use cached data instead of making async calls
 
   /// Check if user has access to drills (cached)
-  bool get canAccessDrills => _featureAccess['drills'] ?? false;
+  bool get canAccessDrills {
+    if (!_isInitialized) {
+      _initializePermissionsSilently();
+      return false;
+    }
+    return _featureAccess['drills'] ?? false;
+  }
 
   /// Check if user has access to programs (cached)
   bool get canAccessPrograms => _featureAccess['programs'] ?? false;
@@ -141,7 +244,13 @@ class PermissionManager extends ChangeNotifier {
   bool get canAccessAdminPrograms => _featureAccess['admin_programs'] ?? false;
 
   /// Check if user is admin (cached)
-  bool get isAdmin => _featureAccess['is_admin'] ?? false;
+  bool get isAdmin {
+    if (!_isInitialized) {
+      _initializePermissionsSilently();
+      return false;
+    }
+    return _featureAccess['is_admin'] ?? false;
+  }
 
   /// Check if user has access to multiplayer (cached)
   bool get canAccessMultiplayer => _featureAccess['multiplayer'] ?? false;
@@ -158,9 +267,78 @@ class PermissionManager extends ChangeNotifier {
   /// Check if user can perform bulk operations (cached)
   bool get canPerformBulkOperations => _featureAccess['bulk_operations'] ?? false;
 
+  /// Check if user has access to admin user management (cached)
+  bool get canAccessAdminUserManagement {
+    if (!_isInitialized) {
+      _initializePermissionsSilently();
+      return false;
+    }
+    return _featureAccess['admin_user_management'] ?? false;
+  }
+
+  /// Check if user has access to admin subscription management (cached)
+  bool get canAccessAdminSubscriptionManagement {
+    if (!_isInitialized) {
+      _initializePermissionsSilently();
+      return false;
+    }
+    return _featureAccess['admin_subscription_management'] ?? false;
+  }
+
+  /// Check if user has access to admin plan requests (cached)
+  bool get canAccessAdminPlanRequests {
+    if (!_isInitialized) {
+      _initializePermissionsSilently();
+      return false;
+    }
+    return _featureAccess['admin_plan_requests'] ?? false;
+  }
+
+  /// Check if user has access to admin category management (cached)
+  bool get canAccessAdminCategoryManagement {
+    if (!_isInitialized) {
+      _initializePermissionsSilently();
+      return false;
+    }
+    return _featureAccess['admin_category_management'] ?? false;
+  }
+
+  /// Check if user has access to admin stimulus management (cached)
+  bool get canAccessAdminStimulusManagement {
+    if (!_isInitialized) {
+      _initializePermissionsSilently();
+      return false;
+    }
+    return _featureAccess['admin_stimulus_management'] ?? false;
+  }
+
+  /// Check if user has access to admin comprehensive activity (cached)
+  bool get canAccessAdminComprehensiveActivity {
+    if (!_isInitialized) {
+      _initializePermissionsSilently();
+      return false;
+    }
+    return _featureAccess['admin_comprehensive_activity'] ?? false;
+  }
+
   /// Check if user has access to a specific module (cached)
   bool hasModuleAccess(String module) {
+    // If not initialized, try to initialize silently
+    if (!_isInitialized) {
+      _initializePermissionsSilently();
+      return false; // Return false for now, will be updated when initialized
+    }
     return _moduleAccess.contains(module);
+  }
+
+  /// Initialize permissions silently without blocking UI
+  void _initializePermissionsSilently() {
+    if (!_isInitialized) {
+      AppLogger.info('Initializing permissions silently due to access check', tag: 'PermissionManager');
+      initializePermissions().catchError((error) {
+        AppLogger.warning('Silent permission initialization failed: $error', tag: 'PermissionManager');
+      });
+    }
   }
 
   /// Check if user should see admin content (cached)
@@ -217,6 +395,7 @@ class PermissionManager extends ChangeNotifier {
 
   @override
   void dispose() {
+    _permissionSubscription?.cancel();
     _permissionStreamController.close();
     super.dispose();
   }

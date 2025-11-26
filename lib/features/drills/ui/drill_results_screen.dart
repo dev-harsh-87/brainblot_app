@@ -113,14 +113,16 @@ class _DrillResultsScreenState extends State<DrillResultsScreen>
         slivers: [
           // Modern Hero Header
           SliverAppBar(
-            expandedHeight: 200,
+            expandedHeight: 300,
             pinned: true,
             backgroundColor: colorScheme.surface,
             foregroundColor: colorScheme.onSurface,
             elevation: 0,
             flexibleSpace: FlexibleSpaceBar(
+              centerTitle: true,
               title: Text(
                 'Session Complete',
+                textAlign: TextAlign.center,
                 style: theme.textTheme.headlineSmall?.copyWith(
                   fontWeight: FontWeight.w700,
                   color: colorScheme.onSurface,
@@ -341,7 +343,7 @@ class _DrillResultsScreenState extends State<DrillResultsScreen>
             ),
             child: Row(
               children: [
-                _buildDrillStat('Difficulty', drill.difficulty.name.toUpperCase(), _getDifficultyColor(drill.difficulty)),
+                _buildDrillStat('Difficulty', drill.difficulty.name, _getDifficultyColor(drill.difficulty)),
                 const SizedBox(width: 24),
                 _buildDrillStat('Configuration', '${drill.sets}×${drill.reps}', colorScheme.secondary),
                 const SizedBox(width: 24),
@@ -359,27 +361,37 @@ class _DrillResultsScreenState extends State<DrillResultsScreen>
     
     return Expanded(
       child: Column(
+        mainAxisSize: MainAxisSize.min,
         children: [
           Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
             decoration: BoxDecoration(
               color: color.withOpacity(0.1),
               borderRadius: BorderRadius.circular(8),
             ),
             child: Text(
               value,
-              style: theme.textTheme.titleSmall?.copyWith(
+              textAlign: TextAlign.center,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: theme.textTheme.bodyMedium?.copyWith(
                 color: color,
                 fontWeight: FontWeight.w700,
+                fontSize: 13,
               ),
             ),
           ),
-          const SizedBox(height: 4),
+          const SizedBox(height: 6),
           Text(
             label,
+            textAlign: TextAlign.center,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
             style: theme.textTheme.bodySmall?.copyWith(
               color: theme.colorScheme.onSurface.withOpacity(0.7),
               fontWeight: FontWeight.w500,
+              fontSize: 11,
             ),
           ),
         ],

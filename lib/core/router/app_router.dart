@@ -48,7 +48,14 @@ import 'package:spark_app/features/subscription/ui/user_requests_screen.dart';
 import 'package:spark_app/features/training/training_screen.dart';
 import 'package:spark_app/features/admin/ui/user_management_screen.dart';
 import 'package:spark_app/features/admin/ui/screens/user_permission_management_screen.dart';
+import 'package:spark_app/features/admin/ui/subscription_management_screen.dart';
+import 'package:spark_app/features/admin/ui/plan_requests_screen.dart';
+import 'package:spark_app/features/admin/ui/category_management_screen.dart';
+import 'package:spark_app/features/admin/ui/stimulus_management_screen.dart';
+import 'package:spark_app/features/admin/ui/screens/comprehensive_activity_screen.dart';
+import 'package:spark_app/features/admin/ui/user_admin_dashboard_screen.dart';
 import 'package:spark_app/core/auth/models/app_user.dart';
+import 'package:spark_app/core/auth/services/permission_manager.dart';
 
 
 /// Main application router configuration
@@ -208,18 +215,40 @@ class AppRouter {
           GoRoute(
             path: '/admin',
             name: 'admin',
-            builder: (context, state) => PermissionBasedScreen(
-              requireAdmin: true,
-              child: EnhancedAdminDashboardScreen(
-                permissionService: getIt<PermissionService>(),
-              ),
-            ),
+            builder: (context, state) {
+              // Check if user should see admin content
+              final permissionManager = PermissionManager.instance;
+              final shouldShowAdminContent = permissionManager.isAdmin ||
+                  permissionManager.shouldShowAdminContent ||
+                  permissionManager.canAccessAdminUserManagement ||
+                  permissionManager.canAccessAdminSubscriptionManagement ||
+                  permissionManager.canAccessAdminPlanRequests ||
+                  permissionManager.canAccessAdminCategoryManagement ||
+                  permissionManager.canAccessAdminStimulusManagement ||
+                  permissionManager.canAccessAdminComprehensiveActivity;
+
+              if (!shouldShowAdminContent) {
+                return PermissionBasedScreen(
+                  requireAdmin: true,
+                  child: Container(), // This will show access denied
+                );
+              }
+
+              // Show full admin dashboard for admins, user admin dashboard for others
+              if (permissionManager.isAdmin) {
+                return EnhancedAdminDashboardScreen(
+                  permissionService: getIt<PermissionService>(),
+                );
+              } else {
+                return const UserAdminDashboardScreen();
+              }
+            },
             routes: [
               GoRoute(
-                path: '/user-management',
-                name: 'user-management',
+                path: '/users',
+                name: 'admin-users',
                 builder: (context, state) => PermissionBasedScreen(
-                  requireAdmin: true,
+                  requiredModule: 'admin_user_management',
                   child: const UserManagementScreen(),
                 ),
                 routes: [
@@ -261,6 +290,46 @@ class AppRouter {
                     },
                   ),
                 ],
+              ),
+              GoRoute(
+                path: '/subscriptions',
+                name: 'admin-subscriptions',
+                builder: (context, state) => PermissionBasedScreen(
+                  requiredModule: 'admin_subscription_management',
+                  child: const SubscriptionManagementScreen(),
+                ),
+              ),
+              GoRoute(
+                path: '/plan-requests',
+                name: 'admin-plan-requests',
+                builder: (context, state) => PermissionBasedScreen(
+                  requiredModule: 'admin_plan_requests',
+                  child: const PlanRequestsScreen(),
+                ),
+              ),
+              GoRoute(
+                path: '/categories',
+                name: 'admin-categories',
+                builder: (context, state) => PermissionBasedScreen(
+                  requiredModule: 'admin_category_management',
+                  child: const CategoryManagementScreen(),
+                ),
+              ),
+              GoRoute(
+                path: '/stimulus',
+                name: 'admin-stimulus',
+                builder: (context, state) => PermissionBasedScreen(
+                  requiredModule: 'admin_stimulus_management',
+                  child: const StimulusManagementScreen(),
+                ),
+              ),
+              GoRoute(
+                path: '/activity',
+                name: 'admin-activity',
+                builder: (context, state) => PermissionBasedScreen(
+                  requiredModule: 'admin_comprehensive_activity',
+                  child: const ComprehensiveActivityScreen(),
+                ),
               ),
             ],
           ),

@@ -381,6 +381,9 @@ class _DrillBuilderScreenState extends State<DrillBuilderScreen>
       elevation: 0,
       backgroundColor: colorScheme.primary,
       foregroundColor: colorScheme.onPrimary,
+              iconTheme: IconThemeData(
+          color: colorScheme.onPrimary,
+        ),
       title: Text(
         widget.initial == null ? 'Create Drill' : 'Edit Drill',
         style: theme.textTheme.headlineSmall?.copyWith(

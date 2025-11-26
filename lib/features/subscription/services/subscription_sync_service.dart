@@ -199,10 +199,23 @@ class SubscriptionSyncService {
   /// Update a user's module access to match their plan
   Future<void> _updateUserModuleAccess(String userId, List<String> moduleAccess) async {
     try {
+      // Get current subscription data first
+      final userDoc = await _firestore.collection('users').doc(userId).get();
+      if (!userDoc.exists) return;
+
+      final userData = userDoc.data()!;
+      final currentSubscription = userData['subscription'] as Map<String, dynamic>? ?? {};
+
+      // Update the entire subscription object with new module access
+      final updatedSubscription = Map<String, dynamic>.from(currentSubscription);
+      updatedSubscription['moduleAccess'] = moduleAccess;
+
       await _firestore.collection('users').doc(userId).update({
-        'subscription.moduleAccess': moduleAccess,
+        'subscription': updatedSubscription,
         'updatedAt': FieldValue.serverTimestamp(),
       });
+
+      print('🔄 Updated module access for user $userId: $moduleAccess');
     } catch (e) {
       AppLogger.error('Error updating module access for user $userId', error: e);
     }

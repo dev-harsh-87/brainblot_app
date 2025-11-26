@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:spark_app/core/auth/models/app_user.dart';
 import 'package:spark_app/core/auth/models/user_role.dart';
 import 'package:spark_app/core/theme/app_theme.dart';
 import 'package:spark_app/features/subscription/domain/subscription_plan.dart';
 import 'package:spark_app/features/subscription/data/subscription_plan_repository.dart';
+import 'package:spark_app/core/auth/services/permission_manager.dart';
 
 class UserPermissionManagementScreen extends StatefulWidget {
   final AppUser user;
@@ -41,6 +43,12 @@ class _UserPermissionManagementScreenState extends State<UserPermissionManagemen
     'team_management': 'Team Management',
     'bulk_operations': 'Bulk Operations',
     'subscription': 'Subscription Management',
+    'admin_user_management': 'Admin User Management',
+    'admin_subscription_management': 'Admin Subscription Management',
+    'admin_plan_requests': 'Admin Plan Requests',
+    'admin_category_management': 'Admin Category Management',
+    'admin_stimulus_management': 'Admin Stimulus Management',
+    'admin_comprehensive_activity': 'Admin Activity Monitoring',
   };
 
   @override
@@ -415,15 +423,42 @@ class _UserPermissionManagementScreenState extends State<UserPermissionManagemen
 
     try {
       // Update user role and subscription
+      // Get current user data first
+      final userDoc = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(widget.user.id)
+          .get();
+      
+      if (!userDoc.exists) return;
+      
+      final userData = userDoc.data()!;
+      final currentSubscription = userData['subscription'] as Map<String, dynamic>? ?? {};
+      
+      // Update the entire subscription object
+      final updatedSubscription = Map<String, dynamic>.from(currentSubscription);
+      updatedSubscription['plan'] = _selectedPlanId;
+      updatedSubscription['moduleAccess'] = _customModuleAccess;
+
       await FirebaseFirestore.instance
           .collection('users')
           .doc(widget.user.id)
           .update({
         'role': _selectedRole.value,
-        'subscription.plan': _selectedPlanId,
-        'subscription.moduleAccess': _customModuleAccess,
+        'subscription': updatedSubscription,
         'updatedAt': FieldValue.serverTimestamp(),
       });
+
+      // If the updated user is currently logged in, refresh their permissions
+      final currentUser = FirebaseAuth.instance.currentUser;
+      if (currentUser != null && currentUser.uid == widget.user.id) {
+        try {
+          await PermissionManager.instance.refreshPermissions();
+          print('🔄 Updated user permissions manually refreshed');
+        } catch (e) {
+          print('⚠️ Failed to manually refresh updated user permissions: $e');
+          // Don't throw - the automatic refresh via listener should still work
+        }
+      }
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(

@@ -114,6 +114,9 @@ class _ProgramCreationScreenState extends State<ProgramCreationScreen>
 
     return AppBar(
       elevation: 0,
+              iconTheme: IconThemeData(
+          color: colorScheme.onPrimary,
+        ),
       backgroundColor: colorScheme.primary,
       foregroundColor: colorScheme.onPrimary,
       title: Text(
@@ -131,18 +134,31 @@ class _ProgramCreationScreenState extends State<ProgramCreationScreen>
         ),
       ),
       actions: [
-        if (_currentStep > 0)
-          TextButton(
-            onPressed: _previousStep,
-            child: Text(
-              'Back',
-              style: TextStyle(
-                color: colorScheme.onPrimary,
-                fontWeight: FontWeight.w600,
-              ),
+          
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: Text(
+            'Cancel',
+            style: TextStyle(
+              color: colorScheme.onPrimary,
+              fontWeight: FontWeight.w600,
             ),
           ),
+        ),
         const SizedBox(width: 8),
+      
+        // if (_currentStep > 0)
+        //   TextButton(
+        //     onPressed: _previousStep,
+        //     child: Text(
+        //       'Back',
+        //       style: TextStyle(
+        //         color: colorScheme.onPrimary,
+        //         fontWeight: FontWeight.w600,
+        //       ),
+        //     ),
+        //   ),
+        // const SizedBox(width: 8),
       ],
     );
   }

@@ -124,6 +124,9 @@ class _ProfileScreenState extends State<ProfileScreen> with AutoRefreshMixin {
 
     return AppBar(
       elevation: 0,
+              iconTheme: IconThemeData(
+          color: colorScheme.onPrimary,
+        ),
       backgroundColor: colorScheme.primary,
       foregroundColor: colorScheme.onPrimary,
       title: Text(

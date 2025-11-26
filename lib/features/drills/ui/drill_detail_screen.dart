@@ -116,6 +116,9 @@ class _DrillDetailScreenState extends State<DrillDetailScreen> with WidgetsBindi
       appBar: AppBar(
         backgroundColor: colorScheme.primary,
         foregroundColor: colorScheme.onPrimary,
+        iconTheme: IconThemeData(
+          color: colorScheme.onPrimary,
+        ),
         elevation: 0,
         flexibleSpace: Container(
           decoration: BoxDecoration(
