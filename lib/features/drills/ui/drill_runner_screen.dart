@@ -1473,12 +1473,16 @@ void _broadcastStimulusToParticipants(String label, Color color, StimulusType ty
   }
   
   void _playWhistleAndStartDrill() async {
-    // Play whistle sound
+    AppLogger.info('Playing whistle sound to signal "now stimuli comes"', tag: 'DrillRunner');
+    
+    // Play the user's whistle sound from assets/audio/whistle.mp3
+    // This signals to the user that stimuli are about to appear
     await _audioService.playWhistle();
     
-    // Add a small delay for the whistle sound effect
-    await Future.delayed(const Duration(milliseconds: 300));
+    AppLogger.info('Whistle sound completed - now starting drill with stimuli', tag: 'DrillRunner');
     
+    // Start the drill immediately after whistle completes
+    // The whistle sound method handles its own timing internally
     _startDrill();
   }
   

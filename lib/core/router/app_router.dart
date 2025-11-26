@@ -111,7 +111,7 @@ class AppRouter {
     
     // Authenticated user trying to access auth routes -> redirect to home
     if (authState.status == AuthStatus.authenticated && isAuthRoute) {
-      return '/';
+      return '/home';
     }
     
     // Allow navigation (admin routes protected by AdminGuard)

@@ -67,7 +67,6 @@ class CogniTrainApp extends StatelessWidget {
       create: (context) {
         final authBloc = AuthBloc(
           getIt(),
-          userRepo: getIt(),
           sessionService: getIt(),
         );
         

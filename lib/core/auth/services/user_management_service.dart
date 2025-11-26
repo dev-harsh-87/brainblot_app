@@ -3,11 +3,13 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:spark_app/core/auth/models/app_user.dart';
 import 'package:spark_app/core/auth/models/user_role.dart';
 import 'package:firebase_core/firebase_core.dart';
+import 'package:spark_app/core/auth/services/unified_user_service.dart';
 
 /// Service for comprehensive user management including Firebase Auth and Firestore
 class UserManagementService {
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  final UnifiedUserService _unifiedUserService = UnifiedUserService();
 
   // Secondary Firebase app for creating users without affecting current session
   FirebaseApp? _secondaryApp;
@@ -50,96 +52,37 @@ class UserManagementService {
     required UserRole role,
     Map<String, dynamic>? subscriptionData,
   }) async {
-    try {
-      // Store current admin user info to restore session later
-      final currentUser = _auth.currentUser;
-      final currentAdminId = currentUser?.uid;
-      final currentAdminEmail = currentUser?.email;
-      final currentAdminName = currentUser?.displayName;
+    // Store current admin user info for metadata
+    final currentUser = _auth.currentUser;
+    final currentAdminId = currentUser?.uid;
+    final currentAdminEmail = currentUser?.email;
+    final currentAdminName = currentUser?.displayName;
 
-      if (currentAdminId == null || currentAdminEmail == null) {
-        throw Exception('No authenticated admin user found');
-      }
+    if (currentAdminId == null || currentAdminEmail == null) {
+      throw Exception('No authenticated admin user found');
+    }
 
-      // Step 1: Create Firebase Auth account
-      // Initialize secondary app for creating users
-      await _initializeSecondaryApp();
+    // Use unified service with secondary auth
+    final newUser = await _unifiedUserService.createUser(
+      email: email,
+      password: password,
+      displayName: displayName,
+      role: role,
+      customSubscriptionData: subscriptionData,
+      useSecondaryAuth: true,
+    );
 
-      // Use secondary auth to create user without logging out admin
-      final userCredential =
-          await _secondaryAuth!.createUserWithEmailAndPassword(
-        email: email,
-        password: password,
-      );
-
-      final firebaseUser = userCredential.user;
-      if (firebaseUser == null) {
-        throw Exception('Failed to create Firebase Auth user');
-      }
-
-      // Step 2: Update the Firebase Auth profile
-      await firebaseUser.updateDisplayName(displayName);
-// Step 3: Sign out from secondary auth to prevent conflicts
-      await _secondaryAuth!.signOut();
-
-      print('✅ User created successfully without affecting admin session');
-
-      // Step 3: Create Firestore user document
-      final newUser = AppUser(
-        id: firebaseUser.uid,
-        email: email,
-        displayName: displayName,
-        role: role,
-        subscription: subscriptionData != null
-            ? UserSubscription.fromJson(subscriptionData)
-            : const UserSubscription(
-                plan: 'free',
-                moduleAccess: ['drills', 'profile', 'stats', 'analysis'],
-              ),
-        preferences: const UserPreferences(),
-        stats: const UserStats(),
-        createdAt: DateTime.now(),
-        updatedAt: DateTime.now(),
-      );
-
-      // Add metadata about who created this user
-      final userData = newUser.toFirestore();
-      userData['createdBy'] = {
+    // Add metadata about who created this user
+    await _firestore.collection('users').doc(newUser.id).update({
+      'createdBy': {
         'adminId': currentAdminId,
         'adminEmail': currentAdminEmail,
         'adminName': currentAdminName ?? 'Unknown Admin',
         'createdAt': FieldValue.serverTimestamp(),
-      };
+      },
+    });
 
-      // Save to Firestore with error handling
-      try {
-        await _firestore
-            .collection('users')
-            .doc(firebaseUser.uid)
-            .set(userData);
-        print('✅ User document created successfully in Firestore');
-      } catch (firestoreError) {
-        print('❌ Failed to create user document in Firestore: $firestoreError');
-        // Clean up Firebase Auth user if Firestore fails
-        try {
-          await firebaseUser.delete();
-        } catch (cleanupError) {
-          print('⚠️ Failed to cleanup Firebase Auth user: $cleanupError');
-        }
-        throw Exception(
-            'Failed to create user profile in Firestore: $firestoreError');
-      }
-
-      // Note: Admin session restoration would require admin password
-      // For security reasons, admin password should be passed as parameter
-      // when this method is called
-
-      return newUser;
-    } catch (e) {
-      // If user creation failed partway through, clean up
-      await _cleanupFailedUserCreation(email);
-      rethrow;
-    }
+    return newUser;
   }
 
   /// Creates a user using an alternative approach that doesn't require session switching
@@ -426,25 +369,4 @@ class UserManagementService {
     }
   }
 
-  /// Logs user management operations for audit trail
-  Future<void> _logOperation(
-    String operation,
-    String targetUserId, {
-    Map<String, dynamic>? additionalData,
-  }) async {
-    try {
-      final currentUser = _auth.currentUser;
-      await _firestore.collection('user_audit_log').add({
-        'operation': operation,
-        'targetUserId': targetUserId,
-        'performedBy': currentUser?.uid,
-        'performedByEmail': currentUser?.email,
-        'timestamp': FieldValue.serverTimestamp(),
-        'additionalData': additionalData ?? {},
-      });
-    } catch (e) {
-      // Don't throw on audit log failure, just log it
-      print('Failed to log operation: $e');
-    }
-  }
 }

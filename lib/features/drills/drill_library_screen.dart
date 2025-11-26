@@ -16,6 +16,7 @@ import 'package:spark_app/core/widgets/app_loader.dart';
 import 'package:spark_app/core/ui/edge_to_edge.dart';
 import 'package:spark_app/features/auth/bloc/auth_bloc.dart';
 import 'package:spark_app/core/auth/models/user_role.dart';
+import 'package:spark_app/core/services/subscription_access_service.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -363,34 +364,6 @@ class _DrillLibraryScreenState extends State<DrillLibraryScreen>
     );
   }
 
-  PreferredSizeWidget _buildAppBar(BuildContext context) {
-    final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
-
-    return AppBar(
-      elevation: 0,
-      backgroundColor: colorScheme.primary,
-      foregroundColor: colorScheme.onPrimary,
-      title: Text(
-        'Drill Library',
-        style: theme.textTheme.headlineSmall?.copyWith(
-          color: colorScheme.onPrimary,
-          fontWeight: FontWeight.w700,
-          letterSpacing: 0.5,
-        ),
-      ),
-      centerTitle: true,
-      flexibleSpace: Container(
-        decoration: BoxDecoration(
-          color: AppTheme.goldPrimary,
-        ),
-      ),
-      actions: [
-        _buildFilterButton(colorScheme),
-        const SizedBox(width: 8),
-      ],
-    );
-  }
 
   Widget _buildSearchAndFilterSection(BuildContext context) {
     final theme = Theme.of(context);
@@ -653,7 +626,16 @@ Widget _buildCompactStatChip(IconData icon, String text, Color color) {
       child: Material(
         color: Colors.transparent,
         child: InkWell(
-          onTap: () {
+          onTap: () async {
+            // Check if this is an admin drill and user has access
+            if (drill.createdByRole == 'admin') {
+              final subscriptionService = getIt<SubscriptionAccessService>();
+              final hasAccess = await subscriptionService.checkAdminDrillsAccess(context);
+              if (!hasAccess) {
+                return; // SubscriptionAccessService already showed the snackbar
+              }
+            }
+            
             HapticFeedback.lightImpact();
             context.push('/drill-detail', extra: drill);
           },
@@ -1004,17 +986,6 @@ Widget _buildCompactStatChip(IconData icon, String text, Color color) {
   }
 
   Widget _buildAdminDrillsView() {
-    final authState = context.read<AuthBloc>().state;
-    final permissions = authState.permissions;
-    final hasDrillAccess = permissions?.hasDrillAccess ?? false;
-    
-    // Check if user has drill access from pre-loaded permissions
-    if (!hasDrillAccess) {
-      print('🔴 User does not have admin_drills access - showing no access state');
-      return _buildNoAccessState();
-    }
-    
-    print('🔍 User has drill access - showing admin drills');
     return BlocBuilder<DrillLibraryBloc, DrillLibraryState>(
       builder: (context, state) {
         // Filter admin drills from the BLoC state

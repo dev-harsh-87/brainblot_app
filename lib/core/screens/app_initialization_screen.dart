@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:spark_app/core/utils/app_logger.dart';
-import 'package:spark_app/core/services/admin_account_service.dart';
+import 'package:spark_app/core/services/database_initialization_service.dart';
 import 'package:spark_app/core/services/category_initialization_service.dart';
 import 'package:spark_app/core/auth/services/permission_manager.dart';
 
@@ -131,33 +131,24 @@ class _AppInitializationScreenState extends State<AppInitializationScreen>
   /// Create admin account if it doesn't exist
   Future<void> _createAdminAccountIfNeeded() async {
     try {
-      AppLogger.info('🚀 Starting admin account creation process...', tag: 'AppInit');
+      AppLogger.info('🚀 Starting database initialization process...', tag: 'AppInit');
       
-      final adminService = AdminAccountService();
-      final result = await adminService.createAdminAccountIfNeeded();
+      final dbService = DatabaseInitializationService();
       
-      if (result.success) {
-        if (result.alreadyExists) {
-          AppLogger.success('✅ Admin account already exists and is ready to use', tag: 'AppInit');
-        } else {
-          AppLogger.success('🎉 Admin account created successfully!', tag: 'AppInit');
-        }
-        
-        // Verify the account was created properly
-        final isVerified = await adminService.verifyAdminAccount();
-        if (isVerified) {
-          AppLogger.success('✅ Admin account verification passed', tag: 'AppInit');
-        } else {
-          AppLogger.warning('⚠️ Admin account verification failed', tag: 'AppInit');
-        }
-      } else {
-        AppLogger.error('❌ Failed to create admin account: ${result.message}', tag: 'AppInit');
-        // Don't throw - let the app continue even if admin creation fails
+      // Check if database is already initialized
+      final isInitialized = await dbService.isDatabaseInitialized();
+      if (isInitialized) {
+        AppLogger.success('✅ Database already initialized', tag: 'AppInit');
+        return;
       }
       
+      // Initialize database with default admin and subscription plans
+      await dbService.initializeDatabase();
+      AppLogger.success('🎉 Database initialized successfully!', tag: 'AppInit');
+      
     } catch (e) {
-      AppLogger.error('❌ Unexpected error during admin account creation', error: e, tag: 'AppInit');
-      // Don't throw - let the app continue even if admin creation fails
+      AppLogger.error('❌ Database initialization failed', error: e, tag: 'AppInit');
+      // Don't throw - let the app continue even if initialization fails
     }
   }
 

@@ -81,9 +81,11 @@ class _ProgramCreationScreenState extends State<ProgramCreationScreen>
       setState(() {
         _availableDrills = drills;
         _availableCategories = categories;
-        // Set default category if available
-        if (categories.isNotEmpty && _selectedCategory.isEmpty) {
-          _selectedCategory = categories.first.name;
+        // Set default category if available and current selection is invalid
+        if (categories.isNotEmpty) {
+          if (_selectedCategory.isEmpty || !categories.any((cat) => cat.name == _selectedCategory)) {
+            _selectedCategory = categories.first.name;
+          }
         }
         _isLoading = false;
       });
@@ -268,7 +270,7 @@ class _ProgramCreationScreenState extends State<ProgramCreationScreen>
     final theme = Theme.of(context);
 
     return DropdownButtonFormField<String>(
-      initialValue: _selectedCategory,
+      value: _selectedCategory.isEmpty ? null : _selectedCategory,
       decoration: InputDecoration(
         labelText: 'Category *',
         border: OutlineInputBorder(
@@ -913,16 +915,42 @@ class _ProgramCreationScreenState extends State<ProgramCreationScreen>
   }
 
   List<Drill> _getFilteredDrills() {
+    if (_selectedCategory.isEmpty) return _availableDrills;
+    
     // Filter drills based on selected program category
     return _availableDrills.where((drill) {
       // Match drill category with program category
-      final drillCategory = drill.category.toLowerCase();
-      final programCategory = _selectedCategory.toLowerCase();
+      final drillCategory = drill.category.toLowerCase().trim();
+      final programCategory = _selectedCategory.toLowerCase().trim();
       
-      // Direct match or fitness category matches all
+      // Direct match
       if (drillCategory == programCategory) return true;
-      if (programCategory == 'fitness' && 
-          ['strength', 'cardio', 'flexibility', 'endurance'].contains(drillCategory)) {
+      
+      // Special handling for fitness category - includes related subcategories
+      if (programCategory == 'fitness') {
+        final fitnessSubcategories = [
+          'strength', 'cardio', 'flexibility', 'endurance',
+          'conditioning', 'core', 'balance', 'agility'
+        ];
+        if (fitnessSubcategories.contains(drillCategory)) return true;
+      }
+      
+      // Special handling for sports categories
+      if (programCategory == 'soccer' || programCategory == 'football') {
+        if (['soccer', 'football', 'ball_control', 'passing', 'shooting'].contains(drillCategory)) {
+          return true;
+        }
+      }
+      
+      if (programCategory == 'basketball') {
+        if (['basketball', 'dribbling', 'shooting', 'defense'].contains(drillCategory)) {
+          return true;
+        }
+      }
+      
+      // Agility drills can be used in multiple sports
+      if (drillCategory == 'agility' &&
+          ['soccer', 'basketball', 'tennis', 'hockey', 'fitness'].contains(programCategory)) {
         return true;
       }
       

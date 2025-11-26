@@ -177,6 +177,9 @@ class UserPermissions {
   /// Check if user has program creation access
   bool get hasProgramAccess => isAdmin || hasModuleAccess('programs') || hasModuleAccess('admin_programs');
 
+  /// Check if user has admin programs access (to view admin-created programs)
+  bool get hasAdminProgramAccess => isAdmin || hasModuleAccess('admin_programs');
+
   /// Check if user has multiplayer access
   bool get hasMultiplayerAccess => isAdmin || hasModuleAccess('multiplayer');
 

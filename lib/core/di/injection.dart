@@ -2,7 +2,9 @@ import 'package:get_it/get_it.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:spark_app/features/auth/data/auth_repository.dart';
-import 'package:spark_app/features/auth/data/firebase_user_repository.dart';
+import 'package:spark_app/core/auth/services/unified_user_service.dart';
+import 'package:spark_app/core/services/module_access_fix_service.dart';
+import 'package:spark_app/core/services/subscription_access_service.dart';
 import 'package:spark_app/features/drills/data/drill_repository.dart';
 import 'package:spark_app/features/drills/data/drill_category_repository.dart';
 import 'package:spark_app/features/drills/data/session_repository.dart';
@@ -51,10 +53,15 @@ Future<void> configureDependencies() async {
   
   // Authentication and User Management
   getIt.registerLazySingleton<AuthRepository>(() => FirebaseAuthRepository(firebaseAuth));
-  getIt.registerLazySingleton<FirebaseUserRepository>(() => FirebaseUserRepository(
-    firestore: firebaseFirestore,
+  getIt.registerLazySingleton<UnifiedUserService>(() => UnifiedUserService(
     auth: firebaseAuth,
-  ),);
+    firestore: firebaseFirestore,
+  ));
+  getIt.registerLazySingleton<ModuleAccessFixService>(() => ModuleAccessFixService(
+    auth: firebaseAuth,
+    firestore: firebaseFirestore,
+  ));
+  getIt.registerLazySingleton<SubscriptionAccessService>(() => SubscriptionAccessService());
   
   // Professional Firebase Repositories
   AppLogger.debug('Registering Firebase repositories');

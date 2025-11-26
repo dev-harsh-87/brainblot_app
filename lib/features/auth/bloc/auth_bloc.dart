@@ -3,7 +3,6 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:equatable/equatable.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:spark_app/features/auth/data/auth_repository.dart';
-import 'package:spark_app/features/auth/data/firebase_user_repository.dart';
 import 'package:spark_app/core/services/preferences_service.dart';
 import 'package:spark_app/core/auth/services/session_management_service.dart';
 import 'package:spark_app/core/auth/services/device_session_service.dart';
@@ -17,7 +16,6 @@ part 'auth_state.dart';
 
 class AuthBloc extends Bloc<AuthEvent, AuthState> {
   final AuthRepository _repo;
-  final FirebaseUserRepository? _userRepo;
   final SessionManagementService? _sessionService;
   final DeviceSessionService _deviceSessionService;
   final PermissionInitializationService _permissionService;
@@ -25,12 +23,10 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
   
   AuthBloc(
     this._repo, {
-    FirebaseUserRepository? userRepo,
     SessionManagementService? sessionService,
     DeviceSessionService? deviceSessionService,
     PermissionInitializationService? permissionService,
-  })  : _userRepo = userRepo,
-        _sessionService = sessionService ?? getIt<SessionManagementService>(),
+  })  : _sessionService = sessionService ?? getIt<SessionManagementService>(),
         _deviceSessionService = deviceSessionService ?? DeviceSessionService(),
         _permissionService = permissionService ?? PermissionInitializationService(),
         super(_getInitialState()) {

@@ -24,13 +24,18 @@ class PermissionBasedScreen extends StatelessWidget {
     
     // Check if permissions are initialized
     if (!permissionManager.isInitialized) {
-      // Redirect to splash screen if permissions not initialized
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        context.go('/splash');
-      });
+      // Instead of redirecting to splash, show loading indicator
+      // This prevents navigation loops and app restarts
       return const Scaffold(
         body: Center(
-          child: CircularProgressIndicator(),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              CircularProgressIndicator(),
+              SizedBox(height: 16),
+              Text('Loading permissions...'),
+            ],
+          ),
         ),
       );
     }

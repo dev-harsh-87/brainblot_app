@@ -4,7 +4,6 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:spark_app/features/drills/data/firebase_drill_repository.dart';
 import 'package:spark_app/features/drills/data/firebase_session_repository.dart';
 import 'package:spark_app/features/programs/data/firebase_program_repository.dart';
-import 'package:spark_app/features/auth/data/firebase_user_repository.dart';
 
 /// Professional data migration service for transitioning to the new Firestore structure
 /// Handles migration from old schema to new professional schema safely
@@ -16,7 +15,6 @@ class FirestoreMigrationService {
   late final FirebaseDrillRepository _drillRepo;
   late final FirebaseSessionRepository _sessionRepo;
   late final FirebaseProgramRepository _programRepo;
-  late final FirebaseUserRepository _userRepo;
 
   FirestoreMigrationService({
     FirebaseFirestore? firestore,
@@ -26,7 +24,6 @@ class FirestoreMigrationService {
     _drillRepo = FirebaseDrillRepository(firestore: _firestore, auth: _auth);
     _sessionRepo = FirebaseSessionRepository(firestore: _firestore, auth: _auth);
     _programRepo = FirebaseProgramRepository(firestore: _firestore, auth: _auth);
-    _userRepo = FirebaseUserRepository(firestore: _firestore, auth: _auth);
   }
 
   /// Run complete migration to new professional Firestore structure
@@ -198,7 +195,7 @@ class FirestoreMigrationService {
               'plan': userData['subscriptionPlan'] ?? 'free',
               'status': 'active',
               'expiresAt': null,
-              'features': ['basic_drills', 'basic_programs'],
+              'moduleAccess': ['drills', 'programs', 'profile', 'stats', 'subscription'],
             },
             'stats': {
               'totalSessions': userData['totalSessions'] ?? 0,

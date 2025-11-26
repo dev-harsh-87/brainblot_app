@@ -72,9 +72,20 @@ service cloud.firestore {
       }
     }
     
-    // Temporary: Allow all access for development (REMOVE IN PRODUCTION)
+    // Allow initial database setup (admin creation, subscription plans, categories)
+    // This is needed for first-time app initialization
     match /{document=**} {
-      allow read, write: if request.auth != null;
+      allow read, write: if request.auth != null ||
+                            // Allow initial admin creation
+                            (resource == null &&
+                             request.resource.data.keys().hasAny(['email', 'role']) &&
+                             request.resource.data.email == 'admin@gmail.com') ||
+                            // Allow subscription plan initialization
+                            (resource == null &&
+                             request.resource.data.keys().hasAny(['name', 'price', 'features'])) ||
+                            // Allow category initialization
+                            (resource == null &&
+                             request.resource.data.keys().hasAny(['name', 'displayName', 'order']));
     }
   }
 }

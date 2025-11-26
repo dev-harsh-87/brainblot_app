@@ -4,6 +4,9 @@ import 'package:spark_app/core/auth/models/app_user.dart';
 import 'package:spark_app/core/auth/models/user_role.dart';
 import 'package:spark_app/core/services/preferences_service.dart';
 import 'package:spark_app/core/auth/services/permission_service.dart';
+import 'package:spark_app/core/auth/services/unified_user_service.dart';
+import 'package:spark_app/core/services/module_access_fix_service.dart';
+import 'package:spark_app/core/services/force_module_update_service.dart';
 import 'package:spark_app/core/auth/services/device_session_service.dart';
 import 'package:spark_app/features/subscription/services/subscription_sync_service.dart';
 import 'package:spark_app/core/utils/app_logger.dart';
@@ -152,6 +155,14 @@ class SessionManagementService {
         await _subscriptionSync.syncUserOnLogin(firebaseUser.uid);
         AppLogger.info('Subscription synced successfully');
         
+        // Force update user to new complete module access
+        final forceUpdateService = ForceModuleUpdateService();
+        await forceUpdateService.forceUpdateUser(firebaseUser.uid);
+        
+        // Fix module access naming issues (basic_drills -> drills, etc.)
+        final moduleFixService = ModuleAccessFixService();
+        await moduleFixService.fixUserModuleAccess(firebaseUser.uid);
+        
         // Wait a bit more to ensure Firestore document is updated
         await Future.delayed(const Duration(milliseconds: 300));
       } catch (e) {
@@ -206,16 +217,7 @@ class SessionManagementService {
     }
   }
 
-  /// Handle force logout from another device
-  Future<void> _handleForceLogout() async {
-    AppLogger.info('Force logout initiated - another device logged in');
-    
-    // Sign out from Firebase Auth
-    await _auth.signOut();
-    
-    // Show user notification (you can customize this)
-    AppLogger.info('You have been logged out because your account was accessed from another device');
-  }
+
 
   /// Clear user session (called automatically by auth state changes)
   Future<void> _clearSession() async {
@@ -240,18 +242,6 @@ class SessionManagementService {
     _notifySessionListeners(null);
     
     AppLogger.info('Session cleared');
-  }
-
-  /// Update user's last active timestamp
-  Future<void> _updateLastActive(String userId) async {
-    try {
-      await _firestore.collection('users').doc(userId).update({
-        'lastActiveAt': FieldValue.serverTimestamp(),
-      });
-    } catch (e) {
-      // Silent fail - not critical
-      AppLogger.error('Failed to update last active', error: e);
-    }
   }
 
   /// Get current session
@@ -535,54 +525,12 @@ class SessionManagementService {
     }
   }
 
-  /// Create user profile in Firestore
+  /// Create user profile in Firestore using UnifiedUserService
   Future<void> _createUserProfile(User firebaseUser) async {
     try {
-      final userRole = _determineUserRole(firebaseUser.email);
-      final isAdmin = userRole == 'admin';
-      AppLogger.debug('Assigning $userRole role to: ${firebaseUser.email}');
-      
-      // Create proper AppUser object and convert to Firestore format
-      final appUser = AppUser(
-        id: firebaseUser.uid,
-        email: firebaseUser.email?.toLowerCase() ?? '',
-        displayName: firebaseUser.displayName ?? (isAdmin ? 'Admin' : firebaseUser.email?.split('@').first ?? 'User'),
-        profileImageUrl: firebaseUser.photoURL,
-        role: UserRole.fromString(userRole),
-        subscription: isAdmin
-            ? const UserSubscription(
-                plan: 'institute',
-                moduleAccess: [
-                  'drills',
-                  'profile',
-                  'stats',
-                  'analysis',
-                  'admin_drills',
-                  'admin_programs',
-                  'programs',
-                  'multiplayer',
-                  'user_management',
-                  'team_management',
-                  'bulk_operations',
-                ],
-              )
-            : const UserSubscription(
-                plan: 'free',
-                moduleAccess: ['drills', 'profile', 'stats', 'analysis'],
-              ),
-        preferences: const UserPreferences(
-          notifications: true,
-        ),
-        stats: const UserStats(
-          totalDrillsCompleted: 0,
-        ),
-        createdAt: DateTime.now(),
-        lastActiveAt: DateTime.now(),
-        updatedAt: DateTime.now(),
-      );
-
-      await _firestore.collection('users').doc(firebaseUser.uid).set(appUser.toFirestore());
-      AppLogger.info('Created profile for: ${firebaseUser.email} with role: $userRole');
+      final unifiedUserService = UnifiedUserService();
+      await unifiedUserService.createUserProfile(firebaseUser);
+      AppLogger.info('Created profile for: ${firebaseUser.email}');
     } catch (e) {
       AppLogger.error('Failed to create user profile', error: e);
       rethrow;

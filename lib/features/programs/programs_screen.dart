@@ -31,6 +31,7 @@ import 'package:spark_app/core/widgets/profile_avatar.dart';
 import 'package:spark_app/features/profile/services/profile_service.dart';
 import 'package:spark_app/features/sharing/domain/user_profile.dart';
 import 'package:spark_app/features/auth/bloc/auth_bloc.dart';
+import 'package:spark_app/core/services/subscription_access_service.dart';
 
 class ProgramsScreen extends StatefulWidget {
   const ProgramsScreen({super.key});
@@ -1040,15 +1041,8 @@ class _ProgramsScreenState extends State<ProgramsScreen>
                   icon: const Icon(Icons.explore),
                   label: const Text('Browse Programs'),
                 ),
-                const SizedBox(width: 16),
-                FilledButton.icon(
-                  onPressed: () {
-                    HapticFeedback.mediumImpact();
-                    _showCreateProgramScreen();
-                  },
-                  icon: const Icon(Icons.add),
-                  label: const Text('Create Program'),
-                ),
+
+               
               ],
             ),
           ],
@@ -1788,7 +1782,16 @@ class _ProgramsScreenState extends State<ProgramsScreen>
         child: Material(
           color: Colors.transparent,
           child: InkWell(
-            onTap: () {
+            onTap: () async {
+              // Check if this is an admin program and user has access
+              if (program.createdByRole == 'admin') {
+                final subscriptionService = getIt<SubscriptionAccessService>();
+                final hasAccess = await subscriptionService.checkAdminProgramsAccess(context);
+                if (!hasAccess) {
+                  return; // SubscriptionAccessService already showed the snackbar
+                }
+              }
+              
               Navigator.of(context).push(
                 MaterialPageRoute(
                   builder: (context) => ProgramDetailsScreen(program: program),
@@ -2945,6 +2948,7 @@ class _ProgramsScreenState extends State<ProgramsScreen>
       itemBuilder: (context, index) {
         final program = filteredPrograms[index];
         final isActive = state.active?.programId == program.id;
+        
         return _buildProgramCard(
           program,
           isActive: isActive,
@@ -3060,6 +3064,60 @@ class _ProgramsScreenState extends State<ProgramsScreen>
               },
               icon: const Icon(Icons.explore),
               label: const Text('Browse Programs'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+Widget _buildNoAdminProgramAccessState() {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(32),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Container(
+              width: 120,
+              height: 120,
+              decoration: BoxDecoration(
+                color: colorScheme.errorContainer,
+                shape: BoxShape.circle,
+              ),
+              child: Icon(
+                Icons.lock_outlined,
+                size: 60,
+                color: colorScheme.onErrorContainer,
+              ),
+            ),
+            const SizedBox(height: 24),
+            Text(
+              'Premium Programs Access Required',
+              style: theme.textTheme.headlineSmall?.copyWith(
+                color: colorScheme.onSurface,
+                fontWeight: FontWeight.w600,
+              ),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Admin programs are premium content created by professional coaches. Upgrade your subscription to access these exclusive training programs.',
+              style: theme.textTheme.bodyMedium?.copyWith(
+                color: colorScheme.onSurface.withOpacity(0.7),
+              ),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 32),
+            FilledButton.icon(
+              onPressed: () {
+                HapticFeedback.mediumImpact();
+                context.go('/subscription');
+              },
+              icon: const Icon(Icons.upgrade),
+              label: const Text('Upgrade Subscription'),
             ),
           ],
         ),
