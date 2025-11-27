@@ -283,7 +283,7 @@ class _UserFormScreenState extends State<UserFormScreen> {
           borderRadius: BorderRadius.circular(12),
         ),
         filled: true,
-        fillColor: Colors.white,
+          fillColor:  context.colors.surfaceContainerHighest,
       ),
     );
   }
@@ -340,7 +340,7 @@ class _UserFormScreenState extends State<UserFormScreen> {
                           role.displayName,
                           style: TextStyle(
                             fontWeight: FontWeight.w600,
-                            color: isSelected ? roleColor : Colors.black87,
+                            color: isSelected ? roleColor : Colors.grey[600],
                           ),
                         ),
                         Text(

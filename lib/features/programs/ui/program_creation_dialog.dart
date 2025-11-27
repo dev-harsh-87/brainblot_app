@@ -72,28 +72,37 @@ class _ProgramCreationScreenState extends State<ProgramCreationScreen>
     setState(() => _isLoading = true);
     
     try {
+      print('🔄 Loading categories from database...');
       final drillRepository = getIt<DrillRepository>();
       final categoryRepository = getIt<DrillCategoryRepository>();
       
-      final drills = await drillRepository.fetchAll();
+      // Fetch categories dynamically from database
       final categories = await categoryRepository.getActiveCategories();
+      print('✅ Loaded ${categories.length} categories from database');
+      
+      // Fetch drills dynamically from database
+      final drills = await drillRepository.fetchAll();
+      print('✅ Loaded ${drills.length} drills from database');
       
       setState(() {
         _availableDrills = drills;
         _availableCategories = categories;
-        // Set default category if available and current selection is invalid
-        if (categories.isNotEmpty) {
-          if (_selectedCategory.isEmpty || !categories.any((cat) => cat.name == _selectedCategory)) {
-            _selectedCategory = categories.first.name;
-          }
-        }
+        // Don't set default category - let user choose
         _isLoading = false;
       });
+      
+      if (categories.isNotEmpty) {
+        print('📋 Available categories: ${categories.map((c) => c.displayName).join(', ')}');
+      }
     } catch (e) {
+      print('❌ Error loading data from database: $e');
       setState(() => _isLoading = false);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error loading data: $e')),
+          SnackBar(
+            content: Text('Error loading categories from database: $e'),
+            backgroundColor: Theme.of(context).colorScheme.error,
+          ),
         );
       }
     }
@@ -282,66 +291,198 @@ class _ProgramCreationScreenState extends State<ProgramCreationScreen>
     );
   }
 
-  Widget _buildCategoryDropdown() {
+  Widget _buildCategorySelection() {
     final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
 
-    return DropdownButtonFormField<String>(
-      value: _selectedCategory.isEmpty ? null : _selectedCategory,
-      decoration: InputDecoration(
-        labelText: 'Category *',
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-        ),
-        enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: BorderSide(
-            color: theme.colorScheme.outline.withValues(alpha: 0.5),
-          ),
-        ),
-        focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: BorderSide(
-            color: theme.colorScheme.primary,
-            width: 2,
-          ),
-        ),
-        prefixIcon: Icon(Icons.category, color: theme.colorScheme.primary),
-        filled: true,
-        fillColor: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
-      ),
-      items: _availableCategories.map((category) {
-        return DropdownMenuItem(
-          value: category.name,
-          child: Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(6),
-                decoration: BoxDecoration(
-                  color: _getCategoryColor(category.name).withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(6),
-                ),
-                child: Icon(
-                  _getCategoryIcon(category.name),
-                  size: 18,
-                  color: _getCategoryColor(category.name),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Text(
+              'Category *',
+              style: theme.textTheme.titleMedium?.copyWith(
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            const SizedBox(width: 8),
+            if (_isLoading)
+              SizedBox(
+                width: 16,
+                height: 16,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2,
+                  color: colorScheme.primary,
                 ),
               ),
-              const SizedBox(width: 10),
-              Text(category.displayName),
-            ],
+          ],
+        ),
+        const SizedBox(height: 8),
+        Text(
+          _isLoading
+              ? 'Loading categories from database...'
+              : _availableCategories.isEmpty
+                  ? 'No categories found in database'
+                  : 'Select a category for your program (${_availableCategories.length} available)',
+          style: theme.textTheme.bodySmall?.copyWith(
+            color: colorScheme.onSurface.withOpacity(0.7),
           ),
-        );
-      }).toList(),
-      onChanged: (value) {
-        if (value != null) {
+        ),
+        const SizedBox(height: 12),
+        _isLoading
+            ? Container(
+                height: 60,
+                child: Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      CircularProgressIndicator(color: colorScheme.primary),
+                      const SizedBox(height: 8),
+                      Text(
+                        'Fetching categories...',
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: colorScheme.onSurface.withOpacity(0.6),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              )
+            : _availableCategories.isEmpty
+                ? Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: colorScheme.errorContainer.withOpacity(0.5),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(
+                        color: colorScheme.error.withOpacity(0.3),
+                      ),
+                    ),
+                    child: Column(
+                      children: [
+                        Row(
+                          children: [
+                            Icon(
+                              Icons.storage,
+                              color: colorScheme.error,
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Text(
+                                'No categories found in database',
+                                style: TextStyle(
+                                  color: colorScheme.onErrorContainer,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          'Categories need to be added to the database first. Please contact your administrator.',
+                          style: TextStyle(
+                            color: colorScheme.onErrorContainer.withOpacity(0.8),
+                            fontSize: 12,
+                          ),
+                        ),
+                      ],
+                    ),
+                  )
+                : Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      if (_selectedCategory.isEmpty)
+                        Container(
+                          padding: const EdgeInsets.all(12),
+                          margin: const EdgeInsets.only(bottom: 12),
+                          decoration: BoxDecoration(
+                            color: colorScheme.primaryContainer.withOpacity(0.3),
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(
+                              color: colorScheme.primary.withOpacity(0.3),
+                            ),
+                          ),
+                          child: Row(
+                            children: [
+                              Icon(
+                                Icons.info_outline,
+                                color: colorScheme.primary,
+                                size: 16,
+                              ),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: Text(
+                                  'Please select a category to continue',
+                                  style: theme.textTheme.bodySmall?.copyWith(
+                                    color: colorScheme.onPrimaryContainer,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      Wrap(
+                        spacing: 8,
+                        runSpacing: 8,
+                        children: _availableCategories
+                            .map((category) => _buildCategoryChip(category))
+                            .toList(),
+                      ),
+                    ],
+                  ),
+      ],
+    );
+  }
+
+  Widget _buildCategoryChip(DrillCategory category) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final isSelected = _selectedCategory == category.name;
+
+    return FilterChip(
+      label: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(
+            _getCategoryIcon(category.name),
+            size: 16,
+            color: isSelected ? colorScheme.onPrimary : _getCategoryColor(category.name),
+          ),
+          const SizedBox(width: 6),
+          Text(
+            category.displayName.toUpperCase(),
+            style: TextStyle(
+              fontWeight: FontWeight.w600,
+              color: isSelected ? colorScheme.onPrimary : colorScheme.onSurface,
+            ),
+          ),
+        ],
+      ),
+      selected: isSelected,
+      onSelected: (selected) {
+        if (selected) {
           setState(() {
-            _selectedCategory = value;
+            _selectedCategory = category.name;
             // Clear selected drills when category changes since filtered drills will be different
             _selectedDrillIds.clear();
             _dayWiseDrills.clear();
           });
+          HapticFeedback.lightImpact();
+          print('🔄 Category changed to: ${category.name}');
+          print('🔍 Available drills after category change: ${_getFilteredDrills().length}');
         }
       },
+      backgroundColor: colorScheme.surface,
+      selectedColor: _getCategoryColor(category.name),
+      checkmarkColor: colorScheme.onPrimary,
+      side: BorderSide(
+        color: isSelected ? _getCategoryColor(category.name) : colorScheme.outline,
+        width: isSelected ? 2 : 1,
+      ),
+      elevation: isSelected ? 4 : 0,
+      shadowColor: _getCategoryColor(category.name).withOpacity(0.3),
     );
   }
 
@@ -628,7 +769,7 @@ class _ProgramCreationScreenState extends State<ProgramCreationScreen>
             const SizedBox(height: 20),
             _buildDescriptionField(),
             const SizedBox(height: 20),
-            _buildCategoryDropdown(),
+            _buildCategorySelection(),
             const SizedBox(height: 20),
             _buildDurationSlider(),
             const SizedBox(height: 20),
@@ -778,6 +919,7 @@ class _ProgramCreationScreenState extends State<ProgramCreationScreen>
   Widget _buildDrillSelectionStep() {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
+    final filteredDrills = _getFilteredDrills();
     
     return Padding(
       padding: const EdgeInsets.all(24),
@@ -803,26 +945,48 @@ class _ProgramCreationScreenState extends State<ProgramCreationScreen>
               children: [
                 Row(
                   children: [
-                    Icon(
-                      Icons.fitness_center,
-                      color: colorScheme.onPrimaryContainer,
-                      size: 28,
+                    Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: _getCategoryColor(_selectedCategory).withValues(alpha: 0.2),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Icon(
+                        _getCategoryIcon(_selectedCategory),
+                        color: _getCategoryColor(_selectedCategory),
+                        size: 28,
+                      ),
                     ),
                     const SizedBox(width: 12),
                     Expanded(
-                      child: Text(
-                        'Select Drills',
-                        style: theme.textTheme.headlineSmall?.copyWith(
-                          fontWeight: FontWeight.bold,
-                          color: colorScheme.onPrimaryContainer,
-                        ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Select Drills',
+                            style: theme.textTheme.headlineSmall?.copyWith(
+                              fontWeight: FontWeight.bold,
+                              color: colorScheme.onPrimaryContainer,
+                            ),
+                          ),
+                          if (_selectedCategory.isNotEmpty)
+                            Text(
+                              'Category: ${_formatCategoryName(_selectedCategory)}',
+                              style: theme.textTheme.bodySmall?.copyWith(
+                                color: colorScheme.onPrimaryContainer.withOpacity(0.8),
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                        ],
                       ),
                     ),
                   ],
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  'Choose drills for your program. You can filter by category.',
+                  filteredDrills.isEmpty
+                      ? 'No drills found for this category. You can still create the program.'
+                      : 'Choose drills for your ${_formatCategoryName(_selectedCategory)} program.',
                   style: theme.textTheme.bodyMedium?.copyWith(
                     color: colorScheme.onPrimaryContainer,
                   ),
@@ -843,33 +1007,43 @@ class _ProgramCreationScreenState extends State<ProgramCreationScreen>
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Available Drills',
-                      style: theme.textTheme.bodySmall?.copyWith(
-                        color: colorScheme.onSurface.withOpacity(0.7),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Available Drills',
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: colorScheme.onSurface.withOpacity(0.7),
+                        ),
                       ),
-                    ),
-                    Text(
-                      '${_getFilteredDrills().length} drills',
-                      style: theme.textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.w600,
-                        color: colorScheme.primary,
+                      Text(
+                        '${filteredDrills.length} drills',
+                        style: theme.textTheme.titleMedium?.copyWith(
+                          fontWeight: FontWeight.w600,
+                          color: filteredDrills.isEmpty ? colorScheme.error : colorScheme.primary,
+                        ),
                       ),
-                    ),
-                  ],
+                      if (_selectedDrillIds.isNotEmpty)
+                        Text(
+                          '${_selectedDrillIds.length} selected',
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color: colorScheme.secondary,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                    ],
+                  ),
                 ),
-                if (_getFilteredDrills().isNotEmpty)
+                if (filteredDrills.isNotEmpty)
                   FilledButton.icon(
-                    onPressed: _selectedDrillIds.length == _getFilteredDrills().length
+                    onPressed: _selectedDrillIds.length == filteredDrills.length
                         ? _deselectAllDrills
                         : _selectAllDrills,
-                    icon: Icon(_selectedDrillIds.length == _getFilteredDrills().length
+                    icon: Icon(_selectedDrillIds.length == filteredDrills.length
                         ? Icons.deselect
                         : Icons.select_all),
-                    label: Text(_selectedDrillIds.length == _getFilteredDrills().length
+                    label: Text(_selectedDrillIds.length == filteredDrills.length
                         ? 'Deselect All'
                         : 'Select All'),
                     style: FilledButton.styleFrom(
@@ -888,39 +1062,94 @@ class _ProgramCreationScreenState extends State<ProgramCreationScreen>
           Expanded(
             child: _isLoading
                 ? const Center(child: CircularProgressIndicator())
-                : _getFilteredDrills().isEmpty
+                : filteredDrills.isEmpty
                     ? Center(
                         child: Column(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
-                            Icon(Icons.fitness_center, size: 64, color: Theme.of(context).colorScheme.onSurface.withOpacity(0.5)),
+                            Container(
+                              padding: const EdgeInsets.all(16),
+                              decoration: BoxDecoration(
+                                color: colorScheme.surfaceContainerHighest,
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              child: Icon(
+                                _getCategoryIcon(_selectedCategory),
+                                size: 64,
+                                color: _getCategoryColor(_selectedCategory).withOpacity(0.5),
+                              ),
+                            ),
                             const SizedBox(height: 16),
-                            Text('No drills available'),
+                            Text(
+                              'No drills available',
+                              style: theme.textTheme.titleMedium?.copyWith(
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
                             const SizedBox(height: 8),
-                            Text('You can still create the program without drills',
-                                 style: Theme.of(context).textTheme.bodySmall,),
+                            Text(
+                              'No drills found for ${_formatCategoryName(_selectedCategory)} category.\nYou can still create the program and add drills later.',
+                              style: theme.textTheme.bodySmall?.copyWith(
+                                color: colorScheme.onSurface.withOpacity(0.7),
+                              ),
+                              textAlign: TextAlign.center,
+                            ),
                           ],
                         ),
                       )
                     : ListView.builder(
-                        itemCount: _getFilteredDrills().length,
+                        itemCount: filteredDrills.length,
                         itemBuilder: (context, index) {
-                          final drill = _getFilteredDrills()[index];
+                          final drill = filteredDrills[index];
                           final isSelected = _selectedDrillIds.contains(drill.id);
                           
-                          return CheckboxListTile(
-                            title: Text(drill.name),
-                            subtitle: Text('${drill.durationSec}s • ${drill.category}'),
-                            value: isSelected,
-                            onChanged: (selected) {
-                              setState(() {
-                                if (selected == true) {
-                                  _selectedDrillIds.add(drill.id);
-                                } else {
-                                  _selectedDrillIds.remove(drill.id);
-                                }
-                              });
-                            },
+                          return Card(
+                            margin: const EdgeInsets.only(bottom: 8),
+                            child: CheckboxListTile(
+                              title: Text(
+                                drill.name,
+                                style: theme.textTheme.titleSmall?.copyWith(
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                              subtitle: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text('${drill.durationSec}s • ${drill.difficulty.name} • ${drill.category}'),
+                                  if (drill.description.isNotEmpty)
+                                    Text(
+                                      drill.description,
+                                      style: theme.textTheme.bodySmall?.copyWith(
+                                        color: colorScheme.onSurface.withOpacity(0.6),
+                                      ),
+                                      maxLines: 2,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                ],
+                              ),
+                              value: isSelected,
+                              onChanged: (selected) {
+                                setState(() {
+                                  if (selected == true) {
+                                    _selectedDrillIds.add(drill.id);
+                                  } else {
+                                    _selectedDrillIds.remove(drill.id);
+                                  }
+                                });
+                              },
+                              secondary: Container(
+                                padding: const EdgeInsets.all(8),
+                                decoration: BoxDecoration(
+                                  color: _getCategoryColor(_selectedCategory).withValues(alpha: 0.1),
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                child: Icon(
+                                  Icons.fitness_center,
+                                  color: _getCategoryColor(_selectedCategory),
+                                  size: 20,
+                                ),
+                              ),
+                            ),
                           );
                         },
                       ),
@@ -933,45 +1162,86 @@ class _ProgramCreationScreenState extends State<ProgramCreationScreen>
   List<Drill> _getFilteredDrills() {
     if (_selectedCategory.isEmpty) return _availableDrills;
     
+    print('🔍 Filtering drills for category: $_selectedCategory');
+    print('🔍 Total available drills: ${_availableDrills.length}');
+    
     // Filter drills based on selected program category
-    return _availableDrills.where((drill) {
+    final filteredDrills = _availableDrills.where((drill) {
       // Match drill category with program category
       final drillCategory = drill.category.toLowerCase().trim();
       final programCategory = _selectedCategory.toLowerCase().trim();
       
-      // Direct match
-      if (drillCategory == programCategory) return true;
+      print('🔍 Comparing drill category "$drillCategory" with program category "$programCategory"');
+      
+      // Direct match (most common case)
+      if (drillCategory == programCategory) {
+        print('✅ Direct match found for drill: ${drill.name}');
+        return true;
+      }
+      
+      // Case-insensitive partial matching for similar categories
+      if (drillCategory.contains(programCategory) || programCategory.contains(drillCategory)) {
+        print('✅ Partial match found for drill: ${drill.name}');
+        return true;
+      }
       
       // Special handling for fitness category - includes related subcategories
       if (programCategory == 'fitness') {
         final fitnessSubcategories = [
           'strength', 'cardio', 'flexibility', 'endurance',
-          'conditioning', 'core', 'balance', 'agility'
+          'conditioning', 'core', 'balance', 'agility', 'training'
         ];
-        if (fitnessSubcategories.contains(drillCategory)) return true;
+        if (fitnessSubcategories.any((sub) => drillCategory.contains(sub))) {
+          print('✅ Fitness subcategory match found for drill: ${drill.name}');
+          return true;
+        }
       }
       
       // Special handling for sports categories
       if (programCategory == 'soccer' || programCategory == 'football') {
-        if (['soccer', 'football', 'ball_control', 'passing', 'shooting'].contains(drillCategory)) {
+        final soccerCategories = ['soccer', 'football', 'ball_control', 'passing', 'shooting', 'dribbling'];
+        if (soccerCategories.any((cat) => drillCategory.contains(cat) || cat.contains(drillCategory))) {
+          print('✅ Soccer/Football match found for drill: ${drill.name}');
           return true;
         }
       }
       
       if (programCategory == 'basketball') {
-        if (['basketball', 'dribbling', 'shooting', 'defense'].contains(drillCategory)) {
+        final basketballCategories = ['basketball', 'dribbling', 'shooting', 'defense', 'passing'];
+        if (basketballCategories.any((cat) => drillCategory.contains(cat) || cat.contains(drillCategory))) {
+          print('✅ Basketball match found for drill: ${drill.name}');
           return true;
         }
       }
       
-      // Agility drills can be used in multiple sports
-      if (drillCategory == 'agility' &&
-          ['soccer', 'basketball', 'tennis', 'hockey', 'fitness'].contains(programCategory)) {
+      if (programCategory == 'tennis') {
+        final tennisCategories = ['tennis', 'racket', 'serve', 'volley'];
+        if (tennisCategories.any((cat) => drillCategory.contains(cat) || cat.contains(drillCategory))) {
+          print('✅ Tennis match found for drill: ${drill.name}');
+          return true;
+        }
+      }
+      
+      if (programCategory == 'hockey') {
+        final hockeyCategories = ['hockey', 'stick', 'puck', 'skating'];
+        if (hockeyCategories.any((cat) => drillCategory.contains(cat) || cat.contains(drillCategory))) {
+          print('✅ Hockey match found for drill: ${drill.name}');
+          return true;
+        }
+      }
+      
+      // Agility and general training drills can be used in multiple sports
+      if (drillCategory == 'agility' || drillCategory == 'training' || drillCategory == 'general') {
+        print('✅ General training drill match found for drill: ${drill.name}');
         return true;
       }
       
+      print('❌ No match found for drill: ${drill.name} (category: $drillCategory)');
       return false;
     }).toList();
+    
+    print('🔍 Filtered ${filteredDrills.length} drills for category $_selectedCategory');
+    return filteredDrills;
   }
 
   Widget _buildDayWiseAssignmentStep() {
@@ -1112,8 +1382,8 @@ class _ProgramCreationScreenState extends State<ProgramCreationScreen>
 
     _dayWiseDrills.clear();
     
-    // Smart drill assignment based on program duration
-    final drillsPerDay = _programDuration <= 30 ? 3 : _programDuration <= 60 ? 2 : 1;
+    // Assign only 1 drill per day for all program durations
+    final drillsPerDay = 1;
     
     // Shuffle drills for variety
     final shuffledDrills = List<Drill>.from(selectedDrills)..shuffle();
@@ -1133,7 +1403,7 @@ class _ProgramCreationScreenState extends State<ProgramCreationScreen>
     
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text('Auto-assigned drills to ${_dayWiseDrills.length} days'),
+        content: Text('Auto-assigned 1 drill per day to ${_dayWiseDrills.length} days'),
         backgroundColor: AppTheme.successColor,
       ),
     );
@@ -1320,6 +1590,14 @@ class _ProgramCreationScreenState extends State<ProgramCreationScreen>
     
     if (_nameController.text.trim().isEmpty) {
       errors.add('Program name is required');
+    }
+    
+    if (_selectedCategory.isEmpty) {
+      errors.add('Category selection is required');
+    }
+    
+    if (_programDuration < 7) {
+      errors.add('Program duration must be at least 7 days');
     }
     
     // Make drill selection optional for now

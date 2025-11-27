@@ -183,13 +183,28 @@ class ModuleAccessFixService {
     }
   }
 
-  /// Reset user to default module access based on their role
-  Future<void> resetUserToDefaultModules(String userId) async {
+  /// Reset user to default module access based on their role (ONLY if explicitly requested)
+  /// WARNING: This will override any upgraded subscription plans!
+  Future<void> resetUserToDefaultModules(String userId, {bool forceReset = false}) async {
     try {
       final userDoc = await _firestore.collection('users').doc(userId).get();
       if (!userDoc.exists) return;
 
       final userData = userDoc.data()!;
+      final subscription = userData['subscription'] as Map<String, dynamic>?;
+      
+      // CRITICAL: Warn if user has an upgraded plan and force reset is not enabled
+      if (!forceReset && subscription != null && subscription['plan'] != null) {
+        final currentPlan = subscription['plan'] as String;
+        if (currentPlan != 'free' && currentPlan != 'institute') {
+          AppLogger.warning(
+            'User $userId has upgraded plan "$currentPlan" - skipping reset to prevent data loss. Use forceReset=true to override.',
+            tag: 'ModuleAccessFix'
+          );
+          return;
+        }
+      }
+
       final role = userData['role'] as String? ?? 'user';
       final defaultModules = getDefaultModuleAccess(role);
 

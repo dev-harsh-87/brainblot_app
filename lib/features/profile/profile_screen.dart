@@ -169,8 +169,8 @@ class _ProfileScreenState extends State<ProfileScreen> with AutoRefreshMixin {
                           context
                               .read<AuthBloc>()
                               .add(const AuthLogoutRequested());
-                          // Navigate to auth screen
-                          context.go('/auth');
+                          // Navigate to login screen
+                          context.go('/login');
                         },
                         style: FilledButton.styleFrom(
                           backgroundColor: AppTheme.errorColor,
@@ -1717,7 +1717,7 @@ class _ProfileScreenState extends State<ProfileScreen> with AutoRefreshMixin {
                             context
                                 .read<AuthBloc>()
                                 .add(const AuthLogoutRequested());
-                            context.go('/auth');
+                            context.go('/login');
 
                             ScaffoldMessenger.of(context).showSnackBar(
                               const SnackBar(

@@ -274,24 +274,32 @@ class FirebaseProgramRepository implements ProgramRepository {
         }
       }
       
-      // Assign drills to program days
+      // Assign drills to program days using enhanced format
       final drillAssignmentService = getIt<DrillAssignmentService>();
+      
+      // Use enhanced drill assignment if dayWiseDrillIds is empty (auto-assignment)
+      Map<int, List<String>> finalDayWiseDrillIds = program.dayWiseDrillIds;
+      if (finalDayWiseDrillIds.isEmpty) {
+        // Auto-assign drills using the enhanced method
+        finalDayWiseDrillIds = await drillAssignmentService.assignDrillsToProgramEnhanced(program);
+        print('✅ Auto-assigned drills to ${finalDayWiseDrillIds.length} days');
+      }
+      
+      // Also generate legacy days format for backward compatibility (but with limited drill info)
       final daysWithDrills = await drillAssignmentService.assignDrillsToProgram(program);
       
-      // Create a properly formatted program with dayWiseDrillIds
+      // Create a properly formatted program with enhanced dayWiseDrillIds
       final programWithMetadata = Program(
         id: program.id.isEmpty ? _uuid.v4() : program.id,
         name: program.name,
         description: program.description,
         category: program.category,
         durationDays: program.durationDays,
-        days: daysWithDrills, // Use days with assigned drills
+        days: daysWithDrills, // Keep for backward compatibility
         level: program.level,
         createdAt: DateTime.now(),
         createdBy: userId, // Can be null for anonymous users
-        dayWiseDrillIds: program.dayWiseDrillIds.map(
-          (key, value) => MapEntry(key, List<String>.from(value)),
-        ),
+        dayWiseDrillIds: finalDayWiseDrillIds,
         selectedDrillIds: List<String>.from(program.selectedDrillIds ?? []),
       );
 
@@ -385,9 +393,10 @@ class FirebaseProgramRepository implements ProgramRepository {
           } else {
             // Check for admin_programs module access
             final subscription = userData['subscription'] as Map<String, dynamic>?;
-            if (subscription != null && subscription['moduleAccess'] is Map) {
-              final moduleAccess = subscription['moduleAccess'] as Map<String, dynamic>;
-              if (moduleAccess['admin_programs'] == true) {
+            if (subscription != null && subscription['moduleAccess'] is List) {
+              final moduleAccess = subscription['moduleAccess'] as List<dynamic>;
+              final moduleAccessList = moduleAccess.map((e) => e.toString()).toList();
+              if (moduleAccessList.contains('admin_programs')) {
                 canUpdate = true;
               }
             }
@@ -450,9 +459,10 @@ class FirebaseProgramRepository implements ProgramRepository {
           } else {
             // Check for admin_programs module access
             final subscription = userData['subscription'] as Map<String, dynamic>?;
-            if (subscription != null && subscription['moduleAccess'] is Map) {
-              final moduleAccess = subscription['moduleAccess'] as Map<String, dynamic>;
-              if (moduleAccess['admin_programs'] == true) {
+            if (subscription != null && subscription['moduleAccess'] is List) {
+              final moduleAccess = subscription['moduleAccess'] as List<dynamic>;
+              final moduleAccessList = moduleAccess.map((e) => e.toString()).toList();
+              if (moduleAccessList.contains('admin_programs')) {
                 canDelete = true;
               }
             }
@@ -597,6 +607,60 @@ class FirebaseProgramRepository implements ProgramRepository {
         .map((snapshot) => snapshot.docs
             .map((doc) => doc.data()['programId'] as String)
             .toList(),);
+  }
+
+  /// Get completed programs with full program details
+  Future<List<Program>> getCompletedPrograms(String userId) async {
+    try {
+      print('📋 Fetching completed programs for user: $userId');
+      
+      // First get completed program IDs (removed orderBy to avoid index requirement)
+      final completedProgressSnapshot = await _firestore
+          .collection('program_progress')
+          .where('userId', isEqualTo: userId)
+          .where('status', isEqualTo: 'completed')
+          .get();
+
+      if (completedProgressSnapshot.docs.isEmpty) {
+        print('📋 No completed programs found');
+        return [];
+      }
+
+      final completedProgramIds = completedProgressSnapshot.docs
+          .map((doc) => doc.data()['programId'] as String)
+          .toList();
+
+      print('📋 Found ${completedProgramIds.length} completed program IDs');
+
+      // Then get the actual program details
+      final completedPrograms = <Program>[];
+      
+      for (final programId in completedProgramIds) {
+        try {
+          final programDoc = await _firestore
+              .collection(_programsCollection)
+              .doc(programId)
+              .get();
+              
+          if (programDoc.exists) {
+            final program = Program.fromJson({
+              'id': programDoc.id,
+              ...programDoc.data()!,
+            });
+            completedPrograms.add(program);
+          }
+        } catch (e) {
+          print('❌ Error fetching completed program $programId: $e');
+          // Continue with other programs
+        }
+      }
+
+      print('✅ Successfully fetched ${completedPrograms.length} completed programs');
+      return completedPrograms;
+    } catch (e) {
+      print('❌ Error fetching completed programs: $e');
+      return [];
+    }
   }
 
   Future<void> seedDefaultPrograms() async {

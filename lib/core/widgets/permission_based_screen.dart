@@ -3,9 +3,9 @@ import 'package:go_router/go_router.dart';
 import 'package:spark_app/core/auth/services/permission_manager.dart';
 import 'package:spark_app/core/utils/app_logger.dart';
 
-/// Simple widget that shows content based on cached permissions
-/// No async calls needed since permissions are pre-analyzed
-class PermissionBasedScreen extends StatelessWidget {
+/// Widget that shows content based on permissions with real-time updates
+/// Listens to permission changes and updates UI accordingly
+class PermissionBasedScreen extends StatefulWidget {
   final Widget child;
   final String? requiredModule;
   final bool requireAdmin;
@@ -20,34 +20,60 @@ class PermissionBasedScreen extends StatelessWidget {
   });
 
   @override
+  State<PermissionBasedScreen> createState() => _PermissionBasedScreenState();
+}
+
+class _PermissionBasedScreenState extends State<PermissionBasedScreen> {
+  @override
+  void initState() {
+    super.initState();
+    // Listen to permission changes for real-time updates
+    PermissionManager.instance.addListener(_onPermissionChanged);
+  }
+
+  @override
+  void dispose() {
+    PermissionManager.instance.removeListener(_onPermissionChanged);
+    super.dispose();
+  }
+
+  void _onPermissionChanged() {
+    if (mounted) {
+      setState(() {
+        // Trigger rebuild when permissions change
+      });
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
     final permissionManager = PermissionManager.instance;
     
     // Check if permissions are initialized
     if (!permissionManager.isInitialized) {
       // For admin-only features, show access denied immediately
-      if (requireAdmin) {
+      if (widget.requireAdmin) {
         return _buildAccessDeniedScreen(context, 'Admin access required');
       }
       
       // For regular modules, allow access by default and initialize permissions silently
       // This prevents the "Loading permissions..." screen during navigation
       _initializePermissionsSilently();
-      return child;
+      return widget.child;
     }
 
     // Check admin requirement
-    if (requireAdmin && !permissionManager.isAdmin) {
+    if (widget.requireAdmin && !permissionManager.isAdmin) {
       return _buildAccessDeniedScreen(context, 'Admin access required');
     }
 
     // Check module requirement
-    if (requiredModule != null && !permissionManager.hasModuleAccess(requiredModule!)) {
+    if (widget.requiredModule != null && !permissionManager.hasModuleAccess(widget.requiredModule!)) {
       return _buildAccessDeniedScreen(context,
-          customMessage ?? 'Access to ${requiredModule!.replaceAll('_', ' ')} module required');
+          widget.customMessage ?? 'Access to ${widget.requiredModule!.replaceAll('_', ' ')} module required');
     }
 
-    return child;
+    return widget.child;
   }
 
   /// Initialize permissions silently in the background without blocking UI
@@ -193,8 +219,9 @@ class PermissionBasedScreen extends StatelessWidget {
   }
 }
 
-/// Simple widget for conditionally showing UI elements based on cached permissions
-class PermissionBasedWidget extends StatelessWidget {
+/// Widget for conditionally showing UI elements based on permissions with real-time updates
+/// Listens to permission changes and updates UI accordingly
+class PermissionBasedWidget extends StatefulWidget {
   final Widget child;
   final String? requiredModule;
   final bool requireAdmin;
@@ -209,32 +236,58 @@ class PermissionBasedWidget extends StatelessWidget {
   });
 
   @override
+  State<PermissionBasedWidget> createState() => _PermissionBasedWidgetState();
+}
+
+class _PermissionBasedWidgetState extends State<PermissionBasedWidget> {
+  @override
+  void initState() {
+    super.initState();
+    // Listen to permission changes for real-time updates
+    PermissionManager.instance.addListener(_onPermissionChanged);
+  }
+
+  @override
+  void dispose() {
+    PermissionManager.instance.removeListener(_onPermissionChanged);
+    super.dispose();
+  }
+
+  void _onPermissionChanged() {
+    if (mounted) {
+      setState(() {
+        // Trigger rebuild when permissions change
+      });
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
     final permissionManager = PermissionManager.instance;
     
     // Check if permissions are initialized
     if (!permissionManager.isInitialized) {
       // For admin-only widgets, hide by default
-      if (requireAdmin) {
-        return fallback ?? const SizedBox.shrink();
+      if (widget.requireAdmin) {
+        return widget.fallback ?? const SizedBox.shrink();
       }
       
       // For regular module widgets, show by default and initialize permissions silently
       _initializePermissionsSilently();
-      return child;
+      return widget.child;
     }
 
     // Check admin requirement
-    if (requireAdmin && !permissionManager.isAdmin) {
-      return fallback ?? const SizedBox.shrink();
+    if (widget.requireAdmin && !permissionManager.isAdmin) {
+      return widget.fallback ?? const SizedBox.shrink();
     }
 
     // Check module requirement
-    if (requiredModule != null && !permissionManager.hasModuleAccess(requiredModule!)) {
-      return fallback ?? const SizedBox.shrink();
+    if (widget.requiredModule != null && !permissionManager.hasModuleAccess(widget.requiredModule!)) {
+      return widget.fallback ?? const SizedBox.shrink();
     }
 
-    return child;
+    return widget.child;
   }
 
   /// Initialize permissions silently in the background without blocking UI

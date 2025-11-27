@@ -208,7 +208,8 @@ class ComprehensivePermissionService {
 
   /// Check if user can access personal statistics
   Future<bool> canAccessStats() async {
-    return await hasModuleAccess('stats');
+    // Check both 'stats' and legacy 'analysis' for backward compatibility
+    return await hasModuleAccess('stats') || await hasModuleAccess('analysis');
   }
 
   /// Check if user can access subscription management
@@ -220,7 +221,8 @@ class ComprehensivePermissionService {
   Future<bool> canAccessMultiplayer() async {
     final isAdmin = await this.isAdmin();
     if (isAdmin) return true;
-    return await hasModuleAccess('multiplayer');
+    // Check both 'multiplayer' and legacy 'host_features' for backward compatibility
+    return await hasModuleAccess('multiplayer') || await hasModuleAccess('host_features');
   }
 
   /// Check if user can manage other users (admin or institute plan)
@@ -234,7 +236,8 @@ class ComprehensivePermissionService {
   Future<bool> canHostSessions() async {
     final isAdmin = await this.isAdmin();
     if (isAdmin) return true;
-    return await hasModuleAccess('host_features');
+    // Host features are now part of multiplayer access
+    return await hasModuleAccess('multiplayer') || await hasModuleAccess('host_features');
   }
 
   /// Check if user can perform bulk operations
@@ -288,7 +291,6 @@ class ComprehensivePermissionService {
       'multiplayer',
       'user_management',
       'team_management',
-      'host_features',
       'bulk_operations',
       'admin_user_management',
       'admin_subscription_management',
@@ -363,9 +365,18 @@ class ComprehensivePermissionService {
         .collection('users')
         .doc(user.uid)
         .snapshots()
-        .asyncMap((_) async {
+        .asyncMap((snapshot) async {
+          AppLogger.info('User document changed, clearing permission cache and refreshing', tag: 'ComprehensivePermissionService');
           _clearCache(); // Clear cache when user data changes
-          return await getPermissionSummary();
+          
+          // Force refresh of all cached data
+          await getCurrentUserRole();
+          await getCurrentUserModuleAccess();
+          
+          final permissionSummary = await getPermissionSummary();
+          AppLogger.success('Permission summary refreshed: ${permissionSummary['modules']}', tag: 'ComprehensivePermissionService');
+          
+          return permissionSummary;
         });
   }
 

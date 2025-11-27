@@ -101,25 +101,76 @@ class _RegisterScreenState extends State<RegisterScreen> with TickerProviderStat
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        // Logo/Brand Section
+                        // Enhanced Logo/Brand Section
                         Container(
-                          width: 120,
-                          height: 120,
+                          width: 150,
+                          height: 150,
                           decoration: BoxDecoration(
-                            color: colorScheme.primary,
-                            shape: BoxShape.circle,
+                            borderRadius: BorderRadius.circular(75),
                             boxShadow: [
                               BoxShadow(
-                                color: colorScheme.primary.withOpacity(0.3),
-                                blurRadius: 20,
-                                offset: const Offset(0, 10),
+                                color: colorScheme.primary.withOpacity(0.15),
+                                blurRadius: 25,
+                                offset: const Offset(0, 8),
+                                spreadRadius: 3,
+                              ),
+                              BoxShadow(
+                                color: colorScheme.primary.withOpacity(0.08),
+                                blurRadius: 50,
+                                offset: const Offset(0, 15),
+                                spreadRadius: 8,
                               ),
                             ],
                           ),
-                          child: Icon(
-                            Icons.psychology,
-                            size: 60,
-                            color: colorScheme.onPrimary,
+                          child: Container(
+                            padding: const EdgeInsets.all(15),
+                            decoration: BoxDecoration(
+                              borderRadius: BorderRadius.circular(75),
+                              gradient: LinearGradient(
+                                begin: Alignment.topLeft,
+                                end: Alignment.bottomRight,
+                                colors: [
+                                  colorScheme.surface,
+                                  colorScheme.surfaceContainerHighest.withOpacity(0.7),
+                                ],
+                              ),
+                              border: Border.all(
+                                color: colorScheme.primary.withOpacity(0.2),
+                                width: 2,
+                              ),
+                            ),
+                            child: ClipRRect(
+                              borderRadius: BorderRadius.circular(60),
+                              child: Image.asset(
+                                "assets/images/logo.png",
+                                width: 120,
+                                height: 120,
+                                fit: BoxFit.contain,
+                                errorBuilder: (context, error, stackTrace) {
+                                  // Fallback if logo image is not found
+                                  return Container(
+                                    width: 120,
+                                    height: 120,
+                                    decoration: BoxDecoration(
+                                      borderRadius: BorderRadius.circular(60),
+                                      gradient: LinearGradient(
+                                        begin: Alignment.topLeft,
+                                        end: Alignment.bottomRight,
+                                        colors: [
+                                          colorScheme.primary,
+                                          colorScheme.primary.withOpacity(0.7),
+                                        ],
+                                      ),
+                                    ),
+                                    child: Icon(
+                                      Icons.psychology_outlined,
+                                      size: 60,
+                                      color: colorScheme.onPrimary,
+                                    ),
+                                  );
+                                },
+                              ),
+                            ),
                           ),
                         ),
                         const SizedBox(height: 32),

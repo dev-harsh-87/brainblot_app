@@ -115,6 +115,27 @@ class UnifiedUserService {
     try {
       AppLogger.info('Creating profile for existing user: ${firebaseUser.email}', tag: 'UnifiedUserService');
 
+      // CRITICAL: Check if user already has a profile with subscription data
+      // This prevents overriding existing subscription plans on app restart
+      final existingDoc = await _firestore.collection('users').doc(firebaseUser.uid).get();
+      
+      if (existingDoc.exists && existingDoc.data() != null) {
+        final existingData = existingDoc.data()!;
+        final existingSubscription = existingData['subscription'] as Map<String, dynamic>?;
+        
+        if (existingSubscription != null) {
+          AppLogger.info('User already has subscription data, preserving it: ${existingSubscription['plan']}', tag: 'UnifiedUserService');
+          
+          // Just update the lastActiveAt timestamp and return existing user
+          await _firestore.collection('users').doc(firebaseUser.uid).update({
+            'lastActiveAt': FieldValue.serverTimestamp(),
+            'updatedAt': FieldValue.serverTimestamp(),
+          });
+          
+          return AppUser.fromFirestore(existingDoc);
+        }
+      }
+
       final role = _determineUserRole(firebaseUser.email);
       final appUser = _createAppUserObject(
         firebaseUser: firebaseUser,
@@ -130,6 +151,86 @@ class UnifiedUserService {
 
     } catch (e) {
       AppLogger.error('Failed to create user profile', error: e, tag: 'UnifiedUserService');
+      rethrow;
+    }
+  }
+
+  /// Create user profile only (without Firebase Auth account) - for admin user creation
+  Future<AppUser> createUserProfileOnly({
+    required String email,
+    required String displayName,
+    required UserRole role,
+    Map<String, dynamic>? customSubscriptionData,
+    required String createdByAdminId,
+    required String createdByAdminEmail,
+    required String createdByAdminName,
+  }) async {
+    try {
+      AppLogger.info('Creating user profile only for: $email', tag: 'UnifiedUserService');
+
+      // Generate a unique user ID
+      final newUserId = _firestore.collection('users').doc().id;
+
+      // Create AppUser with proper default configuration
+      final appUser = AppUser(
+        id: newUserId,
+        email: email.toLowerCase(),
+        displayName: displayName,
+        profileImageUrl: null,
+        role: role,
+        subscription: customSubscriptionData != null
+            ? UserSubscription.fromJson(customSubscriptionData)
+            : UserSubscription(
+                plan: role.isAdmin() ? 'institute' : 'free',
+                status: 'active',
+                moduleAccess: getDefaultModuleAccess(role),
+              ),
+        preferences: const UserPreferences(
+          theme: 'system',
+          notifications: true,
+          soundEnabled: true,
+          language: 'en',
+          timezone: 'UTC',
+        ),
+        stats: const UserStats(
+          totalSessions: 0,
+          totalDrillsCompleted: 0,
+          totalProgramsCompleted: 0,
+          averageAccuracy: 0.0,
+          averageReactionTime: 0.0,
+          streakDays: 0,
+        ),
+        createdAt: DateTime.now(),
+        updatedAt: DateTime.now(),
+        lastActiveAt: DateTime.now(),
+      );
+
+      // Prepare Firestore data
+      final firestoreData = appUser.toFirestore();
+      
+      // Add admin creation metadata
+      firestoreData['createdBy'] = {
+        'adminId': createdByAdminId,
+        'adminEmail': createdByAdminEmail,
+        'adminName': createdByAdminName,
+        'createdAt': FieldValue.serverTimestamp(),
+      };
+      
+      // Mark as admin-created user (no Firebase Auth account yet)
+      firestoreData['requiresFirebaseAuthCreation'] = true;
+      firestoreData['authAccountExists'] = false;
+      
+      // Store temporary password for first login (in production, this should be hashed)
+      firestoreData['tempPassword'] = customSubscriptionData?['tempPassword'] ?? 'defaultPassword123';
+
+      // Save to Firestore
+      await _firestore.collection('users').doc(newUserId).set(firestoreData);
+
+      AppLogger.success('User profile created successfully: $email', tag: 'UnifiedUserService');
+      return appUser;
+
+    } catch (e) {
+      AppLogger.error('Failed to create user profile only: $email', error: e, tag: 'UnifiedUserService');
       rethrow;
     }
   }

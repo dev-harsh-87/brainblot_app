@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:spark_app/features/programs/data/firebase_program_repository.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:equatable/equatable.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:collection/collection.dart';
@@ -23,8 +24,9 @@ class ProgramsBloc extends Bloc<ProgramsEvent, ProgramsState> {
     
     // Event handlers
     on<ProgramsStarted>(_onStarted);
-    on<_ProgramsUpdated>(_onProgramsUpdated); 
+    on<_ProgramsUpdated>(_onProgramsUpdated);
     on<_ActiveUpdated>(_onActiveUpdated);
+    on<_CompletedProgramsUpdated>(_onCompletedProgramsUpdated);
     on<_ProgramsErrorOccurred>(_onError);
     on<ProgramsActivateRequested>(_onActivate);
     on<ProgramsCreateRequested>(_onCreateProgram);
@@ -82,6 +84,9 @@ class ProgramsBloc extends Bloc<ProgramsEvent, ProgramsState> {
           },
           cancelOnError: false,
         );
+        
+        // Load completed programs
+        _loadCompletedPrograms();
       },
       emit,
       (error) => state.copyWith(
@@ -89,6 +94,33 @@ class ProgramsBloc extends Bloc<ProgramsEvent, ProgramsState> {
         errorMessage: error.message,
       ),
     );
+  }
+
+  Future<void> _loadCompletedPrograms() async {
+    try {
+      if (_repo is FirebaseProgramRepository) {
+        final firebaseRepo = _repo as FirebaseProgramRepository;
+        // Get current user ID - you'll need to get this from auth
+        final userId = await _getCurrentUserId();
+        if (userId != null) {
+          final completedPrograms = await firebaseRepo.getCompletedPrograms(userId);
+          if (!isClosed) {
+            add(_CompletedProgramsUpdated(completedPrograms));
+          }
+        }
+      }
+    } catch (e) {
+      AppLogger.error('Failed to load completed programs: $e', tag: 'ProgramsBloc');
+    }
+  }
+
+  Future<String?> _getCurrentUserId() async {
+    try {
+      return FirebaseAuth.instance.currentUser?.uid;
+    } catch (e) {
+      AppLogger.error('Failed to get current user ID: $e', tag: 'ProgramsBloc');
+      return null;
+    }
   }
 
   void _onProgramsUpdated(_ProgramsUpdated event, Emitter<ProgramsState> emit) {
@@ -115,6 +147,15 @@ class ProgramsBloc extends Bloc<ProgramsEvent, ProgramsState> {
     }
   }
   
+  void _onCompletedProgramsUpdated(
+    _CompletedProgramsUpdated event,
+    Emitter<ProgramsState> emit,
+  ) {
+    emit(state.copyWith(
+      completedPrograms: event.completedPrograms,
+    ));
+  }
+
   void _onError(_ProgramsErrorOccurred event, Emitter<ProgramsState> emit) {
     emit(state.copyWith(
       status: ProgramsStatus.error,

@@ -40,7 +40,6 @@ class _PlanFormScreenState extends State<PlanFormScreen> {
     'drills',
     'profile',
     'stats',
-    'analysis',
     'admin_drills',
     'admin_programs',
     'programs',

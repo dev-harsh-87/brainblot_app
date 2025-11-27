@@ -21,15 +21,26 @@ class ForceModuleUpdateService {
     await forceUpdateUser(user.uid);
   }
 
-  /// Force update specific user to new module access
+  /// Force update specific user to new module access (ONLY if they have no valid subscription)
   Future<void> forceUpdateUser(String userId) async {
     try {
-      AppLogger.info('Force updating user $userId to new module access', tag: 'ForceModuleUpdate');
+      AppLogger.info('Checking if user $userId needs module access update', tag: 'ForceModuleUpdate');
 
       final userDoc = await _firestore.collection('users').doc(userId).get();
       if (!userDoc.exists) return;
 
       final userData = userDoc.data()!;
+      final subscription = userData['subscription'] as Map<String, dynamic>?;
+      
+      // CRITICAL: Only update if user has no subscription or invalid subscription data
+      if (subscription != null &&
+          subscription['plan'] != null &&
+          subscription['moduleAccess'] != null &&
+          (subscription['moduleAccess'] as List).isNotEmpty) {
+        AppLogger.info('User $userId already has valid subscription: ${subscription['plan']}, skipping force update', tag: 'ForceModuleUpdate');
+        return;
+      }
+
       final role = userData['role'] as String? ?? 'user';
       
       // Get the correct default modules based on role
@@ -43,7 +54,7 @@ class ForceModuleUpdateService {
       });
 
       AppLogger.success(
-        'Force updated user $userId to modules: $newModules',
+        'Force updated user $userId to modules: $newModules (was missing valid subscription)',
         tag: 'ForceModuleUpdate'
       );
 

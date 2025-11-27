@@ -495,7 +495,7 @@ class _HomeScreenState extends State<HomeScreen>
         description: 'Track progress',
         icon: Icons.analytics,
         hasAccess:
-            isAdmin || userSubscription.moduleAccess.contains('analysis'),
+            isAdmin || userSubscription.moduleAccess.contains('stats') || userSubscription.moduleAccess.contains('analysis'),
         route: '/stats',
         color: Colors.green,
       ),

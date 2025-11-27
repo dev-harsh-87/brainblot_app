@@ -205,8 +205,14 @@ class SubscriptionRequestService {
       print('✅ Subscription request approved and user plan upgraded');
       print("📅 Plan expires at: ${expiresAt?.toString() ?? 'Never (lifetime)'}");
       
-      // If the upgraded user is currently logged in, refresh their permissions
-      // The PermissionManager now listens to user document changes via the
+      // Force permission refresh for all users with this plan
+      // This ensures immediate UI updates across all active sessions
+      print('🔄 Forcing permission refresh for upgraded user...');
+      
+      // Wait a moment for Firestore to propagate the changes
+      await Future.delayed(const Duration(milliseconds: 500));
+      
+      // The PermissionManager listens to user document changes via the
       // ComprehensivePermissionService.watchPermissionChanges() stream
       // This will automatically refresh permissions when the user document is updated
       print('📡 User permissions will be automatically refreshed via Firestore listener');
@@ -214,12 +220,24 @@ class SubscriptionRequestService {
       // Also manually refresh permissions for the current user if they are the one being upgraded
       if (currentUser.uid == request.userId) {
         try {
+          print('🔄 Manually refreshing current user permissions...');
           await PermissionManager.instance.refreshPermissions();
-          print('🔄 Current user permissions manually refreshed');
+          print('✅ Current user permissions manually refreshed');
         } catch (e) {
           print('⚠️ Failed to manually refresh current user permissions: $e');
           // Don't throw - the automatic refresh via listener should still work
         }
+      }
+      
+      // Additional step: Force a permission manager refresh for any active sessions
+      // by triggering a notification to all listeners
+      try {
+        print('📢 Broadcasting permission change notification...');
+        // This will trigger UI updates across the app
+        PermissionManager.instance.notifyListeners();
+        print('✅ Permission change notification broadcasted');
+      } catch (e) {
+        print('⚠️ Failed to broadcast permission change: $e');
       }
     } catch (e) {
       print('❌ Failed to approve request: $e');

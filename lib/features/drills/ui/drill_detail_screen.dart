@@ -150,31 +150,31 @@ class _DrillDetailScreenState extends State<DrillDetailScreen> with WidgetsBindi
             },
             itemBuilder: (context) => [
               if (!_currentDrill.isPreset)
-                const PopupMenuItem(
+                PopupMenuItem(
                   value: 'edit',
                   child: Row(
                     children: [
-                      Icon(Icons.edit),
-                      SizedBox(width: 8),
-                      Text('Edit'),
+                      Icon(Icons.edit , color:  colorScheme.primary,),
+                      const SizedBox(width: 8),
+                      const Text('Edit'),
                     ],
                   ),
                 ),
-              const PopupMenuItem(
+               PopupMenuItem(
                 value: 'duplicate',
                 child: Row(
                   children: [
-                    Icon(Icons.copy),
+                    Icon(Icons.copy, color:  colorScheme.primary),
                     SizedBox(width: 8),
                     Text('Duplicate'),
                   ],
                 ),
               ),
-              const PopupMenuItem(
+               PopupMenuItem(
                 value: 'share',
                 child: Row(
                   children: [
-                    Icon(Icons.share),
+                    Icon(Icons.share, color:  colorScheme.primary),
                     SizedBox(width: 8),
                     Text('Share'),
                   ],
@@ -273,7 +273,7 @@ class _DrillDetailScreenState extends State<DrillDetailScreen> with WidgetsBindi
                               Icons.repeat,
                               'Repetitions',
                               '${_currentDrill.reps}x',
-                              colorScheme.secondary,
+                              colorScheme.primary,
                             ),
                           ),
                           const SizedBox(width: 12),
@@ -283,7 +283,7 @@ class _DrillDetailScreenState extends State<DrillDetailScreen> with WidgetsBindi
                               Icons.pause,
                               'Rest',
                               '${_currentDrill.restSec}s',
-                              colorScheme.tertiary,
+                              colorScheme.primary,
                             ),
                           ),
                         ],
@@ -306,24 +306,24 @@ class _DrillDetailScreenState extends State<DrillDetailScreen> with WidgetsBindi
                       const SizedBox(height: 24),
                       
                       // Reaction Zones Section
-                      Text(
-                        'Reaction Zones',
-                        style: theme.textTheme.titleLarge?.copyWith(
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                      const SizedBox(height: 12),
-                      Container(
-                        width: double.infinity,
-                        height: 200,
-                        decoration: BoxDecoration(
-                          color: colorScheme.surfaceContainerHighest,
-                          borderRadius: BorderRadius.circular(16),
-                          border: Border.all(color: colorScheme.outline.withOpacity(0.3)),
-                        ),
-                        child: _buildZoneVisualization(_currentDrill.zones),
-                      ),
-                      const SizedBox(height: 24),
+                      // Text(
+                      //   'Reaction Zones',
+                      //   style: theme.textTheme.titleLarge?.copyWith(
+                      //     fontWeight: FontWeight.bold,
+                      //   ),
+                      // ),
+                      // const SizedBox(height: 12),
+                      // Container(
+                      //   width: double.infinity,
+                      //   height: 200,
+                      //   decoration: BoxDecoration(
+                      //     color: colorScheme.surfaceContainerHighest,
+                      //     borderRadius: BorderRadius.circular(16),
+                      //     border: Border.all(color: colorScheme.outline.withOpacity(0.3)),
+                      //   ),
+                      //   child: _buildZoneVisualization(_currentDrill.zones),
+                      // ),
+                      // const SizedBox(height: 24),
                       
                       // Configuration Details
                       Text(

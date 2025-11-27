@@ -171,36 +171,73 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
           child: Transform.rotate(
             angle: _logoRotationAnimation.value,
             child: Container(
-              width: 140,
-              height: 140,
+              width: 200,
+              height: 200,
               decoration: BoxDecoration(
-                color: colorScheme.primary,
-                shape: BoxShape.circle,
+                borderRadius: BorderRadius.circular(100),
                 boxShadow: [
                   BoxShadow(
-                    color: colorScheme.primary.withOpacity(0.4),
-                    blurRadius: 25,
-                    offset: const Offset(0, 15),
-                    spreadRadius: 2,
+                    color: colorScheme.primary.withOpacity(0.2),
+                    blurRadius: 30,
+                    offset: const Offset(0, 10),
+                    spreadRadius: 5,
                   ),
                   BoxShadow(
-                    color: colorScheme.secondary.withOpacity(0.2),
-                    blurRadius: 40,
-                    offset: const Offset(0, 25),
-                    spreadRadius: 5,
+                    color: colorScheme.primary.withOpacity(0.1),
+                    blurRadius: 60,
+                    offset: const Offset(0, 20),
+                    spreadRadius: 10,
                   ),
                 ],
               ),
               child: Container(
-                margin: const EdgeInsets.all(8),
+                padding: const EdgeInsets.all(20),
                 decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.1),
-                  shape: BoxShape.circle,
+                  borderRadius: BorderRadius.circular(100),
+                  gradient: LinearGradient(
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                    colors: [
+                      colorScheme.surface,
+                      colorScheme.surfaceContainerHighest.withOpacity(0.8),
+                    ],
+                  ),
+                  border: Border.all(
+                    color: colorScheme.primary.withOpacity(0.2),
+                    width: 2,
+                  ),
                 ),
-                child: Icon(
-                  Icons.psychology,
-                  size: 70,
-                  color: colorScheme.onPrimary,
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(80),
+                  child: Image.asset(
+                    "assets/images/logo.png",
+                    width: 160,
+                    height: 160,
+                    fit: BoxFit.contain,
+                    errorBuilder: (context, error, stackTrace) {
+                      // Fallback if logo image is not found
+                      return Container(
+                        width: 160,
+                        height: 160,
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(80),
+                          gradient: LinearGradient(
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                            colors: [
+                              colorScheme.primary,
+                              colorScheme.primary.withOpacity(0.7),
+                            ],
+                          ),
+                        ),
+                        child: Icon(
+                          Icons.psychology_outlined,
+                          size: 80,
+                          color: colorScheme.onPrimary,
+                        ),
+                      );
+                    },
+                  ),
                 ),
               ),
             ),

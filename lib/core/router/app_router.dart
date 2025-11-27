@@ -235,13 +235,8 @@ class AppRouter {
               }
 
               // Show full admin dashboard for admins, user admin dashboard for others
-              if (permissionManager.isAdmin) {
-                return EnhancedAdminDashboardScreen(
-                  permissionService: getIt<PermissionService>(),
-                );
-              } else {
-                return const UserAdminDashboardScreen();
-              }
+              // Use the unified admin dashboard that shows "Available" tags
+              return const UserAdminDashboardScreen();
             },
             routes: [
               GoRoute(
@@ -568,7 +563,7 @@ class AppRouter {
           path: 'host',
           name: 'multiplayer-host',
           builder: (context, state) => PermissionBasedScreen(
-            requiredModule: 'host_features',
+            requiredModule: 'multiplayer',
             child: BlocProvider.value(
               value: getIt<SettingsBloc>()..add(const SettingsStarted()),
               child: const HostSessionScreen(),

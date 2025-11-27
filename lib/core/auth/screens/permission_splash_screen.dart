@@ -140,37 +140,81 @@ class _PermissionSplashScreenState extends State<PermissionSplashScreen>
             children: [
               const Spacer(flex: 2),
               
-              // Animated Logo
+              // Enhanced Animated Logo
               AnimatedBuilder(
                 animation: _logoAnimation,
                 builder: (context, child) {
                   return Transform.scale(
                     scale: _logoAnimation.value,
                     child: Container(
-                      width: 120,
-                      height: 120,
+                      width: 140,
+                      height: 140,
                       decoration: BoxDecoration(
-                        gradient: LinearGradient(
-                          colors: [
-                            colorScheme.primary,
-                            colorScheme.secondary,
-                          ],
-                          begin: Alignment.topLeft,
-                          end: Alignment.bottomRight,
-                        ),
                         shape: BoxShape.circle,
                         boxShadow: [
                           BoxShadow(
                             color: colorScheme.primary.withOpacity(0.3),
-                            blurRadius: 20,
-                            spreadRadius: 5,
+                            blurRadius: 30,
+                            spreadRadius: 8,
+                            offset: const Offset(0, 10),
+                          ),
+                          BoxShadow(
+                            color: colorScheme.primary.withOpacity(0.15),
+                            blurRadius: 60,
+                            spreadRadius: 15,
+                            offset: const Offset(0, 20),
                           ),
                         ],
                       ),
-                      child: Icon(
-                        Icons.psychology,
-                        size: 60,
-                        color: colorScheme.onPrimary,
+                      child: Container(
+                        padding: const EdgeInsets.all(20),
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          gradient: LinearGradient(
+                            colors: [
+                              colorScheme.surface,
+                              colorScheme.surfaceContainerHighest.withOpacity(0.8),
+                            ],
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                          ),
+                          border: Border.all(
+                            color: colorScheme.primary.withOpacity(0.3),
+                            width: 2,
+                          ),
+                        ),
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(50),
+                          child: Image.asset(
+                            "assets/images/logo.png",
+                            width: 100,
+                            height: 100,
+                            fit: BoxFit.contain,
+                            errorBuilder: (context, error, stackTrace) {
+                              // Fallback if logo image is not found
+                              return Container(
+                                width: 100,
+                                height: 100,
+                                decoration: BoxDecoration(
+                                  shape: BoxShape.circle,
+                                  gradient: LinearGradient(
+                                    colors: [
+                                      colorScheme.primary,
+                                      colorScheme.secondary,
+                                    ],
+                                    begin: Alignment.topLeft,
+                                    end: Alignment.bottomRight,
+                                  ),
+                                ),
+                                child: Icon(
+                                  Icons.psychology_outlined,
+                                  size: 50,
+                                  color: colorScheme.onPrimary,
+                                ),
+                              );
+                            },
+                          ),
+                        ),
                       ),
                     ),
                   );

@@ -31,6 +31,13 @@ class _ActiveUpdated extends ProgramsEvent {
   List<Object?> get props => [active];
 }
 
+class _CompletedProgramsUpdated extends ProgramsEvent {
+  final List<Program> completedPrograms;
+  const _CompletedProgramsUpdated(this.completedPrograms);
+  @override
+  List<Object?> get props => [completedPrograms];
+}
+
 class ProgramsCreateRequested extends ProgramsEvent {
   final Program program;
   const ProgramsCreateRequested(this.program);

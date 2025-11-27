@@ -90,18 +90,7 @@ class _ProgramsScreenState extends State<ProgramsScreen>
     }
   }
 
-  Future<void> _loadUserProfile() async {
-    try {
-      final profile = await _profileService.getCurrentUserProfile();
-      if (mounted) {
-        setState(() {
-          _userProfile = profile;
-        });
-      }
-    } catch (e) {
-      print('❌ Error loading user profile: $e');
-    }
-  }
+
 
   void _refreshPrograms() {
     if (mounted) {
@@ -673,23 +662,17 @@ class _ProgramsScreenState extends State<ProgramsScreen>
 
   // ENHANCED ACTIVE TAB - This is the main improvement
   Widget _buildActiveTab(ProgramsState state) {
-    // Debug logging for active tab
-    print('🔍 DEBUG: Active Tab State:');
-    print('  - Status: ${state.status}');
-    print('  - Active program: ${state.active}');
-    print('  - Active program ID: ${state.active?.programId}');
-    print('  - Programs count: ${state.programs.length}');
-    print('  - Programs: ${state.programs.map((p) => '${p.id}: ${p.name} (${p.createdByRole})').toList()}');
+    
     
     // Handle loading state with professional loading UI
     if (state.status == ProgramsStatus.loading) {
-      print('  - Showing loading state');
+  
       return _buildActiveTabLoadingState();
     }
 
     // Handle no active program
     if (state.active == null) {
-      print('  - No active program found, showing empty state');
+    
       return SingleChildScrollView(
         physics: const AlwaysScrollableScrollPhysics(),
         child: SizedBox(
@@ -702,15 +685,30 @@ class _ProgramsScreenState extends State<ProgramsScreen>
     // Find the active program with better error handling
     final Program? activeProgram = _findActiveProgramSafely(state);
 
-    // If no active program found, show error state with recovery options
+    // If no active program found, check if it was completed and show friendly message
     if (activeProgram == null) {
-      return SingleChildScrollView(
-        physics: const AlwaysScrollableScrollPhysics(),
-        child: SizedBox(
-          height: MediaQuery.of(context).size.height * 0.6,
-          child: _buildActiveProgramNotFoundState(state.active!),
-        ),
-      );
+      // Check if the program was completed
+      final wasCompleted = state.completedPrograms.any((p) => p.id == state.active!.programId);
+      
+      if (wasCompleted) {
+        // Show congratulations message instead of error
+        return SingleChildScrollView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          child: SizedBox(
+            height: MediaQuery.of(context).size.height * 0.6,
+            child: _buildProgramCompletedState(),
+          ),
+        );
+      } else {
+        // Show user-friendly message for other cases
+        return SingleChildScrollView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          child: SizedBox(
+            height: MediaQuery.of(context).size.height * 0.6,
+            child: _buildEmptyActiveState(),
+          ),
+        );
+      }
     }
 
     // Validate active program data
@@ -719,7 +717,7 @@ class _ProgramsScreenState extends State<ProgramsScreen>
         physics: const AlwaysScrollableScrollPhysics(),
         child: SizedBox(
           height: MediaQuery.of(context).size.height * 0.6,
-          child: _buildInvalidActiveProgramState(activeProgram, state.active!),
+          child: _buildEmptyActiveState(), // Show friendly message instead of technical error
         ),
       );
     }
@@ -1051,6 +1049,72 @@ class _ProgramsScreenState extends State<ProgramsScreen>
     );
   }
 
+  Widget _buildProgramCompletedState() {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(32),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Container(
+              width: 120,
+              height: 120,
+              decoration: BoxDecoration(
+                color: AppTheme.successColor.withOpacity(0.1),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(
+                Icons.celebration,
+                size: 60,
+                color: AppTheme.successColor,
+              ),
+            ),
+            const SizedBox(height: 24),
+            Text(
+              'Congratulations! 🎉',
+              style: theme.textTheme.headlineSmall?.copyWith(
+                color: colorScheme.onSurface,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'You\'ve completed your program! Check out your achievement in the Completed tab or start a new program from Browse.',
+              style: theme.textTheme.bodyMedium?.copyWith(
+                color: colorScheme.onSurface.withOpacity(0.7),
+              ),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 32),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                OutlinedButton.icon(
+                  onPressed: () {
+                    _tabController.animateTo(2); // Switch to Completed tab
+                  },
+                  icon: const Icon(Icons.emoji_events),
+                  label: const Text('View Achievement'),
+                ),
+                const SizedBox(width: 16),
+                FilledButton.icon(
+                  onPressed: () {
+                    _tabController.animateTo(1); // Switch to Browse tab
+                  },
+                  icon: const Icon(Icons.explore),
+                  label: const Text('Start New Program'),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   // Enhanced UI components for active program tab
 
   Widget _buildEnhancedActiveProgramCard(
@@ -1231,7 +1295,7 @@ class _ProgramsScreenState extends State<ProgramsScreen>
                             child: Text(
                               program.level,
                               style: theme.textTheme.labelSmall?.copyWith(
-                                color: colorScheme.secondary,
+                                color: colorScheme.onSurface,
                                 fontWeight: FontWeight.w600,
                                 fontSize: 9,
                               ),
@@ -1400,39 +1464,7 @@ class _ProgramsScreenState extends State<ProgramsScreen>
     );
   }
 
-  Widget _buildProgressStatItem(
-      String label, String value, Color color, ThemeData theme) {
-    return Container(
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: color.withOpacity(0.1),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: color.withOpacity(0.2),
-        ),
-      ),
-      child: Column(
-        children: [
-          Text(
-            value,
-            style: theme.textTheme.titleMedium?.copyWith(
-              fontWeight: FontWeight.w700,
-              color: color,
-            ),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            label,
-            style: theme.textTheme.bodySmall?.copyWith(
-              color: color.withOpacity(0.8),
-              fontWeight: FontWeight.w500,
-            ),
-            textAlign: TextAlign.center,
-          ),
-        ],
-      ),
-    );
-  }
+ 
 
   Widget _buildEnhancedTodaySection(Program program, ActiveProgram active) {
     final theme = Theme.of(context);
@@ -1546,7 +1578,7 @@ class _ProgramsScreenState extends State<ProgramsScreen>
                       style: theme.textTheme.titleLarge?.copyWith(
                         fontWeight: FontWeight.w700,
                         color: hasDrill
-                            ? colorScheme.secondary
+                            ? colorScheme.onSecondaryContainer
                             : colorScheme.onSurface,
                       ),
                     ),
@@ -1594,7 +1626,7 @@ class _ProgramsScreenState extends State<ProgramsScreen>
                       style: theme.textTheme.titleMedium?.copyWith(
                         fontWeight: FontWeight.w600,
                         color: hasDrill
-                            ? colorScheme.secondary
+                            ? colorScheme.onSecondaryContainer
                             : colorScheme.onSurface,
                       ),
                     ),
@@ -1664,95 +1696,11 @@ class _ProgramsScreenState extends State<ProgramsScreen>
     );
   }
 
-  Widget _buildProgramDetailChip({
-    required IconData icon,
-    required String label,
-    required String value,
-    required Color color,
-  }) {
-    final theme = Theme.of(context);
-    return Container(
-      padding: const EdgeInsets.all(8),
-      decoration: BoxDecoration(
-        color: color.withOpacity(0.1),
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(
-          color: color.withOpacity(0.2),
-        ),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(
-            icon,
-            color: color,
-            size: 14,
-          ),
-          const SizedBox(width: 6),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  label,
-                  style: theme.textTheme.bodySmall?.copyWith(
-                    color: color.withOpacity(0.8),
-                    fontSize: 10,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-                Text(
-                  value,
-                  style: theme.textTheme.bodySmall?.copyWith(
-                    color: color,
-                    fontSize: 11,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  String _formatStartDate(DateTime? startDate) {
-    if (startDate == null) return 'Today';
-    final now = DateTime.now();
-    final difference = now.difference(startDate).inDays;
-    if (difference == 0) return 'Today';
-    if (difference == 1) return 'Yesterday';
-    if (difference < 7) return '$difference days ago';
-    if (difference < 30) return '${(difference / 7).floor()} weeks ago';
-    return '${(difference / 30).floor()} months ago';
-  }
-
-  String _formatTargetDate(DateTime? startDate, int durationDays) {
-    if (startDate == null) {
-      final targetDate = DateTime.now().add(Duration(days: durationDays));
-      return '${targetDate.day}/${targetDate.month}';
-    }
-    final targetDate = startDate.add(Duration(days: durationDays));
-    return '${targetDate.day}/${targetDate.month}';
-  }
-
-  Color _getDifficultyColor(String level) {
-    switch (level.toLowerCase()) {
-      case 'beginner':
-        return AppTheme.successColor;
-      case 'intermediate':
-        return AppTheme.warningColor;
-      case 'advanced':
-        return AppTheme.errorColor;
-      default:
-        return AppTheme.infoColor;
-    }
-  }
-
+ 
   Widget _buildProgramCard(
     Program program, {
     required bool isActive,
+    bool isCompleted = false,
     required ProgramsState state,
   }) {
     final theme = Theme.of(context);
@@ -1782,14 +1730,11 @@ class _ProgramsScreenState extends State<ProgramsScreen>
         child: Material(
           color: Colors.transparent,
           child: InkWell(
-            onTap: () async {
+            onTap: () {
               // Check if this is an admin program and user has access
-              if (program.createdByRole == 'admin') {
-                final subscriptionService = getIt<SubscriptionAccessService>();
-                final hasAccess = await subscriptionService.checkAdminProgramsAccess(context);
-                if (!hasAccess) {
-                  return; // SubscriptionAccessService already showed the snackbar
-                }
+              if (!_hasAdminProgramAccess(program)) {
+                _showNoAccessSnackBar();
+                return;
               }
               
               Navigator.of(context).push(
@@ -1997,23 +1942,9 @@ class _ProgramsScreenState extends State<ProgramsScreen>
                             child: OutlinedButton(
                               onPressed: () {
                                 // Check if this is an admin program and user has access
-                                final isAdminProgram = program.createdByRole == 'admin' || program.createdByRole == null;
-                                if (isAdminProgram) {
-                                  final authState = context.read<AuthBloc>().state;
-                                  final permissions = authState.permissions;
-                                  final hasProgramAccess = permissions?.hasProgramAccess ?? false;
-                                  
-                                  if (!hasProgramAccess) {
-                                    // Show snackbar for no access
-                                    ScaffoldMessenger.of(context).showSnackBar(
-                                      SnackBar(
-                                        content: const Text('No access to Admin Programs'),
-                                        duration: const Duration(seconds: 2),
-                                        behavior: SnackBarBehavior.floating,
-                                      ),
-                                    );
-                                    return;
-                                  }
+                                if (!_hasAdminProgramAccess(program)) {
+                                  _showNoAccessSnackBar();
+                                  return;
                                 }
                                 
                                 Navigator.of(context).push(
@@ -2049,23 +1980,9 @@ class _ProgramsScreenState extends State<ProgramsScreen>
                               child: ElevatedButton(
                                 onPressed: () async {
                                   // Check if this is an admin program and user has access
-                                  final isAdminProgram = program.createdByRole == 'admin' || program.createdByRole == null;
-                                  if (isAdminProgram) {
-                                    final authState = context.read<AuthBloc>().state;
-                                    final permissions = authState.permissions;
-                                    final hasProgramAccess = permissions?.hasProgramAccess ?? false;
-                                    
-                                    if (!hasProgramAccess) {
-                                      // Show snackbar for no access
-                                      ScaffoldMessenger.of(context).showSnackBar(
-                                        SnackBar(
-                                          content: const Text('No access to Admin Programs'),
-                                          duration: const Duration(seconds: 2),
-                                          behavior: SnackBarBehavior.floating,
-                                        ),
-                                      );
-                                      return;
-                                    }
+                                  if (!_hasAdminProgramAccess(program)) {
+                                    _showNoAccessSnackBar();
+                                    return;
                                   }
                                   
                                   final confirmed = await ConfirmationDialog
@@ -2103,23 +2020,25 @@ class _ProgramsScreenState extends State<ProgramsScreen>
                               ),
                             ),
 
-                          // Share button
-                          const SizedBox(width: 8),
-                          Container(
-                            decoration: BoxDecoration(
-                              color: colorScheme.surfaceContainerHighest.withOpacity(0.5),
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            child: IconButton(
-                              onPressed: () => _shareProgram(program),
-                              icon: Icon(
-                                Icons.share_outlined,
-                                color: colorScheme.onSurface.withOpacity(0.7),
-                                size: 20,
+                          // Share button - only show if user has permission to share this program
+                          if (_hasAdminProgramAccess(program)) ...[
+                            const SizedBox(width: 8),
+                            Container(
+                              decoration: BoxDecoration(
+                                color: colorScheme.surfaceContainerHighest.withOpacity(0.5),
+                                borderRadius: BorderRadius.circular(12),
                               ),
-                              tooltip: 'Share Program',
+                              child: IconButton(
+                                onPressed: () => _shareProgram(program),
+                                icon: Icon(
+                                  Icons.share_outlined,
+                                  color: colorScheme.onSurface.withOpacity(0.7),
+                                  size: 20,
+                                ),
+                                tooltip: 'Share Program',
+                              ),
                             ),
-                          ),
+                          ],
                         ],
                       ),
                     ],
@@ -2160,7 +2079,7 @@ class _ProgramsScreenState extends State<ProgramsScreen>
               value,
               style: theme.textTheme.labelLarge?.copyWith(
                 fontWeight: FontWeight.w700,
-                color: const Color(0xFF1A1A1A),
+                 color: theme.colorScheme.onSurface.withOpacity(0.6),
               ),
             ),
             Text(
@@ -2947,11 +2866,15 @@ class _ProgramsScreenState extends State<ProgramsScreen>
       itemCount: filteredPrograms.length,
       itemBuilder: (context, index) {
         final program = filteredPrograms[index];
-        final isActive = state.active?.programId == program.id;
+        // Check if program is completed
+        final isCompleted = state.completedPrograms.any((p) => p.id == program.id);
+        // Only show as active if it's the active program AND not completed
+        final isActive = state.active?.programId == program.id && !isCompleted;
         
         return _buildProgramCard(
           program,
           isActive: isActive,
+          isCompleted: isCompleted,
           state: state,
         );
       },
@@ -2960,8 +2883,118 @@ class _ProgramsScreenState extends State<ProgramsScreen>
 
   // Completed Tab - Shows completed programs
   Widget _buildCompletedTab(ProgramsState state) {
-    // For now, show empty state as we don't have completed programs tracking
-    return _buildEmptyCompletedState();
+    final completedPrograms = state.completedPrograms;
+    
+    if (completedPrograms.isEmpty) {
+      return _buildEmptyCompletedState();
+    }
+
+    return ListView.builder(
+      padding: const EdgeInsets.all(16),
+      itemCount: completedPrograms.length,
+      itemBuilder: (context, index) {
+        final program = completedPrograms[index];
+        return _buildCompletedProgramCard(program);
+      },
+    );
+  }
+
+  Widget _buildCompletedProgramCard(Program program) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+
+    return Card(
+      margin: const EdgeInsets.only(bottom: 16),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: AppTheme.successColor.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Icon(
+                    Icons.check_circle,
+                    color: AppTheme.successColor,
+                    size: 24,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        program.name,
+                        style: theme.textTheme.titleMedium?.copyWith(
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        'Completed • ${program.durationDays} days',
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: AppTheme.successColor,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            Text(
+              program.description ?? 'No description available',
+              style: theme.textTheme.bodyMedium?.copyWith(
+                color: colorScheme.onSurface.withOpacity(0.7),
+              ),
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+            ),
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: colorScheme.primary.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Text(
+                    program.category,
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: colorScheme.primary,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ),
+                const Spacer(),
+                TextButton.icon(
+                  onPressed: () {
+                    Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (context) => ProgramDetailsScreen(program: program),
+                      ),
+                    );
+                  },
+                  icon: const Icon(Icons.visibility, size: 16),
+                  label: const Text('View Details'),
+                  style: TextButton.styleFrom(
+                    foregroundColor: colorScheme.primary,
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   Widget _buildEmptyBrowseState() {
@@ -3070,60 +3103,7 @@ class _ProgramsScreenState extends State<ProgramsScreen>
       ),
     );
   }
-Widget _buildNoAdminProgramAccessState() {
-    final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
 
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(32),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Container(
-              width: 120,
-              height: 120,
-              decoration: BoxDecoration(
-                color: colorScheme.errorContainer,
-                shape: BoxShape.circle,
-              ),
-              child: Icon(
-                Icons.lock_outlined,
-                size: 60,
-                color: colorScheme.onErrorContainer,
-              ),
-            ),
-            const SizedBox(height: 24),
-            Text(
-              'Premium Programs Access Required',
-              style: theme.textTheme.headlineSmall?.copyWith(
-                color: colorScheme.onSurface,
-                fontWeight: FontWeight.w600,
-              ),
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 8),
-            Text(
-              'Admin programs are premium content created by professional coaches. Upgrade your subscription to access these exclusive training programs.',
-              style: theme.textTheme.bodyMedium?.copyWith(
-                color: colorScheme.onSurface.withOpacity(0.7),
-              ),
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 32),
-            FilledButton.icon(
-              onPressed: () {
-                HapticFeedback.mediumImpact();
-                context.go('/subscription');
-              },
-              icon: const Icon(Icons.upgrade),
-              label: const Text('Upgrade Subscription'),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
 
   List<Program> _getFilteredPrograms(ProgramsState state) {
     var programs = state.programs;
@@ -3158,109 +3138,33 @@ Widget _buildNoAdminProgramAccessState() {
 
     return programs;
   }
-}
 
-class _FilterBottomSheet extends StatelessWidget {
-  final String title;
-  final List<String> options;
-  final String selectedValue;
-  final ValueChanged<String> onSelected;
-  final Map<String, IconData>? icons;
-  final Map<String, Color>? colors;
+  /// Check if user has access to admin programs
+  bool _hasAdminProgramAccess(Program program) {
+    // If it's not an admin program, access is always granted
+    if (program.createdByRole != 'admin' && program.createdByRole != null) {
+      return true;
+    }
+    
+    // For admin programs, check admin_programs permission specifically
+    final authState = context.read<AuthBloc>().state;
+    final permissions = authState.permissions;
+    return permissions?.hasAdminProgramAccess ?? false;
+  }
 
-  const _FilterBottomSheet({
-    required this.title,
-    required this.options,
-    required this.selectedValue,
-    required this.onSelected,
-    this.icons,
-    this.colors,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-
-    return Container(
-      padding: const EdgeInsets.all(16),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            title,
-            style: theme.textTheme.titleLarge?.copyWith(
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-          const SizedBox(height: 16),
-          ...options.map((option) {
-            final icon = icons?[option];
-            final color = colors?[option] ?? theme.colorScheme.primary;
-            final isSelected = option == selectedValue;
-
-            return Container(
-              margin: const EdgeInsets.only(bottom: 8),
-              decoration: BoxDecoration(
-                color: isSelected
-                    ? theme.colorScheme.primaryContainer.withOpacity(0.3)
-                    : null,
-                borderRadius: BorderRadius.circular(12),
-                border: isSelected
-                    ? Border.all(color: theme.colorScheme.primary, width: 1.5)
-                    : null,
-              ),
-              child: ListTile(
-                leading: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Radio<String>(
-                      value: option,
-                      groupValue: selectedValue,
-                      onChanged: (value) {
-                        if (value != null) {
-                          onSelected(value);
-                          Navigator.of(context).pop();
-                        }
-                      },
-                    ),
-                    if (icon != null) ...[
-                      const SizedBox(width: 8),
-                      Container(
-                        padding: const EdgeInsets.all(6),
-                        decoration: BoxDecoration(
-                          color: color.withOpacity(0.1),
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: Icon(
-                          icon,
-                          color: color,
-                          size: 20,
-                        ),
-                      ),
-                    ],
-                  ],
-                ),
-                title: Text(
-                  option,
-                  style: theme.textTheme.bodyLarge?.copyWith(
-                    fontWeight:
-                        isSelected ? FontWeight.w600 : FontWeight.normal,
-                    color: isSelected ? theme.colorScheme.primary : null,
-                  ),
-                ),
-                onTap: () {
-                  onSelected(option);
-                  Navigator.of(context).pop();
-                },
-              ),
-            );
-          }),
-        ],
+  /// Show consistent no access message
+  void _showNoAccessSnackBar() {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: const Text('No access to Admin Programs'),
+        duration: const Duration(seconds: 2),
+        behavior: SnackBarBehavior.floating,
       ),
     );
   }
 }
+
+
 
 class _ProgramDetailsSheet extends StatefulWidget {
   final Program program;

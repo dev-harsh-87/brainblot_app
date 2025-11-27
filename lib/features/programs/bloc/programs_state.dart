@@ -15,6 +15,7 @@ enum ProgramsStatus {
 class ProgramsState extends Equatable {
   final ProgramsStatus status;
   final List<Program> programs;
+  final List<Program> completedPrograms;
   final ActiveProgram? active;
   final String? errorMessage;
   final bool isRefreshing;
@@ -26,6 +27,7 @@ class ProgramsState extends Equatable {
   const ProgramsState({
     required this.status,
     required this.programs,
+    this.completedPrograms = const [],
     this.active,
     this.errorMessage,
     this.isRefreshing = false,
@@ -36,8 +38,9 @@ class ProgramsState extends Equatable {
   });
   
   const ProgramsState.initial() : this(
-    status: ProgramsStatus.initial, 
-    programs: const [], 
+    status: ProgramsStatus.initial,
+    programs: const [],
+    completedPrograms: const [],
     active: null,
     errorMessage: null,
     isRefreshing: false,
@@ -46,6 +49,7 @@ class ProgramsState extends Equatable {
   ProgramsState copyWith({
     ProgramsStatus? status,
     List<Program>? programs,
+    List<Program>? completedPrograms,
     ActiveProgram? active,
     String? errorMessage,
     bool? isRefreshing,
@@ -56,6 +60,7 @@ class ProgramsState extends Equatable {
   }) => ProgramsState(
         status: status ?? this.status,
         programs: programs ?? this.programs,
+        completedPrograms: completedPrograms ?? this.completedPrograms,
         active: active ?? this.active,
         errorMessage: errorMessage,
         isRefreshing: isRefreshing ?? this.isRefreshing,
@@ -89,6 +94,7 @@ class ProgramsState extends Equatable {
   List<Object?> get props => [
     status,
     programs,
+    completedPrograms,
     active,
     errorMessage,
     isRefreshing,

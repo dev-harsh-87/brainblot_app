@@ -215,7 +215,7 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
     final currentStatus = _currentUser?.subscription.status ?? 'unknown';
 
     return Container(
-      padding: EdgeInsets.all(isSmallScreen ? 20.0 : 24.0),
+      padding: EdgeInsets.all(isSmallScreen ? 28.0 : 32.0),
       decoration: BoxDecoration(
         color: colorScheme.surface,
         borderRadius: BorderRadius.circular(20),
@@ -237,7 +237,7 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
           Row(
             children: [
               Container(
-                padding: const EdgeInsets.all(12),
+                padding: const EdgeInsets.all(14),
                 decoration: BoxDecoration(
                   color: colorScheme.primary.withOpacity(0.1),
                   borderRadius: BorderRadius.circular(12),
@@ -245,10 +245,10 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
                 child: Icon(
                   Icons.workspace_premium,
                   color: colorScheme.primary,
-                  size: isSmallScreen ? 24 : 28,
+                  size: isSmallScreen ? 26 : 30,
                 ),
               ),
-              const SizedBox(width: 12),
+              const SizedBox(width: 16),
               Expanded(
                 child: Text(
                   'Your Current Plan',
@@ -262,7 +262,7 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
             ],
           ),
           
-          const SizedBox(height: 20),
+          const SizedBox(height: 28),
           
           Text(
             currentPlanId.toUpperCase(),
@@ -273,7 +273,7 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
             ),
           ),
           
-          const SizedBox(height: 8),
+          const SizedBox(height: 12),
           
           Text(
             _getPlanDescription(currentPlanId),
@@ -283,10 +283,12 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
             ),
           ),
           
-          const SizedBox(height: 16),
+          const SizedBox(height: 24),
           
           // Status Badge
           _buildStatusBadge(currentStatus, theme),
+          
+          const SizedBox(height: 8),
         ],
       ),
     );

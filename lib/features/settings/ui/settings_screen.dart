@@ -636,8 +636,8 @@ class _SettingsScreenState extends State<SettingsScreen> with AutoRefreshMixin {
               Navigator.of(context).pop();
               // Trigger logout via AuthBloc
               context.read<AuthBloc>().add(const AuthLogoutRequested());
-              // Navigate to auth screen
-              context.go('/auth');
+              // Navigate to login screen
+              context.go('/login');
             },
             style: FilledButton.styleFrom(
               backgroundColor: Colors.red,

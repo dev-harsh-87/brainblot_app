@@ -163,7 +163,20 @@ class _MainNavigationState extends State<MainNavigation> {
 
             try {
               appUser = AppUser.fromFirestore(snapshot.data!);
-              isAdmin = appUser.role.isAdmin();
+              // Check if user is admin OR has admin dashboard access
+              // Only specific admin modules grant access to the admin dashboard
+              final adminDashboardModules = [
+                'admin_user_management',
+                'admin_subscription_management',
+                'admin_plan_requests',
+                'admin_category_management',
+                'admin_stimulus_management',
+                'admin_comprehensive_activity'
+              ];
+              
+              isAdmin = appUser.role.isAdmin() ||
+                  appUser.subscription.moduleAccess.any((module) =>
+                      adminDashboardModules.contains(module));
             } catch (e) {
               // If there's an error parsing user data, default to non-admin
               isAdmin = false;
@@ -233,7 +246,7 @@ class _MainNavigationState extends State<MainNavigation> {
                 elevation: 8,
                 backgroundColor: colorScheme.surface,
                 indicatorColor: colorScheme.primaryContainer,
-                labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
+                labelBehavior: NavigationDestinationLabelBehavior.onlyShowSelected,
               ),
             );
           },

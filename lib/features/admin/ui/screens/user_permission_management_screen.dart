@@ -33,12 +33,11 @@ class _UserPermissionManagementScreenState extends State<UserPermissionManagemen
   final Map<String, String> _availableModules = {
     'drills': 'Basic Drills',
     'profile': 'User Profile',
-    'stats': 'Statistics',
-    'analysis': 'Analysis',
+    'stats': 'Statistics & Analysis',
     'admin_drills': 'Admin Drill Management',
     'admin_programs': 'Admin Program Management',
     'programs': 'Programs',
-    'multiplayer': 'Multiplayer Sessions',
+    'multiplayer': 'Multiplayer & Host Features',
     'user_management': 'User Management',
     'team_management': 'Team Management',
     'bulk_operations': 'Bulk Operations',
@@ -413,7 +412,7 @@ class _UserPermissionManagementScreenState extends State<UserPermissionManagemen
         _customModuleAccess = List<String>.from(_availableModules.keys);
         break;
       case UserRole.user:
-        _customModuleAccess = ['drills', 'profile', 'stats', 'analysis'];
+        _customModuleAccess = ['drills', 'profile', 'stats'];
         break;
     }
   }

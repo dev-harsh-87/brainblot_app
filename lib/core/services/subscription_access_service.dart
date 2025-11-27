@@ -70,7 +70,7 @@ class SubscriptionAccessService {
         context,
         'Host Sessions',
         'Upgrade to host multiplayer sessions and manage teams',
-        'host_features',
+        'multiplayer',
       );
       return false;
     }
@@ -211,11 +211,6 @@ class SubscriptionAccessService {
         return {
           'title': 'Multiplayer Features',
           'message': 'Upgrade to join multiplayer sessions and team training',
-        };
-      case 'host_features':
-        return {
-          'title': 'Host Sessions',
-          'message': 'Upgrade to host your own multiplayer training sessions',
         };
       case 'user_management':
         return {

@@ -125,6 +125,10 @@ class SharingService {
         {'type': 'drill_share', 'invitationId': invitation.id},
       );
       
+      // Trigger auto-refresh to ensure immediate UI updates
+      _autoRefreshService.triggerRefresh('drills');
+      _autoRefreshService.triggerRefresh('sharing');
+      
       print('✅ Shared drill $drillId with user $targetUserId');
     } catch (e) {
       print('❌ Share drill error: $e');
@@ -174,6 +178,10 @@ class SharingService {
         'Someone shared a program "$programName" with you',
         {'type': 'program_share', 'invitationId': invitation.id},
       );
+      
+      // Trigger auto-refresh to ensure immediate UI updates
+      _autoRefreshService.triggerRefresh('programs');
+      _autoRefreshService.triggerRefresh('sharing');
       
       print('✅ Shared program $programId with user $targetUserId');
     } catch (e) {
@@ -336,6 +344,10 @@ class SharingService {
         'removed_user_id': userId,
         'removed_by': currentUserId,
       });
+      
+      // Trigger auto-refresh to ensure immediate UI updates
+      _autoRefreshService.triggerRefresh(itemType == 'drill' ? 'drills' : 'programs');
+      _autoRefreshService.triggerRefresh('sharing');
       
       print('✅ Successfully removed user $userId from $itemType $itemId');
     } catch (e) {

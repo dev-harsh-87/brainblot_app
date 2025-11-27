@@ -3,32 +3,17 @@
     "rules": "firestore.rules",
     "indexes": "firestore.indexes.json"
   },
-  "flutter": {
-    "platforms": {
-      "android": {
-        "default": {
-          "projectId": "spark-ab4b3",
-          "appId": "1:83475172268:android:657d6700439d924c47c809",
-          "fileOutput": "android/app/google-services.json"
-        }
-      },
-      "ios": {
-        "default": {
-          "projectId": "spark-ab4b3",
-          "appId": "1:83475172268:ios:70e3b276c712712547c809",
-          "uploadDebugSymbols": false,
-          "fileOutput": "ios/Runner/GoogleService-Info.plist"
-        }
-      },
-      "dart": {
-        "lib/firebase_options.dart": {
-          "projectId": "spark-ab4b3",
-          "configurations": {
-            "android": "1:83475172268:android:657d6700439d924c47c809",
-            "ios": "1:83475172268:ios:70e3b276c712712547c809"
-          }
-        }
+  "hosting": {
+    "public": "build/web",
+    "ignore": [
+      "firebase-debug.log",
+      "firebase-debug.*.log"
+    ],
+    "rewrites": [
+      {
+        "source": "**",
+        "destination": "/index.html"
       }
-    }
+    ]
   }
 }

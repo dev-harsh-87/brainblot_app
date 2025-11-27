@@ -142,29 +142,53 @@ class SessionManagementService {
       //   // Continue - this is not critical for session establishment
       // }
       
-      // CRITICAL: First ensure user profile exists
+      // CRITICAL: First ensure user profile exists (but don't override existing subscription)
       await _ensureUserProfileExists(firebaseUser);
       
       // Wait for profile to be fully created/updated
       await Future.delayed(const Duration(milliseconds: 200));
       
-      // CRITICAL: Sync subscription BEFORE listening to snapshots
-      // This ensures the user gets the correct moduleAccess from their plan
-      AppLogger.debug('Syncing subscription before establishing session');
+      // CRITICAL: Only sync subscription if user doesn't already have valid subscription data
+      // This prevents overriding upgraded plans on app restart
+      AppLogger.debug('Checking if subscription sync is needed');
       try {
-        await _subscriptionSync.syncUserOnLogin(firebaseUser.uid);
-        AppLogger.info('Subscription synced successfully');
+        final userDoc = await _firestore.collection('users').doc(firebaseUser.uid).get();
+        if (userDoc.exists && userDoc.data() != null) {
+          final userData = userDoc.data()!;
+          final existingSubscription = userData['subscription'] as Map<String, dynamic>?;
+          
+          if (existingSubscription != null && existingSubscription['plan'] != null) {
+            AppLogger.info('User already has valid subscription: ${existingSubscription['plan']}, skipping sync', tag: 'SessionManagement');
+          } else {
+            AppLogger.debug('User has no subscription data, performing sync');
+            await _subscriptionSync.syncUserOnLogin(firebaseUser.uid);
+            AppLogger.info('Subscription synced successfully');
+          }
+        }
         
-        // Force update user to new complete module access
-        final forceUpdateService = ForceModuleUpdateService();
-        await forceUpdateService.forceUpdateUser(firebaseUser.uid);
-        
-        // Fix module access naming issues (basic_drills -> drills, etc.)
-        final moduleFixService = ModuleAccessFixService();
-        await moduleFixService.fixUserModuleAccess(firebaseUser.uid);
-        
-        // Wait a bit more to ensure Firestore document is updated
-        await Future.delayed(const Duration(milliseconds: 300));
+        // Only run force update and fix services for users without proper subscription
+        final userDocAfter = await _firestore.collection('users').doc(firebaseUser.uid).get();
+        if (userDocAfter.exists && userDocAfter.data() != null) {
+          final userData = userDocAfter.data()!;
+          final subscription = userData['subscription'] as Map<String, dynamic>?;
+          
+          if (subscription == null || subscription['moduleAccess'] == null) {
+            AppLogger.debug('Running module access fixes for user without proper subscription');
+            
+            // Force update user to new complete module access
+            final forceUpdateService = ForceModuleUpdateService();
+            await forceUpdateService.forceUpdateUser(firebaseUser.uid);
+            
+            // Fix module access naming issues (basic_drills -> drills, etc.)
+            final moduleFixService = ModuleAccessFixService();
+            await moduleFixService.fixUserModuleAccess(firebaseUser.uid);
+            
+            // Wait a bit more to ensure Firestore document is updated
+            await Future.delayed(const Duration(milliseconds: 300));
+          } else {
+            AppLogger.info('User has proper subscription data, skipping module fixes', tag: 'SessionManagement');
+          }
+        }
       } catch (e) {
         AppLogger.error('Subscription sync failed', error: e);
         // Continue - user can still use the app with default permissions
